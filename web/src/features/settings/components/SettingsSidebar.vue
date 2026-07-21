@@ -105,7 +105,7 @@ const handleMenuClick = (key: SettingsPageKey) => {
               @click="handleMenuClick(item.key)"
               :class="
                 cn(
-                  'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-colors duration-200 ease-out',
+                  'flex w-full items-center space-x-3 rounded-md px-4 py-2.5 transition-colors duration-200 ease-out',
                   'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                   activePage === item.key
                     ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&>svg]:text-primary'

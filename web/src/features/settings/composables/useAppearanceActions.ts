@@ -165,6 +165,7 @@ export const useAppearanceActions = () => {
         background: {
           ...appSettings.value.ui.background,
           ...toBackgroundOverlayPatch(preset),
+          ...(preset.primaryColor ? { primaryColor: preset.primaryColor } : {}),
         },
       },
     })

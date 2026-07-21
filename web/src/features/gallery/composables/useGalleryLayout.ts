@@ -27,6 +27,10 @@ export function useGalleryLayout() {
     get: () => store.rightDetailsOpenSize,
     set: (size: string) => store.setRightDetailsOpenSize(size),
   })
+  const sidebarFolderSplitSize = computed({
+    get: () => store.sidebarFolderSplitSize,
+    set: (size: number | string) => store.setSidebarFolderSplitSize(size),
+  })
 
   // ============= 布局操作 =============
 
@@ -66,6 +70,7 @@ export function useGalleryLayout() {
     rightDetailsSize,
     leftSidebarOpenSize,
     rightDetailsOpenSize,
+    sidebarFolderSplitSize,
 
     // 操作
     toggleSidebar,

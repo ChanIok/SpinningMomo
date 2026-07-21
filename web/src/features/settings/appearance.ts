@@ -83,7 +83,7 @@ const applyPrimaryColor = (
   themeMode: WebThemeMode
 ): void => {
   const resolvedTheme = resolveTheme(themeMode)
-  const primaryFallback = resolvedTheme === 'light' ? '#F59E0B' : '#FBBF24'
+  const primaryFallback = resolvedTheme === 'light' ? '#C66900' : '#F59F0A'
   const primaryColor = normalizeHexColor(primaryColorValue, primaryFallback)
   const primaryForeground = resolvePrimaryForeground(primaryColor)
 

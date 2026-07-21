@@ -10,6 +10,7 @@ export interface OverlayPalette {
 export interface OverlayPalettePreset extends OverlayPalette {
   id: string
   themeMode: Exclude<WebThemeMode, 'system'>
+  primaryColor?: string
 }
 
 const DEFAULT_HEX_COLOR = '#000000'
@@ -71,48 +72,56 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
   {
     id: 'peach',
     themeMode: 'light',
+    primaryColor: '#C66900',
     mode: 1,
     colors: ['#F9F1E4', '#F9F1E4', '#F9F1E4', '#F9F1E4'],
   },
   {
     id: 'mist',
     themeMode: 'light',
+    primaryColor: '#C66900',
     mode: 1,
     colors: ['#F1F5FB', '#F1F5FB', '#F1F5FB', '#F1F5FB'],
   },
   {
     id: 'nikki',
     themeMode: 'light',
+    primaryColor: '#C66900',
     mode: 2,
     colors: ['#FDF0F4', '#F9E1E6', '#F9E1E6', '#F9E1E6'],
   },
   {
     id: 'spring',
     themeMode: 'light',
+    primaryColor: '#C66900',
     mode: 2,
     colors: ['#DAE8CA', '#F6EAD3', '#F6EAD3', '#F6EAD3'],
   },
   {
     id: 'graphite',
     themeMode: 'dark',
+    primaryColor: '#F59F0A',
     mode: 1,
     colors: ['#171B22', '#171B22', '#171B22', '#171B22'],
   },
   {
     id: 'slate',
     themeMode: 'dark',
+    primaryColor: '#F59F0A',
     mode: 1,
     colors: ['#1A1824', '#1A1824', '#1A1824', '#1A1824'],
   },
   {
     id: 'teal',
     themeMode: 'dark',
+    primaryColor: '#F59F0A',
     mode: 2,
     colors: ['#1A2D2A', '#162421', '#162421', '#162421'],
   },
   {
     id: 'galaxy',
     themeMode: 'dark',
+    primaryColor: '#F59F0A',
     mode: 3,
     colors: ['#0B1021', '#112240', '#1A1423', '#1A1423'],
   },

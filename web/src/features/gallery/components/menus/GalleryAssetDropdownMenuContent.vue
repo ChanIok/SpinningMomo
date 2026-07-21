@@ -50,7 +50,6 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     <Copy />
     {{ t('gallery.contextMenu.copyFiles.label') }}
   </DropdownMenuItem>
-  <DropdownMenuSeparator />
   <DropdownMenuItem
     :disabled="!assetActions.canCopyTags"
     @click="assetActions.copySelectedAssetTags"

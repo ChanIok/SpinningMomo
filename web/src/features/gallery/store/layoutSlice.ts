@@ -20,6 +20,7 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
   const rightDetailsSize = computed(() => settings.value.layout.rightDetailsSize)
   const leftSidebarOpenSize = computed(() => settings.value.layout.leftSidebarOpenSize)
   const rightDetailsOpenSize = computed(() => settings.value.layout.rightDetailsOpenSize)
+  const sidebarFolderSplitSize = computed(() => settings.value.layout.sidebarFolderSplitSize ?? 0.5)
 
   function setSidebarOpen(open: boolean) {
     settings.value.layout.sidebarOpen = open
@@ -45,6 +46,10 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
     settings.value.layout.rightDetailsOpenSize = size
   }
 
+  function setSidebarFolderSplitSize(size: number | string) {
+    settings.value.layout.sidebarFolderSplitSize = size
+  }
+
   function resetLayoutState() {
     const defaults = createDefaultGallerySettings()
     settings.value.layout = { ...defaults.layout }
@@ -57,12 +62,14 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
     rightDetailsSize,
     leftSidebarOpenSize,
     rightDetailsOpenSize,
+    sidebarFolderSplitSize,
     setSidebarOpen,
     setDetailsOpen,
     setLeftSidebarSize,
     setRightDetailsSize,
     setLeftSidebarOpenSize,
     setRightDetailsOpenSize,
+    setSidebarFolderSplitSize,
     resetLayoutState,
   }
 }

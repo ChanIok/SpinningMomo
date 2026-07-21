@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Split } from '@/components/ui/split'
 import { Images, Plus } from 'lucide-vue-next'
 import {
   AlertDialog,
@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useGallerySidebar, useGalleryData } from '../../composables'
+import { useGallerySidebar, useGalleryData, useGalleryLayout } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { FolderTreeNode } from '../../types'
 import FolderTreeItem from '../folders/FolderTreeItem.vue'
@@ -35,6 +35,7 @@ import {
 
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()
+const { sidebarFolderSplitSize } = useGalleryLayout()
 const { toast } = useToast()
 const { t } = useI18n()
 
@@ -448,115 +449,126 @@ onMounted(() => {
       </AlertDialogContent>
     </AlertDialog>
 
-    <!-- 导航菜单 -->
-    <ScrollArea class="min-h-0 flex-1">
-      <div class="p-4">
-        <button
-          type="button"
-          :class="
-            cn(
-              'mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm transition-colors duration-200 ease-out outline-none',
-              'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
-              isAllMediaSelected
-                ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
-                : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-            )
-          "
-          @click="selectAllMedia"
-        >
-          <Images class="h-4 w-4 shrink-0" />
-          <span class="min-w-0 truncate">{{ t('gallery.sidebar.allMedia') }}</span>
-        </button>
+    <!-- 顶部固定全媒体选项（不参与滚动） -->
+    <div class="p-4 pb-1">
+      <button
+        type="button"
+        :class="
+          cn(
+            'flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-sm transition-colors duration-200 ease-out outline-none',
+            'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+            isAllMediaSelected
+              ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
+              : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+          )
+        "
+        @click="selectAllMedia"
+      >
+        <Images class="h-4 w-4 shrink-0" />
+        <span class="min-w-0 truncate">{{ t('gallery.sidebar.allMedia') }}</span>
+      </button>
+    </div>
 
+    <!-- 导航菜单（文件夹与标签树，垂直 Split 可拖拽） -->
+    <div class="min-h-0 flex-1">
+      <Split v-model:size="sidebarFolderSplitSize" direction="vertical" min="100px" :max="0.8">
         <!-- 文件夹区域 -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <div
-              class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
-            >
-              {{ t('gallery.sidebar.folders.title') }}
+        <template #1>
+          <div class="flex h-full flex-col pt-2 pb-1">
+            <!-- 文件夹标头（不参与滚动） -->
+            <div class="flex flex-shrink-0 items-center justify-between px-4 pb-1">
+              <div
+                class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
+              >
+                {{ t('gallery.sidebar.folders.title') }}
+              </div>
+              <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
+                <Plus class="h-3 w-3" />
+              </Button>
             </div>
-            <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
-              <Plus class="h-3 w-3" />
-            </Button>
+            <!-- 加载状态 -->
+            <div v-if="foldersLoading" class="px-6 text-xs text-muted-foreground">
+              {{ t('gallery.sidebar.common.loading') }}
+            </div>
+            <!-- 错误状态 -->
+            <div v-else-if="foldersError" class="px-6 text-xs text-destructive">
+              {{ foldersError }}
+            </div>
+            <!-- 文件夹树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
+            <ScrollArea v-else class="min-h-0 flex-1">
+              <div class="space-y-1 px-4 pb-1">
+                <FolderTreeItem
+                  v-for="folder in folders"
+                  :key="folder.id"
+                  :folder="folder"
+                  :selected-folder="selectedFolder"
+                  :depth="0"
+                  @select="selectFolder"
+                  @clear-selection="clearFolderFilter"
+                  @rename-display-name="handleRenameFolderDisplayName"
+                  @open-in-explorer="handleOpenFolderInExplorer"
+                  @remove-watch="handleRemoveFolderWatch"
+                  @rescan-folder="openRescanDialog"
+                  @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
+                  @drop-assets-to-folder="handleDropAssetsToFolder"
+                />
+              </div>
+            </ScrollArea>
           </div>
-          <!-- 加载状态 -->
-          <div v-if="foldersLoading" class="px-2 text-xs text-muted-foreground">
-            {{ t('gallery.sidebar.common.loading') }}
-          </div>
-          <!-- 错误状态 -->
-          <div v-else-if="foldersError" class="px-2 text-xs text-destructive">
-            {{ foldersError }}
-          </div>
-          <!-- 文件夹树 -->
-          <div v-else class="space-y-1">
-            <FolderTreeItem
-              v-for="folder in folders"
-              :key="folder.id"
-              :folder="folder"
-              :selected-folder="selectedFolder"
-              :depth="0"
-              @select="selectFolder"
-              @clear-selection="clearFolderFilter"
-              @rename-display-name="handleRenameFolderDisplayName"
-              @open-in-explorer="handleOpenFolderInExplorer"
-              @remove-watch="handleRemoveFolderWatch"
-              @rescan-folder="openRescanDialog"
-              @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
-              @drop-assets-to-folder="handleDropAssetsToFolder"
-            />
-          </div>
-        </div>
-
-        <Separator class="my-4" />
+        </template>
 
         <!-- 标签区域 -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <div
-              class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
-            >
-              {{ t('gallery.sidebar.tags.title') }}
+        <template #2>
+          <div class="flex h-full flex-col pt-2 pb-1">
+            <!-- 标签标头（不参与滚动） -->
+            <div class="flex flex-shrink-0 items-center justify-between px-4 pb-1">
+              <div
+                class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
+              >
+                {{ t('gallery.sidebar.tags.title') }}
+              </div>
+              <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
+                <Plus class="h-3 w-3" />
+              </Button>
             </div>
-            <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
-              <Plus class="h-3 w-3" />
-            </Button>
-          </div>
-          <!-- 加载状态 -->
-          <div v-if="tagsLoading" class="px-2 text-xs text-muted-foreground">
-            {{ t('gallery.sidebar.common.loading') }}
-          </div>
-          <!-- 错误状态 -->
-          <div v-else-if="tagsError" class="px-2 text-xs text-destructive">
-            {{ tagsError }}
-          </div>
-          <!-- 标签树 -->
-          <div v-else class="space-y-1">
-            <!-- 快速创建标签 -->
-            <div v-if="isCreatingTag" class="px-2">
-              <TagInlineEditor
-                :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
-                @confirm="handleCreateTag"
-                @cancel="handleCancelCreateTag"
-              />
+            <!-- 加载状态 -->
+            <div v-if="tagsLoading" class="px-6 text-xs text-muted-foreground">
+              {{ t('gallery.sidebar.common.loading') }}
             </div>
-            <!-- 标签列表 -->
-            <TagTreeItem
-              v-for="tag in tags"
-              :key="tag.id"
-              :tag="tag"
-              :selected-tag="selectedTag"
-              :depth="0"
-              @select="selectTag"
-              @rename="handleRenameTag"
-              @create-child="handleCreateChildTag"
-              @delete="handleDeleteTag"
-              @drop-assets-to-tag="handleDropAssetsToTag"
-            />
+            <!-- 错误状态 -->
+            <div v-else-if="tagsError" class="px-6 text-xs text-destructive">
+              {{ tagsError }}
+            </div>
+            <!-- 标签树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
+            <ScrollArea v-else class="min-h-0 flex-1">
+              <div class="space-y-1 px-4 pb-1">
+                <!-- 快速创建标签 -->
+                <div v-if="isCreatingTag" class="px-2">
+                  <TagInlineEditor
+                    :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
+                    @confirm="handleCreateTag"
+                    @cancel="handleCancelCreateTag"
+                  />
+                </div>
+                <!-- 标签列表 -->
+                <TagTreeItem
+                  v-for="tag in tags"
+                  :key="tag.id"
+                  :tag="tag"
+                  :selected-tag="selectedTag"
+                  :depth="0"
+                  @select="selectTag"
+                  @rename="handleRenameTag"
+                  @create-child="handleCreateChildTag"
+                  @delete="handleDeleteTag"
+                  @drop-assets-to-tag="handleDropAssetsToTag"
+                />
+              </div>
+            </ScrollArea>
           </div>
-        </div>
-      </div>
-    </ScrollArea>
+        </template>
+      </Split>
+    </div>
 
     <GalleryScanDialog :open="showAddFolderDialog" @update:open="handleAddFolderDialogOpenChange" />
     <InfinityNikkiMetadataExtractDialog

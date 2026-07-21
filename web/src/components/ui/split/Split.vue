@@ -45,8 +45,8 @@ export interface SplitProps {
   disabled?: boolean
 
   /**
-   * 分隔条宽度（像素）
-   * - 仅影响布局占位与拖拽命中区域
+   * 分隔条命中区域宽度（像素）
+   * - 覆盖式，不占布局；仅影响拖拽命中区
    * @default 4
    */
   dividerSize?: number
@@ -93,7 +93,7 @@ const props = withDefaults(defineProps<SplitProps>(), {
   min: 0,
   max: 1,
   disabled: false,
-  dividerSize: 4,
+  dividerSize: 5,
   dividerVisualSize: 1,
   dividerClass: '',
   dividerLineClass: '',
@@ -109,22 +109,20 @@ const emit = defineEmits<{
   'drag-end': [e: MouseEvent]
 }>()
 
-// 非受控状态：存储组件内部的尺寸值
+// 同时支持受控和非受控两种用法：
+// 传入 size 时由外部驱动，否则回退到组件内部状态。
 const uncontrolledSize = ref(props.defaultSize)
 
-// 内部状态管理（支持受控和非受控）
 const internalSize = computed({
   get: () => props.size ?? uncontrolledSize.value,
   set: (value) => {
     emit('update:size', value)
-    // 如果是非受控模式（没有外部 size prop），更新内部状态
     if (props.size === undefined) {
       uncontrolledSize.value = value
     }
   },
 })
 
-// 当 defaultSize 变化且处于非受控模式时，同步到内部状态
 watch(
   () => props.defaultSize,
   (newDefault) => {
@@ -134,25 +132,12 @@ watch(
   }
 )
 
-// 使用拖拽逻辑
-const containerRef = ref<HTMLElement>()
-const dividerRef = ref<HTMLElement>()
-
-const {
-  isDragging,
-  dividerStyle,
-  dividerCursor,
-  handleMouseDown,
-  getFirstPaneStyle,
-  getSecondPaneStyle,
-} = useSplitResize({
+const splitResize = useSplitResize({
   direction: toRef(props, 'direction'),
   dividerSize: toRef(props, 'dividerSize'),
   min: toRef(props, 'min'),
   max: toRef(props, 'max'),
   reverse: toRef(props, 'reverse'),
-  containerRef,
-  dividerRef,
   onUpdate: (size) => {
     internalSize.value = size
   },
@@ -161,9 +146,11 @@ const {
   onDragEnd: (e) => emit('drag-end', e),
 })
 
-// 计算样式
+const { isDragging, dividerStyle, dividerCursor, getFirstPaneStyle, getSecondPaneStyle } =
+  splitResize
+
 const containerClass = computed(() => [
-  'flex w-full h-full',
+  'flex h-full w-full',
   props.direction === 'horizontal' ? 'flex-row' : 'flex-col',
 ])
 
@@ -172,19 +159,23 @@ const secondPaneStyle = computed(() => getSecondPaneStyle(internalSize.value))
 const slots = useSlots()
 
 const dividerClasses = computed(() => [
-  'group relative flex-shrink-0',
+  'group absolute z-999 flex-shrink-0',
+  props.direction === 'horizontal'
+    ? 'top-0 left-1/2 h-full -translate-x-1/2'
+    : 'top-1/2 left-0 w-full -translate-y-1/2',
   dividerCursor.value,
   props.dividerClass || 'bg-transparent',
   props.disabled && 'cursor-default opacity-50',
 ])
 
 const dividerLineClasses = computed(() => [
+  // dividerSize 决定拖拽命中区，dividerVisualSize 只控制可见细线。
   'pointer-events-none absolute transition-colors duration-200',
   props.direction === 'horizontal'
     ? 'top-0 left-1/2 h-full -translate-x-1/2'
     : 'top-1/2 left-0 w-full -translate-y-1/2',
   props.dividerLineClass ||
-    (isDragging.value ? 'bg-primary/70' : 'bg-border group-hover:bg-primary/50'),
+    (isDragging.value ? 'bg-primary' : 'bg-border group-hover:bg-primary/50'),
 ])
 
 const dividerLineStyle = computed(() => {
@@ -194,37 +185,40 @@ const dividerLineStyle = computed(() => {
     : { height: `${props.dividerVisualSize}px` }
 })
 
+const dividerAnchorClass = computed(() =>
+  props.direction === 'horizontal'
+    ? 'relative h-full w-0 flex-shrink-0 overflow-visible'
+    : 'relative h-0 w-full flex-shrink-0 overflow-visible'
+)
+
 const hasDividerSlot = computed(() => Boolean(slots.divider))
 
-// 拖拽处理器
 const onMouseDown = (e: MouseEvent) => {
   if (props.disabled) return
-  handleMouseDown(e, internalSize.value)
+  splitResize.handleMouseDown(e, internalSize.value)
 }
 </script>
 
 <template>
-  <div ref="containerRef" :class="containerClass">
-    <!-- 面板 1 -->
+  <div :ref="splitResize.containerRef" :class="['relative', containerClass]">
     <div :class="['min-h-0 min-w-0 overflow-hidden', pane1Class]" :style="firstPaneStyle">
       <slot name="1" :panel="1">
         <slot :panel="1" />
       </slot>
     </div>
 
-    <!-- 分隔条 -->
-    <div
-      v-if="!disabled"
-      ref="dividerRef"
-      :class="dividerClasses"
-      :style="dividerStyle"
-      @mousedown="onMouseDown"
-    >
-      <div v-if="!hasDividerSlot" :class="dividerLineClasses" :style="dividerLineStyle" />
-      <slot name="divider" />
+    <div v-if="!disabled" :class="dividerAnchorClass">
+      <div
+        :ref="splitResize.dividerRef"
+        :class="dividerClasses"
+        :style="dividerStyle"
+        @mousedown="onMouseDown"
+      >
+        <div v-if="!hasDividerSlot" :class="dividerLineClasses" :style="dividerLineStyle" />
+        <slot name="divider" />
+      </div>
     </div>
 
-    <!-- 面板 2 -->
     <div :class="['min-h-0 min-w-0 overflow-hidden', pane2Class]" :style="secondPaneStyle">
       <slot name="2" :panel="2">
         <slot :panel="2" />

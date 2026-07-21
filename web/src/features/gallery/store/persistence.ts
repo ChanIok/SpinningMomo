@@ -16,6 +16,7 @@ export interface GallerySettings {
     rightDetailsSize: string
     leftSidebarOpenSize: string
     rightDetailsOpenSize: string
+    sidebarFolderSplitSize: number | string
   }
 }
 
@@ -38,6 +39,7 @@ export function createDefaultGallerySettings(): GallerySettings {
       rightDetailsSize: '256px',
       leftSidebarOpenSize: '200px',
       rightDetailsOpenSize: '256px',
+      sidebarFolderSplitSize: 0.5,
     },
   }
 }

@@ -406,7 +406,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       backgroundOpacity: 1,
       // 与 overlayPalette 中首个浅色预设（peach）一致
       overlayColors: ['#F8F0E3'],
-      primaryColor: '#F59E0B',
+      primaryColor: '#C66900',
       overlayOpacity: 0.8,
       surfaceOpacity: 1,
     },

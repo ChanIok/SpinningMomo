@@ -442,7 +442,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-8 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMinimize"
         title="Minimize"
       >
@@ -452,7 +452,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-8 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMaximizeToggle"
         title="Maximize / Restore"
       >
@@ -462,7 +462,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-foreground hover:bg-destructive hover:text-destructive-foreground"
+        class="h-8 w-8 rounded-sm text-foreground hover:!bg-[#e01b2d] hover:!text-white dark:hover:!bg-[#c42b1c]"
         @click="handleClose"
         title="Close"
       >

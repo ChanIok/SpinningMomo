@@ -62,15 +62,12 @@ const handleMenuSelect = (key: string) => {
 </script>
 
 <template>
-  <Sidebar
-    collapsible="none"
-    :class="['w-14 bg-transparent pt-8', isHome && 'activity-bar-background-blur']"
-  >
+  <Sidebar collapsible="none" :class="['w-14 bg-transparent pt-8']">
     <SidebarContent class="overflow-hidden">
       <ScrollArea class="min-h-0 flex-1">
         <SidebarGroup>
           <SidebarGroupContent class="px-0">
-            <SidebarMenu>
+            <SidebarMenu class="gap-2">
               <template
                 v-for="(item, index) in menuItems"
                 :key="'key' in item ? item.key : `divider-${index}`"
@@ -86,7 +83,7 @@ const handleMenuSelect = (key: string) => {
                     tooltip-variant="sidebar"
                     :is-active="activeKey === item.key"
                     @click="handleMenuSelect(item.key)"
-                    class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"
+                    class="h-10 w-10 rounded-sm [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"
                   >
                     <component :is="item.icon" :stroke-width="1.8" />
                   </SidebarMenuButton>

@@ -214,7 +214,7 @@ function handleDrop(event: DragEvent) {
           type="button"
           :class="
             cn(
-              'group relative flex h-8 w-full cursor-pointer items-center justify-between rounded-md border-0 bg-transparent px-0 text-left text-sm transition-colors duration-200 ease-out outline-none',
+              'group relative flex h-8 w-full cursor-default items-center justify-between rounded-md border-0 bg-transparent px-0 text-left text-sm transition-colors duration-200 ease-out outline-none',
               'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
               isDragOver ? 'bg-primary/12 text-primary' : '',
               selectedFolder === folder.id

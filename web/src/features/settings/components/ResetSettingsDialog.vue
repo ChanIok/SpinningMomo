@@ -48,7 +48,7 @@ const handleReset = async (e: Event) => {
   <AlertDialog :open="open" @update:open="open = $event">
     <AlertDialogTrigger as-child>
       <slot name="trigger">
-        <Button variant="outline" size="sm" class="surface-top shrink-0 hover:bg-accent">
+        <Button variant="outline" size="sm" class="shrink-0">
           <RotateCcw class="mr-2 h-4 w-4" />
           {{ triggerText || t('settings.reset.dialog.triggerText') }}
         </Button>

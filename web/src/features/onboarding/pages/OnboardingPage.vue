@@ -88,6 +88,9 @@ const getDefaultOverlayColorsByTheme = (mode: 'light' | 'dark'): string[] => {
   return firstPreset.colors.slice(0, firstPreset.mode)
 }
 
+const getDefaultPrimaryColorByTheme = (mode: 'light' | 'dark'): string =>
+  mode === 'light' ? '#C66900' : '#F59F0A'
+
 const getFloatingWindowThemeByWebTheme = (mode: 'light' | 'dark'): FloatingWindowThemeMode => mode
 
 const getFloatingWindowColorsByWebTheme = (mode: 'light' | 'dark') => {
@@ -109,6 +112,7 @@ const syncPreviewAppearance = () => {
       background: {
         ...store.appSettings.ui.background,
         overlayColors: getDefaultOverlayColorsByTheme(themeMode.value),
+        primaryColor: getDefaultPrimaryColorByTheme(themeMode.value),
         overlayOpacity: 1,
       },
     },
@@ -268,6 +272,7 @@ const completeOnboarding = async () => {
         background: {
           ...store.appSettings.ui.background,
           overlayColors: getDefaultOverlayColorsByTheme(themeMode.value),
+          primaryColor: getDefaultPrimaryColorByTheme(themeMode.value),
           overlayOpacity: 0.8,
         },
       },

@@ -91,7 +91,7 @@
   --card-foreground: #3b3b3b;
   --popover: #ffffff;
   --popover-foreground: #3b3b3b;
-  --primary: #f59e0b;
+  --primary: #c66900;
   --primary-foreground: #ffffff;
   --secondary: #e5e5e5;
   --secondary-foreground: #3b3b3b;
@@ -103,16 +103,16 @@
   --destructive-foreground: #ffffff;
   --border: #e5e5e5;
   --input: #e5e5e5;
-  --ring: #f59e0b;
+  --ring: #c66900;
   --sidebar: var(--surface-middle);
   --sidebar-foreground: #2e2e2e;
-  --sidebar-primary: #f59e0b;
+  --sidebar-primary: #c66900;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--surface-top-mixed);
   --sidebar-accent-foreground: #000000;
   --sidebar-hover: rgb(0 0 0 / 0.04);
   --sidebar-border: #e5e5e5;
-  --sidebar-ring: #f59e0b;
+  --sidebar-ring: #c66900;
   --header: #f8f8f8;
   --header-foreground: #1e1e1e;
   --header-accent: #e4e4e4;
@@ -145,8 +145,8 @@
   --card-foreground: #ececec;
   --popover: #303030;
   --popover-foreground: #ececec;
-  --primary: #fbbf24;
-  --primary-foreground: #18181b;
+  --primary: #f59f0a;
+  --primary-foreground: #ffffff;
   --secondary: #313131;
   --secondary-foreground: #ececec;
   --muted: #181818;
@@ -157,16 +157,16 @@
   --destructive-foreground: #ffffff;
   --border: #ffffff1a;
   --input: #ffffff1a;
-  --ring: #fbbf24;
+  --ring: #f59f0a;
   --sidebar: var(--surface-middle);
   --sidebar-foreground: #ececec;
-  --sidebar-primary: #fbbf24;
-  --sidebar-primary-foreground: #18181b;
+  --sidebar-primary: #f59f0a;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--surface-top-mixed);
   --sidebar-accent-foreground: #ececec;
   --sidebar-hover: rgb(255 255 255 / 0.06);
   --sidebar-border: #ffffff1a;
-  --sidebar-ring: #fbbf24;
+  --sidebar-ring: #f59f0a;
   --header: #181818;
   --header-foreground: #ececec;
   --header-accent: #2d2d2d;
@@ -240,12 +240,6 @@
 
 .app-background-overlay-home-clip {
   clip-path: inset(0 calc(100% - 3.5rem) 0 0);
-}
-
-.activity-bar-background-blur {
-  -webkit-backdrop-filter: blur(var(--app-background-blur, 0px));
-  backdrop-filter: blur(var(--app-background-blur, 0px));
-  background-color: rgb(0 0 0 / 0.01);
 }
 
 .route-scene {

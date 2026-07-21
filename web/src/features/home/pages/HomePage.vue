@@ -142,16 +142,11 @@ onUnmounted(() => {
       class="pointer-events-none absolute bottom-8 left-8 z-20 animate-in duration-600 fade-in-0"
     >
       <div
-        class="relative overflow-hidden rounded-sm border border-border/30 shadow-sm backdrop-blur-md"
+        class="relative overflow-hidden rounded-md border border-border shadow-sm backdrop-blur-md dark:border-border/30"
       >
         <!-- Base Backgrounds -->
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
-
-        <!-- Subtle Inner Border for Premium Feel -->
-        <div
-          class="pointer-events-none absolute inset-[1px] z-10 rounded-sm border border-foreground/5"
-        ></div>
 
         <div class="relative z-20 flex min-w-[240px] flex-col p-6">
           <!-- Brand Header -->
@@ -215,13 +210,13 @@ onUnmounted(() => {
     <div class="group absolute right-8 bottom-8 z-20 flex flex-col items-end gap-3">
       <!-- Tooltip Label -->
       <div
-        class="pointer-events-none rounded-sm border border-border/30 px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100"
+        class="pointer-events-none rounded-md border border-border px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100 dark:border-border/30"
       >
         <div
-          class="app-background-overlay pointer-events-none absolute inset-0 z-0 rounded-sm"
+          class="app-background-overlay pointer-events-none absolute inset-0 z-0 rounded-md"
         ></div>
         <div
-          class="surface-middle pointer-events-none absolute inset-0 z-0 rounded-sm opacity-90"
+          class="surface-middle pointer-events-none absolute inset-0 z-0 rounded-md opacity-90"
         ></div>
         <span
           class="relative z-10 text-[0.65rem] font-medium tracking-widest text-foreground/80 uppercase"
@@ -232,18 +227,13 @@ onUnmounted(() => {
 
       <!-- Square Shutter Button -->
       <button
-        class="relative flex h-[52px] w-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-sm border border-border/30 shadow-sm backdrop-blur-md transition-all duration-300 hover:shadow-md focus:outline-none active:scale-[0.97]"
+        class="relative flex h-[52px] w-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-md border border-border shadow-sm backdrop-blur-md transition-all duration-300 hover:shadow-md focus:outline-none dark:border-border/30"
         :disabled="isOpening"
         @click="handleOpenOutputDirectory"
       >
         <!-- Base Backgrounds -->
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
-
-        <!-- Subtle Inner Border -->
-        <div
-          class="pointer-events-none absolute inset-[1px] z-10 rounded-sm border border-foreground/5"
-        ></div>
 
         <!-- Hover Overlay -->
         <div
