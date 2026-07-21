@@ -339,8 +339,8 @@ auto compensate_for_theme(const Utils::Image::RgbColor& color, std::string_view 
     l_max = primary ? 55.0 : 92.0;
   } else {
     // 暗色 UI 上 accent 需更亮一些，否则从壁纸提取的主色容易偏闷
-    l_min = primary ? 78.0 : 6.0;
-    l_max = primary ? 90.0 : 18.0;
+    l_min = primary ? 78.0 : 4.0;
+    l_max = primary ? 90.0 : 10.0;
   }
 
   hsl.l = std::clamp(hsl.l, l_min, l_max);
