@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
-import { Maximize } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
@@ -12,13 +11,7 @@ import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
@@ -393,37 +386,6 @@ useEventListener(window, 'keydown', handleKeydown)
           </ContextMenuTrigger>
           <ContextMenuContent class="w-56">
             <GalleryAssetContextMenuContent />
-            <template v-if="isZoomableAsset">
-              <ContextMenuSeparator />
-              <ContextMenuItem inset @click="handleToolbarFit">
-                {{ t('gallery.lightbox.contextMenu.fit') }}
-              </ContextMenuItem>
-              <ContextMenuItem @click="handleToolbarActual">
-                <Maximize class="size-4 text-muted-foreground" />
-                {{ t('gallery.lightbox.contextMenu.actual') }}
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="handleToolbarZoomIn">
-                {{ t('gallery.lightbox.contextMenu.zoomIn') }}
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="handleToolbarZoomOut">
-                {{ t('gallery.lightbox.contextMenu.zoomOut') }}
-              </ContextMenuItem>
-            </template>
-            <ContextMenuSeparator />
-            <ContextMenuItem inset @click="handleToolbarToggleFilmstrip">
-              {{
-                showFilmstrip
-                  ? t('gallery.lightbox.contextMenu.hideFilmstrip')
-                  : t('gallery.lightbox.contextMenu.showFilmstrip')
-              }}
-            </ContextMenuItem>
-            <ContextMenuItem inset @click="handleToolbarToggleImmersive">
-              {{
-                isImmersive
-                  ? t('gallery.lightbox.contextMenu.exitImmersive')
-                  : t('gallery.lightbox.contextMenu.immersive')
-              }}
-            </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
         <div

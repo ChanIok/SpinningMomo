@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, reactive, readonly } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { galleryApi } from '../api'
@@ -6,6 +6,14 @@ import { useGalleryData } from './useGalleryData'
 import { useGalleryTagClipboard } from './useGalleryTagClipboard'
 import { useGalleryStore } from '../store'
 import type { ReviewFlag } from '../types'
+
+interface MoveToFolderDialogState {
+  open: boolean
+}
+
+const moveToFolderDialogState = reactive<MoveToFolderDialogState>({
+  open: false,
+})
 
 export function useGalleryAssetActions() {
   const store = useGalleryStore()
@@ -163,6 +171,79 @@ export function useGalleryAssetActions() {
         description: message,
       })
     }
+  }
+
+  async function moveAssetsToFolderByIds(folderId: number, assetIds: number[]) {
+    const uniqueIds = [...new Set(assetIds)].filter((id) => id > 0)
+    if (uniqueIds.length === 0) {
+      return
+    }
+
+    try {
+      const result = await galleryApi.moveAssetsToFolder({
+        ids: uniqueIds,
+        targetFolderId: folderId,
+      })
+      const affectedCount = result.affectedCount ?? 0
+      const failedCount = result.failedCount ?? 0
+      const notFoundCount = result.notFoundCount ?? 0
+      const unchangedCount = result.unchangedCount ?? 0
+      if (!result.success && affectedCount === 0) {
+        throw new Error(
+          t('gallery.sidebar.folders.moveAssets.failedDescription', {
+            failed: failedCount,
+            notFound: notFoundCount,
+            unchanged: unchangedCount,
+          })
+        )
+      }
+
+      await Promise.all([
+        galleryData.loadFolderTree({ silent: true }),
+        galleryData.refreshCurrentQuery(),
+      ])
+      store.clearSelection()
+
+      if (result.success) {
+        toast.success(t('gallery.sidebar.folders.moveAssets.successTitle'), {
+          description: t('gallery.sidebar.folders.moveAssets.successDescription', {
+            count: affectedCount,
+          }),
+        })
+      } else {
+        toast.warning(t('gallery.sidebar.folders.moveAssets.partialTitle'), {
+          description: t('gallery.sidebar.folders.moveAssets.partialDescription', {
+            moved: affectedCount,
+            failed: failedCount,
+            notFound: notFoundCount,
+            unchanged: unchangedCount,
+          }),
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(t('gallery.sidebar.folders.moveAssets.failedTitle'), { description: message })
+    }
+  }
+
+  async function handleMoveSelectedAssetsToFolder(folderId: number) {
+    if (selectedAssetIds.value.length === 0) {
+      return
+    }
+
+    await moveAssetsToFolderByIds(folderId, selectedAssetIds.value)
+  }
+
+  function openMoveToFolderDialog() {
+    if (!hasSelection.value) {
+      return
+    }
+
+    moveToFolderDialogState.open = true
+  }
+
+  function setMoveToFolderDialogOpen(open: boolean) {
+    moveToFolderDialogState.open = open
   }
 
   async function handleMoveAssetsToTrash() {
@@ -459,6 +540,11 @@ export function useGalleryAssetActions() {
     canPasteTags,
     copiedTagCount,
     selectedAssetId,
+    moveToFolderDialog: readonly(moveToFolderDialogState),
+    openMoveToFolderDialog,
+    setMoveToFolderDialogOpen,
+    moveAssetsToFolderByIds,
+    handleMoveSelectedAssetsToFolder,
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
     handleCopyAssetsToClipboard,

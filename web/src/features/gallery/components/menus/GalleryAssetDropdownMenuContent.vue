@@ -1,17 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
-import {
-  ClipboardPaste,
-  Copy,
-  Eraser,
-  ExternalLink,
-  Flag,
-  FolderOpen,
-  Star,
-  Tags,
-  Trash2,
-  X,
-} from 'lucide-vue-next'
+import { Copy, Eraser, ExternalLink, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -51,25 +40,32 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     {{ t('gallery.contextMenu.copyFiles.label') }}
   </DropdownMenuItem>
   <DropdownMenuItem
+    inset
+    :disabled="!assetActions.hasSelection"
+    @click="assetActions.openMoveToFolderDialog"
+  >
+    {{ t('gallery.contextMenu.moveToFolder.label') }}
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem
+    inset
     :disabled="!assetActions.canCopyTags"
     @click="assetActions.copySelectedAssetTags"
   >
-    <Tags />
     {{ t('gallery.contextMenu.copyTags.label') }}
     <DropdownMenuShortcut>Ctrl+Shift+C</DropdownMenuShortcut>
   </DropdownMenuItem>
   <DropdownMenuItem
+    inset
     :disabled="!assetActions.canPasteTags"
     @click="assetActions.pasteCopiedTagsToSelection"
   >
-    <ClipboardPaste />
     {{ t('gallery.contextMenu.pasteTags.label') }}
     <DropdownMenuShortcut>Ctrl+Shift+V</DropdownMenuShortcut>
   </DropdownMenuItem>
   <DropdownMenuSeparator />
   <DropdownMenuSub>
-    <DropdownMenuSubTrigger>
-      <Star />
+    <DropdownMenuSubTrigger inset>
       {{ t('gallery.contextMenu.review.rating.label') }}
     </DropdownMenuSubTrigger>
     <DropdownMenuSubContent class="w-40">
@@ -92,8 +88,7 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     </DropdownMenuSubContent>
   </DropdownMenuSub>
   <DropdownMenuSub>
-    <DropdownMenuSubTrigger>
-      <Flag />
+    <DropdownMenuSubTrigger inset>
       {{ t('gallery.contextMenu.review.flag.label') }}
     </DropdownMenuSubTrigger>
     <DropdownMenuSubContent class="w-40">

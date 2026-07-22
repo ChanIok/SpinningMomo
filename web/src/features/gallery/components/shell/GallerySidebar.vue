@@ -17,7 +17,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useGallerySidebar, useGalleryData, useGalleryLayout } from '../../composables'
+import {
+  useGallerySidebar,
+  useGalleryData,
+  useGalleryLayout,
+  useGalleryAssetActions,
+} from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { FolderTreeNode } from '../../types'
 import FolderTreeItem from '../folders/FolderTreeItem.vue'
@@ -34,6 +39,7 @@ import {
 } from '@/extensions/infinity_nikki'
 
 const galleryData = useGalleryData()
+const assetActions = useGalleryAssetActions()
 const galleryStore = useGalleryStore()
 const { sidebarFolderSplitSize } = useGalleryLayout()
 const { toast } = useToast()
@@ -292,56 +298,7 @@ async function confirmRescanFolder() {
 }
 
 async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
-  const uniqueIds = [...new Set(assetIds)]
-  if (uniqueIds.length === 0) {
-    return
-  }
-
-  try {
-    const result = await galleryApi.moveAssetsToFolder({
-      ids: uniqueIds,
-      targetFolderId: folderId,
-    })
-    const affectedCount = result.affectedCount ?? 0
-    const failedCount = result.failedCount ?? 0
-    const notFoundCount = result.notFoundCount ?? 0
-    const unchangedCount = result.unchangedCount ?? 0
-    if (!result.success && affectedCount === 0) {
-      throw new Error(
-        t('gallery.sidebar.folders.moveAssets.failedDescription', {
-          failed: failedCount,
-          notFound: notFoundCount,
-          unchanged: unchangedCount,
-        })
-      )
-    }
-
-    await Promise.all([
-      galleryData.loadFolderTree({ silent: true }),
-      galleryData.refreshCurrentQuery(),
-    ])
-    galleryStore.clearSelection()
-
-    if (result.success) {
-      toast.success(t('gallery.sidebar.folders.moveAssets.successTitle'), {
-        description: t('gallery.sidebar.folders.moveAssets.successDescription', {
-          count: affectedCount,
-        }),
-      })
-    } else {
-      toast.warning(t('gallery.sidebar.folders.moveAssets.partialTitle'), {
-        description: t('gallery.sidebar.folders.moveAssets.partialDescription', {
-          moved: affectedCount,
-          failed: failedCount,
-          notFound: notFoundCount,
-          unchanged: unchangedCount,
-        }),
-      })
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    toast.error(t('gallery.sidebar.folders.moveAssets.failedTitle'), { description: message })
-  }
+  await assetActions.moveAssetsToFolderByIds(folderId, assetIds)
 }
 
 async function handleDropAssetsToTag(tagId: number, assetIds: number[]) {

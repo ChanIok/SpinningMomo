@@ -6,6 +6,7 @@ import ListView from '../viewer/ListView.vue'
 import MasonryView from '../viewer/MasonryView.vue'
 import AdaptiveView from '../viewer/AdaptiveView.vue'
 import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
+import GalleryMoveToFolderDialog from '../dialogs/GalleryMoveToFolderDialog.vue'
 
 const store = useGalleryStore()
 const viewMode = computed(() => store.viewConfig.mode)
@@ -44,5 +45,6 @@ defineExpose({ scrollToIndex, getCardRect })
     <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" />
     <AdaptiveView v-else ref="adaptiveViewRef" />
     <GallerySharedContextMenu />
+    <GalleryMoveToFolderDialog />
   </div>
 </template>
