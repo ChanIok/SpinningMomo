@@ -54,6 +54,7 @@ const {
   updateWebViewTransparentBackground,
   updateCustomCss,
   updateMenuBlur,
+  updateEnableRoundedCorners,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -217,6 +218,14 @@ const handleMenuBlurChange = async (enabled: boolean) => {
     await updateMenuBlur(enabled)
   } catch (error) {
     console.error('Failed to update menu blur setting:', error)
+  }
+}
+
+const handleEnableRoundedCornersChange = async (enabled: boolean) => {
+  try {
+    await updateEnableRoundedCorners(enabled)
+  } catch (error) {
+    console.error('Failed to update enable rounded corners setting:', error)
   }
 }
 
@@ -527,6 +536,23 @@ const handleClearError = () => {
             <Switch
               :model-value="appSettings.ui.webTheme.menuBlur !== false"
               @update:model-value="(value) => handleMenuBlurChange(Boolean(value))"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.enableRoundedCorners.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.enableRoundedCorners.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.ui.webTheme.enableRoundedCorners !== false"
+              @update:model-value="(value) => handleEnableRoundedCornersChange(Boolean(value))"
             />
           </ItemActions>
         </Item>

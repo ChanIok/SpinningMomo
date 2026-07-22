@@ -44,13 +44,13 @@ async function handleCopyFileName() {
 <template>
   <div class="space-y-3">
     <div class="flex justify-center">
-      <div class="flex h-[180px] w-full items-center justify-center rounded">
+      <div class="flex h-[180px] w-full items-center justify-center rounded-md">
         <video
           v-if="asset.type === 'video'"
           :src="assetUrl"
           :poster="thumbnailUrl"
           :aria-label="asset.name"
-          class="max-h-full max-w-full rounded object-contain shadow-md"
+          class="max-h-full max-w-full rounded-md object-contain shadow-md"
           controls
           playsinline
           preload="metadata"
@@ -59,7 +59,7 @@ async function handleCopyFileName() {
           v-else
           :src="thumbnailUrl"
           :alt="asset.name"
-          class="max-h-full max-w-full rounded object-contain shadow-md"
+          class="max-h-full max-w-full rounded-md object-contain shadow-md"
         />
       </div>
     </div>
@@ -94,7 +94,7 @@ async function handleCopyFileName() {
       </div>
       <div class="flex justify-between gap-2">
         <span class="text-muted-foreground">{{ t('gallery.details.asset.type') }}</span>
-        <span class="rounded bg-secondary px-2 py-0.5">{{ getAssetTypeLabel(asset.type) }}</span>
+        <span class="rounded-sm bg-secondary px-2 py-0.5">{{ getAssetTypeLabel(asset.type) }}</span>
       </div>
       <div v-if="asset.width && asset.height" class="flex justify-between gap-2">
         <span class="text-muted-foreground">{{ t('gallery.details.asset.resolution') }}</span>

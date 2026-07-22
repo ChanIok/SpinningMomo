@@ -34,6 +34,12 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const resolveDefaultEnableRoundedCorners = (): boolean => {
+    const caps = store.runtimeCapabilities
+    if (!caps) return true
+    return caps.osMajorVersion > 10 || (caps.osMajorVersion === 10 && caps.osBuildNumber >= 22000)
+  }
+
   const resetAppearanceSettings = async () => {
     await store.updateSettings({
       ...appSettings.value,
@@ -42,7 +48,10 @@ export const useAppearanceActions = () => {
         floatingWindowLayout: DEFAULT_APP_SETTINGS.ui.floatingWindowLayout,
         floatingWindowColors: DEFAULT_APP_SETTINGS.ui.floatingWindowColors,
         floatingWindowThemeMode: DEFAULT_APP_SETTINGS.ui.floatingWindowThemeMode,
-        webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+        webTheme: {
+          ...DEFAULT_APP_SETTINGS.ui.webTheme,
+          enableRoundedCorners: resolveDefaultEnableRoundedCorners(),
+        },
         webviewWindow: {
           ...appSettings.value.ui.webviewWindow,
           enableTransparentBackground:
@@ -58,7 +67,10 @@ export const useAppearanceActions = () => {
       ...appSettings.value,
       ui: {
         ...appSettings.value.ui,
-        webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+        webTheme: {
+          ...DEFAULT_APP_SETTINGS.ui.webTheme,
+          enableRoundedCorners: resolveDefaultEnableRoundedCorners(),
+        },
         webviewWindow: {
           ...appSettings.value.ui.webviewWindow,
           enableTransparentBackground:
@@ -210,6 +222,19 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const updateEnableRoundedCorners = async (enableRoundedCorners: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: {
+          ...appSettings.value.ui.webTheme,
+          enableRoundedCorners,
+        },
+      },
+    })
+  }
+
   const applyWallpaperAnalysis = async (imageFileName: string, persistImage = false) => {
     const currentBackground = appSettings.value.ui.background
     const overlayMode = getOverlayPaletteFromBackground(currentBackground).mode
@@ -291,6 +316,7 @@ export const useAppearanceActions = () => {
     updateWebViewTransparentBackground,
     updateCustomCss,
     updateMenuBlur,
+    updateEnableRoundedCorners,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,

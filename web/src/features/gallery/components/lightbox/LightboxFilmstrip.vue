@@ -182,7 +182,7 @@ function handleWheel(event: WheelEvent) {
           >
             <div
               v-if="item.asset"
-              class="filmstrip-thumbnail group relative h-full w-full cursor-pointer overflow-hidden rounded transition-all duration-200 select-none"
+              class="filmstrip-thumbnail group relative h-full w-full cursor-pointer overflow-hidden rounded-sm transition-all duration-200 select-none"
               :class="{
                 'scale-110 ring-2 ring-primary': item.isCurrent,
                 'bg-foreground/20': item.isSelected,
@@ -234,7 +234,7 @@ function handleWheel(event: WheelEvent) {
               </div>
             </div>
 
-            <div v-else class="h-full w-full animate-pulse rounded bg-muted" />
+            <div v-else class="h-full w-full animate-pulse rounded-sm bg-muted" />
           </div>
         </div>
       </div>

@@ -11,6 +11,7 @@ import Features.Settings.State;
 import Features.Settings.Compute;
 import Features.Settings.Background;
 import Utils.Path;
+import Utils.System;
 import Utils.Logger;
 import Vendor.Windows;
 import <rfl/json.hpp>;
@@ -79,6 +80,15 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       config.app.onboarding.completed = false;
       config.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
       config.extensions.infinity_nikki.enable = false;
+
+      // 根据操作系统版本设定圆角默认值（Win10 默认直角，Win11 默认圆角）
+      if (const auto win_ver = Utils::System::get_windows_version();
+          win_ver && (win_ver->major_version < 10 ||
+                      (win_ver->major_version == 10 && win_ver->build_number < 22000))) {
+        config.ui.web_theme.enable_rounded_corners = false;
+      } else {
+        config.ui.web_theme.enable_rounded_corners = true;
+      }
 
       auto json_str = rfl::json::write(config, rfl::json::pretty);
       std::ofstream file(settings_path.value());

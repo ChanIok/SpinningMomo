@@ -63,6 +63,8 @@
   "settings.appearance.theme.dark": "Dark",
   "settings.appearance.theme.description": "Advanced customization options for the web interface.",
   "settings.appearance.theme.light": "Light",
+  "settings.appearance.theme.enableRoundedCorners.description": "Enable rounded corners for the main interface and components, or use sharp corners when disabled.",
+  "settings.appearance.theme.enableRoundedCorners.label": "Interface Rounded Corners",
   "settings.appearance.theme.menuBlur.description": "Enable frosted glass blur for pop-up menus and panels.",
   "settings.appearance.theme.menuBlur.label": "Pop-up Glass Effect",
   "settings.appearance.theme.mode.description": "Controls text and UI element color scheme - does not affect background overlay colors.",

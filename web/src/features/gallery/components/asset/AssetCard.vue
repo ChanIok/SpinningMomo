@@ -124,7 +124,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
   <div
     data-asset-card
     draggable="true"
-    class="group transition-ring relative w-full overflow-hidden rounded bg-background duration-200 contain-[layout_size_paint] select-none"
+    class="group transition-ring relative w-full overflow-hidden rounded-md bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
       {
         'ring-3 ring-primary': isSelected,
@@ -139,7 +139,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     @dragstart="handleDragStart"
   >
     <!-- 缩略图容器 -->
-    <div data-asset-thumbnail class="relative h-full w-full overflow-hidden rounded">
+    <div data-asset-thumbnail class="relative h-full w-full overflow-hidden rounded-md">
       <!-- 缩略图 -->
       <img
         v-if="hasThumbnail && !imageError"

@@ -70,6 +70,7 @@ export interface WebThemeSettings {
   mode: WebThemeMode
   customCss: string
   menuBlur: boolean
+  enableRoundedCorners: boolean
 }
 
 // 深色主题颜色配置
@@ -398,6 +399,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       mode: 'light',
       customCss: '',
       menuBlur: false,
+      enableRoundedCorners: true,
     },
     background: {
       type: 'none',

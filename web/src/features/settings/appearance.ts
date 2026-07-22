@@ -201,11 +201,19 @@ const applyBackground = (settings: AppSettings): void => {
   updateBackgroundImage(root, imageUrl)
 }
 
+const applyRoundedCorners = (enabled: boolean): void => {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  root.toggleAttribute('data-rounded', enabled)
+  root.style.setProperty('--radius', enabled ? '0.625rem' : '0px')
+}
+
 export const applyAppearanceToDocument = (settings: AppSettings): void => {
   if (typeof document === 'undefined') return
 
   applyTheme(settings.ui.webTheme.mode)
   applyMenuBlur(settings.ui.webTheme.menuBlur !== false)
+  applyRoundedCorners(settings.ui.webTheme.enableRoundedCorners !== false)
   applyBackground(settings)
   applyCustomUserCss(settings.ui.webTheme.customCss ?? '')
 }

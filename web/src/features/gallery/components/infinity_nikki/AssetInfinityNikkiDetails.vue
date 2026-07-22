@@ -592,7 +592,7 @@ watch(
 
       <div
         v-if="canShowSameOutfitDyeFillPrompt"
-        class="space-y-1 rounded border border-border/70 bg-muted/30 px-2 py-1.5"
+        class="space-y-1 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5"
       >
         <div class="text-muted-foreground">
           {{
@@ -789,7 +789,7 @@ watch(
               <PopoverContent align="end" class="w-44 p-1">
                 <button
                   type="button"
-                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                  class="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
                   @click="void handleSelectWorldId(undefined)"
                 >
                   <span>{{ t('gallery.details.infinityNikki.mapArea.auto') }}</span>
@@ -799,7 +799,7 @@ watch(
                   v-for="world in worldOptions"
                   :key="world.id"
                   type="button"
-                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                  class="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
                   @click="void handleSelectWorldId(world.id)"
                 >
                   <span>{{ world.label }}</span>
