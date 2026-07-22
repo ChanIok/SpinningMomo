@@ -34,7 +34,7 @@ const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
-  const gap = 16
+  const gap = 12
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 
@@ -203,7 +203,7 @@ defineExpose({ scrollToIndex, getCardRect })
           }"
         >
           <div
-            class="grid justify-items-center gap-4"
+            class="grid justify-items-center gap-3"
             :style="{
               gridTemplateColumns: `repeat(${columns}, 1fr)`,
             }"

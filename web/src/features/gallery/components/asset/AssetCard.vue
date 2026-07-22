@@ -127,7 +127,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     class="group transition-ring relative w-full overflow-hidden rounded-md bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
       {
-        'ring-3 ring-primary': isSelected,
+        'ring-4 ring-primary': isSelected,
         'shadow-md hover:shadow-lg': !isSelected,
         'shadow-lg': isSelected,
       },
@@ -192,7 +192,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         data-selection-mask
         class="absolute inset-0 bg-black/0 transition-all duration-200"
         :class="{
-          'bg-black/20': isSelected,
+          'bg-black/30': isSelected,
           'group-hover:bg-black/10': !isSelected,
         }"
       />

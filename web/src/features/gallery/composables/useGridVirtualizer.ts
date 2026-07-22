@@ -34,7 +34,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
     if (width === 0) return 200
 
-    const gap = 16
+    const gap = 12
     const cardWidth = Math.floor((width - (columns.value - 1) * gap) / columns.value)
     return cardWidth + gap
   })

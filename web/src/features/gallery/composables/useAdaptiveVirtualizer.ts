@@ -5,8 +5,8 @@ import { useGalleryData } from './useGalleryData'
 import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type { AdaptiveLayoutRow, AdaptiveLayoutRowItem, Asset, AssetLayoutMetaItem } from '../types'
 
-// 自适应视图的行内间距。这里故意比 grid 更紧凑，保持相册式观感。
-const ADAPTIVE_GAP = 6
+// 自适应视图的行内间距（与 grid/masonry 统一保持 12px 间距）。
+const ADAPTIVE_GAP = 12
 
 export interface UseAdaptiveVirtualizerOptions {
   // 原生滚动容器；adaptive 不再依赖 ScrollArea，而是直接读写真实滚动元素。
