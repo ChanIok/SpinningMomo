@@ -53,8 +53,7 @@ auto process_single_file(Core::State::AppState& app_state,
   }
 
   auto asset_type = Common::detect_asset_type(file_path);
-  if (options.generate_thumbnails.value_or(true) && progress_tracker &&
-      (asset_type == "photo" || asset_type == "video")) {
+  if (progress_tracker && (asset_type == "photo" || asset_type == "video")) {
     progress_tracker->mark_thumbnail_processed();
   }
 
@@ -163,15 +162,12 @@ auto run_processing_phase(Core::State::AppState& app_state,
     return std::unexpected("Gallery scan cancelled");
   }
 
-  std::int64_t thumbnail_targets = 0;
-  if (options.generate_thumbnails.value_or(true)) {
-    thumbnail_targets = static_cast<std::int64_t>(
-        std::ranges::count_if(files_to_process, [](const Types::FileAnalysisResult& result) {
-          auto asset_type = Common::detect_asset_type(result.file_info.path);
-          // 视频与照片一样计入缩略图任务，封面失败时仍 mark，避免进度条卡住
-          return asset_type == "photo" || asset_type == "video";
-        }));
-  }
+  std::int64_t thumbnail_targets = static_cast<std::int64_t>(
+      std::ranges::count_if(files_to_process, [](const Types::FileAnalysisResult& result) {
+        auto asset_type = Common::detect_asset_type(result.file_info.path);
+        // 视频与照片一样计入缩略图任务，封面失败时仍 mark，避免进度条卡住
+        return asset_type == "photo" || asset_type == "video";
+      }));
 
   std::int64_t processing_total_units = static_cast<std::int64_t>(files_to_process.size()) +
                                         thumbnail_targets * Progress::kThumbnailProgressWeight;

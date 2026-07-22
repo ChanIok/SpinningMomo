@@ -177,10 +177,10 @@ export struct ScanIgnoreRule {
   std::optional<std::string> description;
 };
 
+export constexpr std::uint32_t kDefaultThumbnailShortEdge = 480;
+
 export struct ScanOptions {
   std::string directory;
-  std::optional<bool> generate_thumbnails = true;
-  std::optional<std::uint32_t> thumbnail_short_edge = 480;
   std::optional<bool> force_reanalyze = false;
   std::optional<bool> rebuild_thumbnails = false;
   // 留空时统一回落到 Scanner::Common::default_supported_extensions()，避免多处维护默认列表。

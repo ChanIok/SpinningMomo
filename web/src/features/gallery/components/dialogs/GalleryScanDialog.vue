@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, Transition } from 'vue'
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
@@ -11,7 +11,6 @@ import { storeToRefs } from 'pinia'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,9 +19,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { ChevronDown, ChevronUp, Loader2, Plus, Trash2 } from 'lucide-vue-next'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ChevronRight, Loader2, Plus, Trash2 } from 'lucide-vue-next'
 
 interface Props {
   open: boolean
@@ -94,12 +98,9 @@ const isPathWithinBase = (target: string, base: string): boolean => {
   return normTarget[normBase.length] === '/' || normBase.endsWith('/')
 }
 
-const isSelectingScanDirectory = ref(false)
 const isSubmittingScanTask = ref(false)
 const showAdvancedOptions = ref(false)
 const scanDirectory = ref('')
-const generateThumbnails = ref(true)
-const thumbnailShortEdge = ref(480)
 const supportedExtensionsText = ref(defaultSupportedExtensions.join(', '))
 const ignoreRules = ref<FormIgnoreRule[]>([])
 const nextIgnoreRuleId = ref(1)
@@ -124,8 +125,6 @@ function toFormIgnoreRules(rules: ScanIgnoreRule[] | undefined): FormIgnoreRule[
 
 function resetForm() {
   scanDirectory.value = ''
-  generateThumbnails.value = true
-  thumbnailShortEdge.value = 480
   supportedExtensionsText.value = defaultSupportedExtensions.join(', ')
   ignoreRules.value = []
   nextIgnoreRuleId.value = 1
@@ -137,12 +136,6 @@ function initializeFormFromPreset() {
 
   if (props.preset?.directory) {
     scanDirectory.value = props.preset.directory
-  }
-  if (props.preset?.generateThumbnails !== undefined) {
-    generateThumbnails.value = props.preset.generateThumbnails
-  }
-  if (props.preset?.thumbnailShortEdge !== undefined) {
-    thumbnailShortEdge.value = props.preset.thumbnailShortEdge
   }
   if (props.preset?.supportedExtensions && props.preset.supportedExtensions.length > 0) {
     supportedExtensionsText.value = props.preset.supportedExtensions.join(', ')
@@ -231,8 +224,6 @@ function buildScanIgnoreRules(): ScanIgnoreRule[] | undefined {
 }
 
 async function handleSelectScanDirectory() {
-  isSelectingScanDirectory.value = true
-
   try {
     const parentWindowMode = isWebView() ? 1 : 2
     const result = await call<{ path: string }>(
@@ -271,8 +262,6 @@ async function handleSelectScanDirectory() {
     }
 
     toast.error(t('gallery.sidebar.scan.selectDirectoryFailed'), { description: message })
-  } finally {
-    isSelectingScanDirectory.value = false
   }
 }
 
@@ -289,8 +278,6 @@ async function handleImportAlbum() {
   try {
     const scanParams: ScanAssetsParams = {
       directory,
-      generateThumbnails: generateThumbnails.value,
-      thumbnailShortEdge: thumbnailShortEdge.value,
       supportedExtensions: parseSupportedExtensions(supportedExtensionsText.value),
       ignoreRules: buildScanIgnoreRules(),
     }
@@ -314,185 +301,175 @@ async function handleImportAlbum() {
     isSubmittingScanTask.value = false
   }
 }
+
+function handleExpandEnter(el: Element) {
+  const target = el as HTMLElement
+  const height = target.scrollHeight
+  target.style.height = '0px'
+  requestAnimationFrame(() => {
+    target.style.height = `${height}px`
+  })
+}
+
+function handleExpandAfterEnter(el: Element) {
+  const target = el as HTMLElement
+  target.style.height = 'auto'
+}
+
+function handleExpandLeave(el: Element) {
+  const target = el as HTMLElement
+  target.style.height = `${target.scrollHeight}px`
+  requestAnimationFrame(() => {
+    target.style.height = '0px'
+  })
+}
 </script>
 
 <template>
   <Dialog :open="open" @update:open="handleDialogOpenChange">
-    <DialogContent class="overflow-hidden p-0 sm:max-w-[720px]" :show-close-button="false">
+    <DialogContent class="overflow-hidden p-0 sm:max-w-xl" :show-close-button="false">
       <div class="flex h-full max-h-[85vh] flex-col">
         <DialogHeader class="px-6 pt-6 pb-3">
           <DialogTitle>{{ t('gallery.sidebar.scan.dialogTitle') }}</DialogTitle>
-          <DialogDescription>
-            {{ t('gallery.sidebar.scan.dialogDescription') }}
-          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea class="min-h-0 flex-1 px-6">
-          <div class="space-y-4 pb-4">
+          <div class="space-y-5 py-2">
             <div class="space-y-2">
-              <Label for="scan-directory">{{ t('gallery.sidebar.scan.directoryLabel') }}</Label>
+              <Label for="scan-directory" class="text-sm font-medium">{{
+                t('gallery.sidebar.scan.directoryLabel')
+              }}</Label>
               <div class="flex items-center gap-2">
                 <Input
                   id="scan-directory"
                   v-model="scanDirectory"
+                  class="flex-1"
                   :placeholder="t('gallery.sidebar.scan.directoryPlaceholder')"
                   readonly
                 />
                 <Button
                   variant="outline"
-                  :disabled="isSelectingScanDirectory || isSubmittingScanTask"
+                  :disabled="isSubmittingScanTask"
                   @click="handleSelectScanDirectory"
                 >
-                  <Loader2 v-if="isSelectingScanDirectory" class="mr-2 h-4 w-4 animate-spin" />
-                  {{
-                    isSelectingScanDirectory
-                      ? t('gallery.sidebar.scan.selectingDirectory')
-                      : t('gallery.sidebar.scan.selectDirectory')
-                  }}
+                  {{ t('gallery.sidebar.scan.selectDirectory') }}
                 </Button>
               </div>
             </div>
 
-            <button
-              type="button"
-              class="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-accent/40"
-              @click="showAdvancedOptions = !showAdvancedOptions"
+            <div class="space-y-1">
+              <button
+                type="button"
+                class="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:opacity-80"
+                @click="showAdvancedOptions = !showAdvancedOptions"
+              >
+                <ChevronRight
+                  class="h-4 w-4 text-muted-foreground transition-transform duration-200"
+                  :class="{ 'rotate-90': showAdvancedOptions }"
+                />
+                <span>{{ t('gallery.sidebar.scan.advancedOptions') }}</span>
+              </button>
+              <p class="pl-5.5 text-xs text-muted-foreground">
+                {{ t('gallery.sidebar.scan.advancedOptionsHint') }}
+              </p>
+            </div>
+
+            <Transition
+              name="dialog-expand"
+              @enter="handleExpandEnter"
+              @after-enter="handleExpandAfterEnter"
+              @leave="handleExpandLeave"
             >
-              <span>{{ t('gallery.sidebar.scan.advancedOptions') }}</span>
-              <ChevronUp v-if="showAdvancedOptions" class="h-4 w-4" />
-              <ChevronDown v-else class="h-4 w-4" />
-            </button>
-
-            <div v-if="showAdvancedOptions" class="space-y-4 rounded-md border p-3">
-              <div class="flex items-center justify-between rounded-md border p-3">
-                <div class="space-y-1">
-                  <Label>{{ t('gallery.sidebar.scan.generateThumbnails') }}</Label>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('gallery.sidebar.scan.generateThumbnailsHint') }}
-                  </p>
-                </div>
-                <Switch
-                  :model-value="generateThumbnails"
-                  @update:model-value="generateThumbnails = Boolean($event)"
-                />
-              </div>
-
-              <div class="space-y-2">
-                <Label for="thumbnail-short-edge">{{
-                  t('gallery.sidebar.scan.thumbnailShortEdge')
-                }}</Label>
-                <Input
-                  id="thumbnail-short-edge"
-                  v-model.number="thumbnailShortEdge"
-                  type="number"
-                  :min="64"
-                  :max="4096"
-                  :disabled="!generateThumbnails"
-                />
-              </div>
-
-              <div class="space-y-2">
-                <Label for="supported-extensions">{{
-                  t('gallery.sidebar.scan.supportedExtensions')
-                }}</Label>
-                <Textarea
-                  id="supported-extensions"
-                  v-model="supportedExtensionsText"
-                  :rows="3"
-                  placeholder=".jpg, .jpeg, .png"
-                />
-                <p class="text-xs text-muted-foreground">
-                  {{ t('gallery.sidebar.scan.supportedExtensionsHint') }}
-                </p>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <Label>{{ t('gallery.sidebar.scan.ignoreRules') }}</Label>
-                  <Button type="button" variant="outline" size="sm" @click="addIgnoreRule">
-                    <Plus class="mr-1 h-3 w-3" />
-                    {{ t('gallery.sidebar.scan.addRule') }}
-                  </Button>
+              <div v-if="showAdvancedOptions" class="space-y-4 pt-2">
+                <div class="space-y-2">
+                  <Label for="supported-extensions" class="text-sm font-medium">{{
+                    t('gallery.sidebar.scan.supportedExtensions')
+                  }}</Label>
+                  <Input
+                    id="supported-extensions"
+                    v-model="supportedExtensionsText"
+                    placeholder=".jpg, .jpeg, .png"
+                  />
                 </div>
 
-                <div
-                  v-if="ignoreRules.length === 0"
-                  class="rounded-md border border-dashed p-3 text-xs text-muted-foreground"
-                >
-                  {{ t('gallery.sidebar.scan.noRules') }}
-                </div>
-
-                <div
-                  v-for="rule in ignoreRules"
-                  :key="rule.id"
-                  class="space-y-3 rounded-md border p-3"
-                >
-                  <div class="flex items-start justify-between gap-2">
-                    <div class="grid flex-1 gap-3 sm:grid-cols-2">
-                      <div class="space-y-2 sm:col-span-2">
-                        <Label>{{ t('gallery.sidebar.scan.rulePattern') }}</Label>
-                        <Input
-                          v-model="rule.pattern"
-                          :placeholder="t('gallery.sidebar.scan.rulePatternPlaceholder')"
-                        />
-                      </div>
-
-                      <div class="space-y-2">
-                        <Label>{{ t('gallery.sidebar.scan.patternType') }}</Label>
-                        <select
-                          v-model="rule.patternType"
-                          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          <option value="regex">
-                            {{ t('gallery.sidebar.scan.patternTypeRegex') }}
-                          </option>
-                          <option value="glob">
-                            {{ t('gallery.sidebar.scan.patternTypeGlob') }}
-                          </option>
-                        </select>
-                      </div>
-
-                      <div class="space-y-2">
-                        <Label>{{ t('gallery.sidebar.scan.ruleType') }}</Label>
-                        <select
-                          v-model="rule.ruleType"
-                          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          <option value="exclude">
-                            {{ t('gallery.sidebar.scan.ruleTypeExclude') }}
-                          </option>
-                          <option value="include">
-                            {{ t('gallery.sidebar.scan.ruleTypeInclude') }}
-                          </option>
-                        </select>
-                      </div>
-
-                      <div class="space-y-2 sm:col-span-2">
-                        <Label>{{ t('gallery.sidebar.scan.ruleDescription') }}</Label>
-                        <Input
-                          v-model="rule.description"
-                          :placeholder="t('gallery.sidebar.scan.ruleDescriptionPlaceholder')"
-                        />
-                      </div>
-                    </div>
-
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <Label class="text-sm font-medium">{{
+                      t('gallery.sidebar.scan.ignoreRules')
+                    }}</Label>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      class="h-8 w-8"
-                      @click="removeIgnoreRule(rule.id)"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 text-xs"
+                      @click="addIgnoreRule"
                     >
-                      <Trash2 class="h-4 w-4 text-destructive" />
+                      <Plus class="mr-0 h-3 w-3" />
+                      {{ t('gallery.sidebar.scan.addRule') }}
                     </Button>
+                  </div>
+
+                  <!-- 显式表格头，确保对齐与清晰指引 -->
+                  <div
+                    v-if="ignoreRules.length > 0"
+                    class="grid grid-cols-[1fr_100px_105px_36px] gap-2 text-[11px] font-medium text-muted-foreground"
+                  >
+                    <span class="px-2">{{ t('gallery.sidebar.scan.rulePattern') }}</span>
+                    <span class="px-2">{{ t('gallery.sidebar.scan.patternType') }}</span>
+                    <span class="px-2">{{ t('gallery.sidebar.scan.ruleType') }}</span>
+                    <span></span>
+                  </div>
+
+                  <div v-if="ignoreRules.length === 0" class="py-1 text-xs text-muted-foreground">
+                    {{ t('gallery.sidebar.scan.noRules') }}
+                  </div>
+
+                  <div v-else class="space-y-2">
+                    <div
+                      v-for="rule in ignoreRules"
+                      :key="rule.id"
+                      class="grid grid-cols-[1fr_100px_105px_36px] items-center gap-2"
+                    >
+                      <Input
+                        v-model="rule.pattern"
+                        :placeholder="t('gallery.sidebar.scan.rulePatternPlaceholder')"
+                      />
+                      <Select v-model="rule.patternType">
+                        <SelectTrigger class="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="regex">regex</SelectItem>
+                          <SelectItem value="glob">glob</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select v-model="rule.ruleType">
+                        <SelectTrigger class="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="exclude">exclude</SelectItem>
+                          <SelectItem value="include">include</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        class="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                        @click="removeIgnoreRule(rule.id)"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Transition>
           </div>
         </ScrollArea>
 
-        <DialogFooter class="shrink-0 border-t px-6 py-4">
+        <DialogFooter class="shrink-0 px-6 py-4">
           <Button
             variant="outline"
             :disabled="isSubmittingScanTask"
@@ -513,3 +490,11 @@ async function handleImportAlbum() {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+.dialog-expand-enter-active,
+.dialog-expand-leave-active {
+  transition: height 0.2s ease-out;
+  overflow: hidden;
+}
+</style>

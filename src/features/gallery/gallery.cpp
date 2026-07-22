@@ -874,8 +874,7 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   // 不在这里顺手做全局孤儿清理，避免把启动级别的缓存对账混进日常扫描。
   if (!options.rebuild_thumbnails.value_or(false)) {
     auto thumbnail_repair_result = Asset::Thumbnail::repair_missing_thumbnails(
-        app_state, std::filesystem::path(options.directory),
-        options.thumbnail_short_edge.value_or(480));
+        app_state, std::filesystem::path(options.directory), Types::kDefaultThumbnailShortEdge);
     if (!thumbnail_repair_result) {
       Logger().warn("Gallery thumbnail repair failed after scan '{}': {}", options.directory,
                     thumbnail_repair_result.error());

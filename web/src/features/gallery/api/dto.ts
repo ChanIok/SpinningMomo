@@ -163,8 +163,6 @@ export interface OperationResult {
 // 扫描参数
 export interface ScanAssetsParams {
   directory: string
-  generateThumbnails?: boolean
-  thumbnailShortEdge?: number
   supportedExtensions?: string[]
   ignoreRules?: ScanIgnoreRule[]
   forceReanalyze?: boolean

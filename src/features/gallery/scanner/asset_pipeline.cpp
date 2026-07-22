@@ -78,31 +78,29 @@ auto prepare_media_asset(Core::State::AppState& app_state,
     std::optional<Utils::Image::BGRABitmapData> thumbnail_bitmap_data;
 
     // 缩略图像素同时供主色复用，避免同一照片重复解码缩放
-    if (options.generate_thumbnails.value_or(true)) {
-      auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
-          photo_wic_factory.get(), normalized_path, options.thumbnail_short_edge.value_or(480));
-      if (!bitmap_data_result) {
-        Logger().warn("Failed to load thumbnail bitmap data for {}: {}", normalized_path.string(),
-                      bitmap_data_result.error());
-      } else {
-        thumbnail_bitmap_data = std::move(bitmap_data_result.value());
+    auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
+        photo_wic_factory.get(), normalized_path, kDefaultThumbnailShortEdge);
+    if (!bitmap_data_result) {
+      Logger().warn("Failed to load thumbnail bitmap data for {}: {}", normalized_path.string(),
+                    bitmap_data_result.error());
+    } else {
+      thumbnail_bitmap_data = std::move(bitmap_data_result.value());
 
-        if (input.hash.empty()) {
-          Logger().warn("Skip thumbnail generation for {}: empty hash", normalized_path.string());
-        } else {
-          auto thumbnail_result = Asset::Thumbnail::save_thumbnail_from_bgra(
-              app_state, input.hash, thumbnail_bitmap_data.value(),
-              options.rebuild_thumbnails.value_or(false));
-          if (!thumbnail_result) {
-            Logger().warn("Failed to generate thumbnail for {}: {}", normalized_path.string(),
-                          thumbnail_result.error());
-          }
+      if (input.hash.empty()) {
+        Logger().warn("Skip thumbnail generation for {}: empty hash", normalized_path.string());
+      } else {
+        auto thumbnail_result = Asset::Thumbnail::save_thumbnail_from_bgra(
+            app_state, input.hash, thumbnail_bitmap_data.value(),
+            options.rebuild_thumbnails.value_or(false));
+        if (!thumbnail_result) {
+          Logger().warn("Failed to generate thumbnail for {}: {}", normalized_path.string(),
+                        thumbnail_result.error());
         }
       }
     }
 
     const Features::Gallery::Color::Types::MainColorExtractOptions color_extract_options{
-        .sample_short_edge = options.thumbnail_short_edge.value_or(480),
+        .sample_short_edge = kDefaultThumbnailShortEdge,
     };
     auto color_result = thumbnail_bitmap_data.has_value()
                             ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
@@ -117,12 +115,9 @@ auto prepare_media_asset(Core::State::AppState& app_state,
       prepared.colors.clear();
     }
   } else if (asset_type == "video") {
-    // MF：分辨率/时长 + 可选封面；失败时兜底写入，避免单文件拖垮整批
-    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
-        normalized_path,
-        options.generate_thumbnails.value_or(true)
-            ? std::optional<std::uint32_t>{options.thumbnail_short_edge.value_or(480)}
-            : std::nullopt);
+    // MF：分辨率/时长 + 封面；失败时兜底写入，避免单文件拖垮整批
+    auto video_result =
+        Utils::Media::VideoAsset::analyze_video_file(normalized_path, kDefaultThumbnailShortEdge);
     if (video_result) {
       asset.width = static_cast<std::int32_t>(video_result->width);
       asset.height = static_cast<std::int32_t>(video_result->height);

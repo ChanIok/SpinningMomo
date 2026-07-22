@@ -407,7 +407,6 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
   size_t started_count = 0;
   std::optional<std::string> first_error;
-  std::uint32_t startup_thumbnail_short_edge = 480;
 
   // 公共 helper：启动 watcher 线程并统一处理计数和错误记录。
   auto try_start_watcher = [&](const std::string& key, State::FolderWatcherState& watcher) -> bool {
@@ -461,10 +460,6 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       lifecycle_lock = std::unique_lock<std::mutex>(watcher_ptr->watch_lifecycle_mutex);
     }
     auto& watcher = *watcher_ptr;
-
-    startup_thumbnail_short_edge =
-        std::max(startup_thumbnail_short_edge,
-                 Sync::get_watcher_scan_options(watcher).thumbnail_short_edge.value_or(480));
 
     if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state, watcher.root_path)) {
       Logger().warn("Skip gallery startup recovery for unavailable remote root '{}'",
@@ -550,7 +545,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
   // 所有 root 的启动恢复都完成后，统一做一次全局缩略图缓存对账：补 missing、删 orphan。
   auto thumbnail_reconcile_result = Features::Gallery::Asset::Thumbnail::reconcile_thumbnail_cache(
-      app_state, startup_thumbnail_short_edge);
+      app_state, Types::kDefaultThumbnailShortEdge);
   if (!thumbnail_reconcile_result) {
     Logger().warn("Gallery startup thumbnail cache reconcile failed: {}",
                   thumbnail_reconcile_result.error());

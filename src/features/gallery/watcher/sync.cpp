@@ -585,7 +585,7 @@ auto apply_full_rescan(Core::State::AppState& app_state, State::FolderWatcherSta
   }
 
   auto thumbnail_repair_result = Features::Gallery::Asset::Thumbnail::repair_missing_thumbnails(
-      app_state, watcher.root_path, options.thumbnail_short_edge.value_or(480));
+      app_state, watcher.root_path, Types::kDefaultThumbnailShortEdge);
   if (!thumbnail_repair_result) {
     Logger().warn("Gallery watcher thumbnail repair failed for '{}': {}",
                   watcher.root_path.string(), thumbnail_repair_result.error());
