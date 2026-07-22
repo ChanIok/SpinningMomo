@@ -24,7 +24,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { TriangleAlert } from 'lucide-vue-next'
+import { TriangleAlert, RotateCcw } from 'lucide-vue-next'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
 
@@ -237,18 +237,6 @@ const handleResetSettings = async () => {
   </div>
 
   <div v-else class="w-full">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.capture.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.capture.description') }}</p>
-      </div>
-      <ResetSettingsDialog
-        :title="t('settings.capture.reset.title')"
-        :description="t('settings.capture.reset.description')"
-        @reset="handleResetSettings"
-      />
-    </div>
-
     <div class="space-y-8">
       <div class="space-y-4">
         <div>
@@ -817,6 +805,26 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
         </ItemGroup>
+      </div>
+
+      <!-- Bottom Reset Section -->
+      <div class="mt-12 flex justify-center pb-4">
+        <ResetSettingsDialog
+          :title="t('settings.capture.reset.title')"
+          :description="t('settings.capture.reset.description')"
+          @reset="handleResetSettings"
+        >
+          <template #trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="gap-1.5 text-xs text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+              {{ t('settings.capture.reset.title') }}
+            </Button>
+          </template>
+        </ResetSettingsDialog>
       </div>
     </div>
   </div>

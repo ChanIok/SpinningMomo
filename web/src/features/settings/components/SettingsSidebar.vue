@@ -10,6 +10,7 @@ import {
   Palette,
   DatabaseBackup,
 } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
 
 export type SettingsPageKey =
@@ -26,7 +27,6 @@ interface SettingsMenuItem {
   key: SettingsPageKey
   label: string
   icon: any
-  description: string
 }
 
 defineProps<{
@@ -44,49 +44,41 @@ const settingsMenus: SettingsMenuItem[] = [
     key: 'general',
     label: 'settings.layout.general.title',
     icon: Settings,
-    description: 'settings.layout.general.description',
   },
   {
     key: 'hotkeys',
     label: 'settings.layout.hotkeys.title',
     icon: Keyboard,
-    description: 'settings.layout.hotkeys.description',
   },
   {
     key: 'capture',
     label: 'settings.layout.capture.title',
     icon: Camera,
-    description: 'settings.layout.capture.description',
   },
   {
     key: 'windowScene',
     label: 'settings.layout.windowScene.title',
     icon: Monitor,
-    description: 'settings.layout.windowScene.description',
   },
   {
     key: 'floatingWindow',
     label: 'settings.layout.floatingWindow.title',
     icon: Menu,
-    description: 'settings.layout.floatingWindow.description',
   },
   {
     key: 'webAppearance',
     label: 'settings.layout.webAppearance.title',
     icon: Palette,
-    description: 'settings.layout.webAppearance.description',
   },
   {
     key: 'extensions',
     label: 'settings.layout.extensions.title',
     icon: Blocks,
-    description: 'settings.layout.extensions.description',
   },
   {
     key: 'backup',
     label: 'settings.layout.backup.title',
     icon: DatabaseBackup,
-    description: 'settings.layout.backup.description',
   },
 ]
 
@@ -96,36 +88,37 @@ const handleMenuClick = (key: SettingsPageKey) => {
 </script>
 
 <template>
-  <div class="flex h-full w-48 flex-col lg:w-56 2xl:w-64">
-    <div class="h-full p-4 pr-0">
-      <nav class="flex-1">
-        <div class="space-y-1">
-          <div v-for="item in settingsMenus" :key="item.key" class="group">
-            <button
-              @click="handleMenuClick(item.key)"
-              :class="
-                cn(
-                  'flex w-full items-center space-x-3 rounded-md px-4 py-2.5 transition-colors duration-200 ease-out',
-                  'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                  activePage === item.key
-                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&>svg]:text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-                )
-              "
-              :title="t(item.description)"
-            >
-              <component
-                :is="item.icon"
-                class="h-5 w-5 flex-shrink-0 transition-colors duration-200 ease-out"
-                stroke-width="1.8"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium">{{ t(item.label) }}</div>
-              </div>
-            </button>
+  <div class="flex h-full w-48 flex-col border-r border-border/40 lg:w-56 2xl:w-64">
+    <ScrollArea class="h-full w-full flex-1">
+      <div class="p-4 pr-3">
+        <nav class="flex-1">
+          <div class="space-y-1">
+            <div v-for="item in settingsMenus" :key="item.key" class="group">
+              <button
+                @click="handleMenuClick(item.key)"
+                :class="
+                  cn(
+                    'flex w-full items-center space-x-3 rounded-md px-4 py-2.5 transition-colors duration-200 ease-out',
+                    'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                    activePage === item.key
+                      ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&>svg]:text-primary'
+                      : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+                  )
+                "
+              >
+                <component
+                  :is="item.icon"
+                  class="h-5 w-5 flex-shrink-0 transition-colors duration-200 ease-out"
+                  stroke-width="1.8"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium">{{ t(item.label) }}</div>
+                </div>
+              </button>
+            </div>
           </div>
-        </div>
-      </nav>
-    </div>
+        </nav>
+      </div>
+    </ScrollArea>
   </div>
 </template>

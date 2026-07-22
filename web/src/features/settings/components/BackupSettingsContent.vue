@@ -88,13 +88,6 @@ const handleConfirmRestore = async () => {
 
 <template>
   <div class="w-full">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.backup.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.backup.description') }}</p>
-      </div>
-    </div>
-
     <div class="space-y-8">
       <div class="space-y-4">
         <ItemGroup>

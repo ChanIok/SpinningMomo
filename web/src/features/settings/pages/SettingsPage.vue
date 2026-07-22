@@ -31,21 +31,23 @@ watch(activePage, () => {
 </script>
 
 <template>
-  <div class="flex h-full text-foreground">
-    <SettingsSidebar v-model:activePage="activePage" />
-    <div class="flex h-full flex-1 flex-col overflow-hidden">
-      <ScrollArea ref="scrollAreaRef" class="h-full w-full flex-1">
-        <div class="mx-auto max-w-[1200px] p-8 pt-4">
-          <GeneralSettingsContent v-if="activePage === 'general'" />
-          <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
-          <CaptureSettingsContent v-if="activePage === 'capture'" />
-          <ExtensionsContent v-if="activePage === 'extensions'" />
-          <WindowSceneContent v-if="activePage === 'windowScene'" />
-          <FloatingWindowContent v-if="activePage === 'floatingWindow'" />
-          <AppearanceContent v-if="activePage === 'webAppearance'" />
-          <BackupSettingsContent v-if="activePage === 'backup'" />
-        </div>
-      </ScrollArea>
+  <div class="flex h-full w-full justify-center text-foreground">
+    <div class="flex h-full w-full max-w-6xl">
+      <SettingsSidebar v-model:activePage="activePage" />
+      <div class="flex h-full flex-1 flex-col overflow-hidden">
+        <ScrollArea ref="scrollAreaRef" class="h-full w-full flex-1">
+          <div class="px-8 py-4">
+            <GeneralSettingsContent v-if="activePage === 'general'" />
+            <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
+            <CaptureSettingsContent v-if="activePage === 'capture'" />
+            <ExtensionsContent v-if="activePage === 'extensions'" />
+            <WindowSceneContent v-if="activePage === 'windowScene'" />
+            <FloatingWindowContent v-if="activePage === 'floatingWindow'" />
+            <AppearanceContent v-if="activePage === 'webAppearance'" />
+            <BackupSettingsContent v-if="activePage === 'backup'" />
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   </div>
 </template>

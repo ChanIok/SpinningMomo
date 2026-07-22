@@ -3,6 +3,7 @@ import { useSettingsStore } from '../store'
 import { useGeneralActions } from '../composables/useGeneralActions'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
+import { RotateCcw } from 'lucide-vue-next'
 import {
   Item,
   ItemContent,
@@ -26,7 +27,9 @@ const {
 const { clearError } = store
 const { t } = useI18n()
 
-const getHotkey = (type: 'floatingWindow' | 'screenshot' | 'recording') => {
+type HotkeyType = 'floatingWindow' | 'screenshot' | 'recording'
+
+const getHotkey = (type: HotkeyType) => {
   const hotkey = appSettings.value.app.hotkey[type]
   return {
     modifiers: hotkey.modifiers,
@@ -60,18 +63,6 @@ const handleReset = async () => {
   </div>
 
   <div v-else class="w-full">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.hotkeys.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.hotkeys.description') }}</p>
-      </div>
-      <ResetSettingsDialog
-        :title="t('settings.hotkeys.reset.title')"
-        :description="t('settings.hotkeys.reset.description')"
-        @reset="handleReset"
-      />
-    </div>
-
     <div class="space-y-8">
       <div class="space-y-4">
         <div>
@@ -138,6 +129,26 @@ const handleReset = async () => {
             </ItemActions>
           </Item>
         </ItemGroup>
+      </div>
+
+      <!-- Bottom Reset Section -->
+      <div class="mt-12 flex justify-center pb-4">
+        <ResetSettingsDialog
+          :title="t('settings.hotkeys.reset.title')"
+          :description="t('settings.hotkeys.reset.description')"
+          @reset="handleReset"
+        >
+          <template #trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="gap-1.5 text-xs text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+              {{ t('settings.hotkeys.reset.title') }}
+            </Button>
+          </template>
+        </ResetSettingsDialog>
       </div>
     </div>
   </div>

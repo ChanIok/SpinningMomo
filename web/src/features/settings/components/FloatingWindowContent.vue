@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import DraggableSettingsList from './DraggableSettingsList.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
+import { RotateCcw } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import {
   Item,
@@ -173,18 +174,6 @@ const handleResetSettings = async () => {
   </div>
 
   <div v-else class="w-full">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.floatingWindow.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.floatingWindow.description') }}</p>
-      </div>
-      <ResetSettingsDialog
-        :title="t('settings.floatingWindow.reset.title')"
-        :description="t('settings.floatingWindow.reset.description')"
-        @reset="handleResetSettings"
-      />
-    </div>
-
     <div class="space-y-8">
       <div class="space-y-6">
         <DraggableSettingsList
@@ -314,6 +303,26 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
         </ItemGroup>
+      </div>
+
+      <!-- Bottom Reset Section -->
+      <div class="mt-12 flex justify-center pb-4">
+        <ResetSettingsDialog
+          :title="t('settings.floatingWindow.reset.title')"
+          :description="t('settings.floatingWindow.reset.description')"
+          @reset="handleResetSettings"
+        >
+          <template #trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="gap-1.5 text-xs text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+              {{ t('settings.floatingWindow.reset.title') }}
+            </Button>
+          </template>
+        </ResetSettingsDialog>
       </div>
     </div>
   </div>

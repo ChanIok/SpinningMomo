@@ -277,17 +277,17 @@ onUnmounted(() => {
 <template>
   <div class="space-y-3">
     <div>
-      <h3 class="text-base font-semibold text-foreground">{{ title }}</h3>
+      <h3 class="text-lg font-semibold text-foreground">{{ title }}</h3>
       <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
     </div>
 
     <div class="surface-top rounded-md p-3">
-      <div ref="itemsContainer" class="relative flex flex-col gap-1">
+      <div ref="itemsContainer" class="relative flex flex-col">
         <TransitionGroup name="list">
           <div
             v-for="item in items"
             :key="item.id"
-            class="draggable-item surface-top group flex cursor-grab items-center justify-between rounded-md p-2.5 transition-colors hover:bg-accent/50 active:cursor-grabbing"
+            class="draggable-item group flex cursor-grab items-center justify-between rounded-md p-2.5 transition-colors hover:bg-accent active:cursor-grabbing"
             :class="{
               'is-dragging-source': draggingId === item.id,
             }"
@@ -327,16 +327,13 @@ onUnmounted(() => {
       </div>
 
       <!-- Add Item Section (only if allowAdd is true) -->
-      <div v-if="allowAdd" class="mt-3 pt-3">
-        <div
-          v-if="isAdding"
-          class="flex items-center gap-2 rounded-md border border-primary bg-primary/5 p-3"
-        >
+      <div v-if="allowAdd" class="mt-2">
+        <div v-if="isAdding" class="flex items-center gap-2">
           <Input
             v-model="newItemValue"
             @keydown="handleKeyDown"
             :placeholder="addPlaceholder"
-            class="flex-1"
+            class="h-8 flex-1"
             autofocus
           />
           <Button size="sm" @click="handleAddItem">
