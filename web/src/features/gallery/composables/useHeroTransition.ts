@@ -2,7 +2,7 @@ import { ref } from 'vue'
 
 const LIGHTBOX_TOOLBAR_HEIGHT = 48
 const LIGHTBOX_FILMSTRIP_HEIGHT = 100
-const LIGHTBOX_VIEWPORT_PADDING = 0
+const LIGHTBOX_VIEWPORT_PADDING = 1
 
 interface HeroSource {
   rect: DOMRect

@@ -393,14 +393,10 @@ onBeforeUnmount(() => {
       />
 
       <div
-        v-if="hasError || !histogram"
+        v-if="hasError"
         class="absolute inset-0 flex items-center justify-center px-4 text-center text-xs text-muted-foreground"
       >
-        {{
-          hasError
-            ? t('gallery.details.histogram.unavailable')
-            : t('gallery.details.histogram.empty')
-        }}
+        {{ t('gallery.details.histogram.unavailable') }}
       </div>
     </div>
   </div>
