@@ -461,7 +461,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
     }
 
     if (Features::Gallery::Ignore::Service::apply_ignore_rules(candidate_path, watcher.root_path,
-                                                               ignore_rules)) {
+                                                               ignore_rules, false)) {
       continue;
     }
 

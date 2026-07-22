@@ -13,10 +13,11 @@ export struct CleanupPhaseResult {
   std::vector<std::string> removed_paths;
 };
 
-// 清理阶段：盘库对账，删除 DB 有盘无的资产与失效 folder
+// 清理阶段：以文件和目录库存对账，删除磁盘上已消失的索引。
 export auto run_cleanup_phase(
     Core::State::AppState& app_state, const std::filesystem::path& normalized_scan_root,
     const std::vector<Types::FileSystemInfo>& file_infos,
+    const std::vector<std::filesystem::path>& folder_paths,
     const std::unordered_map<std::string, Types::Metadata>& asset_cache,
     const std::function<void(const Types::ScanProgress&)>& progress_callback) -> CleanupPhaseResult;
 

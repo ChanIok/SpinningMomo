@@ -20,6 +20,11 @@ struct UpdateFolderDisplayNameParams {
   std::optional<std::string> display_name;
 };
 
+struct CreateFolderParams {
+  std::int64_t parent_folder_id;
+  std::string name;
+};
+
 // ============= 文件夹树 RPC 处理函数 =============
 
 auto handle_get_folder_tree(Core::State::AppState& app_state,
@@ -33,6 +38,21 @@ auto handle_get_folder_tree(Core::State::AppState& app_state,
   }
 
   co_return result.value();
+}
+
+// 在已索引父目录下创建真实子目录，并通知前端刷新文件夹树。
+auto handle_create_folder(Core::State::AppState& app_state, const CreateFolderParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto create_result = Features::Gallery::Folder::Service::create_child_folder(
+      app_state, params.parent_folder_id, params.name);
+  if (!create_result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + create_result.error()});
+  }
+
+  // 目录变化只刷新 Gallery UI，不构造文件级 ScanChange。
+  Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  co_return create_result.value();
 }
 
 auto handle_update_folder_display_name(Core::State::AppState& app_state,
@@ -82,6 +102,10 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<EmptyParams, std::vector<Features::Gallery::Types::FolderTreeNode>>(
       app_state, app_state.rpc->registry, "gallery.getFolderTree", handle_get_folder_tree,
       "Get folder tree structure for navigation");
+
+  register_method<CreateFolderParams, Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.createFolder", handle_create_folder,
+      "Create a physical child folder and index it immediately");
 
   register_method<UpdateFolderDisplayNameParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateFolderDisplayName",

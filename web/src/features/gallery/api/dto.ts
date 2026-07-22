@@ -11,6 +11,11 @@ export interface UpdateFolderDisplayNameParams {
   displayName: string
 }
 
+export interface CreateFolderParams {
+  parentFolderId: number
+  name: string
+}
+
 // 标签统计类型（仅 API 查询/展示用）
 export interface TagStats {
   id: number

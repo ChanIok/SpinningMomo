@@ -48,7 +48,7 @@
 - `src/features/gallery/watcher.cpp`：目录监听、增量同步、扫描后回调。
 - `src/features/gallery/scanner/scanner.cpp`：全量扫描编排入口（五阶段伪代码级流程）。
 - `src/features/gallery/scanner/asset_pipeline.*`：单路径 prepare/upsert/remove（全量与增量共用）。
-- `src/features/gallery/watcher/watcher.cpp`：注册/启停/startup recovery/manual move。
+- `src/features/gallery/watcher/watcher.cpp`：注册/启停/startup recovery/手动文件系统操作去重。
 - `src/features/gallery/watcher/notify.*`：ReadDirectoryChanges → 入队。
 - `src/features/gallery/watcher/sync.*`：pending 队列、防抖、增量/全量应用、dispatch。
 - `src/features/gallery/types.ixx`：`ScanResult` / `ScanChange` / `OperationResult` 等稳定语义。
@@ -72,6 +72,8 @@
 ## 关键不变量
 
 - `ScanChange` 是“文件变化事实”，用于派生同步，不等同于 UI 提示或 DB 统计。
+- `folders` 表映射监听根下真实存在且未被忽略的目录；被 include 的深层路径会保留必要祖先，空目录也是有效节点。
+- 目录库存变化只刷新 Gallery UI，不得伪造文件级 `ScanChange` 触发扩展后处理。
 - 手动文件动作若绕开 watcher 事件，必须显式补发 `ScanChange`。
 - `watcher` 增量整体失败时自动回退一次全量；全量仍失败则进入 Faulted，等待用户明确重试。
 - 启动恢复先让实时通知入队，再应用 USN/全量基线；checkpoint 只推进到已成功应用的启动边界。

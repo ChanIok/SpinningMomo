@@ -500,7 +500,7 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
   }
 
   // 删除录像 session 目录前后都要与 watcher 协作，避免把我们主动清理当成外部文件事件。
-  auto begin_ignore_result = Features::Gallery::Watcher::begin_manual_move_ignore(
+  auto begin_ignore_result = Features::Gallery::Watcher::begin_manual_file_system_ignore(
       app_state, session_directory, session_directory);
   bool ignore_registered = begin_ignore_result.has_value();
   if (!begin_ignore_result) {
@@ -515,7 +515,7 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
       return {};
     }
 
-    auto complete_ignore_result = Features::Gallery::Watcher::complete_manual_move_ignore(
+    auto complete_ignore_result = Features::Gallery::Watcher::complete_manual_file_system_ignore(
         app_state, session_directory, session_directory);
     if (!complete_ignore_result) {
       return std::unexpected("Failed to complete watcher ignore for video session cleanup '" +

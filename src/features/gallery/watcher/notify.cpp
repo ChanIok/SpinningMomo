@@ -49,26 +49,27 @@ auto build_ignore_key(const std::filesystem::path& path)
   return Utils::Path::NormalizeForComparison(normalized_result.value());
 }
 
-auto cleanup_expired_manual_move_ignores(Core::State::AppState& app_state) -> void {
+// 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
+auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state) -> void {
   auto now = std::chrono::steady_clock::now();
-  std::erase_if(app_state.gallery->manual_move_ignore_paths, [now](const auto& pair) {
+  std::erase_if(app_state.gallery->manual_file_system_ignore_paths, [now](const auto& pair) {
     const auto& entry = pair.second;
     return entry.in_flight_count <= 0 && entry.ignore_until <= now;
   });
 }
 
-// 判断路径是否在手动 move 忽略窗口内（与 lifecycle 共用 gallery 表）
-auto is_path_in_manual_move_ignore(Core::State::AppState& app_state,
-                                   const std::filesystem::path& path) -> bool {
+// 判断路径是否在应用主动文件系统操作的忽略窗口内。
+auto is_path_in_manual_file_system_ignore(Core::State::AppState& app_state,
+                                          const std::filesystem::path& path) -> bool {
   auto key_result = build_ignore_key(path);
   if (!key_result) {
     return false;
   }
 
-  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
-  cleanup_expired_manual_move_ignores(app_state);
-  auto it = app_state.gallery->manual_move_ignore_paths.find(key_result.value());
-  if (it == app_state.gallery->manual_move_ignore_paths.end()) {
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
+  cleanup_expired_manual_file_system_ignores(app_state);
+  auto it = app_state.gallery->manual_file_system_ignore_paths.find(key_result.value());
+  if (it == app_state.gallery->manual_file_system_ignore_paths.end()) {
     return false;
   }
 
@@ -76,25 +77,21 @@ auto is_path_in_manual_move_ignore(Core::State::AppState& app_state,
   return it->second.in_flight_count > 0 || it->second.ignore_until > now;
 }
 
-// 判断一个目录结构事件是否影响已索引资产，需要升级为全量对账。
-auto directory_notification_requires_full_rescan(Core::State::AppState& app_state,
-                                                 const ParsedNotification& notification)
+// 在 Basic 通知无法识别已消失路径类型时，用目录索引与资产前缀判断是否需要全量对账。
+auto unknown_removed_path_requires_full_rescan(Core::State::AppState& app_state,
+                                               const ParsedNotification& notification)
     -> std::expected<bool, std::string> {
-  switch (notification.action) {
-    case FILE_ACTION_ADDED:
-      // 运行时新建目录时，先不用急着全量扫描。
-      // 真正需要入库的内容，后面还会通过文件通知继续进入增量链路。
-      return false;
-    case FILE_ACTION_REMOVED:
-    case FILE_ACTION_RENAMED_OLD_NAME:
-    case FILE_ACTION_RENAMED_NEW_NAME:
-      // 目录被删掉或改名时，只有当这个目录下面已经有已入库资产，
-      // 才需要 full scan 去重新校正数据库里的路径状态。
-      return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
-          app_state, notification.path.string());
-    default:
-      return false;
+  auto folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
+      app_state, notification.path.string());
+  if (!folder_result) {
+    return std::unexpected(folder_result.error());
   }
+  if (folder_result->has_value()) {
+    return true;
+  }
+
+  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
+      app_state, notification.path.string());
 }
 
 auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
@@ -233,7 +230,7 @@ auto parse_extended_notification_buffer(const std::filesystem::path& root_path,
   return parsed_notifications;
 }
 
-// 解析 Windows ReadDirectoryChangesW 返回的基础变更通知缓冲区
+// 解析 Basic 变更通知：对仍存在的新路径补查类型，已消失路径保留 Unknown。
 auto parse_basic_notification_buffer(const std::filesystem::path& root_path,
                                      const std::byte* buffer, DWORD bytes_returned)
     -> std::vector<ParsedNotification> {
@@ -248,11 +245,19 @@ auto parse_basic_notification_buffer(const std::filesystem::path& root_path,
     auto full_path = root_path / std::filesystem::path(relative_name);
     auto normalized_result = Utils::Path::NormalizePath(full_path);
     if (normalized_result) {
+      auto entry_type = NotificationEntryType::Unknown;
+      std::error_code type_error;
+      // ADDED/RENAMED_NEW 通常仍可以访问，补查后空目录也能进入结构对账。
+      if (std::filesystem::is_directory(normalized_result.value(), type_error)) {
+        entry_type = NotificationEntryType::Directory;
+      } else if (!type_error &&
+                 std::filesystem::is_regular_file(normalized_result.value(), type_error)) {
+        entry_type = NotificationEntryType::File;
+      }
       parsed_notifications.push_back(ParsedNotification{
           .path = normalized_result.value(),
           .action = info->Action,
-          // 基础结构不含文件属性，尤其旧路径消失后无法补查，保留 Unknown 交给影响检查。
-          .entry_type = NotificationEntryType::Unknown,
+          .entry_type = entry_type,
       });
     } else {
       Logger().warn("Failed to normalize watcher path '{}': {}", full_path.string(),
@@ -277,8 +282,8 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   effective_notifications.reserve(notifications.size());
 
   for (const auto& notification : notifications) {
-    if (is_path_in_manual_move_ignore(app_state, notification.path)) {
-      Logger().debug("Watcher ignored notification for manual move path '{}', action={}",
+    if (is_path_in_manual_file_system_ignore(app_state, notification.path)) {
+      Logger().debug("Watcher ignored notification for manual file-system path '{}', action={}",
                      notification.path.string(), notification.action);
       continue;
     }
@@ -296,12 +301,12 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   }
 
   for (const auto& notification : effective_notifications) {
-    // Basic 无法识别已消失路径的类型；若旧路径下仍有资产，就按目录结构变化处理。
+    // Basic 无法识别已消失路径的类型；命中目录索引或资产前缀时按结构变化处理。
     if (notification.entry_type == NotificationEntryType::Unknown &&
         (notification.action == FILE_ACTION_REMOVED ||
          notification.action == FILE_ACTION_RENAMED_OLD_NAME)) {
       auto require_full_scan_result =
-          directory_notification_requires_full_rescan(app_state, notification);
+          unknown_removed_path_requires_full_rescan(app_state, notification);
       if (!require_full_scan_result) {
         Logger().warn(
             "Failed to inspect unknown Basic watcher change for '{}': {}. Scheduling full rescan.",
@@ -312,7 +317,8 @@ auto process_watch_notifications(Core::State::AppState& app_state,
 
       if (require_full_scan_result.value()) {
         Logger().debug(
-            "Unknown Basic watcher change for '{}' affects indexed assets, scheduling full rescan",
+            "Unknown Basic watcher change for '{}' affects indexed gallery paths, scheduling full "
+            "rescan",
             notification.path.string());
         require_full_rescan = true;
         break;
@@ -328,30 +334,12 @@ auto process_watch_notifications(Core::State::AppState& app_state,
       case FILE_ACTION_REMOVED:
       case FILE_ACTION_RENAMED_OLD_NAME:
       case FILE_ACTION_RENAMED_NEW_NAME: {
-        // 目录事件和文件事件不一样：
-        // 文件可以直接按单个路径做增量，目录则要先判断会不会波及已有资产。
-        auto require_full_scan_result =
-            directory_notification_requires_full_rescan(app_state, notification);
-        if (!require_full_scan_result) {
-          Logger().warn(
-              "Failed to inspect directory change impact for '{}': {}. Scheduling full rescan.",
-              notification.path.string(), require_full_scan_result.error());
-          require_full_rescan = true;
-          break;
-        }
-
-        if (require_full_scan_result.value()) {
-          Logger().debug(
-              "Directory structural change detected for '{}', action={}, indexed assets affected, "
-              "scheduling full rescan",
-              notification.path.string(), notification.action);
-          require_full_rescan = true;
-        } else {
-          Logger().debug(
-              "Directory structural change detected for '{}', action={}, no indexed assets "
-              "affected, keeping incremental path",
-              notification.path.string(), notification.action);
-        }
+        // 目录表现在映射真实目录库存，任何结构变化都需要全量对账。
+        Logger().debug(
+            "Directory structural change detected for '{}', action={}, scheduling "
+            "full rescan",
+            notification.path.string(), notification.action);
+        require_full_rescan = true;
       } break;
       case FILE_ACTION_MODIFIED:
         Logger().debug(
@@ -413,7 +401,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
         // UPSERT 可以早过滤：被忽略的新文件本来就不应该进入图库。
         if (ignore_rules.has_value() &&
             Features::Gallery::Ignore::Service::apply_ignore_rules(
-                candidate_path, watcher.root_path, ignore_rules.value())) {
+                candidate_path, watcher.root_path, ignore_rules.value(), false)) {
           break;
         }
 

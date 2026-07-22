@@ -79,7 +79,7 @@ auto prepare_scan_context(Core::State::AppState& app_state, const Types::ScanOpt
   };
 }
 
-// 全量同步一个目录：准备 → 发现 → 指纹判定 → 处理落库 → 清理 → 组装 ScanChange
+// 全量同步一个目录：准备 → 盘点文件/目录 → 同步目录库存 → 处理资产 → 清理 → 组装 ScanChange。
 auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
                           std::function<void(const Types::ScanProgress&)> progress_callback)
     -> std::expected<Types::ScanResult, std::string> {
@@ -105,20 +105,30 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     return std::unexpected("Gallery scan cancelled");
   }
 
-  // 2. 发现：按扩展名与 ignore 枚举磁盘文件
-  auto file_infos_result = Discovery::run_discovery_phase(
+  // 2. 发现：一次遍历同时产出媒体文件和真实目录库存。
+  auto discovery_result = Discovery::run_discovery_phase(
       app_state, context.directory, context.folder_id, options, progress_callback);
-  if (!file_infos_result) {
-    return std::unexpected(file_infos_result.error());
+  if (!discovery_result) {
+    return std::unexpected(discovery_result.error());
   }
-  auto file_infos = std::move(file_infos_result.value());
+  auto discovery = std::move(discovery_result.value());
+  auto& file_infos = discovery.file_infos;
 
   // 目录发现完成后再次响应停止，避免继续提交内容指纹任务
   if (stop_token.stop_requested()) {
     return std::unexpected("Gallery scan cancelled");
   }
 
-  // 3. 指纹：粗判变更，为候选文件算 hash，得到 NEW/MODIFIED 列表
+  // 3. 目录：先物化本次有效目录库存，空目录也能立即进入文件夹树。
+  auto folder_mapping_result =
+      Folder::Service::batch_create_folders_for_paths(app_state, discovery.folder_paths);
+  if (!folder_mapping_result) {
+    return std::unexpected("Failed to synchronize folder inventory: " +
+                           folder_mapping_result.error());
+  }
+  auto folder_mapping = std::move(folder_mapping_result.value());
+
+  // 4. 指纹：粗判变更，为候选文件算 hash，得到 NEW/MODIFIED 列表。
   auto files_to_process_result = Analysis::run_hash_analysis_phase(
       app_state, file_infos, context.asset_cache, options, progress_callback, stop_token);
   if (!files_to_process_result) {
@@ -126,9 +136,9 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto files_to_process = std::move(files_to_process_result.value());
 
-  // 4. 处理：元数据/缩略图/主色 + 批量写库
+  // 5. 处理：复用完整目录映射写入元数据、缩略图和主色。
   auto processing_result = Process::run_processing_phase(
-      app_state, context.directory, files_to_process, options, progress_callback, stop_token);
+      app_state, files_to_process, folder_mapping, options, progress_callback, stop_token);
   if (!processing_result) {
     return std::unexpected(processing_result.error());
   }
@@ -139,11 +149,12 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     return std::unexpected("Gallery scan cancelled");
   }
 
-  // 5. 清理：DB 有盘无的资产与空目录
-  auto cleanup_phase = Cleanup::run_cleanup_phase(
-      app_state, context.normalized_scan_root, file_infos, context.asset_cache, progress_callback);
+  // 6. 清理：文件与目录分别以本次盘点库存删除过期索引。
+  auto cleanup_phase =
+      Cleanup::run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
+                                 discovery.folder_paths, context.asset_cache, progress_callback);
 
-  // 6. 组装统计与 ScanChange（REMOVE / UPSERT，路径去重）
+  // 7. 只为媒体资产组装 ScanChange，目录库存变化不泄漏给扩展消费者。
   Types::ScanResult result{
       .total_files = static_cast<int>(file_infos.size()),
       .new_items = static_cast<int>(processing_phase.batch_result.new_assets.size()),

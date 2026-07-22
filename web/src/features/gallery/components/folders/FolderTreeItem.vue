@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { FolderOpen, Pen, RefreshCw, Sparkles, Trash2 } from 'lucide-vue-next'
+import { FolderOpen, FolderPlus, Pen, RefreshCw, Sparkles, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -42,6 +42,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   select: [folderId: number, folderName: string]
   clearSelection: []
+  createChild: [parentFolderId: number, name: string]
   renameDisplayName: [folderId: number, displayName: string]
   openInExplorer: [folderId: number]
   removeWatch: [folderId: number]
@@ -61,6 +62,7 @@ const infinityNikkiEnabled = computed(
 // 展开状态放在 gallery store，递归节点重挂载后也能恢复，并可跨会话持久化。
 const isExpanded = computed(() => galleryStore.isFolderExpanded(props.folder.id))
 const isEditingDisplayName = ref(false)
+const isCreatingChild = ref(false)
 const showRemoveDialog = ref(false)
 const shouldPreventAutoFocus = ref(false)
 const isDragOver = ref(false)
@@ -89,6 +91,22 @@ function handleItemClick() {
     // 未选中 → 选中
     emit('select', props.folder.id, props.folder.displayName || props.folder.name)
   }
+}
+
+// 打开当前节点下的行内子目录编辑器，并阻止菜单关闭后抢回焦点。
+function startCreateChild() {
+  isCreatingChild.value = true
+  shouldPreventAutoFocus.value = true
+}
+
+// 确认后把父节点和名称交给上层执行真实文件系统操作。
+function handleCreateChildConfirm(name: string) {
+  emit('createChild', props.folder.id, name)
+  isCreatingChild.value = false
+}
+
+function handleCreateChildCancel() {
+  isCreatingChild.value = false
 }
 
 function startRenameDisplayName() {
@@ -285,6 +303,10 @@ function handleDrop(event: DragEvent) {
       </ContextMenuTrigger>
 
       <ContextMenuContent @close-auto-focus="handleContextMenuCloseAutoFocus">
+        <ContextMenuItem @click="startCreateChild">
+          <FolderPlus />
+          {{ t('gallery.sidebar.folders.menu.create') }}
+        </ContextMenuItem>
         <ContextMenuItem @click="startRenameDisplayName">
           <Pen />
           {{ t('gallery.sidebar.folders.menu.renameDisplayName') }}
@@ -311,6 +333,15 @@ function handleDrop(event: DragEvent) {
       </ContextMenuContent>
     </ContextMenu>
 
+    <!-- 新子目录的输入行固定出现在父节点下方，不依赖已有 children。 -->
+    <div v-if="isCreatingChild" class="px-2" :style="{ paddingLeft: `${(depth + 1) * 12}px` }">
+      <TagInlineEditor
+        :placeholder="t('gallery.sidebar.folders.create.placeholder')"
+        @confirm="handleCreateChildConfirm"
+        @cancel="handleCreateChildCancel"
+      />
+    </div>
+
     <!-- 递归渲染子文件夹 -->
     <div v-if="isExpanded && folder.children && folder.children.length > 0" class="space-y-1">
       <FolderTreeItem
@@ -321,6 +352,7 @@ function handleDrop(event: DragEvent) {
         :depth="depth + 1"
         @select="(folderId, folderName) => emit('select', folderId, folderName)"
         @clear-selection="() => emit('clearSelection')"
+        @create-child="(parentFolderId, name) => emit('createChild', parentFolderId, name)"
         @rename-display-name="
           (folderId, displayName) => emit('renameDisplayName', folderId, displayName)
         "

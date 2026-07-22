@@ -84,7 +84,7 @@ export struct FolderWatcherState {
 };
 
 export struct GalleryState {
-  struct ManualMoveIgnoreEntry {
+  struct ManualFileSystemIgnoreEntry {
     int in_flight_count = 0;
     std::chrono::steady_clock::time_point ignore_until{};
   };
@@ -125,9 +125,9 @@ export struct GalleryState {
   std::unordered_map<std::string, RootAvailability> root_availability_by_path;
   std::mutex root_availability_mutex;
 
-  // 手动 move 操作的 watcher 去重表（key 为大小写归一化后的路径比较键）。
-  std::unordered_map<std::wstring, ManualMoveIgnoreEntry> manual_move_ignore_paths;
-  std::mutex manual_move_ignore_mutex;
+  // 应用主动文件系统操作的 watcher 去重表（key 为大小写归一化后的路径比较键）。
+  std::unordered_map<std::wstring, ManualFileSystemIgnoreEntry> manual_file_system_ignore_paths;
+  std::mutex manual_file_system_ignore_mutex;
 };
 
 }  // namespace Features::Gallery::State

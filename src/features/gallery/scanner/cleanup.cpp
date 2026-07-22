@@ -8,7 +8,6 @@ import Features.Gallery.Types;
 import Features.Gallery.Scanner.Progress;
 import Features.Gallery.Scanner.AssetPipeline;
 import Features.Gallery.Folder.Repository;
-import Features.Gallery.Folder.Service;
 import Utils.Logger;
 
 namespace Features::Gallery::Scanner::Cleanup {
@@ -85,18 +84,10 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
   return result;
 }
 
-// 由本次发现的文件反推仍应存在的 folder 路径集合
-auto build_expected_folder_paths(const std::vector<Types::FileSystemInfo>& file_infos,
+// 把发现阶段的真实目录库存转成清理阶段使用的路径集合。
+auto build_expected_folder_paths(const std::vector<std::filesystem::path>& folder_paths,
                                  const std::filesystem::path& normalized_scan_root)
     -> std::unordered_set<std::string> {
-  std::vector<std::filesystem::path> file_paths;
-  file_paths.reserve(file_infos.size());
-  for (const auto& file_info : file_infos) {
-    file_paths.push_back(file_info.path);
-  }
-
-  auto folder_paths =
-      Folder::Service::extract_unique_folder_paths(file_paths, normalized_scan_root);
   std::unordered_set<std::string> expected_paths;
   expected_paths.reserve(folder_paths.size() + 1);
   for (const auto& folder_path : folder_paths) {
@@ -107,10 +98,10 @@ auto build_expected_folder_paths(const std::vector<Types::FileSystemInfo>& file_
   return expected_paths;
 }
 
-// 删除扫描根下已不再有效的 folder 记录（先深后浅）
+// 删除扫描根下不在真实目录库存中的 folder 记录（先深后浅）。
 auto cleanup_missing_folders(Core::State::AppState& app_state,
                              const std::filesystem::path& normalized_scan_root,
-                             const std::vector<Types::FileSystemInfo>& file_infos) -> int {
+                             const std::vector<std::filesystem::path>& folder_paths) -> int {
   auto all_folders_result = Folder::Repository::list_all_folders(app_state);
   if (!all_folders_result) {
     Logger().warn("Failed to list folders for cleanup: {}", all_folders_result.error());
@@ -118,7 +109,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
   }
 
   auto root_str = normalized_scan_root.string();
-  auto expected_paths = build_expected_folder_paths(file_infos, normalized_scan_root);
+  auto expected_paths = build_expected_folder_paths(folder_paths, normalized_scan_root);
 
   struct MissingFolder {
     std::int64_t id;
@@ -163,10 +154,11 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
   return deleted_folders;
 }
 
-// 清理阶段：盘库对账，删除 DB 有盘无的资产与失效 folder
+// 清理阶段：以文件和目录库存对账，删除磁盘上已消失的索引。
 auto run_cleanup_phase(Core::State::AppState& app_state,
                        const std::filesystem::path& normalized_scan_root,
                        const std::vector<Types::FileSystemInfo>& file_infos,
+                       const std::vector<std::filesystem::path>& folder_paths,
                        const std::unordered_map<std::string, Types::Metadata>& asset_cache,
                        const std::function<void(const Types::ScanProgress&)>& progress_callback)
     -> CleanupPhaseResult {
@@ -176,7 +168,7 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
   auto removed_assets_result =
       cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
   [[maybe_unused]] int deleted_folders =
-      cleanup_missing_folders(app_state, normalized_scan_root, file_infos);
+      cleanup_missing_folders(app_state, normalized_scan_root, folder_paths);
   return CleanupPhaseResult{
       .deleted_items = removed_assets_result.deleted_count,
       .removed_paths = std::move(removed_assets_result.removed_paths),

@@ -17,9 +17,10 @@ export auto load_ignore_rules(Core::State::AppState& app_state,
                               std::optional<std::int64_t> folder_id = std::nullopt)
     -> std::expected<std::vector<Types::IgnoreRule>, std::string>;
 
-// 应用忽略规则到单个文件（返回是否应该忽略）
-export auto apply_ignore_rules(const std::filesystem::path& file_path,
+// 按文件或目录语义应用忽略规则，返回该路径是否应被排除。
+export auto apply_ignore_rules(const std::filesystem::path& path,
                                const std::filesystem::path& base_path,
-                               const std::vector<Types::IgnoreRule>& rules) -> bool;
+                               const std::vector<Types::IgnoreRule>& rules, bool is_directory)
+    -> bool;
 
 }  // namespace Features::Gallery::Ignore::Service

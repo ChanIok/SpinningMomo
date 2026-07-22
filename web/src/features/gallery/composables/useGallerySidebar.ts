@@ -76,6 +76,19 @@ export function useGallerySidebar() {
   // ============= UI 交互操作方法 =============
 
   /**
+   * 在已索引父节点下创建真实子目录
+   */
+  async function createFolder(parentFolderId: number, name: string) {
+    try {
+      await galleryApi.createFolder({ parentFolderId, name })
+      console.log('📁 创建文件夹:', parentFolderId, name)
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+      throw error
+    }
+  }
+
+  /**
    * 选择文件夹
    */
   function selectFolder(folderId: number, folderName: string) {
@@ -316,6 +329,7 @@ export function useGallerySidebar() {
     // UI 交互操作
     selectFolder,
     clearFolderFilter,
+    createFolder,
     updateFolderDisplayName,
     openFolderInExplorer,
     removeFolderWatch,

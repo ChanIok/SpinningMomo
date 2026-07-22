@@ -539,8 +539,8 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
       continue;
     }
 
-    auto begin_ignore_result =
-        Watcher::begin_manual_move_ignore(app_state, candidate.file_path, candidate.file_path);
+    auto begin_ignore_result = Watcher::begin_manual_file_system_ignore(
+        app_state, candidate.file_path, candidate.file_path);
     if (!begin_ignore_result) {
       Logger().warn("Failed to register watcher ignore for recycle-bin move '{}': {}",
                     candidate.file_path.string(), begin_ignore_result.error());
@@ -611,7 +611,7 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     if (!candidate.manual_ignore_registered) {
       continue;
     }
-    if (auto complete_ignore_result = Watcher::complete_manual_move_ignore(
+    if (auto complete_ignore_result = Watcher::complete_manual_file_system_ignore(
             app_state, candidate.file_path, candidate.file_path);
         !complete_ignore_result) {
       Logger().warn("Failed to complete watcher ignore for recycle-bin move '{}': {}",
@@ -753,8 +753,8 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
     bool manual_ignore_registered = false;
     // 先注册 watcher ignore，再执行 move，避免 watcher 抢先对同一路径做重复分析。
-    if (auto begin_ignore_result =
-            Watcher::begin_manual_move_ignore(app_state, source_path, normalized_destination_path);
+    if (auto begin_ignore_result = Watcher::begin_manual_file_system_ignore(
+            app_state, source_path, normalized_destination_path);
         begin_ignore_result) {
       manual_ignore_registered = true;
     } else {
@@ -767,7 +767,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
         return;
       }
       // 无论成功还是失败都尝试完成 ignore，防止 in-flight 计数泄漏。
-      if (auto complete_ignore_result = Watcher::complete_manual_move_ignore(
+      if (auto complete_ignore_result = Watcher::complete_manual_file_system_ignore(
               app_state, source_path, normalized_destination_path);
           !complete_ignore_result) {
         Logger().warn("Failed to complete watcher ignore for manual move '{}': {}",

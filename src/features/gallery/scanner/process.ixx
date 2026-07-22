@@ -24,10 +24,11 @@ export struct ProcessingPhaseResult {
   FileProcessingBatchResult batch_result;
 };
 
-// 处理阶段：建 folder 映射 → 并行抽元数据/缩略图/主色 → 批量写库与颜色
+// 处理阶段：复用目录库存映射 → 并行抽元数据/缩略图/主色 → 批量写库与颜色。
 export auto run_processing_phase(
-    Core::State::AppState& app_state, const std::filesystem::path& directory,
+    Core::State::AppState& app_state,
     const std::vector<Types::FileAnalysisResult>& files_to_process,
+    const std::unordered_map<std::string, std::int64_t>& folder_mapping,
     const Types::ScanOptions& options,
     const std::function<void(const Types::ScanProgress&)>& progress_callback,
     std::stop_token stop_token) -> std::expected<ProcessingPhaseResult, std::string>;

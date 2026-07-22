@@ -14,16 +14,20 @@ namespace Features::Gallery::Ignore::Service {
 
 // ============= 路径处理辅助函数 =============
 
-auto normalize_path_for_matching(const std::filesystem::path& file_path,
+// 把绝对路径转成忽略规则使用的正斜杠相对路径。
+auto normalize_path_for_matching(const std::filesystem::path& path,
                                  const std::filesystem::path& base_path) -> std::string {
+  std::string normalized_path;
   try {
     // 计算相对路径，自动规范化，并使用统一的正斜杠格式
-    auto relative = std::filesystem::relative(file_path, base_path);
-    return relative.lexically_normal().generic_string();
+    auto relative = std::filesystem::relative(path, base_path);
+    normalized_path = relative.lexically_normal().generic_string();
   } catch (const std::filesystem::filesystem_error&) {
     // 如果无法计算相对路径，返回规范化的文件名
-    return file_path.filename().lexically_normal().generic_string();
+    normalized_path = path.filename().lexically_normal().generic_string();
   }
+
+  return normalized_path;
 }
 
 // ============= 业务编排函数 =============
@@ -96,14 +100,14 @@ auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int6
   return combined_rules;
 }
 
-auto apply_ignore_rules(const std::filesystem::path& file_path,
-                        const std::filesystem::path& base_path,
-                        const std::vector<Types::IgnoreRule>& rules) -> bool {
+// 按规则顺序判定文件或目录是否被排除，后命中的规则覆盖先前结果。
+auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem::path& base_path,
+                        const std::vector<Types::IgnoreRule>& rules, bool is_directory) -> bool {
   if (rules.empty()) {
     return false;  // 没有规则，不忽略
   }
 
-  auto normalized_path = normalize_path_for_matching(file_path, base_path);
+  auto normalized_path = normalize_path_for_matching(path, base_path);
   bool should_ignore = false;
 
   // 按顺序应用规则，后面的规则会覆盖前面的结果
@@ -116,7 +120,12 @@ auto apply_ignore_rules(const std::filesystem::path& file_path,
 
     // 根据模式类型选择匹配方法
     if (rule.pattern_type == "glob") {
-      matches = Matcher::match_glob_pattern(rule.rule_pattern, normalized_path);
+      auto glob_path = normalized_path;
+      // 仅 glob 目录语义补上末尾斜杠，不改变现有 regex 的相对路径语义。
+      if (is_directory && !glob_path.empty() && !glob_path.ends_with('/')) {
+        glob_path.push_back('/');
+      }
+      matches = Matcher::match_glob_pattern(rule.rule_pattern, glob_path);
     } else if (rule.pattern_type == "regex") {
       matches = Matcher::match_regex_pattern(rule.rule_pattern, normalized_path);
     } else {

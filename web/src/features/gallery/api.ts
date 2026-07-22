@@ -6,6 +6,7 @@ import type {
   ScanAssetsParams,
   ScanAssetsResult,
   StartScanAssetsResult,
+  CreateFolderParams,
   UpdateFolderDisplayNameParams,
   GetTimelineBucketsParams,
   TimelineBucketsResponse,
@@ -75,6 +76,18 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
   } catch (error) {
     console.error('Failed to get folder tree:', error)
     throw new Error('获取文件夹树失败')
+  }
+}
+
+/**
+ * 在已索引父目录下创建真实子目录
+ */
+export async function createFolder(params: CreateFolderParams): Promise<OperationResult> {
+  try {
+    return await call<OperationResult>('gallery.createFolder', params)
+  } catch (error) {
+    console.error('Failed to create folder:', error)
+    throw error instanceof Error ? error : new Error('创建文件夹失败')
   }
 }
 
@@ -640,6 +653,7 @@ export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<numb
 export const galleryApi = {
   // 数据查询
   getFolderTree,
+  createFolder,
   updateFolderDisplayName,
   openFolderInExplorer,
   removeFolderWatch,

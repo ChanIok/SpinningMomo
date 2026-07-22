@@ -19,8 +19,8 @@ import <wil/resource.h>;
 
 namespace Features::Gallery::Watcher {
 
-// 手动 move 结束后额外缓冲一段时间，吸收“晚到”的文件系统通知。
-constexpr std::chrono::milliseconds kManualMoveIgnoreGracePeriod{3000};
+// 应用主动文件系统操作结束后额外缓冲一段时间，吸收“晚到”的通知。
+constexpr std::chrono::milliseconds kManualFileSystemIgnoreGracePeriod{3000};
 
 auto is_shutdown_requested(const Core::State::AppState& app_state) -> bool {
   return app_state.gallery && app_state.gallery->shutdown_requested.load(std::memory_order_acquire);
@@ -35,9 +35,10 @@ auto build_ignore_key(const std::filesystem::path& path)
   return Utils::Path::NormalizeForComparison(normalized_result.value());
 }
 
-auto cleanup_expired_manual_move_ignores(Core::State::AppState& app_state) -> void {
+// 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
+auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state) -> void {
   auto now = std::chrono::steady_clock::now();
-  std::erase_if(app_state.gallery->manual_move_ignore_paths, [now](const auto& pair) {
+  std::erase_if(app_state.gallery->manual_file_system_ignore_paths, [now](const auto& pair) {
     const auto& entry = pair.second;
     return entry.in_flight_count <= 0 && entry.ignore_until <= now;
   });
@@ -571,9 +572,10 @@ auto start_registered_watchers(Core::State::AppState& app_state)
   return {};
 }
 
-auto begin_manual_move_ignore(Core::State::AppState& app_state,
-                              const std::filesystem::path& source_path,
-                              const std::filesystem::path& destination_path)
+// 在真实磁盘操作前登记源/目标路径，防止 watcher 重复应用同一事实。
+auto begin_manual_file_system_ignore(Core::State::AppState& app_state,
+                                     const std::filesystem::path& source_path,
+                                     const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
   auto source_key_result = build_ignore_key(source_path);
   if (!source_key_result) {
@@ -584,16 +586,16 @@ auto begin_manual_move_ignore(Core::State::AppState& app_state,
     return std::unexpected(destination_key_result.error());
   }
 
-  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
-  cleanup_expired_manual_move_ignores(app_state);
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
+  cleanup_expired_manual_file_system_ignores(app_state);
   const auto now = std::chrono::steady_clock::now();
 
   auto touch = [&](const std::wstring& key) {
-    // in_flight_count 允许多个并发 move 命中同一路径，避免互相提前解除忽略。
-    auto& entry = app_state.gallery->manual_move_ignore_paths[key];
+    // in_flight_count 允许多个并发操作命中同一路径，避免互相提前解除忽略。
+    auto& entry = app_state.gallery->manual_file_system_ignore_paths[key];
     entry.in_flight_count += 1;
-    if (entry.ignore_until < now + kManualMoveIgnoreGracePeriod) {
-      entry.ignore_until = now + kManualMoveIgnoreGracePeriod;
+    if (entry.ignore_until < now + kManualFileSystemIgnoreGracePeriod) {
+      entry.ignore_until = now + kManualFileSystemIgnoreGracePeriod;
     }
   };
 
@@ -602,9 +604,10 @@ auto begin_manual_move_ignore(Core::State::AppState& app_state,
   return {};
 }
 
-auto complete_manual_move_ignore(Core::State::AppState& app_state,
-                                 const std::filesystem::path& source_path,
-                                 const std::filesystem::path& destination_path)
+// 在磁盘与索引操作结束后退出 in-flight，但保留短缓冲过滤延迟通知。
+auto complete_manual_file_system_ignore(Core::State::AppState& app_state,
+                                        const std::filesystem::path& source_path,
+                                        const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
   auto source_key_result = build_ignore_key(source_path);
   if (!source_key_result) {
@@ -615,24 +618,24 @@ auto complete_manual_move_ignore(Core::State::AppState& app_state,
     return std::unexpected(destination_key_result.error());
   }
 
-  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
-  cleanup_expired_manual_move_ignores(app_state);
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
+  cleanup_expired_manual_file_system_ignores(app_state);
   const auto now = std::chrono::steady_clock::now();
 
   auto touch = [&](const std::wstring& key) {
-    auto it = app_state.gallery->manual_move_ignore_paths.find(key);
-    if (it == app_state.gallery->manual_move_ignore_paths.end()) {
+    auto it = app_state.gallery->manual_file_system_ignore_paths.find(key);
+    if (it == app_state.gallery->manual_file_system_ignore_paths.end()) {
       return;
     }
 
     // 操作完成后并不立刻解除，保留短暂 grace 窗口来过滤延迟事件。
     it->second.in_flight_count = std::max(0, it->second.in_flight_count - 1);
-    it->second.ignore_until = now + kManualMoveIgnoreGracePeriod;
+    it->second.ignore_until = now + kManualFileSystemIgnoreGracePeriod;
   };
 
   touch(source_key_result.value());
   touch(destination_key_result.value());
-  cleanup_expired_manual_move_ignores(app_state);
+  cleanup_expired_manual_file_system_ignores(app_state);
   return {};
 }
 

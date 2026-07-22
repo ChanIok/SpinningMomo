@@ -256,7 +256,7 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
     return PathSyncOutcome::Skipped;
   }
 
-  if (Ignore::Service::apply_ignore_rules(normalized, root_path, ignore_rules)) {
+  if (Ignore::Service::apply_ignore_rules(normalized, root_path, ignore_rules, false)) {
     return PathSyncOutcome::Skipped;
   }
 

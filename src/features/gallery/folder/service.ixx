@@ -17,7 +17,7 @@ export auto extract_unique_folder_paths(const std::vector<std::filesystem::path>
                                         const std::filesystem::path& scan_root)
     -> std::vector<std::filesystem::path>;
 
-// 批量创建文件夹记录（统一的文件夹创建接口）
+// 按父先优先顺序严格物化一批目录路径，并返回完整路径映射。
 export auto batch_create_folders_for_paths(Core::State::AppState& app_state,
                                            const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string>;
@@ -25,6 +25,11 @@ export auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
 export auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
+
+// 在已索引父目录下创建真实子目录，并立即物化对应文件夹记录。
+export auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_folder_id,
+                                const std::string& name)
+    -> std::expected<Types::OperationResult, std::string>;
 
 // 更新文件夹显示名称（仅应用内展示）。
 export auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t folder_id,

@@ -9,6 +9,7 @@ import Core.State;
 import Core.Database;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
+import Features.Gallery.Ignore.Service;
 import Features.Gallery.OriginalLocator;
 import Features.Gallery.RootAvailability;
 import Features.Gallery.Watcher;
@@ -17,6 +18,7 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Utils.System;
+import <wil/resource.h>;
 
 namespace Features::Gallery::Folder::Service {
 
@@ -138,7 +140,7 @@ auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
   return result;
 }
 
-// 批量创建文件夹记录（统一的文件夹创建接口）
+// 按父先优先顺序严格物化一批目录路径，并返回完整路径映射。
 auto batch_create_folders_for_paths(Core::State::AppState& app_state,
                                     const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string> {
@@ -151,9 +153,8 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   for (const auto& folder_path : folder_paths) {
     auto normalized_result = Utils::Path::NormalizePath(folder_path);
     if (!normalized_result) {
-      Logger().warn("Failed to normalize folder path '{}': {}", folder_path.string(),
-                    normalized_result.error());
-      continue;
+      return std::unexpected("Failed to normalize folder path '" + folder_path.string() +
+                             "': " + normalized_result.error());
     }
 
     auto normalized_path = normalized_result.value();
@@ -186,9 +187,8 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     // 首先检查数据库中是否已存在
     auto existing_folder_result = Repository::get_folder_by_path(app_state, path_str);
     if (!existing_folder_result) {
-      Logger().error("Failed to query folder for path '{}': {}", path_str,
-                     existing_folder_result.error());
-      continue;
+      return std::unexpected("Failed to query folder for path '" + path_str +
+                             "': " + existing_folder_result.error());
     }
 
     if (existing_folder_result->has_value()) {
@@ -209,12 +209,14 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     if (!parent_path.empty() && parent_path != folder_path.root_path()) {
       std::string parent_path_str = parent_path.string();
 
-      // 由于已经按深度排序，父目录的 ID 应该已经在 map 中
-      if (auto it = path_to_id_map.find(parent_path_str); it != path_to_id_map.end()) {
-        parent_id = it->second;
-      } else {
-        Logger().info("Parent folder '{}' not found in map for child '{}'", parent_path_str,
-                      path_str);
+      // 输入外的父目录表示当前路径是一个扫描根；输入内的父目录必须已物化。
+      if (normalized_path_keys.contains(parent_path_str)) {
+        if (auto it = path_to_id_map.find(parent_path_str); it != path_to_id_map.end()) {
+          parent_id = it->second;
+        } else {
+          return std::unexpected("Parent folder '" + parent_path_str + "' is missing for child '" +
+                                 path_str + "'");
+        }
       }
     }
 
@@ -224,8 +226,8 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 
     auto create_result = Repository::create_folder(app_state, new_folder);
     if (!create_result) {
-      Logger().error("Failed to create folder for path '{}': {}", path_str, create_result.error());
-      continue;
+      return std::unexpected("Failed to create folder for path '" + path_str +
+                             "': " + create_result.error());
     }
 
     auto folder_id = create_result.value();
@@ -255,6 +257,156 @@ auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
   }
 
   return {};
+}
+
+// 校验用户输入是可以安全拼到父目录下的单个路径段。
+auto normalize_child_folder_name(const std::string& name)
+    -> std::expected<std::string, std::string> {
+  auto normalized_name = Utils::String::TrimAscii(name);
+  if (normalized_name.empty()) {
+    return std::unexpected("Folder name cannot be empty");
+  }
+  if (normalized_name == "." || normalized_name == "..") {
+    return std::unexpected("Folder name cannot be '.' or '..'");
+  }
+  if (normalized_name.ends_with('.') || normalized_name.ends_with(' ')) {
+    return std::unexpected("Folder name cannot end with a dot or space");
+  }
+
+  // 在落盘前拒绝 Windows 保留字符和控制字符，避免文件系统暗中改写名称。
+  constexpr std::string_view invalid_characters = "<>:\"/\\|?*";
+  if (std::ranges::any_of(normalized_name, [&](unsigned char ch) {
+        return ch < 32 || invalid_characters.contains(static_cast<char>(ch));
+      })) {
+    return std::unexpected("Folder name contains invalid Windows characters");
+  }
+
+  auto stem_end = normalized_name.find('.');
+  auto device_name = Utils::String::ToLowerAscii(normalized_name.substr(0, stem_end));
+  static const std::unordered_set<std::string> reserved_device_names = {
+      "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
+      "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+  };
+  if (reserved_device_names.contains(device_name)) {
+    return std::unexpected("Folder name is reserved by Windows");
+  }
+
+  auto name_path = std::filesystem::path(Utils::String::FromUtf8(normalized_name));
+  // 只允许单个名称段，不让 RPC 输入跨越已选父目录。
+  if (name_path.empty() || name_path.is_absolute() || name_path.has_root_path() ||
+      name_path.filename() != name_path) {
+    return std::unexpected("Folder name must be a single path segment");
+  }
+  return normalized_name;
+}
+
+// 在已索引父目录下创建真实子目录，并立即物化对应文件夹记录。
+auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_folder_id,
+                         const std::string& name)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto normalized_name_result = normalize_child_folder_name(name);
+  if (!normalized_name_result) {
+    return std::unexpected(normalized_name_result.error());
+  }
+  auto normalized_name = normalized_name_result.value();
+
+  // 路径始终由后端根据已索引父节点构造，前端不能指定任意位置。
+  auto parent_result = Repository::get_folder_by_id(app_state, parent_folder_id);
+  if (!parent_result) {
+    return std::unexpected("Failed to query parent folder: " + parent_result.error());
+  }
+  if (!parent_result->has_value()) {
+    return std::unexpected("Parent folder not found: " + std::to_string(parent_folder_id));
+  }
+  const auto& parent = parent_result->value();
+
+  auto parent_path = std::filesystem::path(Utils::String::FromUtf8(parent.path));
+  auto target_path_result = Utils::Path::NormalizePath(
+      parent_path / std::filesystem::path(Utils::String::FromUtf8(normalized_name)));
+  if (!target_path_result) {
+    return std::unexpected("Failed to normalize target folder path: " + target_path_result.error());
+  }
+  auto target_path = target_path_result.value();
+
+  // 新目录若会被当前 root 规则排除，直接拒绝“创建成功但树中不可见”的状态。
+  auto root_folder_id_result =
+      Features::Gallery::Ignore::Service::resolve_root_folder_id(app_state, parent_folder_id);
+  if (!root_folder_id_result) {
+    return std::unexpected("Failed to resolve parent watch root: " + root_folder_id_result.error());
+  }
+  auto root_folder_result = Repository::get_folder_by_id(app_state, root_folder_id_result.value());
+  if (!root_folder_result) {
+    return std::unexpected("Failed to load parent watch root: " + root_folder_result.error());
+  }
+  if (!root_folder_result->has_value()) {
+    return std::unexpected("Parent watch root not found");
+  }
+  auto ignore_rules_result =
+      Features::Gallery::Ignore::Service::load_ignore_rules(app_state, parent_folder_id);
+  if (!ignore_rules_result) {
+    return std::unexpected("Failed to load folder ignore rules: " + ignore_rules_result.error());
+  }
+  if (Features::Gallery::Ignore::Service::apply_ignore_rules(
+          target_path,
+          std::filesystem::path(Utils::String::FromUtf8(root_folder_result->value().path)),
+          ignore_rules_result.value(), true)) {
+    return std::unexpected("Folder name is excluded by the current ignore rules");
+  }
+
+  std::error_code exists_error;
+  if (std::filesystem::exists(target_path, exists_error)) {
+    return std::unexpected("Folder already exists: " + target_path.string());
+  }
+  if (exists_error) {
+    return std::unexpected("Failed to inspect target folder: " + exists_error.message());
+  }
+
+  // 在落盘前屏蔽这条已知变化，避免 watcher 与 RPC 同时建立同一索引。
+  auto ignore_result = Features::Gallery::Watcher::begin_manual_file_system_ignore(
+      app_state, target_path, target_path);
+  if (!ignore_result) {
+    return std::unexpected("Failed to register watcher ignore: " + ignore_result.error());
+  }
+  auto complete_ignore = wil::scope_exit([&app_state, &target_path]() {
+    auto result = Features::Gallery::Watcher::complete_manual_file_system_ignore(
+        app_state, target_path, target_path);
+    if (!result) {
+      Logger().warn("Failed to complete watcher ignore for created folder '{}': {}",
+                    target_path.string(), result.error());
+    }
+  });
+
+  // 磁盘是目录存在性的事实来源，只有创建成功后才写入索引。
+  std::error_code create_error;
+  if (!std::filesystem::create_directory(target_path, create_error)) {
+    auto message = create_error ? create_error.message() : "target already exists";
+    return std::unexpected("Failed to create folder on disk: " + message);
+  }
+
+  Types::Folder new_folder{
+      .path = target_path.string(),
+      .parent_id = parent_folder_id,
+      .name = normalized_name,
+  };
+  auto create_result = Repository::create_folder(app_state, new_folder);
+  if (!create_result) {
+    // 索引失败时只回滚本次创建且仍为空的目录，不删除并发写入的用户内容。
+    std::error_code rollback_error;
+    bool rolled_back = std::filesystem::remove(target_path, rollback_error);
+    auto message = "Failed to create folder index: " + create_result.error();
+    if (rollback_error || !rolled_back) {
+      auto rollback_message =
+          rollback_error ? rollback_error.message() : "directory is no longer empty";
+      message += "; failed to roll back empty directory: " + rollback_message;
+    }
+    return std::unexpected(message);
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Folder created",
+      .affected_count = 1,
+  };
 }
 
 // 规范化文件夹显示名称（去除首尾空白字符，若为空则返回 nullopt）

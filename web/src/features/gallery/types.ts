@@ -90,6 +90,7 @@ export interface TagTreeNode {
 
 export type {
   // 资产动作/标签动作参数（RPC DTO）
+  CreateFolderParams,
   UpdateFolderDisplayNameParams,
   CreateTagParams,
   UpdateTagParams,

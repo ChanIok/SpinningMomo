@@ -50,6 +50,7 @@ const {
   selectedTag,
   selectFolder,
   clearFolderFilter,
+  createFolder,
   updateFolderDisplayName,
   openFolderInExplorer,
   removeFolderWatch,
@@ -186,6 +187,21 @@ function folderExistsById(nodes: FolderTreeNode[], folderId: number): boolean {
     }
   }
   return false
+}
+
+// 创建子目录后刷新整棵树并展开父节点，让空目录立即可见。
+async function handleCreateChildFolder(parentFolderId: number, name: string) {
+  try {
+    await createFolder(parentFolderId, name)
+    await galleryData.loadFolderTree({ silent: true })
+    galleryStore.setFolderExpanded(parentFolderId, true)
+    toast.success(t('gallery.sidebar.folders.create.successTitle'), {
+      description: t('gallery.sidebar.folders.create.successDescription', { name }),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.folders.create.failedTitle'), { description: message })
+  }
 }
 
 async function handleRenameFolderDisplayName(folderId: number, displayName: string) {
@@ -505,6 +521,7 @@ onMounted(() => {
                   :depth="0"
                   @select="selectFolder"
                   @clear-selection="clearFolderFilter"
+                  @create-child="handleCreateChildFolder"
                   @rename-display-name="handleRenameFolderDisplayName"
                   @open-in-explorer="handleOpenFolderInExplorer"
                   @remove-watch="handleRemoveFolderWatch"

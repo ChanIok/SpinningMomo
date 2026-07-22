@@ -12,7 +12,6 @@ import Features.Gallery.Scanner.Progress;
 import Features.Gallery.Scanner.AssetPipeline;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Color.Repository;
-import Features.Gallery.Folder.Service;
 import Utils.Logger;
 import <wil/resource.h>;
 
@@ -152,9 +151,10 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
   return final_result;
 }
 
-// 处理阶段：建 folder 映射 → 并行抽元数据/缩略图/主色 → 批量写库与颜色
-auto run_processing_phase(Core::State::AppState& app_state, const std::filesystem::path& directory,
+// 处理阶段：复用目录库存映射 → 并行抽元数据/缩略图/主色 → 批量写库与颜色。
+auto run_processing_phase(Core::State::AppState& app_state,
                           const std::vector<Types::FileAnalysisResult>& files_to_process,
+                          const std::unordered_map<std::string, std::int64_t>& folder_mapping,
                           const Types::ScanOptions& options,
                           const std::function<void(const Types::ScanProgress&)>& progress_callback,
                           std::stop_token stop_token)
@@ -193,25 +193,6 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
     return result;
   }
 
-  // 为待处理文件预建完整 folder 层级
-  std::vector<std::filesystem::path> file_paths;
-  file_paths.reserve(files_to_process.size());
-  for (const auto& analysis : files_to_process) {
-    file_paths.push_back(analysis.file_info.path);
-  }
-
-  std::unordered_map<std::string, std::int64_t> path_to_folder_id;
-  auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
-  auto folder_mapping_result =
-      Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
-  if (folder_mapping_result) {
-    path_to_folder_id = std::move(folder_mapping_result.value());
-    Logger().info("Pre-created {} folder records with complete hierarchy",
-                  path_to_folder_id.size());
-  } else {
-    Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
-  }
-
   std::optional<Progress::ProcessingProgressTracker> processing_tracker;
   if (processing_total_units > 0) {
     processing_tracker.emplace(
@@ -221,7 +202,7 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
   }
 
   auto processing_result =
-      process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id,
+      process_files_in_parallel(app_state, files_to_process, options, folder_mapping,
                                 processing_tracker ? &(*processing_tracker) : nullptr, stop_token);
   if (!processing_result) {
     return std::unexpected("File processing failed: " + processing_result.error());
