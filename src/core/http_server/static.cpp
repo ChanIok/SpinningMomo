@@ -17,6 +17,7 @@ import <asio.hpp>;
 
 namespace Core::HttpServer::Static {
 
+// 注册 HTTP 路径解析器：独占修改注册表并转移 resolver 所有权
 auto register_path_resolver(Core::State::AppState& state, std::string prefix,
                             Types::PathResolver resolver) -> void {
   if (!state.http_server) {
@@ -25,32 +26,28 @@ auto register_path_resolver(Core::State::AppState& state, std::string prefix,
   }
 
   auto& registry = state.http_server->path_resolvers;
-  std::unique_lock lock(registry.write_mutex);
+  std::unique_lock lock(registry.mutex);
 
-  auto current = registry.resolvers.load();
-  auto new_resolvers = std::make_shared<std::vector<Types::ResolverEntry>>(*current);
-  new_resolvers->push_back({std::move(prefix), std::move(resolver)});
-  registry.resolvers.store(new_resolvers);
-
-  Logger().debug("Registered custom path resolver for: {}", prefix);
+  // 注册表独占 resolver，读取线程后续只通过 const 引用重复调用
+  registry.resolvers.push_back({std::move(prefix), std::move(resolver)});
+  Logger().debug("Registered custom path resolver for: {}", registry.resolvers.back().prefix);
 }
 
+// 注销指定前缀的 HTTP 路径解析器，并等待正在执行的读取离开共享区
 auto unregister_path_resolver(Core::State::AppState& state, std::string_view prefix) -> void {
   if (!state.http_server) {
     return;
   }
 
   auto& registry = state.http_server->path_resolvers;
-  std::unique_lock lock(registry.write_mutex);
+  std::unique_lock lock(registry.mutex);
 
-  auto current = registry.resolvers.load();
-  auto new_resolvers = std::make_shared<std::vector<Types::ResolverEntry>>(*current);
-  std::erase_if(*new_resolvers, [prefix](const auto& entry) { return entry.prefix == prefix; });
-  registry.resolvers.store(new_resolvers);
-
+  // 独占锁同时充当生命周期屏障，返回后不会再有旧 resolver 正在执行
+  std::erase_if(registry.resolvers, [prefix](const auto& entry) { return entry.prefix == prefix; });
   Logger().debug("Unregistered path resolver for: {}", prefix);
 }
 
+// 按注册顺序查找并调用首个能够解析当前 URL 的 HTTP resolver
 auto try_custom_resolve(Core::State::AppState& state, std::string_view url_path)
     -> std::optional<Types::PathResolution> {
   if (!state.http_server) {
@@ -58,9 +55,10 @@ auto try_custom_resolve(Core::State::AppState& state, std::string_view url_path)
   }
 
   auto& registry = state.http_server->path_resolvers;
-  auto resolvers = registry.resolvers.load();
+  // resolver 执行期间保持共享锁，让注销能够可靠等待在途请求结束
+  std::shared_lock lock(registry.mutex);
 
-  for (const auto& entry : *resolvers) {
+  for (const auto& entry : registry.resolvers) {
     if (url_path.starts_with(entry.prefix)) {
       auto result = entry.resolver(url_path);
       if (result.has_value()) {

@@ -53,7 +53,7 @@ export struct PathResolutionData {
 };
 
 export using PathResolution = std::expected<PathResolutionData, std::string>;
-export using PathResolver = std::function<PathResolution(std::string_view)>;
+export using PathResolver = std::move_only_function<PathResolution(std::string_view) const>;
 
 export struct ResolverEntry {
   std::string prefix;
@@ -62,13 +62,10 @@ export struct ResolverEntry {
 
 // 路径解析器注册表
 export struct ResolverRegistry {
-  // 使用 atomic shared_ptr 实现无锁读取（RCU 模式）
-  // 读取时无需加锁，写入时复制整个 vector
-  std::atomic<std::shared_ptr<const std::vector<ResolverEntry>>> resolvers{
-      std::make_shared<const std::vector<ResolverEntry>>()};
-
-  // 写锁：仅用于保护写操作之间的竞争
-  std::mutex write_mutex;
+  std::vector<ResolverEntry> resolvers;
+  // 请求并发读取，注册和注销独占写入；注销会等待正在执行的 resolver 结束。
+  // resolver 执行期间不得注册或注销同一个注册表，避免共享锁升级死锁。
+  std::shared_mutex mutex;
 };
 
 // SSE连接信息结构

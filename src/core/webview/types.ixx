@@ -15,22 +15,20 @@ export struct WebResourceResolution {
   std::optional<std::wstring> cache_control_header;
 };
 
-export using WebResourceResolver = std::function<WebResourceResolution(std::wstring_view)>;
+export using WebResourceResolver =
+    std::move_only_function<WebResourceResolution(std::wstring_view) const>;
 
 export struct WebResolverEntry {
   std::wstring prefix;
   WebResourceResolver resolver;
 };
 
-// 使用 RCU 模式的注册表（无锁读取）
+// WebView 资源解析器注册表
 export struct WebResolverRegistry {
-  // 使用 atomic shared_ptr 实现无锁读取（RCU 模式）
-  // 读取时无需加锁，写入时复制整个 vector
-  std::atomic<std::shared_ptr<const std::vector<WebResolverEntry>>> resolvers{
-      std::make_shared<const std::vector<WebResolverEntry>>()};
-
-  // 写锁：仅用于保护写操作之间的竞争
-  std::mutex write_mutex;
+  std::vector<WebResolverEntry> resolvers;
+  // 资源请求并发读取，注册操作独占写入。
+  // resolver 执行期间不得修改同一个注册表，避免共享锁升级死锁。
+  std::shared_mutex mutex;
 };
 
 }  // namespace Core::WebView::Types

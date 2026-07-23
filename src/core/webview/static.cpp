@@ -270,6 +270,7 @@ auto build_not_modified_headers(std::wstring_view cache_control, const CacheVali
   return headers;
 }
 
+// 按注册顺序查找并调用首个能够解析当前 URL 的 WebView resolver
 auto try_web_resource_resolve(Core::State::AppState& state, std::wstring_view url)
     -> std::optional<Types::WebResourceResolution> {
   if (!state.webview || !state.webview->resources.web_resolvers) {
@@ -277,10 +278,10 @@ auto try_web_resource_resolve(Core::State::AppState& state, std::wstring_view ur
   }
 
   auto& registry = *state.webview->resources.web_resolvers;
-  // 无锁读取（RCU 模式）
-  auto resolvers = registry.resolvers.load();
+  // resolver 执行期间保持共享锁，与后续注册写入隔离
+  std::shared_lock lock(registry.mutex);
 
-  for (const auto& entry : *resolvers) {
+  for (const auto& entry : registry.resolvers) {
     if (url.starts_with(entry.prefix)) {
       auto result = entry.resolver(url);
       if (result.success) {
@@ -443,6 +444,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   return S_OK;
 }
 
+// 注册 WebView 资源解析器：独占修改注册表并转移 resolver 所有权
 auto register_web_resource_resolver(Core::State::AppState& state, std::wstring prefix,
                                     Types::WebResourceResolver resolver) -> void {
   if (!state.webview || !state.webview->resources.web_resolvers) {
@@ -451,15 +453,12 @@ auto register_web_resource_resolver(Core::State::AppState& state, std::wstring p
   }
 
   auto& registry = *state.webview->resources.web_resolvers;
-  std::unique_lock lock(registry.write_mutex);
+  std::unique_lock lock(registry.mutex);
 
-  // RCU 写入：复制当前 vector，添加新项，然后原子替换
-  auto current = registry.resolvers.load();
-  auto new_resolvers = std::make_shared<std::vector<Types::WebResolverEntry>>(*current);
-  new_resolvers->push_back({std::move(prefix), std::move(resolver)});
-  registry.resolvers.store(new_resolvers);
-
-  Logger().debug("Registered WebView resource resolver for: {}", Utils::String::ToUtf8(prefix));
+  // 注册表独占 resolver，资源请求后续只通过 const 引用重复调用
+  registry.resolvers.push_back({std::move(prefix), std::move(resolver)});
+  Logger().debug("Registered WebView resource resolver for: {}",
+                 Utils::String::ToUtf8(registry.resolvers.back().prefix));
 }
 
 auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* webview,
