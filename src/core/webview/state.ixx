@@ -95,7 +95,7 @@ export struct CoreResources {
 export struct MessageState {
   std::queue<std::string> pending_messages;
   std::unordered_map<std::string, std::string> message_responses;
-  std::unordered_map<std::string, std::function<void(const std::string&)>> handlers;
+  std::unordered_map<std::string, std::move_only_function<void(const std::string&) const>> handlers;
   std::mutex message_mutex;
   std::atomic<uint64_t> next_message_id{0};
 };
@@ -123,7 +123,7 @@ export struct WebViewState {
   MessageState messaging;
   WebViewConfig config;
   std::wstring pending_initial_url;
-  std::function<void()> reveal_after_initial_navigation;
+  std::move_only_function<void()> reveal_after_initial_navigation;
 
   bool is_initialized = false;
   bool is_ready = false;

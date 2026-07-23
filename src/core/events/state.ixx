@@ -8,7 +8,9 @@ import <windows.h>;
 namespace Core::Events::State {
 
 export struct EventsState {
-  std::unordered_map<std::type_index, std::vector<std::function<void(const std::any&)>>> handlers;
+  std::unordered_map<std::type_index,
+                     std::vector<std::move_only_function<void(const std::any&) const>>>
+      handlers;
   std::queue<std::pair<std::type_index, std::any>> event_queue;
   std::mutex queue_mutex;
 

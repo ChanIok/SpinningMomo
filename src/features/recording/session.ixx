@@ -48,8 +48,8 @@ export auto clear_session_runtime_fields(Core::State::AppState& app_state) -> vo
 export auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void;
 
 // 启动延迟释放 D3D 资源的定时器，高频启停时避免反复初始化设备。
-export auto start_cleanup_timer(Core::State::AppState& app_state, std::function<void()> on_timeout)
-    -> void;
+export auto start_cleanup_timer(Core::State::AppState& app_state,
+                                std::move_only_function<void()> on_timeout) -> void;
 
 // 立即释放录制模块可复用的 D3D / WinRT 设备资源。
 export auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void;

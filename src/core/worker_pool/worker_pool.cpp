@@ -37,7 +37,7 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
         try {
           // 工作线程主循环：关闭后继续排空已接收任务，避免遗弃任务持有的同步计数。
           while (true) {
-            std::function<void()> task;
+            std::move_only_function<void()> task;
 
             // 从任务队列获取任务
             {
@@ -119,7 +119,7 @@ auto stop(Core::State::AppState& state) -> void {
     {
       std::lock_guard<std::mutex> lock(pool.queue_mutex);
       // 清空任务队列
-      std::queue<std::function<void()>> empty;
+      std::queue<std::move_only_function<void()>> empty;
       pool.task_queue.swap(empty);
     }
     pool.shutdown_requested = false;
@@ -139,7 +139,7 @@ auto is_running(const Core::State::AppState& state) -> bool {
   return pool.is_running.load();
 }
 
-auto submit_task(Core::State::AppState& state, std::function<void()> task) -> bool {
+auto submit_task(Core::State::AppState& state, std::move_only_function<void()> task) -> bool {
   if (!state.worker_pool) {
     return false;
   }

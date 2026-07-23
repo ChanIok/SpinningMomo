@@ -18,7 +18,7 @@ auto run_worker_loop(Core::DialogService::State::DialogServiceState& service,
   auto com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
   while (!stop_token.stop_requested()) {
-    std::function<void()> task;
+    std::move_only_function<void()> task;
 
     {
       std::unique_lock lock(service.queue_mutex);
@@ -55,9 +55,10 @@ auto run_worker_loop(Core::DialogService::State::DialogServiceState& service,
 template <typename Result>
 using DialogResult = std::expected<Result, std::string>;
 
-template <typename Result>
-auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service,
-                        std::function<DialogResult<Result>()> task) -> DialogResult<Result> {
+template <typename Result, typename Task>
+  requires std::invocable<Task&> && std::same_as<std::invoke_result_t<Task&>, DialogResult<Result>>
+auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service, Task&& task)
+    -> DialogResult<Result> {
   if (!service.is_running.load()) {
     return std::unexpected("DialogService is not running");
   }
@@ -66,21 +67,22 @@ auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service,
     return std::unexpected("DialogService is shutting down");
   }
 
-  auto promise = std::make_shared<std::promise<DialogResult<Result>>>();
-  auto future = promise->get_future();
+  std::promise<DialogResult<Result>> promise;
+  auto future = promise.get_future();
 
   try {
     {
       std::lock_guard lock(service.queue_mutex);
-      service.task_queue.push([task = std::move(task), promise]() mutable {
-        try {
-          promise->set_value(task());
-        } catch (const std::exception& e) {
-          promise->set_value(std::unexpected(std::string("Dialog task failed: ") + e.what()));
-        } catch (...) {
-          promise->set_value(std::unexpected("Dialog task failed: unknown error"));
-        }
-      });
+      service.task_queue.push(
+          [task = std::forward<Task>(task), promise = std::move(promise)]() mutable {
+            try {
+              promise.set_value(std::invoke(task));
+            } catch (const std::exception& e) {
+              promise.set_value(std::unexpected(std::string("Dialog task failed: ") + e.what()));
+            } catch (...) {
+              promise.set_value(std::unexpected("Dialog task failed: unknown error"));
+            }
+          });
     }
 
     service.condition.notify_one();
@@ -138,7 +140,7 @@ auto stop(Core::State::AppState& state) -> void {
 
   {
     std::lock_guard lock(service.queue_mutex);
-    std::queue<std::function<void()>> empty;
+    std::queue<std::move_only_function<void()>> empty;
     service.task_queue.swap(empty);
   }
 

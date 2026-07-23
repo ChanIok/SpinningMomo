@@ -28,6 +28,7 @@ import Vendor.Windows;
 
 namespace Core::Commands {
 
+// 注册单个内置命令：拒绝重复 ID，并把行为所有权移入注册表
 auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void {
   const std::string id = descriptor.id;
 
@@ -36,6 +37,7 @@ auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -
     return;
   }
 
+  // 注册表独占 action/get_state，registration_order 只保存稳定 ID
   registry.descriptors.emplace(id, std::move(descriptor));
   registry.registration_order.push_back(id);
 

@@ -244,10 +244,13 @@ auto post_message(Core::State::AppState& state, const std::string& message) -> v
   }
 }
 
+// 注册 WebView 消息处理器：同一消息类型的新处理器替换旧处理器
 auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
-                              std::function<void(const std::string&)> handler) -> void {
+                              std::move_only_function<void(const std::string&) const> handler)
+    -> void {
   auto& webview_state = *state.webview;
 
+  // 消息注册表独占处理器，避免把回调所有权扩散到调用方
   std::lock_guard<std::mutex> lock(webview_state.messaging.message_mutex);
   webview_state.messaging.handlers[message_type] = std::move(handler);
   Logger().debug("Registered message handler for type: {}", message_type);

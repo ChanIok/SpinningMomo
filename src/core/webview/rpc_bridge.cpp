@@ -83,10 +83,11 @@ auto send_notification(Core::State::AppState& state, const std::string& method,
   }
 }
 
+// 创建交给 WebView2 COM 事件适配层的可复制消息回调
 auto create_message_handler(Core::State::AppState& state)
     -> std::function<void(const std::string&)> {
   return [&state](const std::string& message) {
-    // 在异步运行时中处理消息
+    // COM 回调只负责投递协程，RPC 解析和业务执行都留在异步运行时
     asio::co_spawn(
         *Core::Async::get_io_context(state),
         [&state, message]() -> asio::awaitable<void> {

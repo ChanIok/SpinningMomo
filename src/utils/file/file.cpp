@@ -329,24 +329,23 @@ auto delete_path(const std::filesystem::path& path, bool recursive)
     }
 
     // 递归计算要删除的内容统计
-    std::function<void(const std::filesystem::path&)> calculate_stats =
-        [&](const std::filesystem::path& p) {
-          if (std::filesystem::is_regular_file(p)) {
-            result.files_deleted++;
-            try {
-              result.total_bytes_freed += std::filesystem::file_size(p);
-            } catch (...) {
-              // 忽略文件大小获取错误
-            }
-          } else if (std::filesystem::is_directory(p)) {
-            result.directories_deleted++;
-            if (recursive) {
-              for (const auto& entry : std::filesystem::directory_iterator(p)) {
-                calculate_stats(entry.path());
-              }
-            }
+    auto calculate_stats = [&](this auto&& self, const std::filesystem::path& p) -> void {
+      if (std::filesystem::is_regular_file(p)) {
+        result.files_deleted++;
+        try {
+          result.total_bytes_freed += std::filesystem::file_size(p);
+        } catch (...) {
+          // 忽略文件大小获取错误
+        }
+      } else if (std::filesystem::is_directory(p)) {
+        result.directories_deleted++;
+        if (recursive) {
+          for (const auto& entry : std::filesystem::directory_iterator(p)) {
+            self(entry.path());
           }
-        };
+        }
+      }
+    };
 
     // 先统计
     calculate_stats(path);
@@ -514,21 +513,20 @@ auto copy_path(const std::filesystem::path& source_path,
         std::filesystem::copy(source_path, destination_path, options);
 
         // 统计复制的文件和目录
-        std::function<void(const std::filesystem::path&)> count_items =
-            [&](const std::filesystem::path& p) {
-              for (const auto& entry : std::filesystem::recursive_directory_iterator(p)) {
-                if (entry.is_regular_file()) {
-                  result.files_copied++;
-                  try {
-                    result.total_bytes_copied += entry.file_size();
-                  } catch (...) {
-                    // 忽略文件大小获取错误
-                  }
-                } else if (entry.is_directory()) {
-                  result.directories_copied++;
-                }
+        auto count_items = [&](const std::filesystem::path& p) {
+          for (const auto& entry : std::filesystem::recursive_directory_iterator(p)) {
+            if (entry.is_regular_file()) {
+              result.files_copied++;
+              try {
+                result.total_bytes_copied += entry.file_size();
+              } catch (...) {
+                // 忽略文件大小获取错误
               }
-            };
+            } else if (entry.is_directory()) {
+              result.directories_copied++;
+            }
+          }
+        };
 
         count_items(destination_path);
         Logger().debug("Successfully copied directory recursively: {} -> {}", source_path.string(),

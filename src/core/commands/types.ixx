@@ -21,8 +21,8 @@ export struct CommandDescriptor {
 
   bool is_toggle = false;  // 是否为切换类型
 
-  std::function<void()> action;               // 点击执行的动作
-  std::function<bool()> get_state = nullptr;  // toggle 类型：获取当前状态
+  std::move_only_function<void() const> action;               // 点击执行的动作
+  std::move_only_function<bool() const> get_state = nullptr;  // toggle 类型：获取当前状态
 
   std::optional<HotkeyBinding> hotkey;  // 热键绑定（可选）
 };

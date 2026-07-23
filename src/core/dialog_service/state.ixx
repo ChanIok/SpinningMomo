@@ -9,7 +9,7 @@ namespace Core::DialogService::State {
 export struct DialogServiceState {
   std::jthread worker_thread;
 
-  std::queue<std::function<void()>> task_queue;
+  std::queue<std::move_only_function<void()>> task_queue;
   std::mutex queue_mutex;
   std::condition_variable condition;
 

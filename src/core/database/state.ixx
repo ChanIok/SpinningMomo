@@ -10,7 +10,7 @@ export struct DatabaseState {
   // 存储数据库文件路径
   std::filesystem::path db_path;
 
-  std::queue<std::function<void()>> task_queue;
+  std::queue<std::move_only_function<void()>> task_queue;
   std::mutex queue_mutex;
   std::condition_variable queue_cv;
   std::vector<std::jthread> worker_threads;

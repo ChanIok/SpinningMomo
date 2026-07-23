@@ -10,10 +10,9 @@ import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database {
 
-using DatabaseJob = std::function<void(SQLite::Database&)>;
-
 // 同步执行数据库任务。调用方会等待任务完成；事务内重入时由实现复用当前 worker 连接。
-auto run_database_job(Core::State::AppState& app_state, DatabaseJob job)
+auto run_database_job(Core::State::AppState& app_state,
+                      std::move_only_function<void(SQLite::Database&)> job)
     -> std::expected<void, std::string>;
 
 template <typename Result>

@@ -78,7 +78,7 @@ export struct MethodInfo {
   std::string name;
   std::string description;
   std::string params_schema;  // 参数的JSON Schema
-  std::function<RpcJsonAwaitable(rfl::Generic, rfl::Generic)> handler;
+  std::move_only_function<RpcJsonAwaitable(rfl::Generic, rfl::Generic) const> handler;
 };
 
 // 空参数结构，用于不需要参数的RPC方法

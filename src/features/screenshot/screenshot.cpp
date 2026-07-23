@@ -94,14 +94,15 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
 }
 
 // 安全调用完成回调的辅助函数
-auto safe_call_completion_callback(const Features::Screenshot::State::ScreenshotRequest& request,
+auto safe_call_completion_callback(Features::Screenshot::State::ScreenshotRequest& request,
                                    bool success) -> void {
   if (!request.completion_callback) {
     return;
   }
 
   try {
-    request.completion_callback(success, request.file_path);
+    auto completion_callback = std::move(request.completion_callback);
+    completion_callback(success, request.file_path);
   } catch (...) {
     Logger().error("Exception in completion callback");
   }
@@ -149,7 +150,7 @@ auto finish_screenshot_session(
 }
 
 // 核心截图捕获逻辑
-auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest& request,
+auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& request,
                            Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
   try {
@@ -306,27 +307,30 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
       return std::unexpected("Failed to create capture session: " + session_result.error());
     }
 
-    // 创建会话信息并存储到状态中
-    Features::Screenshot::State::SessionInfo session_info;
+    // 先在注册表中创建槽位；分配失败时 request 尚未移动，调用方仍能完成失败通知。
+    auto [session_it, inserted] = state.active_sessions.try_emplace(session_id);
+    if (!inserted) {
+      return std::unexpected("Screenshot session id already exists");
+    }
+    auto& session_info = session_it->second;
     session_info.session = std::move(session_result.value());
-    session_info.request = request;
+    session_info.request = std::move(request);
 
     // 如果需要手动隐藏光标，则在开始捕获前隐藏光标
     if (session_info.session.need_hide_cursor) {
       ShowCursor(FALSE);
     }
 
-    state.active_sessions[session_id] = std::move(session_info);
-
     // 开始捕获 - 不等待，直接返回
-    auto start_result =
-        Utils::Graphics::Capture::start_capture(state.active_sessions[session_id].session);
+    auto start_result = Utils::Graphics::Capture::start_capture(session_info.session);
     if (!start_result) {
-      // 如果启动失败，清理会话，恢复光标显示
-      if (state.active_sessions[session_id].session.need_hide_cursor) {
+      // request 已归活动会话所有；启动失败由这里完成通知和资源回收。
+      if (session_info.session.need_hide_cursor) {
         ShowCursor(TRUE);
       }
-      state.active_sessions.erase(session_id);
+      Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+      safe_call_completion_callback(session_info.request, false);
+      state.active_sessions.erase(session_it);
       return std::unexpected("Failed to start capture: " + start_result.error());
     }
 
@@ -338,7 +342,7 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
 }
 
 // 处理单个截图请求
-auto process_single_request(const Features::Screenshot::State::ScreenshotRequest& request,
+auto process_single_request(Features::Screenshot::State::ScreenshotRequest request,
                             Core::State::AppState& app_state) -> void {
   auto& state = *app_state.screenshot;
   Logger().debug("Processing screenshot request for window: {}",
@@ -423,7 +427,7 @@ auto worker_thread_proc(Core::State::AppState& app_state) -> void {
       // 获取正常请求
       std::lock_guard<std::mutex> req_lock(state.request_mutex);
       if (!state.pending_requests.empty()) {
-        request = state.pending_requests.front();
+        request = std::move(state.pending_requests.front());
         state.pending_requests.pop();
         has_request = true;
       }
@@ -431,7 +435,7 @@ auto worker_thread_proc(Core::State::AppState& app_state) -> void {
 
     // 处理请求
     if (has_request) {
-      process_single_request(request, app_state);
+      process_single_request(std::move(request), app_state);
 
       // 只有「请求已发出但未形成活跃会话」时（例如启动捕获失败）才在这里启动定时器；
       // 正常路径在帧回调保存完成后再启动，见 do_screenshot_capture 内 frame_callback。
@@ -551,7 +555,7 @@ auto cleanup_system(Core::State::AppState& app_state) -> void {
 
 auto take_screenshot(
     Core::State::AppState& app_state, HWND target_window,
-    std::function<void(bool success, const std::wstring& path)> completion_callback,
+    std::move_only_function<void(bool success, const std::wstring& path)> completion_callback,
     Utils::Image::ImageFormat format, float jpeg_quality,
     std::optional<std::filesystem::path> output_dir_override, int shutter_frames,
     bool capture_client_area) -> std::expected<void, std::string> {
@@ -645,7 +649,7 @@ auto take_screenshot(
   request.jpeg_quality = jpeg_quality;
   request.use_hdr = use_hdr;
   request.hdr_target_peak_nits = hdr_target_peak_nits;
-  request.completion_callback = completion_callback;
+  request.completion_callback = std::move(completion_callback);
   request.timestamp = std::chrono::steady_clock::now();
   request.shutter_frames = std::max(0, shutter_frames);
   request.capture_client_area = capture_client_area;
@@ -667,7 +671,7 @@ auto take_screenshot(
   // 添加到队列并唤醒工作线程
   {
     std::lock_guard<std::mutex> lock(state.request_mutex);
-    state.pending_requests.push(request);
+    state.pending_requests.push(std::move(request));
   }
 
   // 唤醒工作线程

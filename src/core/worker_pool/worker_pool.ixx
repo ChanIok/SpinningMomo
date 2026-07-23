@@ -18,7 +18,7 @@ export auto stop(Core::State::AppState& state) -> void;
 export auto is_running(const Core::State::AppState& state) -> bool;
 
 // 提交任务到线程池
-export auto submit_task(Core::State::AppState& state, std::function<void()> task) -> bool;
+export auto submit_task(Core::State::AppState& state, std::move_only_function<void()> task) -> bool;
 
 // 获取工作线程数量
 export auto get_thread_count(const Core::State::AppState& state) -> size_t;

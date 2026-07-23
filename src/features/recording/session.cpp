@@ -262,8 +262,8 @@ auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
 }
 
 // 高频启停时延迟 5 秒释放 D3D 资源，避免反复创建的损耗
-auto start_cleanup_timer(Core::State::AppState& app_state, std::function<void()> on_timeout)
-    -> void {
+auto start_cleanup_timer(Core::State::AppState& app_state,
+                         std::move_only_function<void()> on_timeout) -> void {
   if (!app_state.recording) {
     return;
   }

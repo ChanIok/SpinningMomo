@@ -11,7 +11,7 @@ export struct WorkerPoolState {
   std::vector<std::jthread> worker_threads;
 
   // 任务队列和同步原语
-  std::queue<std::function<void()>> task_queue;
+  std::queue<std::move_only_function<void()>> task_queue;
   std::mutex queue_mutex;
   std::condition_variable condition;
 

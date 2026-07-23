@@ -110,8 +110,8 @@ auto capture(Core::State::AppState& state) -> void {
   const auto capture_client_area = state.settings->raw.features.screenshot.capture_client_area;
 
   auto result = Features::Screenshot::take_screenshot(
-      state, *target_window, completion_callback, image_format, jpeg_quality, output_dir_override,
-      shutter_frames, capture_client_area);
+      state, *target_window, std::move(completion_callback), image_format, jpeg_quality,
+      output_dir_override, shutter_frames, capture_client_area);
   if (!result) {
     Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],

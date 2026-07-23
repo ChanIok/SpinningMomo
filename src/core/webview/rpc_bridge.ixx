@@ -17,7 +17,7 @@ export auto handle_webview_message(Core::State::AppState& state, const std::stri
 export auto send_notification(Core::State::AppState& state, const std::string& method,
                               const std::string& params) -> void;
 
-// 处理WebView消息的回调函数
+// 创建交给 WebView2/WRL 的可复制消息回调；COM 事件适配层需要复制 callable
 export auto create_message_handler(Core::State::AppState& state)
     -> std::function<void(const std::string&)>;
 

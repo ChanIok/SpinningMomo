@@ -11,7 +11,7 @@ namespace Utils::Timeout {
 
 struct Timeout::shared_state {
   std::mutex mutex;
-  std::function<void()> callback;
+  std::move_only_function<void()> callback;
   // true 表示存在待触发任务；触发/取消后置回 false。
   std::atomic<bool> pending{false};
 };
@@ -19,13 +19,12 @@ struct Timeout::shared_state {
 auto CALLBACK Timeout::threadpool_callback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER)
     -> void {
   auto* shared = static_cast<shared_state*>(context);
-  std::function<void()> callback;
+  std::move_only_function<void()> callback;
   {
     std::lock_guard lock(shared->mutex);
     // 回调触发时先把状态切换为非 pending，再搬运回调，避免竞态下重复执行。
-    callback = shared->callback;
+    callback = std::move(shared->callback);
     shared->pending.store(false, std::memory_order_release);
-    shared->callback = nullptr;
   }
 
   if (callback) {
@@ -66,7 +65,7 @@ auto Timeout::create_timer_object() -> std::expected<void, timeout_error> {
   return {};
 }
 
-auto Timeout::set_timeout(std::chrono::milliseconds delay, std::function<void()> callback)
+auto Timeout::set_timeout(std::chrono::milliseconds delay, std::move_only_function<void()> callback)
     -> std::expected<void, timeout_error> {
   if (!callback) {
     return std::unexpected(timeout_error::invalid_callback);

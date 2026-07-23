@@ -22,7 +22,7 @@ export class Timeout {
 
   // 设置一次性延迟任务（等价于 setTimeout）。
   // 若已有 pending 任务，会先取消再覆盖。
-  auto set_timeout(std::chrono::milliseconds delay, std::function<void()> callback)
+  auto set_timeout(std::chrono::milliseconds delay, std::move_only_function<void()> callback)
       -> std::expected<void, timeout_error>;
   // 取消当前待触发任务；可重复调用（幂等）。
   auto cancel() -> void;

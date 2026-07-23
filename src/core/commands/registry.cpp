@@ -138,6 +138,7 @@ auto uninstall_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state)
   }
 }
 
+// 按 ID 调用注册命令，并把查找失败或执行异常统一转换为 false
 auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool {
   auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
@@ -161,6 +162,7 @@ auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool
   }
 }
 
+// 获取注册表中的命令描述符只读视图，不复制内部回调
 auto get_command(const Core::State::AppState& state, const std::string& id)
     -> const CommandDescriptor* {
   const auto& registry = state.commands->registry;
@@ -171,21 +173,28 @@ auto get_command(const Core::State::AppState& state, const std::string& id)
   return &it->second;
 }
 
-auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptor> {
+// 按注册顺序生成命令元数据快照，不复制注册表持有的行为
+auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptorData> {
   const auto& registry = state.commands->registry;
-  std::vector<CommandDescriptor> result;
+  std::vector<CommandDescriptorData> result;
   result.reserve(registry.registration_order.size());
 
+  // 只导出前端需要的稳定字段，action 和 get_state 始终留在注册表中
   for (const auto& id : registry.registration_order) {
     auto it = registry.descriptors.find(id);
     if (it != registry.descriptors.end()) {
-      result.push_back(it->second);
+      result.push_back(CommandDescriptorData{
+          .id = it->second.id,
+          .i18n_key = it->second.i18n_key,
+          .is_toggle = it->second.is_toggle,
+      });
     }
   }
 
   return result;
 }
 
+// 查询 toggle 命令的实时状态，无状态读取器或普通命令统一返回 false
 auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> bool {
   const auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);

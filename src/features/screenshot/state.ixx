@@ -23,7 +23,7 @@ export struct ScreenshotRequest {
   float hdr_target_peak_nits = 1000.0f;
   int shutter_frames = 0;
   bool capture_client_area = true;
-  std::function<void(bool success, const std::wstring& path)> completion_callback;
+  std::move_only_function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
@@ -78,7 +78,8 @@ export struct ScreenshotState {
 
       // 通知调用者会话被取消
       if (session_info.request.completion_callback) {
-        session_info.request.completion_callback(false, session_info.request.file_path);
+        auto completion_callback = std::move(session_info.request.completion_callback);
+        completion_callback(false, session_info.request.file_path);
       }
     }
     active_sessions.clear();

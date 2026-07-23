@@ -13,26 +13,15 @@ import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Registry {
 
+// 返回命令注册表的可传输元数据，不复制内部 action 和状态读取器
 auto handle_get_all_commands(Core::State::AppState& app_state,
                              const Core::Commands::GetAllCommandsParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::GetAllCommandsResult>> {
   try {
-    auto all_commands = Core::Commands::get_all_commands(app_state);
-
-    // 转换为 RPC 传输格式
-    Core::Commands::GetAllCommandsResult result;
-    result.commands.reserve(all_commands.size());
-
-    for (const auto& command : all_commands) {
-      Core::Commands::CommandDescriptorData data{
-          .id = command.id,
-          .i18n_key = command.i18n_key,
-          .is_toggle = command.is_toggle,
-      };
-      result.commands.push_back(std::move(data));
-    }
-
-    co_return result;
+    // 命令模块已经生成隔离行为字段的元数据快照，RPC 只负责转交
+    co_return Core::Commands::GetAllCommandsResult{
+        .commands = Core::Commands::get_all_commands(app_state),
+    };
   } catch (const std::exception& e) {
     co_return std::unexpected(
         Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -40,6 +29,7 @@ auto handle_get_all_commands(Core::State::AppState& app_state,
   }
 }
 
+// 校验命令 ID 后调用注册表，并返回统一的 RPC 结果
 auto handle_invoke_command(Core::State::AppState& app_state,
                            const Core::Commands::InvokeCommandParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::InvokeCommandResult>> {
@@ -66,6 +56,7 @@ auto handle_invoke_command(Core::State::AppState& app_state,
   }
 }
 
+// 注册命令查询与调用相关的 RPC 方法
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Core::Commands::GetAllCommandsParams,
                              Core::Commands::GetAllCommandsResult>(

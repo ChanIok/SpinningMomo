@@ -18,8 +18,9 @@ export auto invoke_command(Core::State::AppState& state, const std::string& id) 
 export auto get_command(const Core::State::AppState& state, const std::string& id)
     -> const CommandDescriptor*;
 
-// 获取所有命令描述符（按注册顺序）
-export auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptor>;
+// 获取所有命令的可传输元数据（按注册顺序，不暴露内部回调）
+export auto get_all_commands(const Core::State::AppState& state)
+    -> std::vector<CommandDescriptorData>;
 
 // toggle 命令是否处于开启态（非 toggle / 未找到 / 无 get_state 时返回 false）
 export auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> bool;

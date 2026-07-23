@@ -56,7 +56,7 @@ auto bind_params(SQLite::Statement& query, const std::vector<Types::DbParam>& pa
   }
 }
 
-auto submit_task(State::DatabaseState& state, std::function<void()> task)
+auto submit_task(State::DatabaseState& state, std::move_only_function<void()> task)
     -> std::expected<void, std::string> {
   if (!state.is_running.load(std::memory_order_acquire)) {
     return std::unexpected("Database executor is not running");
@@ -79,7 +79,8 @@ auto submit_task(State::DatabaseState& state, std::function<void()> task)
   }
 }
 
-auto execute_job(SQLite::Database& connection, const DatabaseJob& job)
+auto execute_job(SQLite::Database& connection,
+                 std::move_only_function<void(SQLite::Database&)>& job)
     -> std::expected<void, std::string> {
   try {
     job(connection);
@@ -105,7 +106,7 @@ auto worker_loop(State::DatabaseState& state, std::size_t index) -> void {
     Logger().info("Database worker {} started", index);
 
     while (true) {
-      std::function<void()> task;
+      std::move_only_function<void()> task;
       {
         std::unique_lock lock(state.queue_mutex);
         state.queue_cv.wait(lock, [&state] {
@@ -147,7 +148,8 @@ auto worker_loop(State::DatabaseState& state, std::size_t index) -> void {
 
 }  // namespace Executor
 
-auto run_database_job(Core::State::AppState& app_state, DatabaseJob job)
+auto run_database_job(Core::State::AppState& app_state,
+                      std::move_only_function<void(SQLite::Database&)> job)
     -> std::expected<void, std::string> {
   if (current_connection) {
     return Executor::execute_job(*current_connection, job);
@@ -164,15 +166,15 @@ auto run_database_job(Core::State::AppState& app_state, DatabaseJob job)
   }
 
   // 对外保持同步 API：调用线程等待 promise，实际 SQLite 操作在 DB worker 线程执行。
-  auto promise = std::make_shared<std::promise<std::expected<void, std::string>>>();
-  auto future = promise->get_future();
-  auto task = [promise, job = std::move(job)]() mutable {
+  std::promise<std::expected<void, std::string>> promise;
+  auto future = promise.get_future();
+  auto task = [promise = std::move(promise), job = std::move(job)]() mutable {
     if (!current_connection) {
-      promise->set_value(std::unexpected("Database worker connection is not ready"));
+      promise.set_value(std::unexpected("Database worker connection is not ready"));
       return;
     }
 
-    promise->set_value(Executor::execute_job(*current_connection, job));
+    promise.set_value(Executor::execute_job(*current_connection, job));
   };
 
   if (auto submit_result = Executor::submit_task(state, std::move(task)); !submit_result) {
@@ -200,7 +202,7 @@ auto shutdown_executor(State::DatabaseState& state) -> void {
 
   {
     std::lock_guard lock(state.queue_mutex);
-    std::queue<std::function<void()>> empty;
+    std::queue<std::move_only_function<void()>> empty;
     state.task_queue.swap(empty);
   }
 

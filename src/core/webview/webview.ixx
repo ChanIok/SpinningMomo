@@ -32,8 +32,9 @@ export auto navigate_to_url(Core::State::AppState& state, const std::wstring& ur
 export auto send_message(Core::State::AppState& state, const std::string& message)
     -> std::expected<std::string, std::string>;
 export auto post_message(Core::State::AppState& state, const std::string& message) -> void;
-export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
-                                     std::function<void(const std::string&)> handler) -> void;
+export auto register_message_handler(
+    Core::State::AppState& state, const std::string& message_type,
+    std::move_only_function<void(const std::string&) const> handler) -> void;
 export auto register_document_created_script(Core::State::AppState& state, std::string script_id,
                                              std::wstring script_source) -> void;
 export auto register_virtual_host_folder_mapping(

@@ -12,7 +12,8 @@ namespace Core::RPC {
 
 // 异步处理器签名
 template <typename Request, typename Response>
-using AsyncHandler = std::function<RpcAwaitable<Response>(Core::State::AppState&, const Request&)>;
+using AsyncHandler =
+    std::move_only_function<RpcAwaitable<Response>(Core::State::AppState&, const Request&) const>;
 
 // 创建标准错误响应
 auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
@@ -22,16 +23,16 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
 export auto process_request(Core::State::AppState& app_state, const std::string& request_json)
     -> RpcJsonAwaitable;
 
-// 注册RPC方法
+// 注册 RPC 方法：擦除业务处理器类型并生成统一的 JSON-RPC 协程入口
 export template <typename Request, typename Response>
 auto register_method(Core::State::AppState& app_state,
                      std::unordered_map<std::string, MethodInfo>& registry,
                      const std::string& method_name, AsyncHandler<Request, Response> handler,
                      const std::string& description = "") -> void {
-  // 创建类型擦除的处理器包装
-  auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
-                                               rfl::Generic id) -> RpcJsonAwaitable {
-    // 从 rfl::Generic 转换为 Request 类型
+  // 注册表独占业务处理器，包装层只保留可重复 const 调用能力
+  auto wrapped_handler = [handler = std::move(handler), &app_state](
+                             rfl::Generic params_generic, rfl::Generic id) -> RpcJsonAwaitable {
+    // 把通用 JSON 参数转换为当前方法的强类型请求
     auto request_result =
         rfl::from_generic<Request, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(
             params_generic);
@@ -40,18 +41,16 @@ auto register_method(Core::State::AppState& app_state,
                                       "Invalid parameters: " + request_result.error().what());
     }
 
-    // 执行业务逻辑 - 传递 app_state 参数
+    // 调用业务协程并保留统一的 AppState 注入方式
     auto result = co_await handler(app_state, request_result.value());
 
-    // 构造响应
+    // 将业务结果转换为 JSON-RPC 成功或错误响应
     if (result) {
-      // 成功响应
       JsonRpcSuccessResponse success_response;
       success_response.id = id;
       success_response.result = rfl::to_generic<rfl::SnakeCaseToCamelCase>(result.value());
       co_return rfl::json::write<rfl::SnakeCaseToCamelCase>(success_response);
     } else {
-      // 错误响应
       const auto& error = result.error();
       Logger().error("Error response: {}", error.message);
       co_return create_error_response(id, static_cast<ErrorCode>(error.code), error.message);
@@ -63,7 +62,7 @@ auto register_method(Core::State::AppState& app_state,
     params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
   }
 
-  // 存储到注册表
+  // 注册表取得包装处理器的唯一所有权
   registry[method_name] = MethodInfo{.name = method_name,
                                      .description = description,
                                      .params_schema = std::move(params_schema),

@@ -84,7 +84,7 @@ Core::State::AppState&        // 或 const AppState&
 2. 若展开后的模板代码里写 `app_state.database->is_running`，调用方 TU 只有 `Core.State` 的前向声明，看不见 `Core.Database.State::DatabaseState` 的完整布局，就会触发 C2027/C2039 或后续链接问题。
 3. 因此现在的边界是：
    - `database.ixx`：保留 `query<T>` / `query_scalar<T>` / `execute_transaction<Func>`，只做 SQL 结果到 `T` 的映射、返回类型推导、事务 lambda 包装。
-   - `database.cpp`：实现非模板 `run_database_job(AppState&, DatabaseJob)`，内部可以 import `Core.Database.State`，安全访问 `app_state.database`、`is_running`、任务队列、`current_connection`。
+   - `database.cpp`：实现非模板 `run_database_job(AppState&, std::move_only_function<void(SQLite::Database&)>)`，内部可以 import `Core.Database.State`，安全访问 `app_state.database`、`is_running`、任务队列、`current_connection`。
 
 可记一句：**export 模板可以依赖 AppState 作为上下文，但模板体不要穿透 AppState 去摸子 state；需要摸子 state 时，先下沉到同模块 `.cpp` 的非模板函数。**
 

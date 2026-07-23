@@ -16,7 +16,7 @@ auto send_event(Core::State::AppState& state, std::type_index key, const std::an
 auto post_event(Core::State::AppState& state, std::type_index key, std::any data) -> void;
 
 auto subscribe_event(Core::State::AppState& state, std::type_index key,
-                     std::function<void(const std::any&)> handler) -> void;
+                     std::move_only_function<void(const std::any&) const> handler) -> void;
 
 // 同步发送事件
 export template <typename T>
@@ -30,9 +30,10 @@ auto post(Core::State::AppState& state, T event) -> void {
   post_event(state, std::type_index(typeid(T)), std::any(std::move(event)));
 }
 
-// 订阅事件
+// 订阅强类型事件：把处理器移动进总线并在类型擦除边界完成 any_cast
 export template <typename T>
-auto subscribe(Core::State::AppState& state, std::function<void(const T&)> handler) -> void {
+auto subscribe(Core::State::AppState& state, std::move_only_function<void(const T&) const> handler)
+    -> void {
   if (!handler) {
     return;
   }
@@ -42,7 +43,7 @@ auto subscribe(Core::State::AppState& state, std::function<void(const T&)> handl
                     try {
                       handler(std::any_cast<const T&>(data));
                     } catch (const std::bad_any_cast&) {
-                      // 类型转换错误，暂时忽略
+                      // 注册键与载荷类型不一致时忽略该处理器，避免影响同批事件
                     }
                   });
 }

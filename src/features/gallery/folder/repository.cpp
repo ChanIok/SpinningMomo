@@ -266,8 +266,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
   }
 
   // 4. 递归构建树结构
-  std::function<Types::FolderTreeNode(std::int64_t)> build_tree;
-  build_tree = [&](std::int64_t folder_id) -> Types::FolderTreeNode {
+  auto build_tree = [&](this auto&& self, std::int64_t folder_id) -> Types::FolderTreeNode {
     auto node_it = node_map.find(folder_id);
     if (node_it == node_map.end()) {
       Logger().error("Folder {} not found in node_map", folder_id);
@@ -280,7 +279,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
     auto children_it = parent_to_children.find(folder_id);
     if (children_it != parent_to_children.end()) {
       for (std::int64_t child_id : children_it->second) {
-        node.children.push_back(build_tree(child_id));
+        node.children.push_back(self(child_id));
       }
     }
 
@@ -303,8 +302,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
             });
 
   // 递归排序所有子节点
-  std::function<void(Types::FolderTreeNode&)> sort_children;
-  sort_children = [&](Types::FolderTreeNode& node) {
+  auto sort_children = [&](this auto&& self, Types::FolderTreeNode& node) -> void {
     std::sort(node.children.begin(), node.children.end(),
               [](const Types::FolderTreeNode& a, const Types::FolderTreeNode& b) {
                 if (a.sort_order != b.sort_order) {
@@ -314,7 +312,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
               });
 
     for (auto& child : node.children) {
-      sort_children(child);
+      self(child);
     }
   };
 
@@ -323,8 +321,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
   }
 
   // 7. 递归计算每个文件夹的 asset_count（包含所有子文件夹）
-  std::function<std::int64_t(Types::FolderTreeNode&)> calculate_total_assets;
-  calculate_total_assets = [&](Types::FolderTreeNode& node) -> std::int64_t {
+  auto calculate_total_assets = [&](this auto&& self, Types::FolderTreeNode& node) -> std::int64_t {
     // 当前文件夹的直接 assets 数量
     std::int64_t total = 0;
     auto it = direct_asset_counts.find(node.id);
@@ -334,7 +331,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
 
     // 递归累加所有子文件夹的 assets
     for (auto& child : node.children) {
-      total += calculate_total_assets(child);
+      total += self(child);
     }
 
     // 设置节点的 asset_count
