@@ -121,6 +121,7 @@ export function useGallerySidebar() {
         isHidden: false,
         createdAt: 0,
         updatedAt: 0,
+        isNetwork: false,
         assetCount: store.foldersAssetTotalCount,
         children: [],
       },

@@ -105,8 +105,8 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     </DropdownMenuSubContent>
   </DropdownMenuSub>
   <DropdownMenuSeparator />
-  <DropdownMenuItem variant="destructive" @click="assetActions.handleMoveAssetsToTrash">
+  <DropdownMenuItem variant="destructive" @click="assetActions.requestDeleteAssets">
     <Trash2 />
-    {{ t('gallery.contextMenu.moveToTrash.label') }}
+    {{ assetActions.deleteMenuLabel }}
   </DropdownMenuItem>
 </template>

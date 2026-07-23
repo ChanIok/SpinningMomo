@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Database, Palette } from 'lucide-vue-next'
+import { Database, Palette, Trash2 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { useSettingsStore } from '@/features/settings/store'
+import type { GalleryDeleteMode } from '../../store/persistence'
 import MissingAssetCleanupPanel from './MissingAssetCleanupPanel.vue'
 
-type PreferencesTab = 'view' | 'maintenance'
+type PreferencesTab = 'view' | 'deletion' | 'maintenance'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
@@ -33,6 +41,20 @@ const showDyeCodeBadge = computed({
   get: () => store.gallerySettings.view.showDyeCodeBadge,
   set: (value: boolean) => {
     store.gallerySettings.view.showDyeCodeBadge = value
+  },
+})
+
+const deleteMode = computed({
+  get: () => store.gallerySettings.deletion.mode,
+  set: (value: GalleryDeleteMode) => {
+    store.gallerySettings.deletion.mode = value
+  },
+})
+
+const confirmRecycleBin = computed({
+  get: () => store.gallerySettings.deletion.confirmRecycleBin,
+  set: (value: boolean) => {
+    store.gallerySettings.deletion.confirmRecycleBin = value
   },
 })
 
@@ -73,6 +95,19 @@ watch(
         >
           <Palette class="h-4 w-4 shrink-0" />
           {{ t('gallery.preferences.tabs.view') }}
+        </button>
+        <button
+          type="button"
+          class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeTab === 'deletion'
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+          "
+          @click="activeTab = 'deletion'"
+        >
+          <Trash2 class="h-4 w-4 shrink-0" />
+          {{ t('gallery.preferences.tabs.deletion') }}
         </button>
         <button
           type="button"
@@ -130,6 +165,62 @@ watch(
               <Switch v-model="showDyeCodeBadge" />
             </label>
           </div>
+        </div>
+
+        <div v-else-if="activeTab === 'deletion'" class="space-y-6">
+          <div>
+            <h3 class="text-base font-semibold text-foreground">
+              {{ t('gallery.preferences.deletion.title') }}
+            </h3>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {{ t('gallery.preferences.deletion.description') }}
+            </p>
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex items-center justify-between gap-6 rounded-lg p-3.5">
+              <div class="space-y-0.5">
+                <span class="block text-sm font-medium text-foreground">
+                  {{ t('gallery.preferences.deletion.mode.title') }}
+                </span>
+                <span class="block text-xs text-muted-foreground">
+                  {{ t('gallery.preferences.deletion.mode.description') }}
+                </span>
+              </div>
+              <Select v-model="deleteMode">
+                <SelectTrigger class="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recycleBin">
+                    {{ t('gallery.preferences.deletion.mode.recycleBin') }}
+                  </SelectItem>
+                  <SelectItem value="permanent">
+                    {{ t('gallery.preferences.deletion.mode.permanent') }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <label
+              v-if="deleteMode === 'recycleBin'"
+              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
+            >
+              <div class="space-y-0.5">
+                <span class="block text-sm font-medium text-foreground">
+                  {{ t('gallery.preferences.deletion.confirm.title') }}
+                </span>
+                <span class="block text-xs text-muted-foreground">
+                  {{ t('gallery.preferences.deletion.confirm.description') }}
+                </span>
+              </div>
+              <Switch v-model="confirmRecycleBin" />
+            </label>
+          </div>
+
+          <p class="rounded-lg bg-muted/40 px-3.5 py-3 text-xs text-muted-foreground">
+            {{ t('gallery.preferences.deletion.permanentNotice') }}
+          </p>
         </div>
 
         <MissingAssetCleanupPanel v-else />

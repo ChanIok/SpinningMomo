@@ -49,6 +49,11 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     return folders.value.reduce((sum, folder) => sum + folder.assetCount, 0)
   })
 
+  // Asset.rootId 指向监控根；只索引顶层节点可避开展示树折叠/重组带来的隐藏目录缺失。
+  const rootNetworkById = computed(
+    () => new Map(folders.value.map((folder) => [folder.id, folder.isNetwork]))
+  )
+
   const tagsAssetTotalCount = computed(() => {
     return tags.value.reduce((sum, tag) => sum + tag.assetCount, 0)
   })
@@ -189,6 +194,7 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     sortOrder,
     includeSubfolders,
     foldersAssetTotalCount,
+    rootNetworkById,
     tagsAssetTotalCount,
     setFolderExpanded,
     toggleFolderExpanded,

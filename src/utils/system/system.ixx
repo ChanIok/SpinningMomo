@@ -75,6 +75,10 @@ export auto read_clipboard_text() -> std::expected<std::optional<std::string>, s
 export auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
     -> std::expected<void, std::string>;
 
+// 永久删除单个文件，不经过系统回收站。
+export auto delete_file_permanently(const std::filesystem::path& path)
+    -> std::expected<void, std::string>;
+
 // 单实例检测：尝试获取单实例锁
 // 返回 true 表示成功获取锁（当前是第一个实例）
 // 返回 false 表示已有实例在运行

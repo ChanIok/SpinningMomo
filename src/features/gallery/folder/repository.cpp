@@ -8,6 +8,7 @@ import Core.Database;
 import Core.Database.Types;
 import Features.Gallery.Types;
 import Utils.Logger;
+import Utils.Path;
 import <rfl/json.hpp>;
 
 namespace Features::Gallery::Folder::Repository {
@@ -232,17 +233,20 @@ auto get_folder_tree(Core::State::AppState& app_state)
 
   // 第一次遍历：创建所有节点
   for (const auto& folder : folders) {
-    Types::FolderTreeNode node{.id = folder.id,
-                               .path = folder.path,
-                               .parent_id = folder.parent_id,
-                               .name = folder.name,
-                               .display_name = folder.display_name,
-                               .cover_asset_id = folder.cover_asset_id,
-                               .sort_order = folder.sort_order,
-                               .is_hidden = folder.is_hidden,
-                               .created_at = folder.created_at,
-                               .updated_at = folder.updated_at,
-                               .children = {}};
+    Types::FolderTreeNode node{
+        .id = folder.id,
+        .path = folder.path,
+        .parent_id = folder.parent_id,
+        .name = folder.name,
+        .display_name = folder.display_name,
+        .cover_asset_id = folder.cover_asset_id,
+        .sort_order = folder.sort_order,
+        .is_hidden = folder.is_hidden,
+        .created_at = folder.created_at,
+        .updated_at = folder.updated_at,
+        .is_network = Utils::Path::ClassifyPathStorageKind(std::filesystem::path(folder.path)) ==
+                      Utils::Path::PathStorageKind::RemoteUnc,
+        .children = {}};
 
     node_map[folder.id] = std::move(node);
   }

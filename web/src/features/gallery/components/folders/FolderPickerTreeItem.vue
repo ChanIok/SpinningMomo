@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronRight, Folder } from 'lucide-vue-next'
+import { ChevronRight, Cloud, Folder } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import type { FolderTreeNode } from '../../types'
 
@@ -61,7 +61,8 @@ function handleToggleExpand(event: MouseEvent) {
           :class="isExpanded ? 'rotate-90' : ''"
         />
       </span>
-      <Folder class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <Cloud v-if="folder.isNetwork" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <Folder v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span class="truncate pl-1">{{ label }}</span>
     </button>
 

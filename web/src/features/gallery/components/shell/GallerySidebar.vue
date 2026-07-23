@@ -476,7 +476,7 @@ onMounted(() => {
             </div>
             <!-- 文件夹树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
             <ScrollArea v-else class="min-h-0 flex-1">
-              <div class="space-y-1 px-4 pb-1">
+              <div class="space-y-1 pr-3 pb-1 pl-4">
                 <FolderTreeItem
                   v-for="folder in folders"
                   :key="folder.id"
@@ -523,7 +523,7 @@ onMounted(() => {
             </div>
             <!-- 标签树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
             <ScrollArea v-else class="min-h-0 flex-1">
-              <div class="space-y-1 px-4 pb-1">
+              <div class="space-y-1 pr-3 pb-1 pl-4">
                 <!-- 快速创建标签 -->
                 <div v-if="isCreatingTag" class="px-2">
                   <TagInlineEditor

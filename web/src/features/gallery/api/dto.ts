@@ -160,6 +160,18 @@ export interface OperationResult {
   unchangedCount?: number
 }
 
+export type DeleteAssetsMode = 'recycle_where_possible' | 'permanent'
+
+export interface DeleteAssetsParams {
+  ids: number[]
+  mode: DeleteAssetsMode
+}
+
+export interface DeleteAssetsResult extends OperationResult {
+  recycleBinCount: number
+  permanentCount: number
+}
+
 export interface MissingAssetItem {
   id: number
   name: string

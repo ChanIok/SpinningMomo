@@ -20,10 +20,9 @@ export auto open_asset_with_default_app(Core::State::AppState& app_state, std::i
 export auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<Types::OperationResult, std::string>;
 
-// 将选中资产的物理文件移入回收站，并同步删除资产索引。
-export auto move_assets_to_trash(Core::State::AppState& app_state,
-                                 const std::vector<std::int64_t>& ids)
-    -> std::expected<Types::OperationResult, std::string>;
+// 按明确策略处理选中资产；recycle_where_possible 对 UNC 永久删除，其余移入回收站。
+export auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsParams& params)
+    -> std::expected<Types::DeleteAssetsResult, std::string>;
 
 // 将选中资产移动到目标图库文件夹，并同步更新路径索引。
 export auto move_assets_to_folder(Core::State::AppState& app_state,

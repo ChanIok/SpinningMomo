@@ -7,6 +7,7 @@ import MasonryView from '../viewer/MasonryView.vue'
 import AdaptiveView from '../viewer/AdaptiveView.vue'
 import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
 import GalleryMoveToFolderDialog from '../dialogs/GalleryMoveToFolderDialog.vue'
+import GalleryDeleteAssetsDialog from '../dialogs/GalleryDeleteAssetsDialog.vue'
 
 const store = useGalleryStore()
 const viewMode = computed(() => store.viewConfig.mode)
@@ -46,5 +47,6 @@ defineExpose({ scrollToIndex, getCardRect })
     <AdaptiveView v-else ref="adaptiveViewRef" />
     <GallerySharedContextMenu />
     <GalleryMoveToFolderDialog />
+    <GalleryDeleteAssetsDialog />
   </div>
 </template>

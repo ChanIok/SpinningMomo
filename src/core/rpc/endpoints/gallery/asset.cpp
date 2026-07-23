@@ -214,10 +214,10 @@ auto handle_paste_clipboard_to_folder(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_move_assets_to_trash(Core::State::AppState& app_state,
-                                 const Features::Gallery::Types::AssetIdsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::FileOperations::move_assets_to_trash(app_state, params.ids);
+auto handle_delete_assets(Core::State::AppState& app_state,
+                          const Features::Gallery::Types::DeleteAssetsParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::DeleteAssetsResult> {
+  auto result = Features::Gallery::FileOperations::delete_assets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -445,10 +445,10 @@ auto register_all(Core::State::AppState& app_state) -> void {
       handle_paste_clipboard_to_folder,
       "Paste clipboard files or bitmap media into an indexed gallery folder");
 
-  register_method<Features::Gallery::Types::AssetIdsParams,
-                  Features::Gallery::Types::OperationResult>(
-      app_state, app_state.rpc->registry, "gallery.moveAssetsToTrash", handle_move_assets_to_trash,
-      "Move selected asset files to system recycle bin and remove them from gallery index");
+  register_method<Features::Gallery::Types::DeleteAssetsParams,
+                  Features::Gallery::Types::DeleteAssetsResult>(
+      app_state, app_state.rpc->registry, "gallery.deleteAssets", handle_delete_assets,
+      "Recycle selected asset files where possible or permanently delete them");
 
   register_method<Features::Gallery::Types::MoveAssetsToFolderParams,
                   Features::Gallery::Types::OperationResult>(

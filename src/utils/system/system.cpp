@@ -674,6 +674,18 @@ auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
   return {};
 }
 
+auto delete_file_permanently(const std::filesystem::path& path)
+    -> std::expected<void, std::string> {
+  std::error_code ec;
+  if (!std::filesystem::remove(path, ec) && !ec) {
+    return std::unexpected("File does not exist: " + path.string());
+  }
+  if (ec) {
+    return std::unexpected("Failed to permanently delete file: " + ec.message());
+  }
+  return {};
+}
+
 // 单实例互斥锁名称
 constexpr auto kMutexName = L"Global\\SpinningMomo_SingleInstance_Mutex";
 // 窗口类名

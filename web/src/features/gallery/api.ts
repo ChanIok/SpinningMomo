@@ -34,6 +34,8 @@ import type {
   MissingAssetsResponse,
   PurgeMissingAssetsParams,
   PurgeMissingAssetsResult,
+  DeleteAssetsParams,
+  DeleteAssetsResult,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
@@ -272,15 +274,15 @@ export async function pasteClipboardToFolder(folderId: number): Promise<Operatio
 }
 
 /**
- * 将资产移动到系统回收站
+ * 按前端选定的策略删除资产文件。
  */
-export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationResult> {
+export async function deleteAssets(params: DeleteAssetsParams): Promise<DeleteAssetsResult> {
   try {
-    const result = await call<OperationResult>('gallery.moveAssetsToTrash', { ids: assetIds })
+    const result = await call<DeleteAssetsResult>('gallery.deleteAssets', params)
     return result
   } catch (error) {
-    console.error('Failed to move assets to trash:', error)
-    throw new Error('移到回收站失败')
+    console.error('Failed to delete assets:', error)
+    throw new Error('删除文件失败')
   }
 }
 
@@ -727,7 +729,7 @@ export const galleryApi = {
   revealAssetInExplorer,
   copyAssetsToClipboard,
   pasteClipboardToFolder,
-  moveAssetsToTrash,
+  deleteAssets,
   moveAssetsToFolder,
   checkAssetReachable,
   updateAssetsReviewState,

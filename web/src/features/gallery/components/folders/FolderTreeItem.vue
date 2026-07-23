@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ClipboardPaste, FolderOpen, FolderPlus, Pen, Trash2 } from 'lucide-vue-next'
+import {
+  ChevronRight,
+  ClipboardPaste,
+  Cloud,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Pen,
+  Trash2,
+} from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -256,22 +265,8 @@ function handleDrop(event: DragEvent) {
           <!-- 左侧：图标 + 名称 -->
           <div class="flex min-w-0 items-center gap-2">
             <!-- 文件夹图标 -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="flex-shrink-0"
-            >
-              <path
-                d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-              />
-            </svg>
+            <Cloud v-if="folder.isNetwork" class="h-3.5 w-3.5 flex-shrink-0" />
+            <Folder v-else class="h-3.5 w-3.5 flex-shrink-0" />
 
             <!-- 文件夹名称 -->
             <span class="font-tnum truncate text-sm">
@@ -285,24 +280,13 @@ function handleDrop(event: DragEvent) {
             v-if="folder.children && folder.children.length > 0"
           >
             <span
-              class="-mr-0.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-hover"
+              class="mr-1 flex-shrink-0 rounded-sm p-1 hover:bg-sidebar-hover"
               @click.stop="toggleExpand"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="transition-transform"
+              <ChevronRight
+                class="h-4 w-4 transition-transform"
                 :class="{ 'rotate-90': isExpanded }"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
+              />
             </span>
           </div>
         </button>

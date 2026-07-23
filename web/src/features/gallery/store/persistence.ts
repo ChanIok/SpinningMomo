@@ -1,5 +1,7 @@
 import type { ViewMode } from '../types'
 
+export type GalleryDeleteMode = 'recycleBin' | 'permanent'
+
 export interface GallerySettings {
   view: {
     size: number
@@ -10,6 +12,10 @@ export interface GallerySettings {
   navigation: {
     expandedFolderIds: number[]
     expandedTagIds: number[]
+  }
+  deletion: {
+    mode: GalleryDeleteMode
+    confirmRecycleBin: boolean
   }
   layout: {
     sidebarOpen: boolean
@@ -35,6 +41,10 @@ export function createDefaultGallerySettings(): GallerySettings {
     navigation: {
       expandedFolderIds: [],
       expandedTagIds: [],
+    },
+    deletion: {
+      mode: 'recycleBin',
+      confirmRecycleBin: false,
     },
     layout: {
       sidebarOpen: true,

@@ -63,6 +63,7 @@ export struct FolderTreeNode {
   int is_hidden = 0;
   std::int64_t created_at;
   std::int64_t updated_at;
+  bool is_network = false;
   std::int64_t asset_count = 0;
   std::vector<FolderTreeNode> children;
 };
@@ -272,6 +273,11 @@ export struct AssetIdsParams {
   std::vector<std::int64_t> ids;
 };
 
+export struct DeleteAssetsParams {
+  std::vector<std::int64_t> ids;
+  std::string mode = "recycle_where_possible";
+};
+
 export struct MoveAssetsToFolderParams {
   std::vector<std::int64_t> ids;
   std::int64_t target_folder_id = 0;
@@ -301,6 +307,17 @@ export struct OperationResult {
   std::optional<std::int64_t> failed_count = std::nullopt;
   std::optional<std::int64_t> not_found_count = std::nullopt;
   std::optional<std::int64_t> unchanged_count = std::nullopt;
+};
+
+export struct DeleteAssetsResult {
+  bool success = false;
+  std::string message;
+  std::optional<std::int64_t> affected_count = 0;
+  std::optional<std::int64_t> failed_count = 0;
+  std::optional<std::int64_t> not_found_count = 0;
+  std::optional<std::int64_t> unchanged_count = 0;
+  std::int64_t recycle_bin_count = 0;
+  std::int64_t permanent_count = 0;
 };
 
 export struct MissingAssetItem {

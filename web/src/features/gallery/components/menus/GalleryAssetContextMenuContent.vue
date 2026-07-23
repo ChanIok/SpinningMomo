@@ -105,8 +105,8 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     </ContextMenuSubContent>
   </ContextMenuSub>
   <ContextMenuSeparator />
-  <ContextMenuItem variant="destructive" @click="assetActions.handleMoveAssetsToTrash">
+  <ContextMenuItem variant="destructive" @click="assetActions.requestDeleteAssets">
     <Trash2 />
-    {{ t('gallery.contextMenu.moveToTrash.label') }}
+    {{ assetActions.deleteMenuLabel }}
   </ContextMenuItem>
 </template>

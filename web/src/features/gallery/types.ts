@@ -62,6 +62,7 @@ export interface FolderTreeNode {
   isHidden: boolean
   createdAt: number
   updatedAt: number
+  isNetwork: boolean
   assetCount: number // 包含所有子文件夹的 assets 总数
   children: FolderTreeNode[]
 }

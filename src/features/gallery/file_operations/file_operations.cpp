@@ -133,29 +133,34 @@ auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
   };
 }
 
-// 将选中资产的物理文件移入回收站，并同步删除资产索引。
-auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
-    -> std::expected<Types::OperationResult, std::string> {
-  if (ids.empty()) {
-    return Types::OperationResult{
+// 按明确策略删除资产；确认交互由前端统一负责。
+auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsParams& params)
+    -> std::expected<Types::DeleteAssetsResult, std::string> {
+  if (params.ids.empty()) {
+    return Types::DeleteAssetsResult{
         .success = false,
         .message = "No assets selected",
         .affected_count = 0,
     };
   }
 
-  struct TrashCandidate {
+  const bool permanent_mode = params.mode == "permanent";
+  if (!permanent_mode && params.mode != "recycle_where_possible") {
+    return std::unexpected("Invalid delete mode: " + params.mode);
+  }
+
+  struct DeleteCandidate {
     Types::Asset asset;
     std::filesystem::path file_path;
     bool file_exists = false;
+    bool permanent = false;
     bool manual_ignore_registered = false;
   };
 
-  std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
-  std::vector<TrashCandidate> candidates;
+  std::unordered_set<std::int64_t> unique_ids(params.ids.begin(), params.ids.end());
+  std::vector<DeleteCandidate> candidates;
   candidates.reserve(unique_ids.size());
 
-  std::int64_t moved_count = 0;
   std::int64_t skipped_not_found = 0;
   std::vector<std::string> errors;
   errors.reserve(unique_ids.size());
@@ -193,6 +198,8 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
 
     const auto& asset = asset_result->value();
     std::filesystem::path file_path(asset.path);
+    const bool permanent = permanent_mode || Utils::Path::ClassifyPathStorageKind(file_path) ==
+                                                 Utils::Path::PathStorageKind::RemoteUnc;
     std::error_code ec;
     bool file_exists = std::filesystem::exists(file_path, ec);
     if (ec) {
@@ -200,10 +207,11 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
       continue;
     }
 
-    candidates.push_back(TrashCandidate{
+    candidates.push_back(DeleteCandidate{
         .asset = asset,
         .file_path = std::move(file_path),
         .file_exists = file_exists,
+        .permanent = permanent,
     });
   }
 
@@ -217,66 +225,81 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     auto begin_ignore_result = Watcher::begin_manual_file_system_ignore(
         app_state, candidate.file_path, candidate.file_path);
     if (!begin_ignore_result) {
-      Logger().warn("Failed to register watcher ignore for recycle-bin move '{}': {}",
+      Logger().warn("Failed to register watcher ignore for asset deletion '{}': {}",
                     candidate.file_path.string(), begin_ignore_result.error());
     } else {
       candidate.manual_ignore_registered = true;
     }
 
-    recycle_paths.push_back(candidate.file_path);
-  }
-
-  bool recycle_failed = false;
-  if (!recycle_paths.empty()) {
-    auto recycle_result = Utils::System::move_files_to_recycle_bin(recycle_paths);
-    if (!recycle_result) {
-      recycle_failed = true;
-      errors.push_back("Failed to move files to recycle bin: " + recycle_result.error());
+    if (!candidate.permanent) {
+      recycle_paths.push_back(candidate.file_path);
     }
   }
 
-  std::unordered_set<std::int64_t> failed_recycle_ids;
-  if (recycle_failed) {
-    for (const auto& candidate : candidates) {
-      if (!candidate.file_exists) {
-        continue;
+  std::unordered_set<std::int64_t> failed_file_ids;
+  if (!recycle_paths.empty()) {
+    auto recycle_result = Utils::System::move_files_to_recycle_bin(recycle_paths);
+    if (!recycle_result) {
+      errors.push_back("Failed to move files to recycle bin: " + recycle_result.error());
+      for (const auto& candidate : candidates) {
+        if (!candidate.permanent && candidate.file_exists) {
+          failed_file_ids.insert(candidate.asset.id);
+          errors.push_back("Failed to move file to recycle bin " + candidate.asset.path);
+        }
       }
-      failed_recycle_ids.insert(candidate.asset.id);
-      errors.push_back("Failed to move file to recycle bin " + candidate.asset.path);
+    }
+  }
+
+  for (const auto& candidate : candidates) {
+    if (!candidate.permanent || !candidate.file_exists) {
+      continue;
+    }
+    auto delete_file_result = Utils::System::delete_file_permanently(candidate.file_path);
+    if (!delete_file_result) {
+      failed_file_ids.insert(candidate.asset.id);
+      errors.push_back("Failed to permanently delete file " + candidate.asset.path + ": " +
+                       delete_file_result.error());
     }
   }
 
   std::vector<std::int64_t> delete_ids;
   delete_ids.reserve(candidates.size());
   for (const auto& candidate : candidates) {
-    if (failed_recycle_ids.contains(candidate.asset.id)) {
+    if (failed_file_ids.contains(candidate.asset.id)) {
       continue;
     }
     delete_ids.push_back(candidate.asset.id);
   }
+
+  std::int64_t affected_count = 0;
+  std::int64_t recycled_count = 0;
+  std::int64_t permanently_deleted_count = 0;
 
   // 批量只删除资产索引，共享缩略图由缓存对账确认成为孤儿后统一回收。
   auto delete_result = Asset::Repository::batch_delete_assets_by_ids(app_state, delete_ids);
   if (!delete_result) {
     errors.push_back("Failed to delete asset indexes: " + delete_result.error());
   } else {
-    moved_count = static_cast<std::int64_t>(delete_ids.size());
-    Logger().info("Gallery move_assets_to_trash: moved {} asset file(s) to recycle bin",
-                  moved_count);
+    affected_count = static_cast<std::int64_t>(delete_ids.size());
     std::unordered_set<std::int64_t> deleted_id_set(delete_ids.begin(), delete_ids.end());
     for (const auto& candidate : candidates) {
       if (!deleted_id_set.contains(candidate.asset.id)) {
         continue;
       }
+      if (candidate.permanent) {
+        permanently_deleted_count++;
+      } else {
+        recycled_count++;
+      }
       append_manual_change(candidate.file_path, Types::ScanChangeAction::REMOVE);
     }
 
     if (!manual_changes.empty()) {
-      Logger().info("Gallery move_assets_to_trash: dispatching {} manual scan change(s)",
+      Logger().info("Gallery delete_assets: dispatching {} manual scan change(s)",
                     manual_changes.size());
       auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
       if (!dispatch_result) {
-        Logger().warn("Failed to dispatch manual scan changes after trash move: {}",
+        Logger().warn("Failed to dispatch manual scan changes after asset deletion: {}",
                       dispatch_result.error());
       }
     }
@@ -289,36 +312,39 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     if (auto complete_ignore_result = Watcher::complete_manual_file_system_ignore(
             app_state, candidate.file_path, candidate.file_path);
         !complete_ignore_result) {
-      Logger().warn("Failed to complete watcher ignore for recycle-bin move '{}': {}",
+      Logger().warn("Failed to complete watcher ignore for asset deletion '{}': {}",
                     candidate.file_path.string(), complete_ignore_result.error());
     }
   }
 
-  Types::OperationResult result{
+  Types::DeleteAssetsResult result{
       .success = errors.empty(),
       .message = "",
-      .affected_count = moved_count,
+      .affected_count = affected_count,
       .failed_count =
-          static_cast<std::int64_t>(unique_ids.size()) - moved_count - skipped_not_found,
+          static_cast<std::int64_t>(unique_ids.size()) - affected_count - skipped_not_found,
       .not_found_count = skipped_not_found,
       .unchanged_count = 0,
+      .recycle_bin_count = recycled_count,
+      .permanent_count = permanently_deleted_count,
   };
 
   if (errors.empty()) {
-    result.message = std::format("Moved {} asset(s) to recycle bin", moved_count);
+    result.message = std::format("Deleted {} asset(s): {} recycled, {} permanently deleted",
+                                 affected_count, recycled_count, permanently_deleted_count);
     return result;
   }
 
-  if (moved_count > 0) {
-    result.message = std::format("Moved {} asset(s) to recycle bin, {} failed, {} not found",
-                                 moved_count, errors.size(), skipped_not_found);
+  if (affected_count > 0) {
+    result.message = std::format("Deleted {} asset(s), {} failed, {} not found", affected_count,
+                                 result.failed_count.value_or(0), skipped_not_found);
   } else {
-    result.message = std::format("Failed to move assets to recycle bin: {} failed, {} not found",
-                                 errors.size(), skipped_not_found);
+    result.message = std::format("Failed to delete assets: {} failed, {} not found",
+                                 result.failed_count.value_or(0), skipped_not_found);
   }
 
   for (const auto& error : errors) {
-    Logger().warn("move_assets_to_trash: {}", error);
+    Logger().warn("delete_assets: {}", error);
   }
 
   return result;

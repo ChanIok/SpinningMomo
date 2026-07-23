@@ -6,6 +6,7 @@ import { useGalleryData } from './useGalleryData'
 import { useGalleryTagClipboard } from './useGalleryTagClipboard'
 import { useGalleryStore } from '../store'
 import type { ReviewFlag } from '../types'
+import type { GalleryDeleteMode } from '../store/persistence'
 
 interface MoveToFolderDialogState {
   open: boolean
@@ -13,6 +14,24 @@ interface MoveToFolderDialogState {
 
 const moveToFolderDialogState = reactive<MoveToFolderDialogState>({
   open: false,
+})
+
+interface DeleteAssetsDialogState {
+  open: boolean
+  ids: number[]
+  mode: GalleryDeleteMode
+  recycleBinCount: number
+  permanentCount: number
+  unknownCount: number
+}
+
+const deleteAssetsDialogState = reactive<DeleteAssetsDialogState>({
+  open: false,
+  ids: [],
+  mode: 'recycleBin',
+  recycleBinCount: 0,
+  permanentCount: 0,
+  unknownCount: 0,
 })
 
 export function useGalleryAssetActions() {
@@ -35,16 +54,64 @@ export function useGalleryAssetActions() {
 
     return selectedAssetIds.value[0]
   })
+  const currentDeleteImpact = computed(() => {
+    // 分页 Map 原地更新时依靠显式版本触发菜单语义重算。
+    void store.paginatedAssetsVersion
+    return getKnownDeleteImpact(selectedAssetIds.value, store.gallerySettings.deletion.mode)
+  })
+  const deleteMenuLabel = computed(() => {
+    if (store.gallerySettings.deletion.mode === 'permanent') {
+      return t('gallery.contextMenu.delete.permanentLabel')
+    }
 
-  function buildMoveToTrashDescription(result: {
+    const impact = currentDeleteImpact.value
+    if (impact.unknownCount > 0 || (impact.permanentCount > 0 && impact.recycleBinCount > 0)) {
+      return t('gallery.contextMenu.delete.genericLabel')
+    }
+    if (impact.permanentCount > 0) {
+      return t('gallery.contextMenu.delete.permanentLabel')
+    }
+    return t('gallery.contextMenu.delete.recycleBinLabel')
+  })
+
+  function buildDeleteDescription(result: {
     affectedCount?: number
     failedCount?: number
     notFoundCount?: number
   }) {
-    return t('gallery.contextMenu.moveToTrash.partialDescription', {
-      moved: result.affectedCount ?? 0,
+    return t('gallery.contextMenu.delete.partialDescription', {
+      deleted: result.affectedCount ?? 0,
       failed: result.failedCount ?? 0,
       notFound: result.notFoundCount ?? 0,
+    })
+  }
+
+  function buildDeleteSuccessDescription(result: {
+    recycleBinCount: number
+    permanentCount: number
+  }) {
+    const recycled = result.recycleBinCount
+    const permanent = result.permanentCount
+
+    if (recycled > 0 && permanent > 0) {
+      return t('gallery.contextMenu.delete.successDescription', {
+        recycled,
+        permanent,
+      })
+    }
+    if (recycled > 0) {
+      return t('gallery.contextMenu.delete.successRecycleBin', {
+        count: recycled,
+      })
+    }
+    if (permanent > 0) {
+      return t('gallery.contextMenu.delete.successPermanent', {
+        count: permanent,
+      })
+    }
+    return t('gallery.contextMenu.delete.successDescription', {
+      recycled,
+      permanent,
     })
   }
 
@@ -246,22 +313,74 @@ export function useGalleryAssetActions() {
     moveToFolderDialogState.open = open
   }
 
-  async function handleMoveAssetsToTrash() {
-    if (selectedAssetIds.value.length === 0) {
-      return
+  function getKnownDeleteImpact(ids: number[], mode: GalleryDeleteMode) {
+    if (mode === 'permanent') {
+      return { recycleBinCount: 0, permanentCount: ids.length, unknownCount: 0 }
     }
 
-    const ids = [...selectedAssetIds.value]
+    const selectedIdSet = new Set(ids)
+    const knownAssets = new Map<number, { rootId?: number }>()
+    store.paginatedAssets.forEach((assets) => {
+      for (const asset of assets) {
+        if (selectedIdSet.has(asset.id)) {
+          knownAssets.set(asset.id, asset)
+        }
+      }
+    })
+
+    let recycleBinCount = 0
+    let permanentCount = 0
+    let unknownCount = 0
+    for (const id of ids) {
+      const asset = knownAssets.get(id)
+      if (asset?.rootId === undefined) {
+        unknownCount++
+        continue
+      }
+
+      const isNetwork = store.rootNetworkById.get(asset.rootId)
+      if (isNetwork === undefined) {
+        unknownCount++
+      } else if (isNetwork) {
+        permanentCount++
+      } else {
+        recycleBinCount++
+      }
+    }
+
+    return {
+      recycleBinCount,
+      permanentCount,
+      unknownCount,
+    }
+  }
+
+  function openDeleteAssetsDialog(options: Omit<DeleteAssetsDialogState, 'open'>) {
+    Object.assign(deleteAssetsDialogState, options, { open: true })
+  }
+
+  function setDeleteAssetsDialogOpen(open: boolean) {
+    deleteAssetsDialogState.open = open
+    if (!open) {
+      deleteAssetsDialogState.ids = []
+    }
+  }
+
+  async function executeDeleteAssets(ids: number[], mode: GalleryDeleteMode) {
     const previousActiveAssetId = store.selection.activeAssetId
 
     try {
-      const result = await galleryApi.moveAssetsToTrash(ids)
+      const result = await galleryApi.deleteAssets({
+        ids,
+        mode: mode === 'permanent' ? 'permanent' : 'recycle_where_possible',
+      })
+
       const affectedCount = result.affectedCount ?? 0
       const failedCount = result.failedCount ?? 0
       const notFoundCount = result.notFoundCount ?? 0
       if (!result.success && affectedCount === 0) {
         throw new Error(
-          t('gallery.contextMenu.moveToTrash.failedDescription', {
+          t('gallery.contextMenu.delete.failedDescription', {
             failed: failedCount,
             notFound: notFoundCount,
           })
@@ -278,22 +397,63 @@ export function useGalleryAssetActions() {
       }
 
       if (result.success) {
-        toast.success(t('gallery.contextMenu.moveToTrash.successTitle'), {
-          description: t('gallery.contextMenu.moveToTrash.successDescription', {
-            count: affectedCount || ids.length,
-          }),
+        toast.success(t('gallery.contextMenu.delete.successTitle'), {
+          description: buildDeleteSuccessDescription(result),
         })
       } else {
-        toast.warning(t('gallery.contextMenu.moveToTrash.partialTitle'), {
-          description: buildMoveToTrashDescription(result),
+        toast.warning(t('gallery.contextMenu.delete.partialTitle'), {
+          description: buildDeleteDescription(result),
         })
       }
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('gallery.contextMenu.moveToTrash.failedTitle'), {
+      toast.error(t('gallery.contextMenu.delete.failedTitle'), {
         description: message,
       })
+      return false
     }
+  }
+
+  async function requestDeleteAssets() {
+    const ids = [...selectedAssetIds.value]
+    if (ids.length === 0) {
+      return
+    }
+
+    const mode = store.gallerySettings.deletion.mode
+    const impact = getKnownDeleteImpact(ids, mode)
+    if (
+      mode === 'permanent' ||
+      store.gallerySettings.deletion.confirmRecycleBin ||
+      impact.permanentCount > 0 ||
+      impact.unknownCount > 0
+    ) {
+      openDeleteAssetsDialog({
+        ids,
+        mode,
+        ...impact,
+      })
+      return
+    }
+
+    await executeDeleteAssets(ids, mode)
+  }
+
+  async function confirmDeleteAssets() {
+    const { ids, mode, permanentCount } = deleteAssetsDialogState
+    if (ids.length === 0) {
+      return false
+    }
+
+    const effectiveMode: GalleryDeleteMode =
+      mode === 'permanent' || permanentCount > 0 ? 'permanent' : mode
+
+    const completed = await executeDeleteAssets([...ids], effectiveMode)
+    if (completed) {
+      setDeleteAssetsDialogOpen(false)
+    }
+    return completed
   }
 
   async function copySelectedAssetTags() {
@@ -540,6 +700,7 @@ export function useGalleryAssetActions() {
     canPasteTags,
     copiedTagCount,
     selectedAssetId,
+    deleteMenuLabel,
     moveToFolderDialog: readonly(moveToFolderDialogState),
     openMoveToFolderDialog,
     setMoveToFolderDialogOpen,
@@ -548,7 +709,10 @@ export function useGalleryAssetActions() {
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
     handleCopyAssetsToClipboard,
-    handleMoveAssetsToTrash,
+    deleteAssetsDialog: readonly(deleteAssetsDialogState),
+    setDeleteAssetsDialogOpen,
+    requestDeleteAssets,
+    confirmDeleteAssets,
     copySelectedAssetTags,
     pasteCopiedTagsToSelection,
     updateSelectedAssetsReviewState,

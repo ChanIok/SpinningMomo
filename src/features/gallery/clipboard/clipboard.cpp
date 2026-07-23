@@ -350,13 +350,6 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
         continue;
       }
 
-      // 同目录粘贴不制造自身副本，避免把“导入”变成隐式复制命令。
-      if (Utils::Path::NormalizeForComparison(normalized_source.parent_path()) ==
-          Utils::Path::NormalizeForComparison(target_folder)) {
-        unchanged_count++;
-        continue;
-      }
-
       auto temporary_result = make_clipboard_temp_path(target_folder);
       if (!temporary_result) {
         errors.push_back(temporary_result.error());
