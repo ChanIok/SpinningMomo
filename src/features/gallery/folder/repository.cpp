@@ -207,7 +207,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
   std::string count_sql = R"(
             SELECT folder_id, COUNT(*) as count
             FROM assets
-            WHERE folder_id IS NOT NULL
+            WHERE folder_id IS NOT NULL AND missing_at IS NULL
             GROUP BY folder_id
         )";
 

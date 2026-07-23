@@ -3,10 +3,12 @@ module;
 module Extensions.InfinityNikki.PhotoService;
 
 import std;
+import Core.Database;
 import Core.State;
 import Core.Tasks;
 import Core.WorkerPool;
 import Features.Gallery;
+import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
@@ -29,6 +31,67 @@ struct ServiceState {
 auto service_state() -> ServiceState& {
   static ServiceState instance;
   return instance;
+}
+
+// Gallery 只声明通用继承钩子；暖暖扩展在资产创建事务内复制同内容资产的完整暖暖信息。
+auto inherit_asset_data(Core::State::AppState& app_state, std::int64_t new_asset_id,
+                        std::int64_t source_asset_id) -> std::expected<void, std::string> {
+  auto params_result = Core::Database::execute(app_state,
+                                               R"(
+        INSERT OR IGNORE INTO asset_infinity_nikki_params (
+          asset_id, uid, camera_params,
+          time_hour, time_min,
+          camera_focal_length, rotation, aperture_value,
+          filter_id, filter_strength, vignette_intensity,
+          light_id, light_strength,
+          vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
+          vibrance, highlights, shadow,
+          nikki_loc_x, nikki_loc_y, nikki_loc_z,
+          nikki_hidden, pose_id, nikki_diy_json
+        )
+        SELECT ?, uid, camera_params,
+          time_hour, time_min,
+          camera_focal_length, rotation, aperture_value,
+          filter_id, filter_strength, vignette_intensity,
+          light_id, light_strength,
+          vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
+          vibrance, highlights, shadow,
+          nikki_loc_x, nikki_loc_y, nikki_loc_z,
+          nikki_hidden, pose_id, nikki_diy_json
+        FROM asset_infinity_nikki_params
+        WHERE asset_id = ?
+      )",
+                                               {new_asset_id, source_asset_id});
+  if (!params_result) {
+    return std::unexpected("Failed to copy Infinity Nikki params: " + params_result.error());
+  }
+
+  auto clothes_result = Core::Database::execute(app_state,
+                                                R"(
+        INSERT OR IGNORE INTO asset_infinity_nikki_clothes (asset_id, cloth_id)
+        SELECT ?, cloth_id
+        FROM asset_infinity_nikki_clothes
+        WHERE asset_id = ?
+      )",
+                                                {new_asset_id, source_asset_id});
+  if (!clothes_result) {
+    return std::unexpected("Failed to copy Infinity Nikki clothes: " + clothes_result.error());
+  }
+
+  auto user_record_result = Core::Database::execute(app_state,
+                                                    R"(
+        INSERT OR IGNORE INTO asset_infinity_nikki_user_record
+          (asset_id, record_key, record_value)
+        SELECT ?, record_key, record_value
+        FROM asset_infinity_nikki_user_record
+        WHERE asset_id = ?
+      )",
+                                                    {new_asset_id, source_asset_id});
+  if (!user_record_result) {
+    return std::unexpected("Failed to copy Infinity Nikki user records: " +
+                           user_record_result.error());
+  }
+  return {};
 }
 
 // 生成《无限暖暖》照片专用的忽略推断规则
@@ -101,9 +164,9 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
                                                                  scan_result = result]() {
         Logger().info(
             "InfinityNikki managed hardlink worker start: total={}, new={}, updated={}, "
-            "deleted={}, changes={}",
+            "missing={}, changes={}",
             scan_result.total_files, scan_result.new_items, scan_result.updated_items,
-            scan_result.deleted_items, scan_result.changes.size());
+            scan_result.missing_items, scan_result.changes.size());
         auto sync_result =
             Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(app_state, scan_result);
         if (!sync_result) {
@@ -316,6 +379,10 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
 }
 
 auto register_from_settings(Core::State::AppState& app_state) -> void {
+  app_state.gallery->inherit_asset_data_callback = [&app_state](std::int64_t new_asset_id,
+                                                                std::int64_t source_asset_id) {
+    return inherit_asset_data(app_state, new_asset_id, source_asset_id);
+  };
   register_impl(app_state, false);
 }
 

@@ -13,9 +13,10 @@ namespace Features::Gallery::Scanner::AssetPipeline {
 export enum class PathSyncOutcome {
   Skipped,        // 不支持 / ignore / 未变化 / 库中无且无需删除
   UnchangedMeta,  // 内容指纹未变，仅回写 size/mtime
+  Restored,       // 原路径重新出现，恢复原资产行
   Created,
   Updated,
-  Removed,  // 盘上无且已从库删除（或仅库删除）
+  Missing,  // 盘上无且资产首次进入 missing 宽限期
 };
 
 export struct PreparedAsset {
@@ -41,9 +42,9 @@ export auto prepare_media_asset(Core::State::AppState& app_state,
                                 const Types::ScanOptions& options, const MediaPrepareInput& input)
     -> std::expected<PreparedAsset, std::string>;
 
-// 按路径删除资产索引；共享缩略图统一由缓存对账回收，true 表示库中确有并已删
-export auto remove_asset_at_path(Core::State::AppState& app_state,
-                                 const std::filesystem::path& path)
+// 按路径标记原件缺失；重复事件不重置宽限期，true 表示本次发生状态变化。
+export auto mark_asset_missing_at_path(Core::State::AppState& app_state,
+                                       const std::filesystem::path& path)
     -> std::expected<bool, std::string>;
 
 // 增量路径：过滤 → 粗判 → 指纹 → 媒体 → 单条写库

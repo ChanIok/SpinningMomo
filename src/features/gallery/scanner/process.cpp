@@ -212,7 +212,8 @@ auto run_processing_phase(Core::State::AppState& app_state,
         app_state,
         [&result](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
           for (auto& entry : result.batch_result.new_assets) {
-            auto create_result = Asset::Repository::create_asset(txn_app_state, entry.asset);
+            auto create_result = Asset::Repository::create_asset_with_inherited_data_in_transaction(
+                txn_app_state, entry.asset);
             if (!create_result) {
               return std::unexpected("Failed to create asset: " + create_result.error());
             }

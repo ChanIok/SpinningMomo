@@ -306,6 +306,7 @@ auto load_candidate_assets(
       FROM assets a
       LEFT JOIN asset_infinity_nikki_params p ON p.asset_id = a.id
       WHERE a.type = 'photo'
+        AND a.missing_at IS NULL
         AND (
           replace(a.path, '\\', '/') = ?
           OR replace(a.path, '\\', '/') LIKE ?
@@ -340,6 +341,7 @@ auto load_candidate_assets(
     FROM assets a
     LEFT JOIN asset_infinity_nikki_params p ON p.asset_id = a.id
     WHERE a.type = 'photo'
+      AND a.missing_at IS NULL
       AND instr(replace(a.path, '\\', '/'), '/X6Game/Saved/GamePlayPhotos/') > 0
       AND instr(replace(a.path, '\\', '/'), '/NikkiPhotos_HighQuality/') > 0
       AND (lower(coalesce(a.extension, '')) IN ('.jpg', '.jpeg')
@@ -393,6 +395,7 @@ auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
     SELECT a.id, a.path
     FROM assets a
     WHERE a.id IN ({})
+      AND a.missing_at IS NULL
       AND a.type = 'photo'
       AND instr(replace(a.path, '\\', '/'), '/X6Game/Saved/GamePlayPhotos/') > 0
       AND instr(replace(a.path, '\\', '/'), '/NikkiPhotos_HighQuality/') > 0

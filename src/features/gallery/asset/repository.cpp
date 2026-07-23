@@ -127,6 +127,65 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   return result->value();
 }
 
+auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_state,
+                                                     const Types::Asset& item)
+    -> std::expected<std::int64_t, std::string> {
+  auto create_result = create_asset(app_state, item);
+  if (!create_result) {
+    return std::unexpected(create_result.error());
+  }
+
+  const auto new_asset_id = create_result.value();
+  if (!item.hash.has_value() || item.hash->empty()) {
+    return new_asset_id;
+  }
+
+  auto source_result = Core::Database::query_scalar<std::int64_t>(
+      app_state, "SELECT id FROM assets WHERE hash = ? AND id <> ? ORDER BY id ASC LIMIT 1",
+      {*item.hash, new_asset_id});
+  if (!source_result) {
+    return std::unexpected("Failed to find asset inheritance source: " + source_result.error());
+  }
+  if (!source_result->has_value()) {
+    return new_asset_id;
+  }
+
+  const auto source_asset_id = source_result->value();
+  auto fields_result =
+      Core::Database::execute(app_state,
+                              R"(
+        UPDATE assets
+        SET description = (SELECT description FROM assets WHERE id = ?),
+            rating = (SELECT rating FROM assets WHERE id = ?),
+            review_flag = (SELECT review_flag FROM assets WHERE id = ?)
+        WHERE id = ?
+      )",
+                              {source_asset_id, source_asset_id, source_asset_id, new_asset_id});
+  if (!fields_result) {
+    return std::unexpected("Failed to inherit asset user fields: " + fields_result.error());
+  }
+
+  auto tags_result = Core::Database::execute(app_state,
+                                             R"(
+        INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
+        SELECT ?, tag_id FROM asset_tags WHERE asset_id = ?
+      )",
+                                             {new_asset_id, source_asset_id});
+  if (!tags_result) {
+    return std::unexpected("Failed to inherit asset tags: " + tags_result.error());
+  }
+
+  if (app_state.gallery->inherit_asset_data_callback) {
+    auto extension_result =
+        app_state.gallery->inherit_asset_data_callback(new_asset_id, source_asset_id);
+    if (!extension_result) {
+      return std::unexpected("Failed to inherit extension asset data: " + extension_result.error());
+    }
+  }
+
+  return new_asset_id;
+}
+
 auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
@@ -214,7 +273,7 @@ auto update_asset_scanner_fields(Core::State::AppState& app_state, const Types::
             UPDATE assets SET
                 name = ?, path = ?, type = ?,
                 width = ?, height = ?, size = ?, extension = ?, mime_type = ?, hash = ?, folder_id = ?,
-                file_created_at = ?, file_modified_at = ?
+                file_created_at = ?, file_modified_at = ?, missing_at = NULL
             WHERE id = ?
         )";
 
@@ -257,7 +316,7 @@ auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asse
     -> std::expected<void, std::string> {
   std::string sql = R"(
     UPDATE assets
-    SET size = ?, file_modified_at = ?
+    SET size = ?, file_modified_at = ?, missing_at = NULL
     WHERE id = ?
   )";
 
@@ -267,6 +326,65 @@ auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asse
   }
 
   return {};
+}
+
+auto mark_asset_missing_by_path(Core::State::AppState& app_state, const std::string& path)
+    -> std::expected<bool, std::string> {
+  auto result = Core::Database::query_scalar<std::int64_t>(app_state,
+                                                           R"(
+        UPDATE assets
+        SET missing_at = unixepoch('subsec') * 1000
+        WHERE path = ? AND missing_at IS NULL
+        RETURNING id
+      )",
+                                                           {path});
+  if (!result) {
+    return std::unexpected("Failed to mark asset missing: " + result.error());
+  }
+  return result->has_value();
+}
+
+auto restore_assets_by_ids(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
+    -> std::expected<void, std::string> {
+  if (ids.empty()) {
+    return {};
+  }
+
+  return Core::Database::execute_transaction(
+      app_state, [&ids](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+        for (const auto id : ids) {
+          auto result = Core::Database::execute(
+              txn_app_state, "UPDATE assets SET missing_at = NULL WHERE id = ?", {id});
+          if (!result) {
+            return std::unexpected("Failed to restore asset (id=" + std::to_string(id) +
+                                   "): " + result.error());
+          }
+        }
+        return {};
+      });
+}
+
+auto restore_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<bool, std::string> {
+  auto result = Core::Database::query_scalar<std::int64_t>(
+      app_state,
+      "UPDATE assets SET missing_at = NULL WHERE id = ? AND missing_at IS NOT NULL RETURNING id",
+      {id});
+  if (!result) {
+    return std::unexpected("Failed to restore asset: " + result.error());
+  }
+  return result->has_value();
+}
+
+auto purge_expired_missing_assets(Core::State::AppState& app_state, std::int64_t cutoff_millis)
+    -> std::expected<std::int64_t, std::string> {
+  auto result = Core::Database::query<Core::Database::ReturningIdRow>(
+      app_state, "DELETE FROM assets WHERE missing_at IS NOT NULL AND missing_at < ? RETURNING id",
+      {cutoff_millis});
+  if (!result) {
+    return std::unexpected("Failed to purge expired missing assets: " + result.error());
+  }
+  return static_cast<std::int64_t>(result->size());
 }
 
 auto delete_asset(Core::State::AppState& app_state, int64_t id)

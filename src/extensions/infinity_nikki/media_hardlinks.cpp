@@ -745,7 +745,7 @@ auto apply_scan_result(Core::State::AppState& app_state,
   }
 
   // 完全无变化时什么都不做，避免 initial scan 这类路径额外触发一次全量 sync。
-  if (result.new_items == 0 && result.updated_items == 0 && result.deleted_items == 0) {
+  if (result.new_items == 0 && result.updated_items == 0 && result.missing_items == 0) {
     Logger().info("InfinityNikki apply_scan_result: mode=noop");
     return InfinityNikkiInitializeMediaHardlinksResult{};
   }
@@ -754,8 +754,8 @@ auto apply_scan_result(Core::State::AppState& app_state,
   // 若未来上游某条扫描链路破坏了这个不变量，这里至少留下一条可见告警。
   Logger().warn(
       "InfinityNikki MediaHardlinks fallback to full sync: scan result has counters but no "
-      "changes. new={}, updated={}, deleted={}",
-      result.new_items, result.updated_items, result.deleted_items);
+      "changes. new={}, updated={}, missing={}",
+      result.new_items, result.updated_items, result.missing_items);
 
   // 兜底：回退到全量收敛，保证受管投影目录最终一致。
   return sync(app_state);

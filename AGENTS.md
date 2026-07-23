@@ -90,6 +90,14 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 - `installer/` — WiX source files for MSI and bundle installer generation
 - `tasks/` — custom xmake tasks such as `build-all`, `release`, and `vs`
 
+## Subsystem Documentation
+
+Detailed design guidelines and invariants for critical subsystems live in their respective module `README.md` files. Read these on-demand only when your task directly involves modifying or refactoring the subsystem:
+
+- `src/features/gallery/README.md` — Asset identity, metadata inheritance, 30-day missing lifecycle, and scanner/watcher invariants.
+- `src/core/state/README.md` — `AppState` layout, forward-declaration patterns to prevent MSVC module rebuild cascades, and cross-module API conventions.
+- `src/extensions/infinity_nikki/README.md` — Infinity Nikki media hardlink mirroring, task orchestration, and modification checklist.
+
 ### RPC Endpoint Organization
 Endpoints live under `src/core/rpc/endpoints/<domain>/`. Each domain exposes a `register_all(state)` called from `registry.cpp`.
 Game-specific adapters live under `src/extensions/` and are exposed via `rpc/endpoints/extensions/`.

@@ -12,6 +12,7 @@ import Features.Gallery.Scanner.Analysis;
 import Features.Gallery.Scanner.Process;
 import Features.Gallery.Scanner.Cleanup;
 import Features.Gallery.Asset.Service;
+import Features.Gallery.Asset.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
 import Utils.Logger;
@@ -114,6 +115,24 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto discovery = std::move(discovery_result.value());
   auto& file_infos = discovery.file_infos;
 
+  // 原路径重新出现即恢复同一资产；不因 size/mtime/hash 是否变化而更换资产 ID。
+  std::vector<std::int64_t> restored_asset_ids;
+  std::vector<std::string> restored_paths;
+  restored_asset_ids.reserve(file_infos.size());
+  restored_paths.reserve(file_infos.size());
+  for (const auto& file_info : file_infos) {
+    auto cached = context.asset_cache.find(file_info.path.string());
+    if (cached != context.asset_cache.end() && cached->second.missing_at.has_value()) {
+      restored_asset_ids.push_back(cached->second.id);
+      restored_paths.push_back(cached->second.path);
+      cached->second.missing_at.reset();
+    }
+  }
+  auto restore_result = Asset::Repository::restore_assets_by_ids(app_state, restored_asset_ids);
+  if (!restore_result) {
+    return std::unexpected("Failed to restore present assets: " + restore_result.error());
+  }
+
   // 目录发现完成后再次响应停止，避免继续提交内容指纹任务
   if (stop_token.stop_requested()) {
     return std::unexpected("Gallery scan cancelled");
@@ -155,11 +174,21 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                                  discovery.folder_paths, context.asset_cache, progress_callback);
 
   // 7. 只为媒体资产组装 ScanChange，目录库存变化不泄漏给扩展消费者。
+  std::unordered_set<std::string> processed_updated_paths;
+  for (const auto& entry : processing_phase.batch_result.updated_assets) {
+    processed_updated_paths.insert(entry.asset.path);
+  }
+  const auto restore_only_count = static_cast<int>(
+      std::ranges::count_if(restored_paths, [&processed_updated_paths](const std::string& path) {
+        return !processed_updated_paths.contains(path);
+      }));
+
   Types::ScanResult result{
       .total_files = static_cast<int>(file_infos.size()),
       .new_items = static_cast<int>(processing_phase.batch_result.new_assets.size()),
-      .updated_items = static_cast<int>(processing_phase.batch_result.updated_assets.size()),
-      .deleted_items = cleanup_phase.deleted_items,
+      .updated_items = static_cast<int>(processing_phase.batch_result.updated_assets.size()) +
+                       restore_only_count,
+      .missing_items = cleanup_phase.missing_items,
       .errors = std::move(processing_phase.batch_result.errors),
   };
 
@@ -184,6 +213,10 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     append_scan_change(removed_path, Types::ScanChangeAction::REMOVE);
   }
 
+  for (const auto& restored_path : restored_paths) {
+    append_scan_change(restored_path, Types::ScanChangeAction::UPSERT);
+  }
+
   for (const auto& entry : processing_phase.batch_result.new_assets) {
     append_scan_change(entry.asset.path, Types::ScanChangeAction::UPSERT);
   }
@@ -197,9 +230,9 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   result.scan_duration = std::format("{}ms", duration.count());
 
   Logger().info(
-      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Deleted: {}, Errors: "
+      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Missing: {}, Errors: "
       "{}, Duration: {}",
-      result.total_files, result.new_items, result.updated_items, result.deleted_items,
+      result.total_files, result.new_items, result.updated_items, result.missing_items,
       result.errors.size(), result.scan_duration);
 
   Progress::report_scan_progress(

@@ -1,105 +1,97 @@
 # Gallery 模块
 
-`gallery` 是项目的核心纵向模块之一。它不只是一个页面，而是同时覆盖后端索引/扫描/监听/静态文件暴露，以及前端浏览/筛选/详情/灯箱等完整流程。
+Gallery 负责把文件系统中的照片和视频维护为可查询的图库索引，并提供文件夹、标签、
+缩略图、筛选、文件操作及变化通知。它不托管或备份原件：数据库保存图库元数据，
+文件系统决定原件当前是否可用。
 
-## 模块定位
+## 模块边界
 
-- 管理图库资产索引与文件动作（扫描、移动、回收站、缩略图）。
-- 向上提供 `gallery.*` RPC 能力，向下对扩展提供变化语义（`ScanChange`）。
+- Gallery 向前端提供 `gallery.*` RPC，并在可见索引变化后发送 `gallery.changed`。
+- Gallery 通过 `ScanChange` 向扩展报告文件路径变化，但不包含 Infinity Nikki 等扩展业务。
+- 前端沿用 `component -> composable -> store/api -> RPC` 数据流，
+  `web/src/features/gallery/store/index.ts` 是 Gallery UI 状态入口。
 
-## 架构概览
+## 后端入口
 
-### 后端
+- `gallery.cpp`：模块初始化、清理及应用主动发起的文件操作。
+- `scanner/scanner.cpp`：全量扫描编排。
+- `scanner/asset_pipeline.cpp`：全量和增量共用的单路径资产处理。
+- `watcher/watcher.cpp`：watcher 注册、生命周期和启动恢复。
+- `watcher/notify.cpp`：接收文件系统通知并写入待处理队列。
+- `watcher/sync.cpp`：防抖、增量同步、全量回退和结果分发。
+- `asset/`、`folder/`、`tag/`、`color/`：索引查询与各自的数据操作。
+- `asset/thumbnail.cpp`：缩略图生成、修复和缓存对账。
+- `static_resolver.cpp`：缩略图与原图的静态访问入口。
+- `types.ixx`：跨扫描器、watcher、RPC 和扩展共享的稳定语义。
 
-- `src/features/gallery/gallery.ixx/.cpp`：模块编排入口，负责初始化、清理、扫描、缩略图维护、文件动作、watcher 注册。
-- `src/features/gallery/state.ixx`：gallery 运行时状态，例如缩略图目录、资产路径 LRU 缓存、每个根目录的 watcher 状态。
-- `src/features/gallery/scanner/`：全量扫描与索引更新（编排 + Common/Progress/Discovery/Analysis/Process/Cleanup + AssetPipeline）。
-- `src/features/gallery/watcher/`：目录监听与同步（`watcher` 生命周期编排、`notify` 听盘、`sync` 防抖/增量/全量；物化走 Scanner.AssetPipeline）。
-- `src/features/gallery/static_resolver.*`：对外暴露缩略图与原图静态路径。
-- `src/features/gallery/asset/`：资产查询、时间线、描述、颜色、缩略图、无限暖暖扩展元数据。
-- `src/features/gallery/folder/`：目录树持久化、显示名、根目录 watch 管理。
-- `src/features/gallery/tag/`：标签树 CRUD 与资产标签关系。
-- `src/features/gallery/ignore/`：扫描忽略规则。
-- `src/features/gallery/color/`：主色提取与颜色筛选。
+## 资产身份
 
-### 前端
+`assets` 的一行表示一个已索引路径下的资产副本。路径和 hash 承担不同职责：
 
-- `web/src/features/gallery/api.ts`：gallery RPC 与静态 URL 入口。
-- `web/src/features/gallery/store/index.ts`：gallery UI 状态单一事实来源。
-- `web/src/features/gallery/store/`：查询、导航、交互等状态切片。
-- `web/src/features/gallery/composables/`：数据加载、选择、布局、侧栏、灯箱、资产动作等行为协调。
-- `web/src/features/gallery/pages/GalleryPage.vue`：三栏主页面壳。
-- `web/src/features/gallery/components/`：viewer、shell、asset、tags、folders、dialogs、lightbox 等 UI 结构。
-- `web/src/features/gallery/routes.ts`：`/gallery` 路由定义。
+- 相同路径重新出现或内容发生变化，视为同一资产，沿用原 `id`。
+- 新路径始终创建新资产行；若 hash 已存在，则从相同 hash 中最早的 `id` 一次性继承用户数据。
+- 相同 hash 可以对应多个资产行。继承完成后，各副本的用户数据可以独立变化，不持续同步。
+- 因此，路径维持同一位置上的编辑连续性，hash 只用于新路径之间的内容等价与数据继承。
 
-## RPC 与通知
+新路径继承的用户数据包括：
 
-- Gallery RPC 按职责拆在 `src/core/rpc/endpoints/gallery/`：
-  - `gallery.cpp`：扫描与维护动作
-  - `asset.cpp`：资产查询与文件动作
-  - `folder.cpp`：目录树与导航动作
-  - `tag.cpp`：标签管理
-- 前端通常通过 `gallery.*` RPC 进入 gallery。
-- 后端在扫描或索引变更后发送 `gallery.changed`，前端据此刷新目录树与当前视图。
+- `description`、`rating`、`review_flag`
+- 标签关系
+- 扩展通过继承回调维护的资产数据
 
-## 先读这些文件
+路径、文件时间、大小、媒体信息和主色等 Gallery 派生数据必须根据新文件重新生成。
+缩略图按 hash 共享；Infinity Nikki 扩展会为相同 hash 新资产复制用户记录、照片参数和服装关系，
+使复制资产立即拥有与来源资产相同的完整暖暖信息。
 
-- `src/features/gallery/gallery.cpp`：模块编排入口与资产动作主流程。
-- `src/features/gallery/watcher.cpp`：目录监听、增量同步、扫描后回调。
-- `src/features/gallery/scanner/scanner.cpp`：全量扫描编排入口（五阶段伪代码级流程）。
-- `src/features/gallery/scanner/asset_pipeline.*`：单路径 prepare/upsert/remove（全量与增量共用）。
-- `src/features/gallery/watcher/watcher.cpp`：注册/启停/startup recovery/手动文件系统操作去重。
-- `src/features/gallery/watcher/notify.*`：ReadDirectoryChanges → 入队。
-- `src/features/gallery/watcher/sync.*`：pending 队列、防抖、增量/全量应用、dispatch。
-- `src/features/gallery/types.ixx`：`ScanResult` / `ScanChange` / `OperationResult` 等稳定语义。
-- `src/core/rpc/endpoints/gallery/asset.cpp`：前端资产动作 RPC 入口。
-- `web/src/features/gallery/store/index.ts`：前端状态入口。
-- `web/src/features/gallery/composables/`：前端行为组织入口。
+## Missing 生命周期
 
-## 核心数据流
+文件系统中的路径消失不等于用户决定删除图库数据：
 
-- 文件变化（watcher 或手动动作） -> `ScanChange` -> 回调消费者（例如扩展派生同步）。
-- 前端调用 `gallery.*` RPC -> gallery 服务/仓储 -> 返回查询结果或操作结果。
-- 扫描或动作完成 -> `gallery.changed` 通知前端刷新。
+```text
+外部路径消失
+→ 设置 missing_at（重复事件不重置时间）
+→ 普通图库查询隐藏该资产
 
-## 启动行为
+原路径重新出现
+→ 清空 missing_at
+→ 更新同一资产行并保留用户数据
 
-- 应用启动时，gallery 会先完成模块初始化。
-- 随后从数据库恢复 watcher 注册。
-- 再执行 Infinity Nikki 照片源注册。
-- 所有已注册 watcher 会在启动靠后阶段统一启动。
+新路径出现且 hash 已存在
+→ 创建新资产行
+→ 从最早的同 hash 资产继承用户数据
 
-## 关键不变量
+所有启动恢复完成或尝试完成
+→ 硬删除 missing 超过 30 天的资产
+→ 执行全局缩略图缓存对账
+```
 
-- `ScanChange` 是“文件变化事实”，用于派生同步，不等同于 UI 提示或 DB 统计。
-- `folders` 表映射监听根下真实存在且未被忽略的目录；被 include 的深层路径会保留必要祖先，空目录也是有效节点。
-- 目录库存变化只刷新 Gallery UI，不得伪造文件级 `ScanChange` 触发扩展后处理。
-- 手动文件动作若绕开 watcher 事件，必须显式补发 `ScanChange`。
-- `watcher` 增量整体失败时自动回退一次全量；全量仍失败则进入 Faulted，等待用户明确重试。
-- 启动恢复先让实时通知入队，再应用 USN/全量基线；checkpoint 只推进到已成功应用的启动边界。
-- Scanner 只更新文件系统派生字段，不能通过整行 Asset 写回覆盖用户编辑字段。
-- 缩略图按内容 hash 共享；删除资产时不即时删图，孤儿统一由缓存对账回收。
-- 每个 root 只保留一条目录监听线程；Gallery 用一条全局编排线程串行消费各 root 的同步事实。
-- 每个 root 的 watcher 状态直接归 GalleryState 所有；后台入口按路径 key 重新定位状态。
-- 前端应优先遵循 `component -> composable -> api -> RPC` 的既有数据流，不要在组件内复制 store 状态。
-- `web/src/features/gallery/store/index.ts` 是 gallery UI 状态的单一事实来源。
+资源管理器删除、移动、watcher `REMOVE` 和全量扫描对账都只会使资产进入 missing。
+应用内明确移入回收站、删除资产或移除监控根仍然立即硬删除，因为这些操作表达了用户意图。
 
-## 改动提示
+`ScanChange::REMOVE` 表示路径已经从磁盘消失，不表示数据库行已被删除；
+`ScanResult::missing_items` 表示本轮首次进入 missing 的资产数量。
 
-- 改 `move_assets_to_trash` / `move_assets_to_folder`：
-  - 确认 watcher ignore 是否会吞掉系统事件。
-  - 确认是否补发了正确的 `REMOVE/UPSERT` changes。
-- 改 `watcher` 分发逻辑：
-  - 确认 `post_scan_callback` 仍能收到变化。
-  - 确认不会引入重复 `gallery.changed` 通知来源。
-- 改 `types.ixx` 中扫描/操作结果结构：
-  - 同步检查 RPC 端和扩展消费者是否受影响。
-- 改筛选/排序/视图模式：
-  - 先看 `store/index.ts`、`store/` 下相关 slice，以及 `queryFilters.ts`。
-- 改可见交互行为：
-  - 先看对应 composable，再动大型 Vue 组件。
+## 查询与缩略图
 
-## 不要做什么
+- 常规资产、时间线、统计、文件夹、标签及扩展候选查询默认只包含 `missing_at IS NULL`。
+- missing 资产在宽限期内仍引用原缩略图，不能被孤儿清理提前删除。
+- 缩略图修复只使用当前存在的原件；30 天回收后，无引用缩略图由同一次启动对账清理。
+- 缩略图按内容 hash 共享，单个资产状态变化不能直接删除共享文件。
 
-- 不要在 gallery 内直接写 Infinity Nikki 业务分支。
-- 不要把“是否需要通知扩展”与“是否需要刷新前端 UI”混成一个开关。
+## 启动恢复与根目录状态
+
+启动顺序为：恢复 watcher 注册、注册扩展回调、逐个 root 执行 USN 恢复或全量扫描、
+回收过期 missing 资产，最后进行全局缩略图对账。
+
+不可达的网络根会跳过 watcher 和启动扫描，因此不会仅因根不可达而把其资产批量标记 missing。
+每个 root 只有一条监听线程，Gallery 使用一条全局同步线程串行消费各 root 的待处理变化。
+增量同步整体失败时回退一次全量扫描；全量仍失败则将该 root 标为 Faulted，等待用户重试。
+
+## 必须保持的不变量
+
+- Scanner 只能更新文件系统或媒体派生字段，不能覆盖资产用户数据。
+- 全量扫描与 watcher 必须复用 `Scanner.AssetPipeline` 的路径处理语义。
+- 目录库存变化可以刷新 Gallery UI，但不能伪造文件级 `ScanChange`。
+- 应用主动文件操作若忽略了对应 watcher 事件，必须显式补发真实的 `REMOVE/UPSERT`。
+- 启动恢复先接收实时通知，再应用 USN 或全量基线；checkpoint 只能推进到成功应用的边界。
+- Gallery 不得查询或修改扩展业务表；扩展通过回调和 `ScanChange` 维护自己的数据。

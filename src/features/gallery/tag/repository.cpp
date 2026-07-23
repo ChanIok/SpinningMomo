@@ -446,9 +446,10 @@ auto get_tags_by_asset_ids(Core::State::AppState& app_state,
 auto get_tag_stats(Core::State::AppState& app_state)
     -> std::expected<std::vector<Types::TagStats>, std::string> {
   std::string sql = R"(
-            SELECT t.id as tag_id, t.name as tag_name, COUNT(at.asset_id) as asset_count
+            SELECT t.id as tag_id, t.name as tag_name, COUNT(a.id) as asset_count
             FROM tags t
             LEFT JOIN asset_tags at ON t.id = at.tag_id
+            LEFT JOIN assets a ON a.id = at.asset_id AND a.missing_at IS NULL
             GROUP BY t.id, t.name
             ORDER BY asset_count DESC, t.name
         )";
@@ -476,9 +477,10 @@ auto get_tag_tree(Core::State::AppState& app_state)
   // 2. 查询每个标签的直接资产数量（不包含子标签）
   std::unordered_map<std::int64_t, std::int64_t> direct_asset_counts;
   std::string count_sql = R"(
-            SELECT tag_id, COUNT(DISTINCT asset_id) as count
-            FROM asset_tags
-            GROUP BY tag_id
+            SELECT at.tag_id, COUNT(DISTINCT at.asset_id) as count
+            FROM asset_tags at
+            INNER JOIN assets a ON a.id = at.asset_id AND a.missing_at IS NULL
+            GROUP BY at.tag_id
         )";
 
   struct TagAssetCount {

@@ -357,6 +357,7 @@ auto get_home_stats(Core::State::AppState& app_state)
         0
       ) AS today_added_count
     FROM assets
+    WHERE missing_at IS NULL
   )";
 
   auto result = Core::Database::query_single<Types::HomeStats>(app_state, sql);
@@ -404,7 +405,7 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
       COUNT(DISTINCT COALESCE(description, '')) AS distinct_descriptions,
       MIN(COALESCE(description, '')) AS common_description
     FROM assets
-    WHERE id IN ({})
+    WHERE id IN ({}) AND missing_at IS NULL
   )",
                                          placeholders);
 
@@ -632,18 +633,21 @@ auto update_assets_description(Core::State::AppState& app_state,
 
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
+  struct AssetCacheRow {
+    std::int64_t id;
+    std::string path;
+    std::optional<std::int64_t> size;
+    std::optional<std::int64_t> file_modified_at;
+    std::optional<std::string> hash;
+    std::optional<std::int64_t> missing_at;
+  };
+
   std::string sql = R"(
-    SELECT id, name, path, type,
-           NULL AS dominant_color_hex,
-           rating, review_flag,
-           description, width, height, size, extension, mime_type, hash,
-           NULL AS root_id, NULL AS relative_path, folder_id,
-           file_created_at, file_modified_at,
-           created_at, updated_at
+    SELECT id, path, size, file_modified_at, hash, missing_at
     FROM assets
   )";
 
-  auto result = Core::Database::query<Types::Asset>(app_state, sql);
+  auto result = Core::Database::query<AssetCacheRow>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to load asset cache: " + result.error());
   }
@@ -656,7 +660,8 @@ auto load_asset_cache(Core::State::AppState& app_state)
                              .path = asset.path,
                              .size = asset.size.value_or(0),
                              .file_modified_at = asset.file_modified_at.value_or(0),
-                             .hash = asset.hash.value_or("")};
+                             .hash = asset.hash.value_or(""),
+                             .missing_at = asset.missing_at};
 
     cache.emplace(asset.path, std::move(metadata));
   }

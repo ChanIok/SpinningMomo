@@ -30,11 +30,11 @@ auto is_path_under_root(const std::string& candidate_path, const std::string& ro
 }
 
 struct CleanupRemovedAssetsResult {
-  int deleted_count = 0;
+  int missing_count = 0;
   std::vector<std::string> removed_paths;
 };
 
-// 清理磁盘已删除但数据库仍存在的资产（含缩略图）
+// 对磁盘已消失的资产开启 missing 宽限期；已有 missing 记录不重复计数或重置时间。
 auto cleanup_removed_assets(Core::State::AppState& app_state,
                             const std::filesystem::path& normalized_scan_root,
                             const std::vector<Types::FileSystemInfo>& file_infos,
@@ -54,7 +54,7 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
       continue;
     }
 
-    if (!existing_paths.contains(cached_path)) {
+    if (!existing_paths.contains(cached_path) && !metadata.missing_at.has_value()) {
       // DB 有但磁盘没有
       removed_assets.push_back(metadata);
     }
@@ -67,18 +67,19 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
   }
 
   for (const auto& metadata : removed_assets) {
-    auto delete_result = AssetPipeline::remove_asset_at_path(app_state, metadata.path);
-    if (!delete_result) {
-      Logger().warn("Failed to delete removed asset {}: {}", metadata.id, delete_result.error());
+    auto missing_result = AssetPipeline::mark_asset_missing_at_path(app_state, metadata.path);
+    if (!missing_result) {
+      Logger().warn("Failed to mark removed asset {} missing: {}", metadata.id,
+                    missing_result.error());
       continue;
     }
-    if (delete_result.value()) {
-      result.deleted_count++;
+    if (missing_result.value()) {
+      result.missing_count++;
     }
   }
 
-  if (result.deleted_count > 0) {
-    Logger().info("Deleted {} removed assets under '{}'", result.deleted_count, root_str);
+  if (result.missing_count > 0) {
+    Logger().info("Marked {} removed assets missing under '{}'", result.missing_count, root_str);
   }
 
   return result;
@@ -154,7 +155,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
   return deleted_folders;
 }
 
-// 清理阶段：以文件和目录库存对账，删除磁盘上已消失的索引。
+// 对账阶段：缺失文件进入宽限期，目录库存仍按真实文件系统收敛。
 auto run_cleanup_phase(Core::State::AppState& app_state,
                        const std::filesystem::path& normalized_scan_root,
                        const std::vector<Types::FileSystemInfo>& file_infos,
@@ -170,7 +171,7 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
   [[maybe_unused]] int deleted_folders =
       cleanup_missing_folders(app_state, normalized_scan_root, folder_paths);
   return CleanupPhaseResult{
-      .deleted_items = removed_assets_result.deleted_count,
+      .missing_items = removed_assets_result.missing_count,
       .removed_paths = std::move(removed_assets_result.removed_paths),
   };
 }

@@ -115,6 +115,16 @@ auto migrate_v2_0_9_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
+auto migrate_v2_1_2_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.1.2.0: Add gallery asset missing lifecycle");
+
+  auto result = execute_sql_schema<Core::Migration::Schema::V005>(app_state);
+  if (!result) {
+    return std::unexpected("Failed to add gallery asset missing lifecycle: " + result.error());
+  }
+  return {};
+}
+
 auto migrate_v2_0_11_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.11.0: Set update download sources");
 
@@ -168,6 +178,7 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
       {"2.0.8.0", "Add nuan5 Infinity Nikki extract columns", true, migrate_v2_0_8_0},
       {"2.0.9.0", "Rebuild Infinity Nikki user record as key-value", true, migrate_v2_0_9_0},
       {"2.0.11.0", "Set update download sources", false, migrate_v2_0_11_0},
+      {"2.1.2.0", "Add gallery asset missing lifecycle", true, migrate_v2_1_2_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},

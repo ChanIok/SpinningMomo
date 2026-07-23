@@ -11,6 +11,7 @@ import Features.Gallery.Watcher.Sync;
 import Features.Gallery.Watcher.Notify;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Asset.Repository;
 import Features.Gallery.RootAvailability;
 import Utils.Logger;
 import Utils.Path;
@@ -543,7 +544,22 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     return {};
   }
 
-  // 所有 root 的启动恢复都完成后，统一做一次全局缩略图缓存对账：补 missing、删 orphan。
+  // 仅在所有 root 的启动恢复都完成或尝试完成后回收超过 30 天的 missing 资产。
+  constexpr auto kMissingRetention = std::chrono::days(30);
+  const auto cutoff_millis =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch() - kMissingRetention)
+          .count();
+  auto purge_result =
+      Features::Gallery::Asset::Repository::purge_expired_missing_assets(app_state, cutoff_millis);
+  if (!purge_result) {
+    Logger().warn("Gallery startup missing asset purge failed: {}", purge_result.error());
+  } else if (purge_result.value() > 0) {
+    Logger().info("Gallery startup purged {} assets missing for over 30 days",
+                  purge_result.value());
+  }
+
+  // 回收之后统一做一次全局缩略图缓存对账：补 present 资产、删已无引用的 orphan。
   auto thumbnail_reconcile_result = Features::Gallery::Asset::Thumbnail::reconcile_thumbnail_cache(
       app_state, Types::kDefaultThumbnailShortEdge);
   if (!thumbnail_reconcile_result) {
@@ -712,7 +728,7 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 
     for (const auto& change : result.changes) {
       if (change.action == Types::ScanChangeAction::REMOVE) {
-        result.deleted_items++;
+        result.missing_items++;
       } else {
         // 手动上报场景中，UPSERT 语义是“确保目标状态存在”，统一计入 updated。
         result.updated_items++;
@@ -721,9 +737,9 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 
     if (target.post_scan_callback) {
       Logger().info(
-          "Gallery manual scan change dispatch: root='{}', changes={}, updated={}, deleted={}",
+          "Gallery manual scan change dispatch: root='{}', changes={}, updated={}, missing={}",
           target.root_path.string(), result.changes.size(), result.updated_items,
-          result.deleted_items);
+          result.missing_items);
       target.post_scan_callback(result);
     }
   }

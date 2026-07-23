@@ -13,6 +13,11 @@ namespace Features::Gallery::Asset::Repository {
 export auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<std::int64_t, std::string>;
 
+// 调用方已开启事务：创建资产，并从同 hash 最早的既有资产一次性继承用户数据。
+export auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_state,
+                                                            const Types::Asset& item)
+    -> std::expected<std::int64_t, std::string>;
+
 export auto get_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
@@ -37,6 +42,20 @@ export auto update_asset_location(Core::State::AppState& app_state, std::int64_t
 export auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asset_id,
                                     std::int64_t size, std::int64_t file_modified_at)
     -> std::expected<void, std::string>;
+
+export auto mark_asset_missing_by_path(Core::State::AppState& app_state, const std::string& path)
+    -> std::expected<bool, std::string>;
+
+export auto restore_assets_by_ids(Core::State::AppState& app_state,
+                                  const std::vector<std::int64_t>& ids)
+    -> std::expected<void, std::string>;
+
+export auto restore_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<bool, std::string>;
+
+export auto purge_expired_missing_assets(Core::State::AppState& app_state,
+                                         std::int64_t cutoff_millis)
+    -> std::expected<std::int64_t, std::string>;
 
 export auto delete_asset(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string>;

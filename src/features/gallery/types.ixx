@@ -215,7 +215,7 @@ export struct ScanResult {
   int total_files = 0;
   int new_items = 0;
   int updated_items = 0;
-  int deleted_items = 0;
+  int missing_items = 0;
   std::vector<std::string> errors = {};
   std::string scan_duration = "";
   // changes 供运行时增量消费者消费；
@@ -223,7 +223,7 @@ export struct ScanResult {
   std::vector<ScanChange> changes = {};
 };
 
-export enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
+export enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK };
 
 export struct Metadata {
   std::int64_t id;
@@ -231,6 +231,7 @@ export struct Metadata {
   std::int64_t size;
   std::int64_t file_modified_at;
   std::string hash;
+  std::optional<std::int64_t> missing_at;
 };
 
 export struct FileSystemInfo {

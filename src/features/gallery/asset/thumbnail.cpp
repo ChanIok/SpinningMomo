@@ -57,6 +57,7 @@ auto query_thumbnail_candidates(Core::State::AppState& app_state)
            created_at, updated_at
     FROM assets
     WHERE type IN ('photo', 'video')
+      AND missing_at IS NULL
       AND hash IS NOT NULL
       AND hash != ''
       AND path IS NOT NULL

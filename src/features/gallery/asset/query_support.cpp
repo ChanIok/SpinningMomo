@@ -131,6 +131,10 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
   const auto id_column = qualify_asset_column("id", asset_table_alias);
   const auto rating_column = qualify_asset_column("rating", asset_table_alias);
   const auto review_flag_column = qualify_asset_column("review_flag", asset_table_alias);
+  const auto missing_at_column = qualify_asset_column("missing_at", asset_table_alias);
+
+  // missing 是内部宽限状态，所有常规图库查询默认隐藏。
+  conditions.push_back(missing_at_column + " IS NULL");
 
   if (filters.folder_id.has_value()) {
     if (filters.include_subfolders.value_or(false)) {

@@ -492,7 +492,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
     }
 
     auto remove_result =
-        Scanner::AssetPipeline::remove_asset_at_path(app_state, std::filesystem::path(path));
+        Scanner::AssetPipeline::mark_asset_missing_at_path(app_state, std::filesystem::path(path));
     if (!remove_result) {
       // 路径级失败：本轮尽量继续，不升级全量。
       result.errors.push_back(std::format("{}: {}", path, remove_result.error()));
@@ -500,7 +500,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
     }
 
     if (remove_result.value()) {
-      result.deleted_items++;
+      result.missing_items++;
     }
     // 无论索引里是否仍有该行（例如 RPC 已先行删库），都把 REMOVE 写入 changes：
     // ScanChange 表示监视根下的路径已从磁盘消失，供扩展做派生同步（如硬链接撤销）。
@@ -539,15 +539,16 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
         });
         break;
       case PathSyncOutcome::Updated:
+      case PathSyncOutcome::Restored:
         result.updated_items++;
         result.changes.push_back(Types::ScanChange{
             .path = path,
             .action = Types::ScanChangeAction::UPSERT,
         });
         break;
-      case PathSyncOutcome::Removed:
-        // UPSERT 路径上文件已消失：按删除统计，并向扩展发 REMOVE
-        result.deleted_items++;
+      case PathSyncOutcome::Missing:
+        // UPSERT 路径上文件已消失：进入 missing 宽限期，并向扩展发 REMOVE。
+        result.missing_items++;
         result.changes.push_back(Types::ScanChange{
             .path = path,
             .action = Types::ScanChangeAction::REMOVE,
@@ -629,10 +630,10 @@ auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcher
   // 统一收口：日志、gallery.changed 通知、post_scan_callback 都在这里发。
   // 这样启动恢复与运行时增量可以共用同一套“扫描完成后处理”。
   Logger().info(
-      "Gallery sync finished for '{}'. mode={}, total={}, new={}, updated={}, deleted={}, "
+      "Gallery sync finished for '{}'. mode={}, total={}, new={}, updated={}, missing={}, "
       "errors={}",
       watcher.root_path.string(), mode, result.total_files, result.new_items, result.updated_items,
-      result.deleted_items, result.errors.size());
+      result.missing_items, result.errors.size());
 
   // 路径级 partial fail 不改变 Healthy/Faulted；汇总一条 warn 便于排查。
   if (!result.errors.empty()) {
@@ -641,13 +642,13 @@ auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcher
   }
 
   if (force_gallery_changed || result.new_items > 0 || result.updated_items > 0 ||
-      result.deleted_items > 0 || !result.changes.empty()) {
+      result.missing_items > 0 || !result.changes.empty()) {
     Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
   }
 
   auto post_scan_callback = get_post_scan_callback(watcher);
   if (post_scan_callback && (result.new_items > 0 || result.updated_items > 0 ||
-                             result.deleted_items > 0 || !result.changes.empty())) {
+                             result.missing_items > 0 || !result.changes.empty())) {
     post_scan_callback(result);
   }
 }

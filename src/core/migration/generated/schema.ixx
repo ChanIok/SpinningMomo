@@ -10,3 +10,4 @@ export import Core.Migration.Schema.V001;
 export import Core.Migration.Schema.V002;
 export import Core.Migration.Schema.V003;
 export import Core.Migration.Schema.V004;
+export import Core.Migration.Schema.V005;

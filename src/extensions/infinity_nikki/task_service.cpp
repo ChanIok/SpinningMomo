@@ -135,8 +135,8 @@ auto launch_initial_scan_task(
                 .total = result.total_files,
                 .percent = 100.0,
                 .message =
-                    std::format("Scanned {}, new {}, updated {}, deleted {}", result.total_files,
-                                result.new_items, result.updated_items, result.deleted_items),
+                    std::format("Scanned {}, new {}, updated {}, missing {}", result.total_files,
+                                result.new_items, result.updated_items, result.missing_items),
             });
         Core::Tasks::complete_task_success(app_state, task_id);
         Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");

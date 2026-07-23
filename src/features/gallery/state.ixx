@@ -128,6 +128,10 @@ export struct GalleryState {
   // 应用主动文件系统操作的 watcher 去重表（key 为大小写归一化后的路径比较键）。
   std::unordered_map<std::wstring, ManualFileSystemIgnoreEntry> manual_file_system_ignore_paths;
   std::mutex manual_file_system_ignore_mutex;
+
+  // 新路径继承同内容最早资产的 Gallery 用户数据后，扩展在同一事务内复制自己的资产数据。
+  std::function<std::expected<void, std::string>(std::int64_t, std::int64_t)>
+      inherit_asset_data_callback;
 };
 
 }  // namespace Features::Gallery::State

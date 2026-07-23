@@ -79,7 +79,7 @@ auto prepare_media_asset(Core::State::AppState& app_state,
 
     // 缩略图像素同时供主色复用，避免同一照片重复解码缩放
     auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
-        photo_wic_factory.get(), normalized_path, kDefaultThumbnailShortEdge);
+        photo_wic_factory.get(), normalized_path, Types::kDefaultThumbnailShortEdge);
     if (!bitmap_data_result) {
       Logger().warn("Failed to load thumbnail bitmap data for {}: {}", normalized_path.string(),
                     bitmap_data_result.error());
@@ -100,7 +100,7 @@ auto prepare_media_asset(Core::State::AppState& app_state,
     }
 
     const Features::Gallery::Color::Types::MainColorExtractOptions color_extract_options{
-        .sample_short_edge = kDefaultThumbnailShortEdge,
+        .sample_short_edge = Types::kDefaultThumbnailShortEdge,
     };
     auto color_result = thumbnail_bitmap_data.has_value()
                             ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
@@ -116,8 +116,8 @@ auto prepare_media_asset(Core::State::AppState& app_state,
     }
   } else if (asset_type == "video") {
     // MF：分辨率/时长 + 封面；失败时兜底写入，避免单文件拖垮整批
-    auto video_result =
-        Utils::Media::VideoAsset::analyze_video_file(normalized_path, kDefaultThumbnailShortEdge);
+    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
+        normalized_path, Types::kDefaultThumbnailShortEdge);
     if (video_result) {
       asset.width = static_cast<std::int32_t>(video_result->width);
       asset.height = static_cast<std::int32_t>(video_result->height);
@@ -155,31 +155,14 @@ auto prepare_media_asset(Core::State::AppState& app_state,
   return prepared;
 }
 
-// 按路径删除资产索引；hash 共享缩略图留给全局缓存对账统一回收。
-auto remove_asset_at_path(Core::State::AppState& app_state, const std::filesystem::path& path)
+// 外部路径消失只进入 missing 宽限期；重复 REMOVE 不重置 missing_at。
+auto mark_asset_missing_at_path(Core::State::AppState& app_state, const std::filesystem::path& path)
     -> std::expected<bool, std::string> {
   auto normalized_result = Utils::Path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize path: " + normalized_result.error());
   }
-  auto normalized = normalized_result.value();
-
-  auto asset_result = Asset::Repository::get_asset_by_path(app_state, normalized.string());
-  if (!asset_result) {
-    return std::unexpected("Failed to query asset by path: " + asset_result.error());
-  }
-
-  if (!asset_result->has_value()) {
-    return false;
-  }
-
-  // 仅移除索引，避免同一 hash 的其他资产仍引用该缩略图时误删共享文件。
-  auto delete_result = Asset::Repository::delete_asset(app_state, asset_result->value().id);
-  if (!delete_result) {
-    return std::unexpected("Failed to delete asset: " + delete_result.error());
-  }
-
-  return true;
+  return Asset::Repository::mark_asset_missing_by_path(app_state, normalized_result->string());
 }
 
 // 在一个事务中写入单个资产及颜色，避免指纹已提交但颜色仍停留在旧状态。
@@ -205,7 +188,8 @@ auto persist_prepared_asset(Core::State::AppState& app_state, PreparedAsset& pre
           return PathSyncOutcome::Updated;
         }
 
-        auto create_result = Asset::Repository::create_asset(txn_app_state, prepared.asset);
+        auto create_result = Asset::Repository::create_asset_with_inherited_data_in_transaction(
+            txn_app_state, prepared.asset);
         if (!create_result) {
           return std::unexpected("Failed to create asset: " + create_result.error());
         }
@@ -238,11 +222,11 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
   // 盘上不存在或非常规文件 → 按删除处理
   if (!std::filesystem::exists(normalized, ec) ||
       !std::filesystem::is_regular_file(normalized, ec) || ec) {
-    auto remove_result = remove_asset_at_path(app_state, normalized);
+    auto remove_result = mark_asset_missing_at_path(app_state, normalized);
     if (!remove_result) {
       return std::unexpected(remove_result.error());
     }
-    return remove_result.value() ? PathSyncOutcome::Removed : PathSyncOutcome::Skipped;
+    return remove_result.value() ? PathSyncOutcome::Missing : PathSyncOutcome::Skipped;
   }
 
   const auto supported_extensions =
@@ -279,10 +263,20 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
   auto file_modified_millis = Utils::Time::file_time_to_millis(last_write_time);
   auto size_i64 = static_cast<std::int64_t>(file_size);
 
+  // 相同路径始终代表同一资产；即使编辑器采用删除后替换，也先恢复原行。
+  bool restored = false;
+  if (existing_asset) {
+    auto restore_result = Asset::Repository::restore_asset_by_id(app_state, existing_asset->id);
+    if (!restore_result) {
+      return std::unexpected(restore_result.error());
+    }
+    restored = restore_result.value();
+  }
+
   // size/mtime 均一致则跳过内容指纹
   if (existing_asset && existing_asset->size.value_or(0) == size_i64 &&
       existing_asset->file_modified_at.value_or(0) == file_modified_millis) {
-    return PathSyncOutcome::Skipped;
+    return restored ? PathSyncOutcome::Restored : PathSyncOutcome::Skipped;
   }
 
   if (stop_token.stop_requested()) {
@@ -307,7 +301,7 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
     if (!update_result) {
       return std::unexpected(update_result.error());
     }
-    return PathSyncOutcome::UnchangedMeta;
+    return restored ? PathSyncOutcome::Restored : PathSyncOutcome::UnchangedMeta;
   }
 
   std::optional<std::int64_t> folder_id;
