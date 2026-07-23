@@ -260,6 +260,18 @@ export async function copyAssetsToClipboard(assetIds: number[]): Promise<Operati
 }
 
 /**
+ * 将系统剪贴板中的文件或截图导入指定图库文件夹
+ */
+export async function pasteClipboardToFolder(folderId: number): Promise<OperationResult> {
+  try {
+    return await call<OperationResult>('gallery.pasteClipboardToFolder', { folderId })
+  } catch (error) {
+    console.error('Failed to paste clipboard media:', error)
+    throw new Error('粘贴剪贴板内容失败')
+  }
+}
+
+/**
  * 将资产移动到系统回收站
  */
 export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationResult> {
@@ -714,6 +726,7 @@ export const galleryApi = {
   openAssetDefault,
   revealAssetInExplorer,
   copyAssetsToClipboard,
+  pasteClipboardToFolder,
   moveAssetsToTrash,
   moveAssetsToFolder,
   checkAssetReachable,

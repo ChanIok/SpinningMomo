@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { FolderOpen, FolderPlus, Pen, Trash2 } from 'lucide-vue-next'
+import { ClipboardPaste, FolderOpen, FolderPlus, Pen, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -49,6 +49,7 @@ const emit = defineEmits<{
   rescanFolder: [folderId: number, folderName: string]
   extractInfinityNikkiMetadata: [folderId: number, folderName: string]
   dropAssetsToFolder: [folderId: number, assetIds: number[]]
+  pasteClipboard: [folderId: number]
 }>()
 
 const { t } = useI18n()
@@ -125,6 +126,11 @@ function handleRenameCancel() {
 
 function handleOpenInExplorer() {
   emit('openInExplorer', props.folder.id)
+}
+
+// 把右键命中的文件夹作为明确目标交给上层执行剪贴板导入。
+function handlePasteClipboard() {
+  emit('pasteClipboard', props.folder.id)
 }
 
 function handleExtractInfinityNikkiMetadata() {
@@ -307,6 +313,11 @@ function handleDrop(event: DragEvent) {
           <FolderPlus />
           {{ t('gallery.sidebar.folders.menu.create') }}
         </ContextMenuItem>
+        <ContextMenuItem @click="handlePasteClipboard">
+          <ClipboardPaste />
+          {{ t('gallery.sidebar.folders.menu.paste') }}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem @click="startRenameDisplayName">
           <Pen />
           {{ t('gallery.sidebar.folders.menu.renameDisplayName') }}
@@ -367,6 +378,7 @@ function handleDrop(event: DragEvent) {
         @drop-assets-to-folder="
           (folderId, assetIds) => emit('dropAssetsToFolder', folderId, assetIds)
         "
+        @paste-clipboard="(folderId) => emit('pasteClipboard', folderId)"
       />
     </div>
   </div>

@@ -11,10 +11,14 @@ import Features.Gallery.Scanner.Discovery;
 import Features.Gallery.Scanner.Analysis;
 import Features.Gallery.Scanner.Process;
 import Features.Gallery.Scanner.Cleanup;
+import Features.Gallery.Scanner.Common;
+import Features.Gallery.Scanner.AssetPipeline;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
+import Features.Gallery.Ignore.Service;
 import Utils.Logger;
 import Utils.Path;
 
@@ -239,6 +243,108 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
       progress_callback, "completed", static_cast<std::int64_t>(result.total_files),
       static_cast<std::int64_t>(result.total_files), 100.0, "Gallery scan completed");
 
+  return result;
+}
+
+// 同步物化应用主动创建的单个文件，并返回已经落库的真实扫描变化。
+auto upsert_created_file(Core::State::AppState& app_state, std::int64_t folder_id,
+                         const std::filesystem::path& path)
+    -> std::expected<Types::ScanResult, std::string> {
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  // 单文件主动导入与常规扫描共享媒体资源，cleanup 会等待本次处理自然结束。
+  std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
+  auto folder_result = Folder::Repository::get_folder_by_id(app_state, folder_id);
+  if (!folder_result) {
+    return std::unexpected("Failed to query target folder: " + folder_result.error());
+  }
+  if (!folder_result->has_value()) {
+    return std::unexpected("Target folder not found");
+  }
+
+  auto folder_path_result =
+      Utils::Path::NormalizePath(std::filesystem::path(folder_result->value().path));
+  if (!folder_path_result) {
+    return std::unexpected("Failed to normalize target folder: " + folder_path_result.error());
+  }
+  auto file_path_result = Utils::Path::NormalizePath(path);
+  if (!file_path_result) {
+    return std::unexpected("Failed to normalize created file: " + file_path_result.error());
+  }
+  const auto folder_path = folder_path_result.value();
+  const auto file_path = file_path_result.value();
+  if (Utils::Path::NormalizeForComparison(file_path.parent_path()) !=
+      Utils::Path::NormalizeForComparison(folder_path)) {
+    return std::unexpected("Created file does not belong to the target folder");
+  }
+
+  auto root_id_result = Ignore::Service::resolve_root_folder_id(app_state, folder_id);
+  if (!root_id_result) {
+    return std::unexpected("Failed to resolve target watch root: " + root_id_result.error());
+  }
+  auto root_result = Folder::Repository::get_folder_by_id(app_state, root_id_result.value());
+  if (!root_result) {
+    return std::unexpected("Failed to query target watch root: " + root_result.error());
+  }
+  if (!root_result->has_value()) {
+    return std::unexpected("Target watch root not found");
+  }
+
+  auto root_path_result =
+      Utils::Path::NormalizePath(std::filesystem::path(root_result->value().path));
+  if (!root_path_result) {
+    return std::unexpected("Failed to normalize target watch root: " + root_path_result.error());
+  }
+  auto rules_result = Ignore::Service::load_ignore_rules(app_state, folder_id);
+  if (!rules_result) {
+    return std::unexpected("Failed to load target ignore rules: " + rules_result.error());
+  }
+
+  Types::ScanOptions options{
+      .directory = root_path_result->string(),
+      .supported_extensions = Common::default_supported_extensions(),
+  };
+  std::unordered_map<std::string, std::int64_t> folder_mapping{
+      {folder_path.string(), folder_id},
+  };
+
+  // 复用全量与 watcher 共用的单路径管线，避免主动导入另写资产分析逻辑。
+  auto upsert_result = AssetPipeline::upsert_asset_at_path(app_state, root_path_result.value(),
+                                                           options, rules_result.value(),
+                                                           folder_mapping, file_path, stop_token);
+  if (!upsert_result) {
+    return std::unexpected(upsert_result.error());
+  }
+
+  Types::ScanResult result{
+      .total_files = 1,
+      .scan_duration = "manual_upsert",
+  };
+  using AssetPipeline::PathSyncOutcome;
+  switch (upsert_result.value()) {
+    case PathSyncOutcome::Created:
+      result.new_items = 1;
+      result.changes.push_back(
+          Types::ScanChange{.path = file_path.string(), .action = Types::ScanChangeAction::UPSERT});
+      break;
+    case PathSyncOutcome::Updated:
+    case PathSyncOutcome::Restored:
+      result.updated_items = 1;
+      result.changes.push_back(
+          Types::ScanChange{.path = file_path.string(), .action = Types::ScanChangeAction::UPSERT});
+      break;
+    case PathSyncOutcome::Missing:
+      result.missing_items = 1;
+      result.changes.push_back(
+          Types::ScanChange{.path = file_path.string(), .action = Types::ScanChangeAction::REMOVE});
+      break;
+    case PathSyncOutcome::Skipped:
+    case PathSyncOutcome::UnchangedMeta:
+      break;
+  }
   return result;
 }
 

@@ -22,6 +22,7 @@ import {
   useGalleryData,
   useGalleryLayout,
   useGalleryAssetActions,
+  useGalleryFolderActions,
 } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { FolderTreeNode } from '../../types'
@@ -40,6 +41,7 @@ import {
 
 const galleryData = useGalleryData()
 const assetActions = useGalleryAssetActions()
+const folderActions = useGalleryFolderActions()
 const galleryStore = useGalleryStore()
 const { sidebarFolderSplitSize } = useGalleryLayout()
 const { toast } = useToast()
@@ -301,6 +303,11 @@ async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
   await assetActions.moveAssetsToFolderByIds(folderId, assetIds)
 }
 
+// 将文件夹树右键命中的节点作为粘贴目标，不依赖当前筛选状态。
+async function handlePasteClipboardToFolder(folderId: number) {
+  await folderActions.pasteClipboardToFolder(folderId)
+}
+
 async function handleDropAssetsToTag(tagId: number, assetIds: number[]) {
   const uniqueIds = [...new Set(assetIds)]
   if (uniqueIds.length === 0) {
@@ -485,6 +492,7 @@ onMounted(() => {
                   @rescan-folder="openRescanDialog"
                   @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
                   @drop-assets-to-folder="handleDropAssetsToFolder"
+                  @paste-clipboard="handlePasteClipboardToFolder"
                 />
               </div>
             </ScrollArea>

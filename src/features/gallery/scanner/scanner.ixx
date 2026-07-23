@@ -14,4 +14,9 @@ export auto scan_asset_directory(
     std::function<void(const Types::ScanProgress&)> progress_callback = nullptr)
     -> std::expected<Types::ScanResult, std::string>;
 
+// 同步物化应用主动创建的单个文件，并返回已经落库的真实扫描变化。
+export auto upsert_created_file(Core::State::AppState& app_state, std::int64_t folder_id,
+                                const std::filesystem::path& path)
+    -> std::expected<Types::ScanResult, std::string>;
+
 }  // namespace Features::Gallery::Scanner

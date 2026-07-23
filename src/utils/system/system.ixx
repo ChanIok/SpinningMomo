@@ -44,6 +44,30 @@ export auto reveal_file_in_explorer(const std::filesystem::path& path)
 export auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
     -> std::expected<void, std::string>;
 
+export enum class ClipboardMediaKind {
+  Empty,
+  Files,
+  EncodedPng,
+  Bitmap,
+};
+
+export struct ClipboardBitmap {
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  std::uint32_t stride = 0;
+  std::vector<std::uint8_t> bgra_pixels;
+};
+
+export struct ClipboardMedia {
+  ClipboardMediaKind kind = ClipboardMediaKind::Empty;
+  std::vector<std::filesystem::path> file_paths;
+  std::vector<std::uint8_t> encoded_png;
+  std::optional<ClipboardBitmap> bitmap;
+};
+
+// 一次性复制系统剪贴板中的文件列表或位图数据，让调用方在剪贴板关闭后安全使用。
+export auto read_clipboard_media() -> std::expected<ClipboardMedia, std::string>;
+
 // 读取系统剪贴板中的纯文本内容（UTF-8）
 export auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string>;
 

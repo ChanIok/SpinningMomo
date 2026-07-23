@@ -26,6 +26,8 @@ export auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int6
 export auto copy_assets_to_clipboard(Core::State::AppState& app_state,
                                      const std::vector<std::int64_t>& ids)
     -> std::expected<Types::OperationResult, std::string>;
+export auto paste_clipboard_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<Types::OperationResult, std::string>;
 export auto move_assets_to_trash(Core::State::AppState& app_state,
                                  const std::vector<std::int64_t>& ids)
     -> std::expected<Types::OperationResult, std::string>;

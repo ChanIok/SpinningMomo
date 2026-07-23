@@ -22,6 +22,10 @@ struct CheckAssetReachableParams {
   std::int64_t asset_id = 0;
 };
 
+struct PasteClipboardToFolderParams {
+  std::int64_t folder_id = 0;
+};
+
 struct CheckAssetReachableResult {
   bool exists = false;
   bool readable = false;
@@ -190,6 +194,21 @@ auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
                                        .message = "Service error: " + result.error()});
   }
 
+  co_return result.value();
+}
+
+// 将系统剪贴板中的文件或截图导入指定的已索引图库文件夹。
+auto handle_paste_clipboard_to_folder(Core::State::AppState& app_state,
+                                      const PasteClipboardToFolderParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::paste_clipboard_to_folder(app_state, params.folder_id);
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
   co_return result.value();
 }
 
@@ -418,6 +437,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.copyAssetsToClipboard",
       handle_copy_assets_to_clipboard,
       "Copy selected asset files to the system clipboard as files");
+
+  register_method<PasteClipboardToFolderParams, Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.pasteClipboardToFolder",
+      handle_paste_clipboard_to_folder,
+      "Paste clipboard files or bitmap media into an indexed gallery folder");
 
   register_method<Features::Gallery::Types::AssetIdsParams,
                   Features::Gallery::Types::OperationResult>(

@@ -13,6 +13,7 @@ namespace Vendor::ShellApi {
 export using NOTIFYICONDATAW = ::NOTIFYICONDATAW;
 export using PNOTIFYICONDATAW = ::PNOTIFYICONDATAW;
 export using DROPFILES = ::DROPFILES;
+export using HDROP = ::HDROP;
 
 // 导出函数
 export auto Shell_NotifyIconW(DWORD dwMessage, PNOTIFYICONDATAW lpData) -> BOOL {
@@ -53,6 +54,11 @@ export constexpr auto kFOF_SILENT = FOF_SILENT;
 
 export auto SHFileOperationW(LPSHFILEOPSTRUCTW lpFileOp) -> int {
   return ::SHFileOperationW(lpFileOp);
+}
+
+export auto DragQueryFileW(HDROP drop, UINT file_index, LPWSTR file_name, UINT file_name_size)
+    -> UINT {
+  return ::DragQueryFileW(drop, file_index, file_name, file_name_size);
 }
 
 // 常用文件夹 ID

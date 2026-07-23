@@ -4,6 +4,7 @@ import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vue
 import {
   useGalleryAssetActions,
   useGalleryData,
+  useGalleryFolderActions,
   useGallerySelection,
   useGalleryView,
 } from '../../composables'
@@ -23,6 +24,7 @@ import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
+const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const galleryView = useGalleryView()
 const viewerRef = ref<HTMLElement | null>(null)
@@ -311,6 +313,13 @@ function handleKeydown(event: KeyboardEvent) {
       void assetActions.pasteCopiedTagsToSelection()
       return
     }
+  }
+
+  // 普通 Ctrl+V 只导入到当前明确选中的文件夹，不占用标签粘贴快捷键。
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+    event.preventDefault()
+    void folderActions.pasteClipboardToSelectedFolder()
+    return
   }
 
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {

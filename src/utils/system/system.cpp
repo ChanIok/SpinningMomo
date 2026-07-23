@@ -13,6 +13,192 @@ namespace Utils::System {
 // Windows 约定：Preferred DropEffect = 1 表示“复制”，
 // 这样其他程序在粘贴这些文件时会按“复制文件”来理解，而不是“移动文件”。
 constexpr DWORD kClipboardDropEffectCopy = 1;
+constexpr std::uint32_t kMaxClipboardBitmapDimension = 100'000;
+constexpr std::size_t kMaxClipboardBitmapBytes = 1024ULL * 1024ULL * 1024ULL;
+
+// 把没有有效 alpha 的剪贴板位图统一补成不透明，避免截图保存后完全透明。
+auto normalize_clipboard_alpha(ClipboardBitmap& bitmap) -> void {
+  bool has_nonzero_alpha = false;
+  for (std::size_t offset = 3; offset < bitmap.bgra_pixels.size(); offset += 4) {
+    if (bitmap.bgra_pixels[offset] != 0) {
+      has_nonzero_alpha = true;
+      break;
+    }
+  }
+  if (has_nonzero_alpha) {
+    return;
+  }
+  for (std::size_t offset = 3; offset < bitmap.bgra_pixels.size(); offset += 4) {
+    bitmap.bgra_pixels[offset] = 255;
+  }
+}
+
+// 从 CF_HDROP 中复制全部路径，关闭剪贴板后不再依赖 Shell 持有的句柄。
+auto read_clipboard_file_paths() -> std::expected<std::vector<std::filesystem::path>, std::string> {
+  auto drop = static_cast<Vendor::ShellApi::HDROP>(GetClipboardData(Vendor::ShellApi::kCF_HDROP));
+  if (drop == nullptr) {
+    return std::unexpected("Failed to get clipboard file list, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  const auto file_count = Vendor::ShellApi::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+  std::vector<std::filesystem::path> paths;
+  paths.reserve(file_count);
+  for (UINT index = 0; index < file_count; ++index) {
+    const auto path_length = Vendor::ShellApi::DragQueryFileW(drop, index, nullptr, 0);
+    if (path_length == 0) {
+      continue;
+    }
+
+    std::wstring path(path_length + 1, L'\0');
+    const auto copied_length =
+        Vendor::ShellApi::DragQueryFileW(drop, index, path.data(), path_length + 1);
+    if (copied_length == 0) {
+      continue;
+    }
+    path.resize(copied_length);
+    paths.emplace_back(std::move(path));
+  }
+  return paths;
+}
+
+// 复制注册 PNG 格式的编码字节，优先保留截图工具提供的无损原始数据。
+auto read_clipboard_encoded_png(UINT png_format)
+    -> std::expected<std::vector<std::uint8_t>, std::string> {
+  auto handle = GetClipboardData(png_format);
+  if (handle == nullptr) {
+    return std::unexpected("Failed to get clipboard PNG handle, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  const auto byte_count = GlobalSize(handle);
+  if (byte_count < 8 || byte_count > kMaxClipboardBitmapBytes) {
+    return std::unexpected("Clipboard PNG size is invalid");
+  }
+
+  auto* bytes = static_cast<const std::uint8_t*>(GlobalLock(handle));
+  if (bytes == nullptr) {
+    return std::unexpected("Failed to lock clipboard PNG, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+  struct GlobalUnlockGuard {
+    HGLOBAL handle;
+    ~GlobalUnlockGuard() { GlobalUnlock(handle); }
+  } unlock_guard{handle};
+
+  constexpr std::array<std::uint8_t, 8> kPngSignature = {0x89, 0x50, 0x4E, 0x47,
+                                                         0x0D, 0x0A, 0x1A, 0x0A};
+  if (!std::equal(kPngSignature.begin(), kPngSignature.end(), bytes)) {
+    return std::unexpected("Clipboard PNG signature is invalid");
+  }
+  return std::vector<std::uint8_t>(bytes, bytes + byte_count);
+}
+
+// 把 CF_DIB/CF_DIBV5 的 24/32 位像素复制成统一的顶向下 BGRA 缓冲区。
+auto read_clipboard_dib(UINT clipboard_format) -> std::expected<ClipboardBitmap, std::string> {
+  auto handle = GetClipboardData(clipboard_format);
+  if (handle == nullptr) {
+    return std::unexpected("Failed to get clipboard DIB handle, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  const auto total_bytes = GlobalSize(handle);
+  if (total_bytes < sizeof(BITMAPINFOHEADER) || total_bytes > kMaxClipboardBitmapBytes) {
+    return std::unexpected("Clipboard DIB size is invalid");
+  }
+
+  auto* data = static_cast<const std::uint8_t*>(GlobalLock(handle));
+  if (data == nullptr) {
+    return std::unexpected("Failed to lock clipboard DIB, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+  struct GlobalUnlockGuard {
+    HGLOBAL handle;
+    ~GlobalUnlockGuard() { GlobalUnlock(handle); }
+  } unlock_guard{handle};
+
+  BITMAPINFOHEADER header{};
+  std::memcpy(&header, data, sizeof(header));
+  if (header.biSize < sizeof(BITMAPINFOHEADER) || header.biSize > total_bytes ||
+      header.biWidth <= 0 || header.biHeight == 0 || header.biPlanes != 1 ||
+      (header.biBitCount != 24 && header.biBitCount != 32)) {
+    return std::unexpected("Clipboard DIB header is unsupported");
+  }
+  if (header.biCompression != BI_RGB && header.biCompression != BI_BITFIELDS
+#ifdef BI_ALPHABITFIELDS
+      && header.biCompression != BI_ALPHABITFIELDS
+#endif
+  ) {
+    return std::unexpected("Clipboard DIB compression is unsupported");
+  }
+
+  const auto width = static_cast<std::uint64_t>(header.biWidth);
+  const auto signed_height = static_cast<std::int64_t>(header.biHeight);
+  const auto height =
+      static_cast<std::uint64_t>(signed_height < 0 ? -signed_height : signed_height);
+  if (width > kMaxClipboardBitmapDimension || height > kMaxClipboardBitmapDimension) {
+    return std::unexpected("Clipboard DIB dimensions are too large");
+  }
+
+  std::size_t pixel_offset = header.biSize;
+  if (header.biCompression == BI_BITFIELDS
+#ifdef BI_ALPHABITFIELDS
+      || header.biCompression == BI_ALPHABITFIELDS
+#endif
+  ) {
+    // BITMAPINFOHEADER 的通道掩码紧跟头部；V4/V5 则已经把掩码包含在 biSize 内。
+    if (header.biSize == sizeof(BITMAPINFOHEADER)) {
+      const auto mask_count =
+#ifdef BI_ALPHABITFIELDS
+          header.biCompression == BI_ALPHABITFIELDS ? 4ULL : 3ULL;
+#else
+          3ULL;
+#endif
+      pixel_offset += mask_count * sizeof(DWORD);
+    }
+  }
+
+  const auto source_stride = ((width * header.biBitCount + 31ULL) / 32ULL) * 4ULL;
+  const auto source_bytes = source_stride * height;
+  const auto output_stride = width * 4ULL;
+  const auto output_bytes = output_stride * height;
+  if (source_bytes > kMaxClipboardBitmapBytes || output_bytes > kMaxClipboardBitmapBytes ||
+      pixel_offset > total_bytes || source_bytes > total_bytes - pixel_offset) {
+    return std::unexpected("Clipboard DIB pixel buffer is invalid");
+  }
+
+  ClipboardBitmap bitmap{
+      .width = static_cast<std::uint32_t>(width),
+      .height = static_cast<std::uint32_t>(height),
+      .stride = static_cast<std::uint32_t>(output_stride),
+      .bgra_pixels = std::vector<std::uint8_t>(static_cast<std::size_t>(output_bytes)),
+  };
+
+  const auto* source_pixels = data + pixel_offset;
+  const bool bottom_up = header.biHeight > 0;
+  for (std::size_t row = 0; row < height; ++row) {
+    const auto source_row = bottom_up ? height - row - 1 : row;
+    const auto* source = source_pixels + source_row * source_stride;
+    auto* destination = bitmap.bgra_pixels.data() + row * output_stride;
+    if (header.biBitCount == 32) {
+      std::memcpy(destination, source, static_cast<std::size_t>(output_stride));
+      continue;
+    }
+
+    // 24 位 DIB 没有 alpha，扩展为 WIC 可直接编码的 BGRA。
+    for (std::size_t column = 0; column < width; ++column) {
+      destination[column * 4] = source[column * 3];
+      destination[column * 4 + 1] = source[column * 3 + 1];
+      destination[column * 4 + 2] = source[column * 3 + 2];
+      destination[column * 4 + 3] = 255;
+    }
+  }
+
+  if (header.biBitCount == 32) {
+    normalize_clipboard_alpha(bitmap);
+  }
+  return bitmap;
+}
 
 // 获取当前 Windows 系统版本信息
 [[nodiscard]] auto get_windows_version() noexcept
@@ -346,6 +532,65 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
   drop_effect_handle = nullptr;
 
   return {};
+}
+
+// 按文件列表、PNG、DIBV5、DIB 的优先级快照系统剪贴板媒体。
+auto read_clipboard_media() -> std::expected<ClipboardMedia, std::string> {
+  if (!OpenClipboard(nullptr)) {
+    return std::unexpected("Failed to open clipboard, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+  struct ClipboardCloser {
+    ~ClipboardCloser() { CloseClipboard(); }
+  } clipboard_closer;
+
+  // 文件列表保留原文件语义，优先于同一剪贴板对象附带的预览位图。
+  if (IsClipboardFormatAvailable(Vendor::ShellApi::kCF_HDROP)) {
+    auto paths_result = read_clipboard_file_paths();
+    if (!paths_result) {
+      return std::unexpected(paths_result.error());
+    }
+    return ClipboardMedia{
+        .kind = ClipboardMediaKind::Files,
+        .file_paths = std::move(paths_result.value()),
+    };
+  }
+
+  const auto png_format = RegisterClipboardFormatW(L"PNG");
+  if (png_format != 0 && IsClipboardFormatAvailable(png_format)) {
+    auto png_result = read_clipboard_encoded_png(png_format);
+    if (!png_result) {
+      return std::unexpected(png_result.error());
+    }
+    return ClipboardMedia{
+        .kind = ClipboardMediaKind::EncodedPng,
+        .encoded_png = std::move(png_result.value()),
+    };
+  }
+
+  if (IsClipboardFormatAvailable(CF_DIBV5)) {
+    auto bitmap_result = read_clipboard_dib(CF_DIBV5);
+    if (!bitmap_result) {
+      return std::unexpected(bitmap_result.error());
+    }
+    return ClipboardMedia{
+        .kind = ClipboardMediaKind::Bitmap,
+        .bitmap = std::move(bitmap_result.value()),
+    };
+  }
+
+  if (IsClipboardFormatAvailable(CF_DIB)) {
+    auto bitmap_result = read_clipboard_dib(CF_DIB);
+    if (!bitmap_result) {
+      return std::unexpected(bitmap_result.error());
+    }
+    return ClipboardMedia{
+        .kind = ClipboardMediaKind::Bitmap,
+        .bitmap = std::move(bitmap_result.value()),
+    };
+  }
+
+  return ClipboardMedia{};
 }
 
 auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string> {
