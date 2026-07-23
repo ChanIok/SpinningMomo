@@ -384,6 +384,11 @@ auto Utils::Path::IsPathWithinBase(const std::filesystem::path& target,
     return true;
   }
 
+  // base 已以分隔符结束时，前缀命中本身就是完整路径段边界
+  if (normalized_base.ends_with(L'/')) {
+    return true;
+  }
+
   return normalized_target[normalized_base.size()] == L'/';
 }
 

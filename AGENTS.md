@@ -18,6 +18,8 @@ SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infi
 
 Full setup steps live in `docs/developer/architecture.md`.
 
+Build Policy: Default to Debug (xmake build). Do not run builds automatically; let the user confirm or run manually. 
+
 Common commands:
 ```
 # C++ backend — debug
@@ -133,10 +135,12 @@ These must be re-run when their source files change:
 - **Module import order** in `.ixx`: `std` → `Vendor.*` → `Core.*` → `Features.*` / `UI.*` / `Utils.*`
 
 ## Testing
-No automated test suite. Manual testing only:
-1. Build and run the exe.
-2. Use the `web/src/features/playground/` pages for interactive RPC endpoint testing during development.
-3. Use the root-level `playground/` scripts for backend HTTP/RPC debugging and ad-hoc experiments.
+Backend regression tests use doctest and are executed through Xmake:
+1. Run `xmake test -v` for the automated backend suite.
+2. Keep tests deterministic and focused on stable behavior or documented invariants; do not pursue coverage targets.
+3. Build and run the exe for Windows, hardware, and desktop integration testing.
+4. Use the `web/src/features/playground/` pages for interactive RPC endpoint testing during development.
+5. Use the root-level `playground/` scripts for backend HTTP/RPC debugging and ad-hoc experiments.
 
 ## Adding a New Feature
 1. Create a directory under `src/features/<name>/` with at minimum a `.ixx` module interface and `.cpp` implementation.

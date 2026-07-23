@@ -107,6 +107,17 @@ npm run build:prepare
 | Release | `build\windows\x64\release\` |
 | 打包产物 | `dist\` |
 
+### 后端自动化测试
+
+后端回归测试使用 doctest，并由独立的 `SpinningMomoTests` 目标承载：
+
+```bash
+xmake test -v
+```
+
+测试只保护确定性的稳定行为和已记录不变量，不以覆盖率为目标。涉及窗口、显卡、
+音频设备和其他 Windows 桌面环境的行为仍需运行应用进行手工验证。
+
 ---
 
 ## 打包发布产物
