@@ -14,6 +14,7 @@ import UI.FloatingWindow.State;
 import Utils.Logger;
 import Utils.System;
 import <d2d1_3.h>;
+import <dwrite_3.h>;
 import <windows.h>;
 
 namespace UI::NotificationWindow::Painter {

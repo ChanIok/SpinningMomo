@@ -21,6 +21,7 @@ import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.String;
 import Utils.System;
+import <audioclient.h>;
 import <mfapi.h>;
 import <wil/com.h>;
 import <windows.h>;
