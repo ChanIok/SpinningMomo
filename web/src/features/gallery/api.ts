@@ -31,6 +31,9 @@ import type {
   UpdateAssetsDescriptionParams,
   AssetReachability,
   BatchSelectionSummary,
+  MissingAssetsResponse,
+  PurgeMissingAssetsParams,
+  PurgeMissingAssetsResult,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
@@ -205,6 +208,16 @@ export async function getThumbnailStats(): Promise<string> {
     console.error('Failed to get thumbnail stats:', error)
     throw new Error('获取缩略图统计失败')
   }
+}
+
+export async function getMissingAssets(): Promise<MissingAssetsResponse> {
+  return call<MissingAssetsResponse>('gallery.getMissingAssets', {})
+}
+
+export async function purgeMissingAssets(
+  params: PurgeMissingAssetsParams = {}
+): Promise<PurgeMissingAssetsResult> {
+  return call<PurgeMissingAssetsResult>('gallery.purgeMissingAssets', params)
 }
 
 /**
@@ -672,6 +685,8 @@ export const galleryApi = {
   // 维护操作
   cleanupThumbnails,
   getThumbnailStats,
+  getMissingAssets,
+  purgeMissingAssets,
 
   // 标签管理
   getTagTree,

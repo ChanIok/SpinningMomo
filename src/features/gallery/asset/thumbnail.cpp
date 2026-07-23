@@ -57,7 +57,6 @@ auto query_thumbnail_candidates(Core::State::AppState& app_state)
            created_at, updated_at
     FROM assets
     WHERE type IN ('photo', 'video')
-      AND missing_at IS NULL
       AND hash IS NOT NULL
       AND hash != ''
       AND path IS NOT NULL
@@ -517,6 +516,88 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
   }
 
   return deleted_count;
+}
+
+auto measure_thumbnail_storage(Core::State::AppState& app_state,
+                               const std::unordered_set<std::string>& hashes)
+    -> std::expected<ThumbnailStorageStats, std::string> {
+  if (app_state.gallery->thumbnails_directory.empty()) {
+    return std::unexpected("Thumbnails directory not initialized");
+  }
+
+  ThumbnailStorageStats stats;
+  for (const auto& hash : hashes) {
+    if (hash.size() < 4) {
+      stats.failed_count++;
+      continue;
+    }
+
+    const auto path = build_thumbnail_path(app_state.gallery->thumbnails_directory, hash);
+    std::error_code exists_ec;
+    if (!std::filesystem::is_regular_file(path, exists_ec)) {
+      if (exists_ec) {
+        stats.failed_count++;
+      }
+      continue;
+    }
+
+    std::error_code size_ec;
+    const auto size = std::filesystem::file_size(path, size_ec);
+    if (size_ec) {
+      stats.failed_count++;
+      continue;
+    }
+
+    stats.file_count++;
+    stats.total_size += static_cast<std::int64_t>(size);
+  }
+
+  return stats;
+}
+
+auto remove_thumbnail_files(Core::State::AppState& app_state,
+                            const std::unordered_set<std::string>& hashes)
+    -> std::expected<ThumbnailStorageStats, std::string> {
+  if (app_state.gallery->thumbnails_directory.empty()) {
+    return std::unexpected("Thumbnails directory not initialized");
+  }
+
+  ThumbnailStorageStats stats;
+  for (const auto& hash : hashes) {
+    if (hash.size() < 4) {
+      stats.failed_count++;
+      continue;
+    }
+
+    const auto path = build_thumbnail_path(app_state.gallery->thumbnails_directory, hash);
+    std::error_code exists_ec;
+    if (!std::filesystem::is_regular_file(path, exists_ec)) {
+      if (exists_ec) {
+        stats.failed_count++;
+      }
+      continue;
+    }
+
+    std::error_code size_ec;
+    const auto size = std::filesystem::file_size(path, size_ec);
+    if (size_ec) {
+      stats.failed_count++;
+      continue;
+    }
+
+    std::error_code remove_ec;
+    if (!std::filesystem::remove(path, remove_ec)) {
+      stats.failed_count++;
+      Logger().warn("Failed to remove thumbnail during missing asset purge '{}': {}", path.string(),
+                    remove_ec.message());
+      continue;
+    }
+
+    stats.file_count++;
+    stats.total_size += static_cast<std::int64_t>(size);
+  }
+
+  return stats;
 }
 
 // ============= 基于哈希的缩略图生成 =============

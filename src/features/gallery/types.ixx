@@ -303,6 +303,34 @@ export struct OperationResult {
   std::optional<std::int64_t> unchanged_count = std::nullopt;
 };
 
+export struct MissingAssetItem {
+  std::int64_t id = 0;
+  std::string name;
+  std::string path;
+  std::int64_t missing_at = 0;
+};
+
+export struct MissingAssetsResponse {
+  std::vector<MissingAssetItem> items;
+  std::int64_t total_count = 0;
+  std::int64_t reclaimable_thumbnail_count = 0;
+  std::int64_t reclaimable_thumbnail_bytes = 0;
+};
+
+export struct PurgeMissingAssetsParams {
+  std::optional<std::vector<std::int64_t>> ids;
+};
+
+export struct PurgeMissingAssetsResult {
+  bool success = false;
+  std::string message;
+  std::int64_t deleted_asset_count = 0;
+  std::int64_t skipped_asset_count = 0;
+  std::int64_t deleted_thumbnail_count = 0;
+  std::int64_t released_thumbnail_bytes = 0;
+  std::int64_t failed_thumbnail_count = 0;
+};
+
 // ============= 时间线相关类型 =============
 
 export struct TimelineBucket {

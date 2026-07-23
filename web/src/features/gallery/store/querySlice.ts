@@ -18,6 +18,7 @@ export function createQuerySlice() {
   const hasNextPage = ref(false)
   const isRefreshing = ref(false)
   const queryVersion = ref(0)
+  const dyeCodeAssetIds = ref<Set<number>>(new Set())
 
   // ============= 分页缓存状态（普通模式使用） =============
   // paginatedAssets: 只缓存已加载页，避免一次性加载全量资产。
@@ -106,8 +107,24 @@ export function createQuerySlice() {
     paginatedAssetsVersion.value += 1
   }
 
+  function setDyeCodeStatuses(queriedAssetIds: number[], matchingAssetIds: number[]) {
+    const next = new Set(dyeCodeAssetIds.value)
+    for (const assetId of queriedAssetIds) {
+      next.delete(assetId)
+    }
+    for (const assetId of matchingAssetIds) {
+      next.add(assetId)
+    }
+    dyeCodeAssetIds.value = next
+  }
+
+  function clearDyeCodeStatuses() {
+    dyeCodeAssetIds.value = new Set()
+  }
+
   function replacePaginatedAssets(pages: Map<number, Asset[]>) {
     paginatedAssets.value = new Map(pages)
+    clearDyeCodeStatuses()
     paginatedAssetsVersion.value += 1
   }
 
@@ -148,6 +165,7 @@ export function createQuerySlice() {
 
     clearTimelineData()
     clearPaginatedAssets()
+    clearDyeCodeStatuses()
     setVisibleRange(undefined, undefined)
   }
 
@@ -160,6 +178,7 @@ export function createQuerySlice() {
     hasNextPage,
     isRefreshing,
     queryVersion,
+    dyeCodeAssetIds,
     paginatedAssets,
     paginatedAssetsVersion,
     perPage,
@@ -177,6 +196,8 @@ export function createQuerySlice() {
     getAssetsInRange,
     isPageLoaded,
     setPageAssets,
+    setDyeCodeStatuses,
+    clearDyeCodeStatuses,
     replacePaginatedAssets,
     clearPaginatedAssets,
     setVisibleRange,

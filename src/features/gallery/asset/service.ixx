@@ -48,6 +48,13 @@ export auto update_assets_description(Core::State::AppState& app_state,
     -> std::expected<Types::OperationResult, std::string>;
 
 // 维护服务
+export auto get_missing_assets(Core::State::AppState& app_state)
+    -> std::expected<Types::MissingAssetsResponse, std::string>;
+
+export auto purge_missing_assets(Core::State::AppState& app_state,
+                                 const Types::PurgeMissingAssetsParams& params)
+    -> std::expected<Types::PurgeMissingAssetsResult, std::string>;
+
 export auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;
 

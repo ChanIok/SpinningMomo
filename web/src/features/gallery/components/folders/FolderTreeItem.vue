@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { FolderOpen, FolderPlus, Pen, RefreshCw, Sparkles, Trash2 } from 'lucide-vue-next'
+import { FolderOpen, FolderPlus, Pen, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -315,12 +315,14 @@ function handleDrop(event: DragEvent) {
           <FolderOpen />
           {{ t('gallery.sidebar.folders.menu.openInExplorer') }}
         </ContextMenuItem>
-        <ContextMenuItem @click="handleRescanFolder">
-          <RefreshCw />
+        <ContextMenuItem inset @click="handleRescanFolder">
           {{ t('gallery.sidebar.folders.menu.rescan') }}
         </ContextMenuItem>
-        <ContextMenuItem v-if="infinityNikkiEnabled" @click="handleExtractInfinityNikkiMetadata">
-          <Sparkles />
+        <ContextMenuItem
+          v-if="infinityNikkiEnabled"
+          inset
+          @click="handleExtractInfinityNikkiMetadata"
+        >
           {{ t('gallery.sidebar.folders.menu.extractInfinityNikkiMetadata') }}
         </ContextMenuItem>
         <template v-if="isRootFolder">

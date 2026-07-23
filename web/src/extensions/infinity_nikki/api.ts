@@ -8,6 +8,7 @@ import type {
   InfinityNikkiSameOutfitDyeCodeFillPreview,
   InfinityNikkiSameOutfitDyeCodeFillResult,
   GetInfinityNikkiMetadataNamesParams,
+  GetDyeCodeAssetIdsParams,
   PhotoMapPoint,
   PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
   QueryPhotoMapPointsParams,
@@ -74,6 +75,13 @@ export async function getInfinityNikkiDetails(assetId: number): Promise<Infinity
     console.error('Failed to get Infinity Nikki details:', error)
     throw new Error('获取无限暖暖详情失败')
   }
+}
+
+export async function getDyeCodeAssetIds(params: GetDyeCodeAssetIdsParams): Promise<number[]> {
+  if (params.assetIds.length === 0) {
+    return []
+  }
+  return call<number[]>('extensions.infinityNikki.getDyeCodeAssetIds', params)
 }
 
 export async function getInfinityNikkiMetadataNames(

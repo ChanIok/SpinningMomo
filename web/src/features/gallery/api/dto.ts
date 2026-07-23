@@ -160,6 +160,34 @@ export interface OperationResult {
   unchangedCount?: number
 }
 
+export interface MissingAssetItem {
+  id: number
+  name: string
+  path: string
+  missingAt: number
+}
+
+export interface MissingAssetsResponse {
+  items: MissingAssetItem[]
+  totalCount: number
+  reclaimableThumbnailCount: number
+  reclaimableThumbnailBytes: number
+}
+
+export interface PurgeMissingAssetsParams {
+  ids?: number[]
+}
+
+export interface PurgeMissingAssetsResult {
+  success: boolean
+  message: string
+  deletedAssetCount: number
+  skippedAssetCount: number
+  deletedThumbnailCount: number
+  releasedThumbnailBytes: number
+  failedThumbnailCount: number
+}
+
 // 扫描参数
 export interface ScanAssetsParams {
   directory: string

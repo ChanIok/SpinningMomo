@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
-import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
@@ -42,7 +41,6 @@ const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const assetActions = useGalleryAssetActions()
-const { t } = useI18n()
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
 

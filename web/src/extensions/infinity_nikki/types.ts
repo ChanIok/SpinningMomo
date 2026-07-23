@@ -71,6 +71,10 @@ export interface InfinityNikkiDetails {
   mapArea?: InfinityNikkiMapArea
 }
 
+export interface GetDyeCodeAssetIdsParams {
+  assetIds: number[]
+}
+
 export interface InfinityNikkiMapLocalizedName {
   zh?: string
   en?: string

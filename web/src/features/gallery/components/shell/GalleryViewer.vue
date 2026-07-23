@@ -18,6 +18,7 @@ import {
 import GalleryToolbar from './GalleryToolbar.vue'
 import GalleryContent from './GalleryContent.vue'
 import GalleryLightbox from '../lightbox/GalleryLightbox.vue'
+import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
@@ -30,6 +31,7 @@ const contentRef = ref<HTMLElement | null>(null)
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
+const preferencesOpen = ref(false)
 
 const galleryColumnClass = computed(() => {
   const hidden = store.lightbox.isOpen && !store.lightbox.isClosing
@@ -424,7 +426,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
-      <GalleryToolbar />
+      <GalleryToolbar @open-preferences="preferencesOpen = true" />
       <div ref="contentRef" class="flex-1 overflow-hidden" @contextmenu="handleContentContextMenu">
         <GalleryContent ref="galleryContentRef" />
       </div>
@@ -436,6 +438,8 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :gallery-content-ref="galleryContentRef"
       @request-reverse-hero="startReverseHero"
     />
+
+    <GalleryPreferencesDialog v-model:open="preferencesOpen" />
 
     <!-- Hero overlay: 缩略图放大到 lightbox 的动画层 -->
     <Teleport to="body">

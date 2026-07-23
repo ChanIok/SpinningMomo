@@ -148,6 +148,10 @@ export interface ViewConfig {
 export type {
   // 扫描/可达性
   OperationResult,
+  MissingAssetItem,
+  MissingAssetsResponse,
+  PurgeMissingAssetsParams,
+  PurgeMissingAssetsResult,
   ScanAssetsParams,
   ScanAssetsResult,
   StartScanAssetsResult,

@@ -24,7 +24,8 @@ export const useGalleryStore = defineStore('gallery', () => {
   const gallerySettings = useStorage(
     GALLERY_SETTINGS_STORAGE_KEY,
     createDefaultGallerySettings(),
-    localStorage
+    localStorage,
+    { mergeDefaults: true }
   )
 
   // 查询与缓存层：负责结果集、分页、时间线、并发刷新版本。

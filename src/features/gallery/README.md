@@ -67,6 +67,8 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 
 资源管理器删除、移动、watcher `REMOVE` 和全量扫描对账都只会使资产进入 missing。
 应用内明确移入回收站、删除资产或移除监控根仍然立即硬删除，因为这些操作表达了用户意图。
+图库维护界面允许用户提前硬删除仍处于 missing 宽限期的资产；执行时必须再次检查
+`missing_at IS NOT NULL`，避免误删在界面打开后已经恢复的资产。
 
 `ScanChange::REMOVE` 表示路径已经从磁盘消失，不表示数据库行已被删除；
 `ScanResult::missing_items` 表示本轮首次进入 missing 的资产数量。

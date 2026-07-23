@@ -281,7 +281,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
         :class="[!isSidebarOpen && 'text-muted-foreground']"
         :title="
           isSidebarOpen
@@ -296,7 +296,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
         :class="[!isDetailsOpen && 'text-muted-foreground']"
         :title="
           isDetailsOpen

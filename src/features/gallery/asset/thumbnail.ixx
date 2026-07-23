@@ -90,6 +90,22 @@ export auto reconcile_thumbnail_cache(Core::State::AppState& app_state,
 export auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string>;
 
+export struct ThumbnailStorageStats {
+  std::int64_t file_count = 0;
+  std::int64_t total_size = 0;
+  std::int64_t failed_count = 0;
+};
+
+// 只检查指定 hash 对应的缓存文件，不创建目录或修改缓存。
+export auto measure_thumbnail_storage(Core::State::AppState& app_state,
+                                      const std::unordered_set<std::string>& hashes)
+    -> std::expected<ThumbnailStorageStats, std::string>;
+
+// 删除指定 hash 对应的缓存文件；调用方负责确保这些 hash 已无资产引用。
+export auto remove_thumbnail_files(Core::State::AppState& app_state,
+                                   const std::unordered_set<std::string>& hashes)
+    -> std::expected<ThumbnailStorageStats, std::string>;
+
 // 统计信息
 export struct AssetThumbnailStats {
   int total_thumbnails;

@@ -34,6 +34,7 @@ import {
   Palette,
   Rows3,
   Search,
+  Settings,
   Star,
   Tag,
   Type,
@@ -54,6 +55,10 @@ import type {
 } from '../../types'
 
 type SourceType = 'all' | 'folder' | 'tag'
+
+const emit = defineEmits<{
+  'open-preferences': []
+}>()
 
 const { t, locale } = useI18n()
 const store = useGalleryStore()
@@ -621,6 +626,15 @@ function onViewSizeSliderChange(value: number[] | undefined) {
             </div>
           </PopoverContent>
         </Popover>
+
+        <Button
+          variant="sidebarGhost"
+          size="icon-sm"
+          :title="t('gallery.preferences.open')"
+          @click="emit('open-preferences')"
+        >
+          <Settings class="h-4 w-4" />
+        </Button>
       </div>
     </div>
 

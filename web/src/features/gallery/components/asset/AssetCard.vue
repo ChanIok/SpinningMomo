@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../../composables/useGalleryData'
+import { useGalleryStore } from '../../store'
 import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../../types'
 
@@ -34,6 +35,11 @@ const imageError = ref(false)
 
 // 使用useGalleryData获取缩略图URL
 const { getAssetThumbnailUrl } = useGalleryData()
+const store = useGalleryStore()
+const showRatingBadge = computed(() => store.gallerySettings.view.showRatingBadge)
+const showDyeCodeBadge = computed(
+  () => store.gallerySettings.view.showDyeCodeBadge && store.dyeCodeAssetIds.has(props.asset.id)
+)
 
 // 缩略图URL - 从useGalleryData中获取
 const thumbnailUrl = computed(() => {
@@ -208,7 +214,12 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         </div>
       </div>
 
-      <MediaStatusChips :rating="asset.rating" :review-flag="asset.reviewFlag" />
+      <MediaStatusChips
+        :rating="asset.rating"
+        :review-flag="asset.reviewFlag"
+        :show-rating="showRatingBadge"
+        :has-dye-code="showDyeCodeBadge"
+      />
 
       <!-- 选择指示器 -->
       <div

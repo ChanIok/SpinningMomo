@@ -11,6 +11,7 @@ import { storeToRefs } from 'pinia'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -331,6 +332,9 @@ function handleExpandLeave(el: Element) {
       <div class="flex h-full max-h-[85vh] flex-col">
         <DialogHeader class="px-6 pt-6 pb-3">
           <DialogTitle>{{ t('gallery.sidebar.scan.dialogTitle') }}</DialogTitle>
+          <DialogDescription class="sr-only">
+            {{ t('gallery.sidebar.scan.dialogTitle') }}
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea class="min-h-0 flex-1 px-6">

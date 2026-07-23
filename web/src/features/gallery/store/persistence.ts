@@ -4,6 +4,8 @@ export interface GallerySettings {
   view: {
     size: number
     mode: ViewMode
+    showRatingBadge: boolean
+    showDyeCodeBadge: boolean
   }
   navigation: {
     expandedFolderIds: number[]
@@ -27,6 +29,8 @@ export function createDefaultGallerySettings(): GallerySettings {
     view: {
       size: 256,
       mode: 'grid' satisfies ViewMode,
+      showRatingBadge: true,
+      showDyeCodeBadge: true,
     },
     navigation: {
       expandedFolderIds: [],

@@ -109,6 +109,21 @@ auto handle_infinity_nikki_get_details(
   co_return result.value();
 }
 
+auto handle_infinity_nikki_get_dye_code_asset_ids(
+    Core::State::AppState& app_state,
+    const ::Extensions::InfinityNikki::GetDyeCodeAssetIdsParams& params)
+    -> Core::RPC::RpcAwaitable<std::vector<std::int64_t>> {
+  auto result =
+      ::Extensions::InfinityNikki::AssetService::get_dye_code_asset_ids(app_state, params);
+  if (!result) {
+    co_return std::unexpected(Core::RPC::RpcError{
+        .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        .message = "Service error: " + result.error(),
+    });
+  }
+  co_return result.value();
+}
+
 auto handle_infinity_nikki_get_map_config(Core::State::AppState& app_state,
                                           [[maybe_unused]] const rfl::Generic& params)
     -> Core::RPC::RpcAwaitable<::Extensions::InfinityNikki::InfinityNikkiMapConfig> {
@@ -248,6 +263,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getDetails",
       handle_infinity_nikki_get_details,
       "Get Infinity Nikki extracted data and user record for the specified asset");
+
+  Core::RPC::register_method<::Extensions::InfinityNikki::GetDyeCodeAssetIdsParams,
+                             std::vector<std::int64_t>>(
+      app_state, app_state.rpc->registry, "extensions.infinityNikki.getDyeCodeAssetIds",
+      handle_infinity_nikki_get_dye_code_asset_ids,
+      "Return which of the specified assets have a non-empty Infinity Nikki dye code");
 
   Core::RPC::register_method<rfl::Generic, ::Extensions::InfinityNikki::InfinityNikkiMapConfig>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getMapConfig",

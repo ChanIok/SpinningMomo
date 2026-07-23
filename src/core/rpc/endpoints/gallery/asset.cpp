@@ -126,6 +126,32 @@ auto handle_get_batch_selection_summary(
   co_return result.value();
 }
 
+auto handle_get_missing_assets(Core::State::AppState& app_state,
+                               [[maybe_unused]] const EmptyParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::MissingAssetsResponse> {
+  auto result = Features::Gallery::Asset::Service::get_missing_assets(app_state);
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+  co_return result.value();
+}
+
+auto handle_purge_missing_assets(Core::State::AppState& app_state,
+                                 const Features::Gallery::Types::PurgeMissingAssetsParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::PurgeMissingAssetsResult> {
+  auto result = Features::Gallery::Asset::Service::purge_missing_assets(app_state, params);
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->deleted_asset_count > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+  co_return result.value();
+}
+
 // ============= 资产动作 RPC 处理函数 =============
 
 auto handle_open_asset_default(Core::State::AppState& app_state,
@@ -369,6 +395,15 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.getBatchSelectionSummary",
       handle_get_batch_selection_summary,
       "Get the aggregated review and common-tag summary for the current selection");
+
+  register_method<EmptyParams, Features::Gallery::Types::MissingAssetsResponse>(
+      app_state, app_state.rpc->registry, "gallery.getMissingAssets", handle_get_missing_assets,
+      "List assets in the missing recovery period and their reclaimable thumbnail storage");
+
+  register_method<Features::Gallery::Types::PurgeMissingAssetsParams,
+                  Features::Gallery::Types::PurgeMissingAssetsResult>(
+      app_state, app_state.rpc->registry, "gallery.purgeMissingAssets", handle_purge_missing_assets,
+      "Permanently purge selected or all assets that are still marked missing");
 
   register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,

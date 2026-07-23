@@ -18,6 +18,10 @@ export auto get_details(Core::State::AppState& app_state,
                         const GetInfinityNikkiDetailsParams& params)
     -> asio::awaitable<std::expected<InfinityNikkiDetails, std::string>>;
 
+export auto get_dye_code_asset_ids(Core::State::AppState& app_state,
+                                   const GetDyeCodeAssetIdsParams& params)
+    -> std::expected<std::vector<std::int64_t>, std::string>;
+
 export auto get_map_config(Core::State::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>>;
 

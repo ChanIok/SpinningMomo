@@ -199,6 +199,10 @@ export struct InfinityNikkiDetails {
   std::optional<InfinityNikkiMapArea> map_area;
 };
 
+export struct GetDyeCodeAssetIdsParams {
+  std::vector<std::int64_t> asset_ids;
+};
+
 export struct GetInfinityNikkiMetadataNamesParams {
   std::optional<std::int64_t> filter_id;
   std::optional<std::int64_t> pose_id;

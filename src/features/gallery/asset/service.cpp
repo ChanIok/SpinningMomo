@@ -9,6 +9,7 @@ import Core.Database.Types;
 import Features.Gallery.OriginalLocator;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Asset.QuerySupport;
 import Features.Gallery.Color.Repository;
 import Utils.Logger;
@@ -630,6 +631,169 @@ auto update_assets_description(Core::State::AppState& app_state,
 }
 
 // ============= 维护服务实现 =============
+
+auto get_missing_assets(Core::State::AppState& app_state)
+    -> std::expected<Types::MissingAssetsResponse, std::string> {
+  struct MissingAssetRow {
+    std::int64_t id = 0;
+    std::string name;
+    std::string path;
+    std::int64_t missing_at = 0;
+  };
+
+  auto items_result = Core::Database::query<MissingAssetRow>(app_state,
+                                                             R"(
+        SELECT id, name, path, missing_at
+        FROM assets
+        WHERE missing_at IS NOT NULL
+        ORDER BY path COLLATE NOCASE
+      )");
+  if (!items_result) {
+    return std::unexpected("Failed to query missing assets: " + items_result.error());
+  }
+
+  struct HashRow {
+    std::string hash;
+  };
+
+  auto hashes_result = Core::Database::query<HashRow>(app_state,
+                                                      R"(
+        SELECT DISTINCT candidate.hash
+        FROM assets candidate
+        WHERE candidate.missing_at IS NOT NULL
+          AND candidate.hash IS NOT NULL
+          AND candidate.hash != ''
+          AND NOT EXISTS (
+            SELECT 1
+            FROM assets remaining
+            WHERE remaining.hash = candidate.hash
+              AND remaining.missing_at IS NULL
+          )
+      )");
+  if (!hashes_result) {
+    return std::unexpected("Failed to query reclaimable missing asset hashes: " +
+                           hashes_result.error());
+  }
+
+  std::unordered_set<std::string> reclaimable_hashes;
+  reclaimable_hashes.reserve(hashes_result->size());
+  for (const auto& row : hashes_result.value()) {
+    reclaimable_hashes.insert(row.hash);
+  }
+
+  auto storage_result = Asset::Thumbnail::measure_thumbnail_storage(app_state, reclaimable_hashes);
+  if (!storage_result) {
+    return std::unexpected("Failed to measure reclaimable thumbnails: " + storage_result.error());
+  }
+
+  Types::MissingAssetsResponse response;
+  response.items.reserve(items_result->size());
+  for (auto& row : items_result.value()) {
+    response.items.push_back(Types::MissingAssetItem{
+        .id = row.id,
+        .name = std::move(row.name),
+        .path = std::move(row.path),
+        .missing_at = row.missing_at,
+    });
+  }
+  response.total_count = static_cast<std::int64_t>(response.items.size());
+  response.reclaimable_thumbnail_count = storage_result->file_count;
+  response.reclaimable_thumbnail_bytes = storage_result->total_size;
+  return response;
+}
+
+auto purge_missing_assets(Core::State::AppState& app_state,
+                          const Types::PurgeMissingAssetsParams& params)
+    -> std::expected<Types::PurgeMissingAssetsResult, std::string> {
+  std::vector<std::int64_t> requested_ids;
+  if (params.ids.has_value()) {
+    std::unordered_set<std::int64_t> unique_ids;
+    for (const auto id : params.ids.value()) {
+      if (id > 0) {
+        unique_ids.insert(id);
+      }
+    }
+    requested_ids.assign(unique_ids.begin(), unique_ids.end());
+  }
+
+  if (params.ids.has_value() && requested_ids.empty()) {
+    return Types::PurgeMissingAssetsResult{
+        .success = true,
+        .message = "No missing assets selected",
+    };
+  }
+
+  struct DeletedMissingAssetRow {
+    std::int64_t id = 0;
+    std::optional<std::string> hash;
+  };
+
+  auto deleted_result = Core::Database::execute_transaction(
+      app_state,
+      [&](Core::State::AppState& txn_app_state)
+          -> std::expected<std::vector<DeletedMissingAssetRow>, std::string> {
+        if (!params.ids.has_value()) {
+          return Core::Database::query<DeletedMissingAssetRow>(
+              txn_app_state, "DELETE FROM assets WHERE missing_at IS NOT NULL RETURNING id, hash");
+        }
+
+        const auto placeholders = build_in_clause_placeholders(requested_ids.size());
+        std::vector<Core::Database::Types::DbParam> db_params;
+        db_params.reserve(requested_ids.size());
+        for (const auto id : requested_ids) {
+          db_params.push_back(id);
+        }
+
+        return Core::Database::query<DeletedMissingAssetRow>(
+            txn_app_state,
+            std::format(
+                "DELETE FROM assets WHERE missing_at IS NOT NULL AND id IN ({}) RETURNING id, hash",
+                placeholders),
+            db_params);
+      });
+  if (!deleted_result) {
+    return std::unexpected("Failed to purge missing assets: " + deleted_result.error());
+  }
+
+  std::unordered_set<std::string> deleted_hashes;
+  for (const auto& row : deleted_result.value()) {
+    if (row.hash.has_value() && !row.hash->empty()) {
+      deleted_hashes.insert(row.hash.value());
+    }
+  }
+
+  std::unordered_set<std::string> orphaned_hashes;
+  for (const auto& hash : deleted_hashes) {
+    auto count_result = Core::Database::query_scalar<std::int64_t>(
+        app_state, "SELECT COUNT(*) FROM assets WHERE hash = ?", {hash});
+    if (!count_result) {
+      return std::unexpected("Failed to check thumbnail references after missing asset purge: " +
+                             count_result.error());
+    }
+    if (count_result->value_or(0) == 0) {
+      orphaned_hashes.insert(hash);
+    }
+  }
+
+  auto thumbnail_result = Asset::Thumbnail::remove_thumbnail_files(app_state, orphaned_hashes);
+  if (!thumbnail_result) {
+    return std::unexpected("Missing assets were deleted, but thumbnail cleanup failed: " +
+                           thumbnail_result.error());
+  }
+
+  const auto deleted_count = static_cast<std::int64_t>(deleted_result->size());
+  const auto skipped_count =
+      params.ids.has_value() ? static_cast<std::int64_t>(requested_ids.size()) - deleted_count : 0;
+  return Types::PurgeMissingAssetsResult{
+      .success = thumbnail_result->failed_count == 0,
+      .message = std::format("Purged {} missing asset(s)", deleted_count),
+      .deleted_asset_count = deleted_count,
+      .skipped_asset_count = skipped_count,
+      .deleted_thumbnail_count = thumbnail_result->file_count,
+      .released_thumbnail_bytes = thumbnail_result->total_size,
+      .failed_thumbnail_count = thumbnail_result->failed_count,
+  };
+}
 
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {

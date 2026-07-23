@@ -502,6 +502,58 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
                                  .map_area = std::move(map_area)};
 }
 
+auto get_dye_code_asset_ids(Core::State::AppState& app_state,
+                            const GetDyeCodeAssetIdsParams& params)
+    -> std::expected<std::vector<std::int64_t>, std::string> {
+  std::unordered_set<std::int64_t> unique_ids;
+  for (const auto id : params.asset_ids) {
+    if (id > 0) {
+      unique_ids.insert(id);
+    }
+  }
+  if (unique_ids.empty()) {
+    return std::vector<std::int64_t>{};
+  }
+
+  std::string placeholders;
+  placeholders.reserve(unique_ids.size() * 2 - 1);
+  std::vector<Core::Database::Types::DbParam> db_params;
+  db_params.reserve(unique_ids.size());
+  for (const auto id : unique_ids) {
+    if (!placeholders.empty()) {
+      placeholders += ",";
+    }
+    placeholders += "?";
+    db_params.push_back(id);
+  }
+
+  struct AssetIdRow {
+    std::int64_t asset_id = 0;
+  };
+
+  auto result = Core::Database::query<AssetIdRow>(app_state,
+                                                  std::format(
+                                                      R"(
+            SELECT asset_id
+            FROM asset_infinity_nikki_user_record
+            WHERE record_key = 'dye_code'
+              AND trim(record_value) != ''
+              AND asset_id IN ({})
+          )",
+                                                      placeholders),
+                                                  db_params);
+  if (!result) {
+    return std::unexpected("Failed to query Infinity Nikki dye code asset ids: " + result.error());
+  }
+
+  std::vector<std::int64_t> asset_ids;
+  asset_ids.reserve(result->size());
+  for (const auto& row : result.value()) {
+    asset_ids.push_back(row.asset_id);
+  }
+  return asset_ids;
+}
+
 // 暴露给 RPC 层的地图配置获取入口，供前端直接调用。
 auto get_map_config(Core::State::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {

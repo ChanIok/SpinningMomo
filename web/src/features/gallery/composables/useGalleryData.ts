@@ -2,6 +2,7 @@ import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
 import type { Asset, ScanAssetsParams } from '../types'
 import { toQueryAssetsFilters } from '../queryFilters'
+import { getDyeCodeAssetIds } from '@/extensions/infinity_nikki/api'
 
 /**
  * Gallery数据管理 Composable
@@ -10,6 +11,28 @@ import { toQueryAssetsFilters } from '../queryFilters'
  */
 export function useGalleryData() {
   const store = useGalleryStore()
+
+  async function refreshDyeCodeStatuses(assets: Asset[], requestVersion: number) {
+    const assetIds = [...new Set(assets.map((asset) => asset.id))]
+    if (assetIds.length === 0) {
+      return
+    }
+
+    try {
+      const matchingAssetIds: number[] = []
+      const batchSize = 800
+      for (let start = 0; start < assetIds.length; start += batchSize) {
+        const batch = assetIds.slice(start, start + batchSize)
+        matchingAssetIds.push(...(await getDyeCodeAssetIds({ assetIds: batch })))
+      }
+      if (store.isQueryVersionCurrent(requestVersion)) {
+        store.setDyeCodeStatuses(assetIds, matchingAssetIds)
+      }
+    } catch (error) {
+      // 染色码角标是增强展示，失败不影响图库主体查询。
+      console.warn('Failed to load Infinity Nikki dye code badges:', error)
+    }
+  }
 
   function findLoadedAssetById(assetId: number) {
     for (const pageAssets of store.paginatedAssets.values()) {
@@ -257,6 +280,7 @@ export function useGalleryData() {
         store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
         store.replacePaginatedAssets(pages)
       }
+      void refreshDyeCodeStatuses([...pages.values()].flat(), requestVersion)
 
       await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
       tryFocusFirstResultWhenDetailsEmpty(requestVersion)
@@ -332,6 +356,7 @@ export function useGalleryData() {
         )
         store.replacePaginatedAssets(pages)
       }
+      void refreshDyeCodeStatuses([...pages.values()].flat(), requestVersion)
 
       await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
       tryFocusFirstResultWhenDetailsEmpty(requestVersion)
@@ -394,6 +419,7 @@ export function useGalleryData() {
       }
 
       store.setPageAssets(pageNum, response.items)
+      void refreshDyeCodeStatuses(response.items, requestVersion)
 
       console.log('✅ 第', pageNum, '页加载完成:', response.items.length, '个资产')
     } catch (error) {
