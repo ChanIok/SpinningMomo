@@ -16,25 +16,6 @@ export auto cleanup(Core::State::AppState& app_state,
                     std::function<void(Core::State::AppState&)> before_watchers_shutdown = nullptr)
     -> void;
 
-// 资产管理
-export auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& params)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto open_asset_with_default_app(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto copy_assets_to_clipboard(Core::State::AppState& app_state,
-                                     const std::vector<std::int64_t>& ids)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto paste_clipboard_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto move_assets_to_trash(Core::State::AppState& app_state,
-                                 const std::vector<std::int64_t>& ids)
-    -> std::expected<Types::OperationResult, std::string>;
-export auto move_assets_to_folder(Core::State::AppState& app_state,
-                                  const Types::MoveAssetsToFolderParams& params)
-    -> std::expected<Types::OperationResult, std::string>;
-
 // 扫描与索引
 export auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
                            std::function<void(const Types::ScanProgress&)> progress_callback =

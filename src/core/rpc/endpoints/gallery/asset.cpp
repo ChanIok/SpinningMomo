@@ -8,8 +8,9 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Core.RPC.NotificationHub;
-import Features.Gallery;
 import Features.Gallery.Types;
+import Features.Gallery.Clipboard;
+import Features.Gallery.FileOperations;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.OriginalLocator;
@@ -161,7 +162,8 @@ auto handle_purge_missing_assets(Core::State::AppState& app_state,
 auto handle_open_asset_default(Core::State::AppState& app_state,
                                const Features::Gallery::Types::GetParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::open_asset_with_default_app(app_state, params.id);
+  auto result =
+      Features::Gallery::FileOperations::open_asset_with_default_app(app_state, params.id);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -174,7 +176,7 @@ auto handle_open_asset_default(Core::State::AppState& app_state,
 auto handle_reveal_asset_in_explorer(Core::State::AppState& app_state,
                                      const Features::Gallery::Types::GetParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::reveal_asset_in_explorer(app_state, params.id);
+  auto result = Features::Gallery::FileOperations::reveal_asset_in_explorer(app_state, params.id);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -187,7 +189,7 @@ auto handle_reveal_asset_in_explorer(Core::State::AppState& app_state,
 auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
                                      const Features::Gallery::Types::AssetIdsParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::copy_assets_to_clipboard(app_state, params.ids);
+  auto result = Features::Gallery::Clipboard::copy_assets(app_state, params.ids);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -201,7 +203,7 @@ auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
 auto handle_paste_clipboard_to_folder(Core::State::AppState& app_state,
                                       const PasteClipboardToFolderParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::paste_clipboard_to_folder(app_state, params.folder_id);
+  auto result = Features::Gallery::Clipboard::paste_to_folder(app_state, params.folder_id);
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
@@ -215,7 +217,7 @@ auto handle_paste_clipboard_to_folder(Core::State::AppState& app_state,
 auto handle_move_assets_to_trash(Core::State::AppState& app_state,
                                  const Features::Gallery::Types::AssetIdsParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::move_assets_to_trash(app_state, params.ids);
+  auto result = Features::Gallery::FileOperations::move_assets_to_trash(app_state, params.ids);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -232,7 +234,7 @@ auto handle_move_assets_to_trash(Core::State::AppState& app_state,
 auto handle_move_assets_to_folder(Core::State::AppState& app_state,
                                   const Features::Gallery::Types::MoveAssetsToFolderParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::move_assets_to_folder(app_state, params);
+  auto result = Features::Gallery::FileOperations::move_assets_to_folder(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),

@@ -13,7 +13,9 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 
 ## 后端入口
 
-- `gallery.cpp`：模块初始化、清理及应用主动发起的文件操作。
+- `gallery.cpp`：模块初始化、清理、显式扫描和缩略图维护入口。
+- `clipboard/clipboard.cpp`：系统剪贴板文件复制、截图粘贴及粘贴后的同步入库。
+- `file_operations/file_operations.cpp`：删除、打开、定位、回收站和文件夹移动等主动操作。
 - `scanner/scanner.cpp`：全量扫描编排。
 - `scanner/asset_pipeline.cpp`：全量和增量共用的单路径资产处理。
 - `watcher/watcher.cpp`：watcher 注册、生命周期和启动恢复。
