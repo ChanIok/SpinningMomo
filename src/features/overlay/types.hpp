@@ -1,13 +1,15 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
 
-namespace Features::Overlay::Types {
+namespace features::overlay {
 
 // 消息常量
 constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
@@ -49,8 +51,8 @@ struct WindowState {
 
 // 渲染状态
 struct RenderingState {
-  Utils::Graphics::D3D::D3DContext d3d_context;
-  Utils::Graphics::D3D::ShaderResources shader_resources;
+  utils::graphics::d3d::D3DContext d3d_context;
+  utils::graphics::d3d::ShaderResources shader_resources;
   wil::com_ptr<ID3D11Texture2D> frame_texture;
   wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
   HANDLE frame_latency_object = nullptr;
@@ -62,7 +64,7 @@ struct RenderingState {
 
 // 捕获状态
 struct CaptureState {
-  Utils::Graphics::Capture::CaptureSession session;
+  utils::graphics::capture::CaptureSession session;
   std::atomic<int> last_frame_width = 0;
   std::atomic<int> last_frame_height = 0;
 };
@@ -86,4 +88,4 @@ struct ThreadState {
   DWORD window_manager_thread_id = 0;
 };
 
-}  // namespace Features::Overlay::Types
+}  // namespace features::overlay

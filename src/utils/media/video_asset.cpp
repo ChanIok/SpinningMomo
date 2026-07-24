@@ -1,19 +1,21 @@
 #include "utils/media/video_asset.hpp"
 
-#include <mfapi.h>
-#include <mferror.h>
-#include <mfidl.h>
-#include <mfobjects.h>
-#include <mfreadwrite.h>
-#include <propvarutil.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/mfapi.hpp"
+#include "vendor/windows/mferror.hpp"
+#include "vendor/windows/mfidl.hpp"
+#include "vendor/windows/mfobjects.hpp"
+#include "vendor/windows/mfreadwrite.hpp"
+#include "vendor/windows/propvarutil.hpp"
 
 #include "utils/file/mime.hpp"
 #include "utils/image/image.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Utils::Media::VideoAsset {
+namespace utils::media::video_asset {
 
 // Media Foundation 使用 100ns 作为时长单位。
 constexpr std::int64_t kHundredNanosecondsPerMillisecond = 10'000;
@@ -216,7 +218,7 @@ auto resolve_video_frame_layout(IMFMediaType* media_type)
 
 auto copy_bitmap_data_from_linear_buffer(const BYTE* buffer_start, std::uint32_t buffer_length,
                                          const VideoFrameLayout& layout)
-    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
+    -> std::expected<utils::image::BGRABitmapData, std::string> {
   if (!buffer_start || buffer_length == 0) {
     return std::unexpected("Video buffer is empty");
   }
@@ -240,7 +242,7 @@ auto copy_bitmap_data_from_linear_buffer(const BYTE* buffer_start, std::uint32_t
   }
 
   auto pixel_bytes = visible_row_bytes * layout.visible_height;
-  Utils::Image::BGRABitmapData result;
+  utils::image::BGRABitmapData result;
   result.width = layout.visible_width;
   result.height = layout.visible_height;
   result.stride = static_cast<std::uint32_t>(visible_row_bytes);
@@ -317,7 +319,7 @@ auto read_current_video_frame_layout(IMFSourceReader* reader)
 
 // 从视频起点读取第一张 RGB32 画面。
 auto read_first_thumbnail_bgra_frame(IMFSourceReader* reader)
-    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
+    -> std::expected<utils::image::BGRABitmapData, std::string> {
   DWORD stream_flags = 0;
   wil::com_ptr<IMFSample> sample;
   auto hr = reader->ReadSample(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, nullptr, &stream_flags,
@@ -391,7 +393,7 @@ auto analyze_video_file(const std::filesystem::path& path,
   VideoAnalysis result{
       .width = width,
       .height = height,
-      .mime_type = Utils::File::Mime::get_mime_type(path),
+      .mime_type = utils::file::mime::get_mime_type(path),
       .duration_millis = duration_millis,
       .thumbnail = std::nullopt,
   };
@@ -414,7 +416,7 @@ auto analyze_video_file(const std::filesystem::path& path,
     return std::unexpected(bitmap_result.error());
   }
 
-  auto wic_factory_result = Utils::Image::get_thread_wic_factory();
+  auto wic_factory_result = utils::image::get_thread_wic_factory();
   if (!wic_factory_result) {
     auto error =
         "Failed to initialize WIC factory for video thumbnail: " + wic_factory_result.error();
@@ -423,11 +425,11 @@ auto analyze_video_file(const std::filesystem::path& path,
     return std::unexpected(error);
   }
 
-  Utils::Image::WebPEncodeOptions webp_options;
+  utils::image::WebPEncodeOptions webp_options;
   webp_options.quality = 80.0f;
 
   // 把 BGRA 位图缩放并编码成 WebP，供图库缩略图直接使用。
-  auto thumbnail_result = Utils::Image::generate_webp_thumbnail_from_bgra(
+  auto thumbnail_result = utils::image::generate_webp_thumbnail_from_bgra(
       wic_factory_result->get(), bitmap_result.value(), thumbnail_short_edge.value(), webp_options);
   if (!thumbnail_result) {
     auto error = "Failed to encode video thumbnail: " + thumbnail_result.error();
@@ -440,4 +442,4 @@ auto analyze_video_file(const std::filesystem::path& path,
   return result;
 }
 
-}  // namespace Utils::Media::VideoAsset
+}  // namespace utils::media::video_asset

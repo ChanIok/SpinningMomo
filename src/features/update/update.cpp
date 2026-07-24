@@ -1,6 +1,9 @@
 #include "features/update/update.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/async/async.hpp"
 #include "core/events/events.hpp"
@@ -11,6 +14,7 @@
 #include "core/notifications/types.hpp"
 #include "core/state/app_state.hpp"
 #include "core/tasks/tasks.hpp"
+#include "core/version.hpp"
 #include "features/settings/state.hpp"
 #include "features/update/state.hpp"
 #include "features/update/types.hpp"
@@ -22,37 +26,32 @@
 #include "utils/powershell/powershell.hpp"
 #include "utils/string/string.hpp"
 #include "utils/throttle/throttle.hpp"
-#include "vendor/version.hpp"
-#include "vendor/windows.hpp"
 
-namespace Features::Update {
+namespace features::update {
 
-auto post_update_notification(Core::State::AppState& app_state, const std::string& message)
-    -> void {
+auto post_update_notification(core::AppState& app_state, const std::string& message) -> void {
   auto app_name_it = app_state.i18n->texts.find("label.app_name");
   if (app_name_it == app_state.i18n->texts.end()) {
     Logger().warn("Skip update notification: app name text is missing");
     return;
   }
 
-  Core::Notifications::Types::NotificationOptions options;
-  options.title = Utils::String::FromUtf8(app_name_it->second);
-  options.message = Utils::String::FromUtf8(message);
+  core::notifications::NotificationOptions options;
+  options.title = utils::string::FromUtf8(app_name_it->second);
+  options.message = utils::string::FromUtf8(message);
 
   auto action_label_it = app_state.i18n->texts.find("notification.action.view");
   if (action_label_it != app_state.i18n->texts.end()) {
-    options.action = Core::Notifications::Types::NotificationAction{
-        .label = Utils::String::FromUtf8(action_label_it->second),
+    options.action = core::notifications::NotificationAction{
+        .label = utils::string::FromUtf8(action_label_it->second),
         .callback =
-            [](Core::State::AppState& state) {
-              UI::WebViewWindow::activate_window(state, L"/about");
-            },
+            [](core::AppState& state) { ui::webview_window::activate_window(state, L"/about"); },
     };
   } else {
     Logger().warn("Skip update notification action: view action text is missing");
   }
 
-  Core::Notifications::post_notification_request(app_state, std::move(options));
+  core::notifications::post_notification_request(app_state, std::move(options));
 }
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
@@ -93,14 +92,14 @@ auto is_update_needed(const std::string& current_version, const std::string& lat
   return false;  // 版本相同
 }
 
-auto http_get(Core::State::AppState& app_state, const std::string& url)
+auto http_get(core::AppState& app_state, const std::string& url)
     -> asio::awaitable<std::expected<std::string, std::string>> {
-  Core::HttpClient::Types::Request request{
+  core::http_client::Request request{
       .method = "GET",
       .url = url,
   };
 
-  auto response_result = co_await Core::HttpClient::fetch(app_state, request);
+  auto response_result = co_await core::http_client::fetch(app_state, request);
   if (!response_result) {
     co_return std::unexpected("Failed to send HTTP request: " + response_result.error());
   }
@@ -113,7 +112,7 @@ auto http_get(Core::State::AppState& app_state, const std::string& url)
 }
 
 auto get_temp_directory() -> std::expected<std::filesystem::path, std::string> {
-  return Utils::Path::GetAppDataSubdirectory("temp");
+  return utils::path::GetAppDataSubdirectory("temp");
 }
 
 auto format_download_url(const std::string& url_template, const std::string& version,
@@ -130,7 +129,7 @@ auto parse_sha256sum_for_filename(const std::string& checksums_content, const st
   std::istringstream stream(checksums_content);
   std::string line;
   while (std::getline(stream, line)) {
-    auto trimmed_line = Utils::String::TrimAscii(line);
+    auto trimmed_line = utils::string::TrimAscii(line);
     if (trimmed_line.empty()) {
       continue;
     }
@@ -160,9 +159,9 @@ auto parse_sha256sum_for_filename(const std::string& checksums_content, const st
       hash_end++;
     }
 
-    auto file_part = Utils::String::TrimAscii(trimmed_line.substr(hash_end));
+    auto file_part = utils::string::TrimAscii(trimmed_line.substr(hash_end));
     if (file_part == filename) {
-      return Utils::String::ToLowerAscii(hash);
+      return utils::string::ToLowerAscii(hash);
     }
   }
 
@@ -172,12 +171,12 @@ auto parse_sha256sum_for_filename(const std::string& checksums_content, const st
 auto verify_downloaded_file_sha256(const std::filesystem::path& file_path,
                                    const std::string& expected_sha256)
     -> std::expected<void, std::string> {
-  auto actual_sha256 = Utils::Crypto::sha256_file(file_path);
+  auto actual_sha256 = utils::crypto::sha256_file(file_path);
   if (!actual_sha256) {
     return std::unexpected("Failed to calculate downloaded file hash: " + actual_sha256.error());
   }
 
-  auto expected = Utils::String::ToLowerAscii(Utils::String::TrimAscii(expected_sha256));
+  auto expected = utils::string::ToLowerAscii(utils::string::TrimAscii(expected_sha256));
   if (actual_sha256.value() != expected) {
     return std::unexpected("SHA256 mismatch");
   }
@@ -196,14 +195,14 @@ auto get_update_filename(const std::string& version, bool is_portable) -> std::s
 
 // 检测是否为便携版安装（exe同目录下存在portable标记文件）
 auto detect_portable() -> bool {
-  return Utils::Path::GetAppMode() == Utils::Path::AppMode::Portable;
+  return utils::path::GetAppMode() == utils::path::AppMode::Portable;
 }
 
 constexpr auto kUpdateDownloadTaskType = "update.download";
 
 auto make_task_progress(std::string stage, std::optional<std::string> message = std::nullopt,
-                        std::optional<double> percent = std::nullopt) -> Core::Tasks::TaskProgress {
-  return Core::Tasks::TaskProgress{
+                        std::optional<double> percent = std::nullopt) -> core::tasks::TaskProgress {
+  return core::tasks::TaskProgress{
       .stage = std::move(stage),
       .current = 0,
       .total = 0,
@@ -229,8 +228,8 @@ auto format_byte_size(std::uint64_t bytes) -> std::string {
 }
 
 auto make_download_task_progress(const std::string& source_name,
-                                 const Core::HttpClient::Types::DownloadProgress& progress)
-    -> Core::Tasks::TaskProgress {
+                                 const core::http_client::DownloadProgress& progress)
+    -> core::tasks::TaskProgress {
   std::optional<double> percent = std::nullopt;
   std::optional<std::string> message = std::nullopt;
 
@@ -244,7 +243,7 @@ auto make_download_task_progress(const std::string& source_name,
     message = std::format("{}: {}", source_name, format_byte_size(progress.downloaded_bytes));
   }
 
-  return Core::Tasks::TaskProgress{
+  return core::tasks::TaskProgress{
       .stage = "download",
       .current = static_cast<std::int64_t>(progress.downloaded_bytes),
       .total = static_cast<std::int64_t>(progress.total_bytes.value_or(0)),
@@ -254,14 +253,14 @@ auto make_download_task_progress(const std::string& source_name,
 }
 
 // 从版本检查URL获取最新版本号
-auto fetch_latest_version(Core::State::AppState& app_state, const std::string& version_url)
+auto fetch_latest_version(core::AppState& app_state, const std::string& version_url)
     -> asio::awaitable<std::expected<std::string, std::string>> {
   auto response = co_await http_get(app_state, version_url);
   if (!response) {
     co_return std::unexpected("Failed to fetch version info: " + response.error());
   }
 
-  auto version = Utils::String::TrimAscii(response.value());
+  auto version = utils::string::TrimAscii(response.value());
   if (version.empty()) {
     co_return std::unexpected("Empty version response");
   }
@@ -269,18 +268,18 @@ auto fetch_latest_version(Core::State::AppState& app_state, const std::string& v
   co_return version;
 }
 
-auto download_file(Core::State::AppState& app_state, const std::string& url,
+auto download_file(core::AppState& app_state, const std::string& url,
                    const std::filesystem::path& save_path,
-                   Core::HttpClient::Types::DownloadProgressCallback progress_callback = nullptr)
+                   core::http_client::DownloadProgressCallback progress_callback = nullptr)
     -> asio::awaitable<std::expected<void, std::string>> {
   try {
-    Core::HttpClient::Types::Request request{
+    core::http_client::Request request{
         .method = "GET",
         .url = url,
     };
 
-    auto result = co_await Core::HttpClient::download_to_file(app_state, request, save_path,
-                                                              progress_callback);
+    auto result = co_await core::http_client::download_to_file(app_state, request, save_path,
+                                                               progress_callback);
     if (!result) {
       co_return std::unexpected("Download failed: " + result.error());
     }
@@ -371,13 +370,13 @@ Remove-Item -LiteralPath $PackagePath -Force -ErrorAction SilentlyContinue
   }
 }
 
-auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& app_state) -> std::expected<void, std::string> {
   try {
     if (!app_state.update) {
       return std::unexpected("Update state not created");
     }
 
-    auto default_state = State::create_default_update_state();
+    auto default_state = create_default_update_state();
     *app_state.update = std::move(default_state);
 
     // 检测安装类型
@@ -391,22 +390,22 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 }
 
-auto run_download_update_task(Core::State::AppState& app_state, const std::string& task_id,
+auto run_download_update_task(core::AppState& app_state, const std::string& task_id,
                               const std::string& version, bool prepare_install_on_exit)
     -> asio::awaitable<void> {
   try {
     if (!app_state.update || !app_state.settings) {
-      Core::Tasks::complete_task_failed(app_state, task_id, "Update state is not ready");
+      core::tasks::complete_task_failed(app_state, task_id, "Update state is not ready");
       co_return;
     }
 
-    Core::Tasks::mark_task_running(app_state, task_id);
+    core::tasks::mark_task_running(app_state, task_id);
     // 下载开始时使旧的已下载版本标记失效，避免下载期间 install_update 误用旧文件
     app_state.update->downloaded_version.clear();
 
     const auto& download_sources = app_state.settings->raw.update.download_sources;
     if (download_sources.empty()) {
-      Core::Tasks::complete_task_failed(app_state, task_id, "No download sources configured");
+      core::tasks::complete_task_failed(app_state, task_id, "No download sources configured");
       co_return;
     }
 
@@ -414,13 +413,13 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       auto error_message = "Failed to get temporary directory: " + temp_dir.error();
-      Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+      core::tasks::complete_task_failed(app_state, task_id, error_message);
       co_return;
     }
 
     std::filesystem::path save_path = *temp_dir / filename;
 
-    Core::Tasks::update_task_progress(
+    core::tasks::update_task_progress(
         app_state, task_id,
         make_task_progress("prepare", std::format("Preparing update package for {}", version),
                            0.0));
@@ -442,7 +441,7 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
         continue;
       }
 
-      Core::Tasks::update_task_progress(
+      core::tasks::update_task_progress(
           app_state, task_id,
           make_task_progress("fetchChecksums",
                              std::format("Fetching checksums from {}", source.name), 5.0));
@@ -462,33 +461,33 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
         continue;
       }
 
-      Core::Tasks::update_task_progress(
+      core::tasks::update_task_progress(
           app_state, task_id,
           make_task_progress("download", std::format("Trying download source: {}", source.name),
                              15.0));
       Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
 
-      auto progress_throttle = Utils::Throttle::create<Core::HttpClient::Types::DownloadProgress>(
+      auto progress_throttle = utils::throttle::create<core::http_client::DownloadProgress>(
           std::chrono::milliseconds(250));
       auto emit_progress = [&app_state, &task_id,
-                            &source](const Core::HttpClient::Types::DownloadProgress& progress) {
-        Core::Tasks::update_task_progress(app_state, task_id,
+                            &source](const core::http_client::DownloadProgress& progress) {
+        core::tasks::update_task_progress(app_state, task_id,
                                           make_download_task_progress(source.name, progress));
       };
 
       auto download_result = co_await download_file(
           app_state, package_url_result.value(), save_path,
           [&progress_throttle,
-           &emit_progress](const Core::HttpClient::Types::DownloadProgress& progress) {
-            Utils::Throttle::call(*progress_throttle, emit_progress, progress);
+           &emit_progress](const core::http_client::DownloadProgress& progress) {
+            utils::throttle::call(*progress_throttle, emit_progress, progress);
           });
-      Utils::Throttle::flush(*progress_throttle, emit_progress);
+      utils::throttle::flush(*progress_throttle, emit_progress);
       if (!download_result) {
         Logger().warn("Download failed from {}: {}", source.name, download_result.error());
         continue;
       }
 
-      Core::Tasks::update_task_progress(
+      core::tasks::update_task_progress(
           app_state, task_id,
           make_task_progress(
               "verify", std::format("Verifying downloaded package from {}", source.name), 85.0));
@@ -505,25 +504,25 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
       app_state.update->downloaded_version = version;
 
       if (prepare_install_on_exit) {
-        Core::Tasks::update_task_progress(
+        core::tasks::update_task_progress(
             app_state, task_id,
             make_task_progress(
                 "prepareInstall",
                 std::format("Downloaded from {}. Preparing install on exit", source.name), 95.0));
 
-        Types::InstallUpdateParams install_params;
+        InstallUpdateParams install_params;
         install_params.restart = false;
         install_params.quiet_install = true;
         auto install_result = install_update(app_state, install_params);
         if (!install_result) {
           auto error_message = "Failed to prepare downloaded update: " + install_result.error();
           Logger().warn("Startup auto update prepare failed: {}", install_result.error());
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          core::tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
       }
 
-      Core::Tasks::update_task_progress(
+      core::tasks::update_task_progress(
           app_state, task_id,
           make_task_progress(
               "completed",
@@ -533,19 +532,19 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
               100.0));
 
       Logger().info("Download completed from {}: {}", source.name,
-                    Utils::String::ToUtf8(save_path.wstring()));
-      Core::Tasks::complete_task_success(app_state, task_id);
+                    utils::string::ToUtf8(save_path.wstring()));
+      core::tasks::complete_task_success(app_state, task_id);
       co_return;
     }
 
-    Core::Tasks::complete_task_failed(app_state, task_id, "All download sources failed");
+    core::tasks::complete_task_failed(app_state, task_id, "All download sources failed");
   } catch (const std::exception& e) {
-    Core::Tasks::complete_task_failed(app_state, task_id, std::string(e.what()));
+    core::tasks::complete_task_failed(app_state, task_id, std::string(e.what()));
   }
 }
 
-auto start_download_update_task(Core::State::AppState& app_state, bool prepare_install_on_exit)
-    -> asio::awaitable<std::expected<Types::StartDownloadUpdateResult, std::string>> {
+auto start_download_update_task(core::AppState& app_state, bool prepare_install_on_exit)
+    -> asio::awaitable<std::expected<StartDownloadUpdateResult, std::string>> {
   if (!app_state.update) {
     co_return std::unexpected("Update not initialized");
   }
@@ -563,21 +562,21 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
   }
 
   // 同一时刻只允许一个下载任务，重复调用直接返回已有任务 ID
-  if (auto active_task = Core::Tasks::find_active_task_of_type(app_state, kUpdateDownloadTaskType);
+  if (auto active_task = core::tasks::find_active_task_of_type(app_state, kUpdateDownloadTaskType);
       active_task.has_value()) {
-    co_return Types::StartDownloadUpdateResult{
+    co_return StartDownloadUpdateResult{
         .task_id = active_task->task_id,
         .status = "already_running",
     };
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
     co_return std::unexpected("Async runtime is not available");
   }
 
   auto version = app_state.update->latest_version;
-  auto task_id = Core::Tasks::create_task(app_state, kUpdateDownloadTaskType, version);
+  auto task_id = core::tasks::create_task(app_state, kUpdateDownloadTaskType, version);
   if (task_id.empty()) {
     co_return std::unexpected("Failed to create update download task");
   }
@@ -591,13 +590,13 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
       },
       asio::detached_t{});
 
-  co_return Types::StartDownloadUpdateResult{
+  co_return StartDownloadUpdateResult{
       .task_id = task_id,
       .status = "started",
   };
 }
 
-auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> void {
+auto schedule_startup_auto_update_check(core::AppState& app_state) -> void {
   if (!app_state.settings || !app_state.update || !app_state.async) {
     Logger().warn("Skip startup auto update check: state is not ready");
     return;
@@ -608,7 +607,7 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip startup auto update check: async runtime is not ready");
     return;
@@ -673,8 +672,8 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
       asio::detached_t{});
 }
 
-auto check_for_update(Core::State::AppState& app_state)
-    -> asio::awaitable<std::expected<Types::CheckUpdateResult, std::string>> {
+auto check_for_update(core::AppState& app_state)
+    -> asio::awaitable<std::expected<CheckUpdateResult, std::string>> {
   try {
     if (!app_state.update) {
       co_return std::unexpected("Update not initialized");
@@ -697,9 +696,9 @@ auto check_for_update(Core::State::AppState& app_state)
       co_return std::unexpected(latest.error());
     }
 
-    auto current_version = Vendor::Version::get_app_version();
+    auto current_version = core::version::get_app_version();
 
-    Types::CheckUpdateResult result;
+    CheckUpdateResult result;
     result.latest_version = latest.value();
     result.current_version = current_version;
     result.has_update = is_update_needed(current_version, result.latest_version);
@@ -728,7 +727,7 @@ auto check_for_update(Core::State::AppState& app_state)
   }
 }
 
-auto execute_pending_update(Core::State::AppState& app_state) -> void {
+auto execute_pending_update(core::AppState& app_state) -> void {
   if (!app_state.update || !app_state.update->pending_update.has_value()) {
     return;
   }
@@ -741,15 +740,15 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
 
   if (script_path.empty() || package_path.empty() || target_install_directory.empty()) {
     Logger().error("Pending update context is incomplete: script={}, package={}, target={}",
-                   Utils::String::ToUtf8(script_path.wstring()),
-                   Utils::String::ToUtf8(package_path.wstring()),
-                   Utils::String::ToUtf8(target_install_directory.wstring()));
+                   utils::string::ToUtf8(script_path.wstring()),
+                   utils::string::ToUtf8(package_path.wstring()),
+                   utils::string::ToUtf8(target_install_directory.wstring()));
     app_state.update->pending_update.reset();
     return;
   }
 
   Logger().info("Executing pending update script: {}",
-                Utils::String::ToUtf8(script_path.wstring()));
+                utils::string::ToUtf8(script_path.wstring()));
 
   const auto update_mode =
       pending_update.is_portable ? std::wstring(L"portable") : std::wstring(L"installed");
@@ -757,7 +756,7 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   // 所有业务路径都作为独立参数交给统一执行器，避免手工拼接命令行。
   std::vector<std::wstring> arguments{
       L"-PidToWait",
-      std::to_wstring(Vendor::Windows::GetCurrentProcessId()),
+      std::to_wstring(GetCurrentProcessId()),
       L"-Mode",
       update_mode,
       L"-PackagePath",
@@ -779,12 +778,12 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   }
 
   // 更新与恢复共享同一个隐藏 PowerShell 启动入口。
-  auto launch_result = Utils::PowerShell::launch_script(script_path, arguments);
+  auto launch_result = utils::powershell::launch_script(script_path, arguments);
   if (launch_result) {
     Logger().info("Update PowerShell script started");
   } else {
     Logger().error("Failed to execute update script: error={}, script_path={}",
-                   launch_result.error(), Utils::String::ToUtf8(script_path.wstring()));
+                   launch_result.error(), utils::string::ToUtf8(script_path.wstring()));
   }
 
   // 清除待处理更新标志
@@ -792,8 +791,8 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   app_state.update->pending_update.reset();
 }
 
-auto install_update(Core::State::AppState& app_state, const Types::InstallUpdateParams& params)
-    -> std::expected<Types::InstallUpdateResult, std::string> {
+auto install_update(core::AppState& app_state, const InstallUpdateParams& params)
+    -> std::expected<InstallUpdateResult, std::string> {
   try {
     if (!app_state.update) {
       return std::unexpected("Update not initialized");
@@ -821,14 +820,14 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
 
     if (!std::filesystem::exists(update_package_path)) {
       return std::unexpected("Update package does not exist: " +
-                             Utils::String::ToUtf8(update_package_path.wstring()));
+                             utils::string::ToUtf8(update_package_path.wstring()));
     }
 
     Logger().info("Preparing update with package: {} (portable: {})",
-                  Utils::String::ToUtf8(update_package_path.wstring()),
+                  utils::string::ToUtf8(update_package_path.wstring()),
                   app_state.update->is_portable);
 
-    auto current_dir_result = Utils::Path::GetExecutableDirectory();
+    auto current_dir_result = utils::path::GetExecutableDirectory();
     if (!current_dir_result) {
       return std::unexpected("Failed to get executable directory: " + current_dir_result.error());
     }
@@ -844,7 +843,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
             : *temp_dir / std::filesystem::path("SpinningMomo-Update-Install.log");
 
     app_state.update->update_script_path = script_result.value();
-    app_state.update->pending_update = State::PendingUpdateContext{
+    app_state.update->pending_update = PendingUpdateContext{
         .package_path = update_package_path,
         .target_install_directory = current_dir_result.value(),
         .install_log_path = install_log_path,
@@ -853,11 +852,11 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
         .is_portable = app_state.update->is_portable,
     };
 
-    Types::InstallUpdateResult result;
+    InstallUpdateResult result;
 
     if (params.restart) {
       Logger().info("Sending exit event for immediate update");
-      Core::Events::post(app_state, UI::FloatingWindow::Events::ExitEvent{});
+      core::events::post(app_state, ui::floating_window::events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
       Logger().info("Update scheduled for program exit");
@@ -871,4 +870,4 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
   }
 }
 
-}  // namespace Features::Update
+}  // namespace features::update

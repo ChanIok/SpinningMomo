@@ -1,11 +1,13 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "utils/graphics/capture_region.hpp"
 #include "utils/media/audio_capture.hpp"
 
-namespace Features::Recording::Types {
+namespace features::recording {
 
 // 码率控制模式
 enum class RateControlMode {
@@ -100,9 +102,9 @@ struct RecordingConfig {
   bool auto_restart_on_resize = true;                   // 尺寸变化时是否自动切段重启录制
 
   // 音频配置
-  Utils::Media::AudioCapture::AudioSource audio_source =
-      Utils::Media::AudioCapture::AudioSource::System;  // 音频源类型 (默认系统音频)
-  std::uint32_t audio_bitrate = 192'000;                // 音频码率 (默认 192kbps)
+  utils::media::audio_capture::AudioSource audio_source =
+      utils::media::audio_capture::AudioSource::System;  // 音频源类型 (默认系统音频)
+  std::uint32_t audio_bitrate = 192'000;                 // 音频码率 (默认 192kbps)
 };
 
 // 录制状态枚举
@@ -123,7 +125,7 @@ struct CapturePlan {
   std::uint32_t output_width = 0;
   std::uint32_t output_height = 0;
   bool should_crop = false;
-  Utils::Graphics::CaptureRegion::CropRegion region{};
+  utils::graphics::capture_region::CropRegion region{};
 };
 
 struct StartRequest {
@@ -164,4 +166,4 @@ struct QueuedAudioPacket {
 
 constexpr std::size_t k_max_audio_queue_size = 120;
 
-}  // namespace Features::Recording::Types
+}  // namespace features::recording

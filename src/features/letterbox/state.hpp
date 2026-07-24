@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Features::Letterbox::State {
+#include "vendor/windows.hpp"
+
+namespace features::letterbox {
 
 struct LetterboxState {
   // 状态标志
@@ -37,4 +39,4 @@ constexpr UINT WM_UPDATE_TASKBAR_ZORDER = WM_USER + 103;
 // 计时器ID定义
 constexpr UINT TIMER_TASKBAR_ZORDER = 1001;
 
-}  // namespace Features::Letterbox::State
+}  // namespace features::letterbox

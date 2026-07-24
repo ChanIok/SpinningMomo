@@ -1,21 +1,24 @@
 #pragma once
 
-#include "core/state/app_state.hpp"
-#include "utils/dialog/dialog.hpp"
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Core::DialogService {
+#include "core/state/app_state.hpp"
+#include "utils/dialog/dialog.hpp"
 
-auto start(Core::State::AppState& state) -> std::expected<void, std::string>;
+namespace core::dialog_service {
 
-auto stop(Core::State::AppState& state) -> void;
+auto start(core::AppState& state) -> std::expected<void, std::string>;
 
-auto open_file(Core::State::AppState& state, const Utils::Dialog::FileSelectorParams& params,
-               Vendor::Windows::HWND hwnd = nullptr)
-    -> std::expected<Utils::Dialog::FileSelectorResult, std::string>;
+auto stop(core::AppState& state) -> void;
 
-auto open_folder(Core::State::AppState& state, const Utils::Dialog::FolderSelectorParams& params,
-                 Vendor::Windows::HWND hwnd = nullptr)
-    -> std::expected<Utils::Dialog::FolderSelectorResult, std::string>;
+auto open_file(core::AppState& state, const utils::dialog::FileSelectorParams& params,
+               HWND hwnd = nullptr)
+    -> std::expected<utils::dialog::FileSelectorResult, std::string>;
 
-}  // namespace Core::DialogService
+auto open_folder(core::AppState& state, const utils::dialog::FolderSelectorParams& params,
+                 HWND hwnd = nullptr)
+    -> std::expected<utils::dialog::FolderSelectorResult, std::string>;
+
+}  // namespace core::dialog_service

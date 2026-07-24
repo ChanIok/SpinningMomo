@@ -1,6 +1,8 @@
 #include "core/migration/scripts/scripts.hpp"
 
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/rfl.hpp"
 
 #include "core/database/database.hpp"
 #include "core/migration/generated/schema.hpp"
@@ -9,15 +11,15 @@
 #include "features/settings/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::Migration::Scripts {
+namespace core::migration::scripts {
 
-// 执行 SQL Schema 迁移的辅助函数
+// 执行 SQL schema 迁移的辅助函数
 template <typename SchemaModule>
-auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void, std::string> {
-  return Core::Database::execute_transaction(
-      app_state, [](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+auto execute_sql_schema(core::AppState& app_state) -> std::expected<void, std::string> {
+  return core::database::execute_transaction(
+      app_state, [](core::AppState& txn_app_state) -> std::expected<void, std::string> {
         for (const auto& sql : SchemaModule::statements) {
-          auto result = Core::Database::execute(txn_app_state, std::string(sql));
+          auto result = core::database::execute(txn_app_state, std::string(sql));
           if (!result) {
             return std::unexpected(std::format("SQL execution failed: {}", result.error()));
           }
@@ -27,12 +29,12 @@ auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void,
 }
 
 // Migration: 2.0.0.0 - Initialize database schema
-auto migrate_v2_0_0_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_0_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.0.0: Initialize database schema");
 
-  // 首次启动，初始化数据库Schema
+  // 首次启动，初始化数据库schema
   // Settings会在后续initialize时自动创建最新配置
-  auto result = execute_sql_schema<Core::Migration::Schema::V001>(app_state);
+  auto result = execute_sql_schema<core::migration::schema::V001>(app_state);
 
   if (!result) {
     return std::unexpected("Failed to initialize database schema: " + result.error());
@@ -42,10 +44,10 @@ auto migrate_v2_0_0_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-auto migrate_v2_0_1_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_1_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.1.0: Add gallery watch root recovery state");
 
-  auto result = execute_sql_schema<Core::Migration::Schema::V002>(app_state);
+  auto result = execute_sql_schema<core::migration::schema::V002>(app_state);
   if (!result) {
     return std::unexpected("Failed to add watch root recovery state schema: " + result.error());
   }
@@ -53,10 +55,10 @@ auto migrate_v2_0_1_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_2_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.2.0: Update version check URL");
 
-  auto settings_path_result = Features::Settings::get_settings_path();
+  auto settings_path_result = features::settings::get_settings_path();
   if (!settings_path_result) {
     return std::unexpected("Failed to get settings path: " + settings_path_result.error());
   }
@@ -75,7 +77,7 @@ auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, s
   std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
   auto settings_result =
-      rfl::json::read<Features::Settings::Types::AppSettings, rfl::DefaultIfMissing>(json_str);
+      rfl::json::read<features::settings::AppSettings, rfl::DefaultIfMissing>(json_str);
   if (!settings_result) {
     return std::unexpected("Failed to parse settings: " + settings_result.error().what());
   }
@@ -83,7 +85,7 @@ auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, s
   auto settings = settings_result.value();
   settings.update.version_url = "https://spin.infinitymomo.com/version.txt";
 
-  auto save_result = Features::Settings::save_settings_to_file(settings_path, settings);
+  auto save_result = features::settings::save_settings_to_file(settings_path, settings);
   if (!save_result) {
     return std::unexpected("Failed to save settings: " + save_result.error());
   }
@@ -92,20 +94,20 @@ auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-auto migrate_v2_0_8_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_8_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.8.0: Add nuan5 extended Infinity Nikki columns");
 
-  auto result = execute_sql_schema<Core::Migration::Schema::V003>(app_state);
+  auto result = execute_sql_schema<core::migration::schema::V003>(app_state);
   if (!result) {
     return std::unexpected("Failed to add nuan5 Infinity Nikki columns: " + result.error());
   }
   return {};
 }
 
-auto migrate_v2_0_9_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_9_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.9.0: Rebuild Infinity Nikki user record as key-value");
 
-  auto result = execute_sql_schema<Core::Migration::Schema::V004>(app_state);
+  auto result = execute_sql_schema<core::migration::schema::V004>(app_state);
   if (!result) {
     return std::unexpected("Failed to rebuild Infinity Nikki user record schema: " +
                            result.error());
@@ -113,20 +115,20 @@ auto migrate_v2_0_9_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-auto migrate_v2_1_2_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_1_2_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.1.2.0: Add gallery asset missing lifecycle");
 
-  auto result = execute_sql_schema<Core::Migration::Schema::V005>(app_state);
+  auto result = execute_sql_schema<core::migration::schema::V005>(app_state);
   if (!result) {
     return std::unexpected("Failed to add gallery asset missing lifecycle: " + result.error());
   }
   return {};
 }
 
-auto migrate_v2_0_11_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto migrate_v2_0_11_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.11.0: Set update download sources");
 
-  auto settings_path_result = Features::Settings::get_settings_path();
+  auto settings_path_result = features::settings::get_settings_path();
   if (!settings_path_result) {
     return std::unexpected("Failed to get settings path: " + settings_path_result.error());
   }
@@ -144,22 +146,22 @@ auto migrate_v2_0_11_0(Core::State::AppState& app_state) -> std::expected<void, 
 
   std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   auto settings_result =
-      rfl::json::read<Features::Settings::Types::AppSettings, rfl::DefaultIfMissing>(json_str);
+      rfl::json::read<features::settings::AppSettings, rfl::DefaultIfMissing>(json_str);
   if (!settings_result) {
     return std::unexpected("Failed to parse settings: " + settings_result.error().what());
   }
 
   auto settings = settings_result.value();
   settings.update.download_sources = {
-      Features::Settings::Types::AppSettings::Update::DownloadSource{
+      features::settings::AppSettings::Update::DownloadSource{
           "CNB", "https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}"},
-      Features::Settings::Types::AppSettings::Update::DownloadSource{
+      features::settings::AppSettings::Update::DownloadSource{
           "Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"},
-      Features::Settings::Types::AppSettings::Update::DownloadSource{
+      features::settings::AppSettings::Update::DownloadSource{
           "GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
   };
 
-  auto save_result = Features::Settings::save_settings_to_file(settings_path, settings);
+  auto save_result = features::settings::save_settings_to_file(settings_path, settings);
   if (!save_result) {
     return std::unexpected("Failed to save settings: " + save_result.error());
   }
@@ -184,4 +186,4 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
   return migrations;
 }
 
-}  // namespace Core::Migration::Scripts
+}  // namespace core::migration::scripts

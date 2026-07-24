@@ -1,11 +1,13 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/database/state.hpp"
 #include "core/state/app_state.hpp"
 
-namespace Core::Initializer::Database {
+namespace core::initializer::database {
 
 // 初始化数据库
-auto initialize_database(Core::State::AppState& state) -> std::expected<void, std::string>;
+auto initialize_database(core::AppState& state) -> std::expected<void, std::string>;
 
-}  // namespace Core::Initializer::Database
+}  // namespace core::initializer::database

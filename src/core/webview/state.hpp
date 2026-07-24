@@ -1,15 +1,16 @@
 #pragma once
 
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <WebView2.h>  // 必须放最后面
-#include <d3d11.h>
-#include <dcomp.h>
+#include "vendor/webview2.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dcomp.hpp"
 
 #include "core/webview/types.hpp"
 
-namespace Core::WebView::State {
+namespace core::webview {
 
 constexpr UINT kWM_APP_BEGIN_RESIZE = WM_APP + 2;
 // WM_APP + 3：通知 WebView 窗口线程对虚拟主机映射进行协调同步
@@ -74,7 +75,7 @@ struct CoreResources {
   std::wstring current_url;
 
   // WebView 资源解析器注册表
-  std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
+  std::unique_ptr<WebResolverRegistry> web_resolvers;
   std::unordered_map<std::wstring, VirtualHostFolderMapping> virtual_host_folder_mappings;
   // 已成功应用到 WebView2 的映射快照（host -> mapping）
   // reconcile 时和 virtual_host_folder_mappings（期望状态）做双向差异计算。
@@ -85,7 +86,7 @@ struct CoreResources {
   HostRuntime host_runtime;
 
   // 构造函数：初始化解析器注册表
-  CoreResources() : web_resolvers(std::make_unique<Types::WebResolverRegistry>()) {}
+  CoreResources() : web_resolvers(std::make_unique<WebResolverRegistry>()) {}
 };
 
 // 消息通信状态
@@ -127,4 +128,4 @@ struct WebViewState {
   bool has_initial_content = false;
 };
 
-}  // namespace Core::WebView::State
+}  // namespace core::webview

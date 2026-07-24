@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::Events::Handlers {
+namespace core::events::handlers {
 
-auto register_feature_handlers(Core::State::AppState& app_state) -> void;
+auto register_feature_handlers(core::AppState& app_state) -> void;
 
 }

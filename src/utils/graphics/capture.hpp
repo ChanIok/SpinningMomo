@@ -1,11 +1,13 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
-#include <winrt/Windows.Graphics.Capture.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Graphics::Capture {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/winrt/windows_graphics_capture.hpp"
+
+namespace utils::graphics::capture {
 
 // 捕获会话
 struct CaptureSession {
@@ -89,4 +91,4 @@ template <typename T>
 auto get_dxgi_interface_from_object(const winrt::Windows::Foundation::IInspectable& object)
     -> wil::com_ptr<T>;
 
-}  // namespace Utils::Graphics::Capture
+}  // namespace utils::graphics::capture

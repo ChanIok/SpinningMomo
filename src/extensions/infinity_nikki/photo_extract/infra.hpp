@@ -1,12 +1,14 @@
 #pragma once
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/state/app_state.hpp"
 #include "extensions/infinity_nikki/photo_extract/scan.hpp"
 #include "extensions/infinity_nikki/types.hpp"
 
-namespace Extensions::InfinityNikki::PhotoExtract::Infra {
+namespace extensions::infinity_nikki::photo_extract::infra {
 
 struct ParsedPhotoParamsRecord {
   std::optional<std::string> camera_params;
@@ -50,20 +52,20 @@ struct ExtractBatchPhotoParamsRecord {
 };
 
 auto load_candidate_assets(
-    Core::State::AppState& app_state,
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
-    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
+    core::AppState& app_state,
+    const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsRequest& request)
+    -> std::expected<std::vector<scan::CandidateAssetRow>, std::string>;
 
-auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
+auto load_candidate_assets_by_ids(core::AppState& app_state,
                                   const std::vector<std::int64_t>& candidate_asset_ids)
-    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
+    -> std::expected<std::vector<scan::CandidateAssetRow>, std::string>;
 
-auto extract_batch_photo_params(Core::State::AppState& app_state,
-                                const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
+auto extract_batch_photo_params(core::AppState& app_state,
+                                const std::vector<scan::PreparedPhotoExtractEntry>& entries)
     -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>>;
 
-auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
+auto upsert_photo_params_batch(core::AppState& app_state, const std::string& uid,
                                const std::vector<ParsedPhotoParamsBatchItem>& items)
     -> std::expected<std::int32_t, std::string>;
 
-}  // namespace Extensions::InfinityNikki::PhotoExtract::Infra
+}  // namespace extensions::infinity_nikki::photo_extract::infra

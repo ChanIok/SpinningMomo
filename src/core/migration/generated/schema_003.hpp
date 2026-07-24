@@ -1,10 +1,12 @@
 #pragma once
 
-// Auto-generated SQL schema module
+#include "vendor/std.hpp"
+
+// Auto-generated SQL schema header
 // DO NOT EDIT - This file is generated from
 // src/migrations/003_infinity_nikki_params_nuan5_columns.sql
 
-namespace Core::Migration::Schema {
+namespace core::migration::schema {
 
 struct V003 {
   static constexpr std::array<std::string_view, 8> statements = {
@@ -105,4 +107,4 @@ CREATE INDEX IF NOT EXISTS idx_infinity_nikki_params_uid ON asset_infinity_nikki
         )SQL"};
 };
 
-}  // namespace Core::Migration::Schema
+}  // namespace core::migration::schema

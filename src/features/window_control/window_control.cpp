@@ -1,6 +1,8 @@
 #include "features/window_control/window_control.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/settings/state.hpp"
@@ -10,7 +12,7 @@
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 
-namespace Features::WindowControl {
+namespace features::window_control {
 
 constexpr int kWindowSizeAlignment = 8;
 constexpr int kAlignmentSearchRadius = 16;
@@ -35,12 +37,12 @@ auto is_rect_similar(const RECT& lhs, const RECT& rhs, int tolerance) -> bool {
          std::abs(lhs.bottom - rhs.bottom) <= tolerance;
 }
 
-auto reset_center_lock_tracking(State::WindowControlState& window_control) -> void {
+auto reset_center_lock_tracking(WindowControlState& window_control) -> void {
   window_control.center_lock_owned = false;
   window_control.last_center_lock_rect = RECT{};
 }
 
-auto reset_layered_capture_workaround_tracking(State::WindowControlState& window_control) -> void {
+auto reset_layered_capture_workaround_tracking(WindowControlState& window_control) -> void {
   window_control.layered_capture_workaround_owned = false;
   window_control.layered_capture_workaround_hwnd = nullptr;
 }
@@ -82,8 +84,8 @@ auto set_layered_window_style(HWND hwnd, DWORD ex_style, bool enabled)
   return next_style;
 }
 
-auto release_layered_capture_workaround_if_owned(State::WindowControlState& window_control,
-                                                 HWND hwnd) -> std::expected<void, std::string> {
+auto release_layered_capture_workaround_if_owned(WindowControlState& window_control, HWND hwnd)
+    -> std::expected<void, std::string> {
   if (!window_control.layered_capture_workaround_owned ||
       window_control.layered_capture_workaround_hwnd != hwnd) {
     return {};
@@ -109,17 +111,17 @@ auto release_layered_capture_workaround_if_owned(State::WindowControlState& wind
   return {};
 }
 
-auto apply_layered_capture_workaround(Core::State::AppState& state, HWND hwnd, int width,
-                                      int height, DWORD ex_style,
-                                      const Utils::Display::MonitorInfo& monitor_info)
+auto apply_layered_capture_workaround(core::AppState& state, HWND hwnd, int width, int height,
+                                      DWORD ex_style,
+                                      const utils::display::MonitorInfo& monitor_info)
     -> std::expected<DWORD, std::string> {
   auto* window_control = state.window_control.get();
   if (!window_control) {
     return ex_style;
   }
 
-  const int screen_w = Utils::Display::rect_width(monitor_info.monitor_rect);
-  const int screen_h = Utils::Display::rect_height(monitor_info.monitor_rect);
+  const int screen_w = utils::display::rect_width(monitor_info.monitor_rect);
+  const int screen_h = utils::display::rect_height(monitor_info.monitor_rect);
   const bool oversized = width > screen_w || height > screen_h;
   const bool workaround_enabled =
       state.settings && state.settings->raw.window.enable_layered_capture_workaround;
@@ -208,7 +210,7 @@ auto get_client_rect_in_screen_coords(HWND hwnd) -> std::optional<RECT> {
 auto calculate_center_lock_rect(const RECT& client_rect) -> RECT {
   const int center_x = (client_rect.left + client_rect.right) / 2;
   const int center_y = (client_rect.top + client_rect.bottom) / 2;
-  const int half_size = State::kCenterLockSize / 2;
+  const int half_size = kCenterLockSize / 2;
 
   return RECT{
       .left = center_x - half_size,
@@ -218,7 +220,7 @@ auto calculate_center_lock_rect(const RECT& client_rect) -> RECT {
   };
 }
 
-auto release_center_lock_if_owned(State::WindowControlState& window_control) -> void {
+auto release_center_lock_if_owned(WindowControlState& window_control) -> void {
   if (!window_control.center_lock_owned) {
     return;
   }
@@ -234,7 +236,7 @@ auto release_center_lock_if_owned(State::WindowControlState& window_control) -> 
   reset_center_lock_tracking(window_control);
 }
 
-auto process_center_lock_monitor(Core::State::AppState& state) -> void {
+auto process_center_lock_monitor(core::AppState& state) -> void {
   if (!state.window_control || !state.settings) {
     return;
   }
@@ -255,7 +257,7 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
     return;
   }
 
-  auto configured_title = Utils::String::FromUtf8(window_settings.target_title);
+  auto configured_title = utils::string::FromUtf8(window_settings.target_title);
   // 这里先根据设置解析目标 HWND，再比较 foreground HWND。
   // 不再直接读取前台窗口标题，避免退出阶段对本进程窗口发送同步文本消息而死锁。
   auto target_window = find_target_window(configured_title);
@@ -283,7 +285,7 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
     return;
   }
 
-  if (!is_rect_similar(*clip_rect, *client_rect, State::kClipTolerance)) {
+  if (!is_rect_similar(*clip_rect, *client_rect, kClipTolerance)) {
     revert();
     return;
   }
@@ -298,8 +300,7 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
   window_control.last_center_lock_rect = center_lock_rect;
 }
 
-auto center_lock_monitor_thread_proc(Core::State::AppState& state, std::stop_token stop_token)
-    -> void {
+auto center_lock_monitor_thread_proc(core::AppState& state, std::stop_token stop_token) -> void {
   auto& window_control = *state.window_control;
   // stop_token 触发时立即唤醒 wait_for，使 shutdown 阶段的 join() 可以快速返回。
   std::stop_callback on_stop(
@@ -311,7 +312,7 @@ auto center_lock_monitor_thread_proc(Core::State::AppState& state, std::stop_tok
     lock.unlock();
     process_center_lock_monitor(state);
     lock.lock();
-    window_control.center_lock_monitor_cv.wait_for(lock, State::kCenterLockPollInterval);
+    window_control.center_lock_monitor_cv.wait_for(lock, kCenterLockPollInterval);
   }
 
   if (state.window_control) {
@@ -354,21 +355,21 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
 }
 
 // 调整窗口大小并居中
-auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width, int height,
+auto resize_and_center_window(core::AppState& state, HWND hwnd, int width, int height,
                               bool activate) -> std::expected<void, std::string> {
   if (!hwnd || !IsWindow(hwnd)) {
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
   }
 
   const auto& fw = *state.floating_window;
-  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
   const auto& screen_rect = monitor_info->monitor_rect;
-  const int screen_w = Utils::Display::rect_width(screen_rect);
-  const int screen_h = Utils::Display::rect_height(screen_rect);
+  const int screen_w = utils::display::rect_width(screen_rect);
+  const int screen_h = utils::display::rect_height(screen_rect);
 
   auto style_long = get_window_long_checked(hwnd, GWL_STYLE, "style");
   if (!style_long) {
@@ -738,9 +739,8 @@ auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput&
 }
 
 // 应用窗口变换
-auto apply_window_transform(Core::State::AppState& state, HWND target_window,
-                            const Resolution& resolution, const TransformOptions& options)
-    -> std::expected<void, std::string> {
+auto apply_window_transform(core::AppState& state, HWND target_window, const Resolution& resolution,
+                            const TransformOptions& options) -> std::expected<void, std::string> {
   auto result = resize_and_center_window(state, target_window, resolution.width, resolution.height,
                                          options.activate_window);
   if (!result) {
@@ -750,21 +750,21 @@ auto apply_window_transform(Core::State::AppState& state, HWND target_window,
 }
 
 // 重置窗口到屏幕尺寸
-auto reset_window_to_screen(Core::State::AppState& state, HWND target_window,
+auto reset_window_to_screen(core::AppState& state, HWND target_window,
                             const TransformOptions& options) -> std::expected<void, std::string> {
   const auto& fw = *state.floating_window;
-  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
-  const int screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);
-  const int screen_height = Utils::Display::rect_height(monitor_info->monitor_rect);
+  const int screen_width = utils::display::rect_width(monitor_info->monitor_rect);
+  const int screen_height = utils::display::rect_height(monitor_info->monitor_rect);
   return apply_window_transform(state, target_window, Resolution{screen_width, screen_height},
                                 options);
 }
 
-auto start_center_lock_monitor(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto start_center_lock_monitor(core::AppState& state) -> std::expected<void, std::string> {
   if (!state.window_control) {
     return std::unexpected{"Window control state is not initialized."};
   }
@@ -785,7 +785,7 @@ auto start_center_lock_monitor(Core::State::AppState& state) -> std::expected<vo
   }
 }
 
-auto stop_center_lock_monitor(Core::State::AppState& state) -> void {
+auto stop_center_lock_monitor(core::AppState& state) -> void {
   if (!state.window_control) {
     return;
   }
@@ -809,4 +809,4 @@ auto stop_center_lock_monitor(Core::State::AppState& state) -> void {
   Logger().info("Window control center lock monitor stopped");
 }
 
-}  // namespace Features::WindowControl
+}  // namespace features::window_control

@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::WorkerPool::State {
+#include "vendor/std.hpp"
+
+namespace core::worker_pool {
 
 struct WorkerPoolState {
   // 工作线程池
@@ -16,4 +18,4 @@ struct WorkerPoolState {
   std::atomic<bool> shutdown_requested{false};
 };
 
-}  // namespace Core::WorkerPool::State
+}  // namespace core::worker_pool

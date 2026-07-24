@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Tag::Service {
+namespace features::gallery::tag::service {
 
 // TODO: 未来可添加的业务逻辑函数
 // 例如：
@@ -11,4 +13,4 @@ namespace Features::Gallery::Tag::Service {
 // - auto auto_tag_by_folder(...) -> std::expected<void, std::string>;
 // - auto merge_tags(...) -> std::expected<void, std::string>;
 
-}  // namespace Features::Gallery::Tag::Service
+}  // namespace features::gallery::tag::service

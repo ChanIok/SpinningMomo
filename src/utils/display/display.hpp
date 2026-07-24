@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Display {
+#include "vendor/windows.hpp"
+
+namespace utils::display {
 
 struct MonitorInfo {
   RECT monitor_rect{};
@@ -16,4 +18,4 @@ auto rect_height(const RECT& rect) -> int;
 auto get_working_monitor(HWND anchor_hwnd, bool anchor_visible)
     -> std::expected<MonitorInfo, std::string>;
 
-}  // namespace Utils::Display
+}  // namespace utils::display

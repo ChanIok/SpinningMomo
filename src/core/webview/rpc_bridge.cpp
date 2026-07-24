@@ -1,6 +1,8 @@
 #include "core/webview/rpc_bridge.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/async/async.hpp"
 #include "core/events/events.hpp"
@@ -11,7 +13,7 @@
 #include "core/webview/webview.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::WebView::RpcBridge {
+namespace core::webview::rpc_bridge {
 
 // 辅助函数：创建通用错误响应（当无法处理请求时）
 auto create_generic_error_response(const std::string& error_message) -> std::string {
@@ -26,48 +28,48 @@ auto create_generic_error_response(const std::string& error_message) -> std::str
                      error_message);
 }
 
-auto initialize_rpc_bridge(Core::State::AppState& state) -> void {
-  Logger().info("Initializing WebView RPC bridge");
+auto initialize_rpc_bridge(core::AppState& state) -> void {
+  Logger().info("Initializing WebView rpc bridge");
 
   // 确保异步运行时已启动
-  if (!Core::Async::is_running(state)) {
+  if (!core::async::is_running(state)) {
     Logger().warn("Async runtime not running when initializing RPC bridge");
   }
 
-  // 初始化RPC桥接状态
+  // 初始化rpc桥接状态
   state.webview->messaging.next_message_id = 1;
 
-  Logger().info("WebView RPC bridge initialized");
+  Logger().info("WebView rpc bridge initialized");
 }
 
-auto handle_webview_message(Core::State::AppState& state, const std::string& message)
+auto handle_webview_message(core::AppState& state, const std::string& message)
     -> asio::awaitable<void> {
   Logger().debug("Handling WebView message: {}",
                  message.substr(0, 100) + (message.size() > 100 ? "..." : ""));
 
   try {
-    // 在异步线程上处理RPC请求
-    auto response = co_await Core::RPC::process_request(state, message);
+    // 在异步线程上处理rpc请求
+    auto response = co_await core::rpc::process_request(state, message);
 
     // 直接投递响应字符串到UI线程处理
-    Core::Events::post(state, Core::WebView::Events::WebViewResponseEvent{response});
+    core::events::post(state, core::webview::events::WebViewResponseEvent{response});
 
     Logger().debug("WebView response queued for UI thread processing");
 
   } catch (const std::exception& e) {
-    Logger().error("Error handling WebView RPC message: {}", e.what());
+    Logger().error("Error handling WebView rpc message: {}", e.what());
 
     // 错误处理：直接投递错误响应字符串
-    Core::Events::post(state, Core::WebView::Events::WebViewResponseEvent{
+    core::events::post(state, core::webview::events::WebViewResponseEvent{
                                   create_generic_error_response(e.what())});
 
     Logger().debug("WebView error response queued for UI thread processing");
   }
 }
 
-auto send_notification(Core::State::AppState& state, const std::string& method,
-                       const std::string& params) -> void {
-  // 构造JSON-RPC 2.0通知格式
+auto send_notification(core::AppState& state, const std::string& method, const std::string& params)
+    -> void {
+  // 构造 JSON-RPC 2.0 通知格式
   auto notification = std::format(R"({{
         "jsonrpc": "2.0",
         "method": "{}",
@@ -76,7 +78,7 @@ auto send_notification(Core::State::AppState& state, const std::string& method,
                                   method, params);
 
   try {
-    Core::WebView::post_message(state, notification);
+    core::webview::post_message(state, notification);
     Logger().debug("Sent notification: {}", method);
   } catch (const std::exception& e) {
     Logger().error("Failed to send notification '{}': {}", method, e.what());
@@ -84,12 +86,11 @@ auto send_notification(Core::State::AppState& state, const std::string& method,
 }
 
 // 创建交给 WebView2 COM 事件适配层的可复制消息回调
-auto create_message_handler(Core::State::AppState& state)
-    -> std::function<void(const std::string&)> {
+auto create_message_handler(core::AppState& state) -> std::function<void(const std::string&)> {
   return [&state](const std::string& message) {
     // COM 回调只负责投递协程，RPC 解析和业务执行都留在异步运行时
     asio::co_spawn(
-        *Core::Async::get_io_context(state),
+        *core::async::get_io_context(state),
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },
@@ -97,4 +98,4 @@ auto create_message_handler(Core::State::AppState& state)
   };
 }
 
-}  // namespace Core::WebView::RpcBridge
+}  // namespace core::webview::rpc_bridge

@@ -1,5 +1,7 @@
 #include "features/gallery/ignore/service.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/folder/repository.hpp"
 #include "features/gallery/ignore/matcher.hpp"
@@ -7,7 +9,7 @@
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Ignore::Service {
+namespace features::gallery::ignore::service {
 
 // ============= 路径处理辅助函数 =============
 
@@ -29,7 +31,7 @@ auto normalize_path_for_matching(const std::filesystem::path& path,
 
 // ============= 业务编排函数 =============
 
-auto resolve_root_folder_id(Core::State::AppState& app_state, std::int64_t folder_id)
+auto resolve_root_folder_id(core::AppState& app_state, std::int64_t folder_id)
     -> std::expected<std::int64_t, std::string> {
   std::unordered_set<std::int64_t> visited_ids;
 
@@ -41,7 +43,7 @@ auto resolve_root_folder_id(Core::State::AppState& app_state, std::int64_t folde
     }
 
     auto folder_result =
-        Features::Gallery::Folder::Repository::get_folder_by_id(app_state, *current_id);
+        features::gallery::folder::repository::get_folder_by_id(app_state, *current_id);
     if (!folder_result) {
       return std::unexpected("Failed to query folder while loading ignore rules: " +
                              folder_result.error());
@@ -63,12 +65,12 @@ auto resolve_root_folder_id(Core::State::AppState& app_state, std::int64_t folde
                          std::to_string(folder_id));
 }
 
-auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int64_t> folder_id)
-    -> std::expected<std::vector<Types::IgnoreRule>, std::string> {
-  std::vector<Types::IgnoreRule> combined_rules;
+auto load_ignore_rules(core::AppState& app_state, std::optional<std::int64_t> folder_id)
+    -> std::expected<std::vector<IgnoreRule>, std::string> {
+  std::vector<IgnoreRule> combined_rules;
 
   // 1. 先加载全局规则
-  auto global_rules_result = Repository::get_global_rules(app_state);
+  auto global_rules_result = repository::get_global_rules(app_state);
   if (!global_rules_result) {
     return std::unexpected("Failed to load global ignore rules: " + global_rules_result.error());
   }
@@ -83,7 +85,7 @@ auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int6
     }
 
     auto folder_rules_result =
-        Repository::get_rules_by_folder_id(app_state, root_folder_id_result.value());
+        repository::get_rules_by_folder_id(app_state, root_folder_id_result.value());
     if (!folder_rules_result) {
       Logger().warn("Failed to load root-folder ignore rules for folder_id {}: {}",
                     root_folder_id_result.value(), folder_rules_result.error());
@@ -99,7 +101,7 @@ auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int6
 
 // 按规则顺序判定文件或目录是否被排除，后命中的规则覆盖先前结果。
 auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem::path& base_path,
-                        const std::vector<Types::IgnoreRule>& rules, bool is_directory) -> bool {
+                        const std::vector<IgnoreRule>& rules, bool is_directory) -> bool {
   if (rules.empty()) {
     return false;  // 没有规则，不忽略
   }
@@ -122,9 +124,9 @@ auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem
       if (is_directory && !glob_path.empty() && !glob_path.ends_with('/')) {
         glob_path.push_back('/');
       }
-      matches = Matcher::match_glob_pattern(rule.rule_pattern, glob_path);
+      matches = matcher::match_glob_pattern(rule.rule_pattern, glob_path);
     } else if (rule.pattern_type == "regex") {
-      matches = Matcher::match_regex_pattern(rule.rule_pattern, normalized_path);
+      matches = matcher::match_regex_pattern(rule.rule_pattern, normalized_path);
     } else {
       Logger().warn("Unknown pattern type '{}' for rule: {}", rule.pattern_type, rule.rule_pattern);
       continue;
@@ -139,4 +141,4 @@ auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem
   return should_ignore;
 }
 
-}  // namespace Features::Gallery::Ignore::Service
+}  // namespace features::gallery::ignore::service

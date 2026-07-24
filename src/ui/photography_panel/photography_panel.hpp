@@ -1,13 +1,15 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace UI::PhotographyPanel {
+namespace ui::photography_panel {
 
-auto show(Core::State::AppState& state) -> std::expected<void, std::string>;
-auto hide(Core::State::AppState& state) -> void;
-auto request_repaint(Core::State::AppState& state) -> void;
-auto refresh_from_settings(Core::State::AppState& state) -> void;
-auto cleanup(Core::State::AppState& state) -> void;
+auto show(core::AppState& state) -> std::expected<void, std::string>;
+auto hide(core::AppState& state) -> void;
+auto request_repaint(core::AppState& state) -> void;
+auto refresh_from_settings(core::AppState& state) -> void;
+auto cleanup(core::AppState& state) -> void;
 
-}  // namespace UI::PhotographyPanel
+}  // namespace ui::photography_panel

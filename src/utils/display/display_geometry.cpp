@@ -1,8 +1,10 @@
 #include "utils/display/display_geometry.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::DisplayGeometry {
+#include "vendor/windows.hpp"
+
+namespace utils::display_geometry {
 
 auto clamp_relative_position(double value) -> double {
   if (!std::isfinite(value)) {
@@ -48,4 +50,4 @@ auto calculate_window_position_for_viewport(const RECT& viewport_rect, int windo
   };
 }
 
-}  // namespace Utils::DisplayGeometry
+}  // namespace utils::display_geometry

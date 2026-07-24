@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Core::Async {
+#include "vendor/windows.hpp"
+
+namespace core::async {
 
 // 用于存储定时器 ID 到协程句柄的映射
 inline std::unordered_map<UINT_PTR, std::coroutine_handle<>>& get_timer_handles() {
@@ -62,4 +64,4 @@ struct ui_task {
   };
 };
 
-}  // namespace Core::Async
+}  // namespace core::async

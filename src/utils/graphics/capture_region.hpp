@@ -1,10 +1,12 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Graphics::CaptureRegion {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+
+namespace utils::graphics::capture_region {
 
 // 捕获区域（以窗口纹理左上角为原点）
 struct CropRegion {
@@ -26,4 +28,4 @@ auto crop_texture_to_region(ID3D11Device* device, ID3D11DeviceContext* context,
                             wil::com_ptr<ID3D11Texture2D>& output_texture)
     -> std::expected<ID3D11Texture2D*, std::string>;
 
-}  // namespace Utils::Graphics::CaptureRegion
+}  // namespace utils::graphics::capture_region

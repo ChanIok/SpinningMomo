@@ -1,31 +1,33 @@
 #pragma once
 
-#include <asio.hpp>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
 
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
+
+#include "core/build_config.hpp"
 #include "core/rpc/types.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/logger/logger.hpp"
-#include "vendor/build_config.hpp"
 
-namespace Core::RPC {
+namespace core::rpc {
 
 // 异步处理器签名
 template <typename Request, typename Response>
 using AsyncHandler =
-    std::move_only_function<RpcAwaitable<Response>(Core::State::AppState&, const Request&) const>;
+    std::move_only_function<RpcAwaitable<Response>(core::AppState&, const Request&) const>;
 
 // 创建标准错误响应
 auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
                            const std::string& message) -> std::string;
 
 // 处理JSON-RPC请求
-auto process_request(Core::State::AppState& app_state, const std::string& request_json)
+auto process_request(core::AppState& app_state, const std::string& request_json)
     -> RpcJsonAwaitable;
 
 // 注册 RPC 方法：擦除业务处理器类型并生成统一的 JSON-RPC 协程入口
 template <typename Request, typename Response>
-inline auto register_method(Core::State::AppState& app_state,
+inline auto register_method(core::AppState& app_state,
                             std::unordered_map<std::string, MethodInfo>& registry,
                             const std::string& method_name, AsyncHandler<Request, Response> handler,
                             const std::string& description = "") -> void {
@@ -58,7 +60,7 @@ inline auto register_method(Core::State::AppState& app_state,
   };
 
   std::string params_schema;
-  if constexpr (Vendor::BuildConfig::rpc_json_schema_enabled()) {
+  if constexpr (core::build_config::rpc_json_schema_enabled()) {
     params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
   }
 
@@ -69,4 +71,4 @@ inline auto register_method(Core::State::AppState& app_state,
                                      .handler = std::move(wrapped_handler)};
 }
 
-}  // namespace Core::RPC
+}  // namespace core::rpc

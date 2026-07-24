@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::Events {
+namespace core::events {
 
-auto register_all_handlers(Core::State::AppState& app_state) -> void;
+auto register_all_handlers(core::AppState& app_state) -> void;
 
-}  // namespace Core::Events
+}  // namespace core::events

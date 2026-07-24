@@ -1,15 +1,17 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/notifications/types.hpp"
 
-namespace UI::NotificationWindow {
+namespace ui::notification_window {
 
 // 最大可见通知数量
 constexpr int MAX_VISIBLE_NOTIFICATIONS = 5;
@@ -90,7 +92,7 @@ struct Notification {
   size_t id = 0;
   std::wstring title;
   std::wstring message;
-  std::optional<Core::Notifications::Types::NotificationAction> action;
+  std::optional<core::notifications::NotificationAction> action;
 
   // 主题颜色快照（创建通知时读取设置，确保通知生命周期内外观稳定）
   NotificationThemeColors colors;
@@ -148,4 +150,4 @@ struct RenderResources {
   int dpi = 96;
 };
 
-}  // namespace UI::NotificationWindow
+}  // namespace ui::notification_window

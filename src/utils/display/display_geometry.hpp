@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::DisplayGeometry {
+#include "vendor/windows.hpp"
+
+namespace utils::display_geometry {
 
 // 根据目标可见视口与相对位置，计算窗口左上角。
 // 当窗口大于视口时，优先让该相对位置对应的窗口点落在视口中心，
@@ -12,4 +14,4 @@ auto calculate_window_position_for_viewport(const RECT& viewport_rect, int windo
                                             int window_height, double relative_x, double relative_y)
     -> POINT;
 
-}  // namespace Utils::DisplayGeometry
+}  // namespace utils::display_geometry

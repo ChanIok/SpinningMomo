@@ -1,5 +1,7 @@
 #include "extensions/infinity_nikki/photo_service.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/database/database.hpp"
 #include "core/state/app_state.hpp"
 #include "core/tasks/tasks.hpp"
@@ -18,7 +20,7 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
-namespace Extensions::InfinityNikki::PhotoService {
+namespace extensions::infinity_nikki::photo_service {
 
 struct ServiceState {
   std::mutex mutex;
@@ -31,9 +33,9 @@ auto service_state() -> ServiceState& {
 }
 
 // Gallery 只声明通用继承钩子；暖暖扩展在资产创建事务内复制同内容资产的完整暖暖信息。
-auto inherit_asset_data(Core::State::AppState& app_state, std::int64_t new_asset_id,
+auto inherit_asset_data(core::AppState& app_state, std::int64_t new_asset_id,
                         std::int64_t source_asset_id) -> std::expected<void, std::string> {
-  auto params_result = Core::Database::execute(app_state,
+  auto params_result = core::database::execute(app_state,
                                                R"(
         INSERT OR IGNORE INTO asset_infinity_nikki_params (
           asset_id, uid, camera_params,
@@ -63,7 +65,7 @@ auto inherit_asset_data(Core::State::AppState& app_state, std::int64_t new_asset
     return std::unexpected("Failed to copy Infinity Nikki params: " + params_result.error());
   }
 
-  auto clothes_result = Core::Database::execute(app_state,
+  auto clothes_result = core::database::execute(app_state,
                                                 R"(
         INSERT OR IGNORE INTO asset_infinity_nikki_clothes (asset_id, cloth_id)
         SELECT ?, cloth_id
@@ -75,7 +77,7 @@ auto inherit_asset_data(Core::State::AppState& app_state, std::int64_t new_asset
     return std::unexpected("Failed to copy Infinity Nikki clothes: " + clothes_result.error());
   }
 
-  auto user_record_result = Core::Database::execute(app_state,
+  auto user_record_result = core::database::execute(app_state,
                                                     R"(
         INSERT OR IGNORE INTO asset_infinity_nikki_user_record
           (asset_id, record_key, record_value)
@@ -92,8 +94,8 @@ auto inherit_asset_data(Core::State::AppState& app_state, std::int64_t new_asset
 }
 
 // 生成《无限暖暖》照片专用的忽略推断规则
-auto make_infinity_nikki_ignore_rules() -> std::vector<Features::Gallery::Types::ScanIgnoreRule> {
-  using Features::Gallery::Types::ScanIgnoreRule;
+auto make_infinity_nikki_ignore_rules() -> std::vector<features::gallery::ScanIgnoreRule> {
+  using features::gallery::ScanIgnoreRule;
 
   return {
       ScanIgnoreRule{.pattern = "^.*$", .pattern_type = "regex", .rule_type = "exclude"},
@@ -107,10 +109,10 @@ auto make_infinity_nikki_ignore_rules() -> std::vector<Features::Gallery::Types:
 }
 
 // 确保监听根目录的过滤规则在数据库中存在并生效
-auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
+auto ensure_watch_root_ignore_rules(core::AppState& app_state,
                                     const std::filesystem::path& watch_root)
     -> std::expected<void, std::string> {
-  auto normalized_watch_root_result = Utils::Path::ResolvePath(watch_root);
+  auto normalized_watch_root_result = utils::path::ResolvePath(watch_root);
   if (!normalized_watch_root_result) {
     return std::unexpected("Failed to normalize GamePlayPhotos root folder: " +
                            normalized_watch_root_result.error());
@@ -119,7 +121,7 @@ auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
   auto normalized_watch_root = normalized_watch_root_result.value();
   std::vector<std::filesystem::path> root_paths = {normalized_watch_root};
   auto folder_mapping_result =
-      Features::Gallery::Folder::Service::batch_create_folders_for_paths(app_state, root_paths);
+      features::gallery::folder::service::batch_create_folders_for_paths(app_state, root_paths);
   if (!folder_mapping_result) {
     return std::unexpected("Failed to create GamePlayPhotos root folder: " +
                            folder_mapping_result.error());
@@ -131,7 +133,7 @@ auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
     return std::unexpected("Failed to resolve GamePlayPhotos root folder id");
   }
 
-  auto persist_result = Features::Gallery::Ignore::Repository::replace_rules_by_folder_id(
+  auto persist_result = features::gallery::ignore::repository::replace_rules_by_folder_id(
       app_state, root_it->second, make_infinity_nikki_ignore_rules());
   if (!persist_result) {
     return std::unexpected("Failed to persist InfinityNikki ignore rules: " +
@@ -142,8 +144,8 @@ auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
 }
 
 // 每次画廊扫描完毕后触发的回调处理，包含同步受管硬链接（照片/录像）和提取照片参数
-auto on_gallery_scan_complete(Core::State::AppState& app_state,
-                              const Features::Gallery::Types::ScanResult& result) -> void {
+auto on_gallery_scan_complete(core::AppState& app_state,
+                              const features::gallery::ScanResult& result) -> void {
   if (!app_state.settings) {
     return;
   }
@@ -151,21 +153,21 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   const auto& config = app_state.settings->raw.extensions.infinity_nikki;
 
   if (config.manage_media_hardlinks) {
-    if (Core::Tasks::has_active_task_of_type(app_state,
+    if (core::tasks::has_active_task_of_type(app_state,
                                              "extensions.infinityNikki.initializeMediaHardlinks")) {
       Logger().debug("Skip InfinityNikki managed hardlink sync: initialization task is active");
     } else {
-      // 扫描结果如何驱动硬链接同步，由 MediaHardlinks 自己解释；
+      // 扫描结果如何驱动硬链接同步，由 media_hardlinks 自己解释；
       // PhotoService 只负责把 Gallery 的事实转发过去。
-      bool submitted = Core::WorkerPool::submit_task(app_state, [&app_state,
-                                                                 scan_result = result]() {
+      bool submitted = core::worker_pool::submit_task(app_state, [&app_state,
+                                                                  scan_result = result]() {
         Logger().info(
             "InfinityNikki managed hardlink worker start: total={}, new={}, updated={}, "
             "missing={}, changes={}",
             scan_result.total_files, scan_result.new_items, scan_result.updated_items,
             scan_result.missing_items, scan_result.changes.size());
         auto sync_result =
-            Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(app_state, scan_result);
+            extensions::infinity_nikki::media_hardlinks::apply_scan_result(app_state, scan_result);
         if (!sync_result) {
           Logger().warn("InfinityNikki managed hardlinks sync failed: {}", sync_result.error());
         } else {
@@ -192,12 +194,12 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
     seen_ids.reserve(result.changes.size());
 
     for (const auto& change : result.changes) {
-      if (change.action != Features::Gallery::Types::ScanChangeAction::UPSERT) {
+      if (change.action != features::gallery::ScanChangeAction::UPSERT) {
         continue;
       }
 
       auto asset_result =
-          Features::Gallery::Asset::Repository::get_asset_by_path(app_state, change.path);
+          features::gallery::asset::repository::get_asset_by_path(app_state, change.path);
       if (!asset_result) {
         Logger().warn("Skip silent extract candidate '{}': {}", change.path, asset_result.error());
         continue;
@@ -215,7 +217,7 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
 
     if (!candidate_asset_ids.empty()) {
       // 传递资产 ID 而非数量/时间窗口，保证候选集与本次变更一一对应。
-      Extensions::InfinityNikki::TaskService::schedule_silent_extract_photo_params(
+      extensions::infinity_nikki::task_service::schedule_silent_extract_photo_params(
           app_state, InfinityNikkiSilentExtractPhotoParamsRequest{
                          .candidate_asset_ids = std::move(candidate_asset_ids),
                      });
@@ -226,7 +228,7 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
 // 首次 initial scan 完成后的补偿路径：
 // initial scan 关注最终一致性，changes 可能为空，导致 on_gallery_scan_complete 里的增量提取无候选。
 // 因此这里显式触发一次全量解析任务（only_missing=false），确保首次导入可直接获得元数据。
-auto maybe_start_full_extract_after_initial_scan(Core::State::AppState& app_state) -> void {
+auto maybe_start_full_extract_after_initial_scan(core::AppState& app_state) -> void {
   if (!app_state.settings) {
     return;
   }
@@ -236,7 +238,7 @@ auto maybe_start_full_extract_after_initial_scan(Core::State::AppState& app_stat
     return;
   }
 
-  if (Core::Tasks::has_active_task_of_type(app_state,
+  if (core::tasks::has_active_task_of_type(app_state,
                                            "extensions.infinityNikki.extractPhotoParams")) {
     // 避免与用户手动触发或其他流程触发的同类任务并发。
     Logger().debug(
@@ -244,7 +246,7 @@ auto maybe_start_full_extract_after_initial_scan(Core::State::AppState& app_stat
     return;
   }
 
-  auto task_result = Extensions::InfinityNikki::TaskService::start_extract_photo_params_task(
+  auto task_result = extensions::infinity_nikki::task_service::start_extract_photo_params_task(
       app_state, InfinityNikkiExtractPhotoParamsRequest{
                      .only_missing = false,
                      .folder_id = std::nullopt,
@@ -261,15 +263,15 @@ auto maybe_start_full_extract_after_initial_scan(Core::State::AppState& app_stat
 }
 
 auto make_initial_scan_options(const std::filesystem::path& directory)
-    -> Features::Gallery::Types::ScanOptions {
-  Features::Gallery::Types::ScanOptions options;
+    -> features::gallery::ScanOptions {
+  features::gallery::ScanOptions options;
   options.directory = directory.string();
   options.ignore_rules = make_infinity_nikki_ignore_rules();
   return options;
 }
 
 // 根据当前的系统设置，注册《无限暖暖》照片服务的监听目录与回调。
-auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> void {
+auto register_impl(core::AppState& app_state, bool start_immediately) -> void {
   auto& state = service_state();
   std::lock_guard<std::mutex> lock(state.mutex);
 
@@ -277,7 +279,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     if (state.current_watch_path.empty()) {
       return;
     }
-    auto remove_result = Features::Gallery::Watcher::remove_watcher_for_directory(
+    auto remove_result = features::gallery::watcher::remove_watcher_for_directory(
         app_state, state.current_watch_path);
     if (!remove_result) {
       Logger().warn("Failed to remove InfinityNikki gallery watcher for '{}': {}",
@@ -303,7 +305,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  auto dir_result = Extensions::InfinityNikki::MediaHardlinks::resolve_watch_directory(app_state);
+  auto dir_result = extensions::infinity_nikki::media_hardlinks::resolve_watch_directory(app_state);
   if (!dir_result) {
     Logger().warn("Skip InfinityNikki gallery watcher: {}", dir_result.error());
     stop_current_watcher();
@@ -324,19 +326,19 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  auto callback = [&app_state](const Features::Gallery::Types::ScanResult& result) {
+  auto callback = [&app_state](const features::gallery::ScanResult& result) {
     on_gallery_scan_complete(app_state, result);
   };
 
   auto register_result =
-      Features::Gallery::Watcher::register_watcher_for_directory(app_state, new_watch_path);
+      features::gallery::watcher::register_watcher_for_directory(app_state, new_watch_path);
   if (!register_result) {
     Logger().warn("Failed to register InfinityNikki gallery watcher for '{}': {}",
                   new_watch_path.string(), register_result.error());
     return;
   }
 
-  auto callback_result = Features::Gallery::Watcher::set_post_scan_callback_for_directory(
+  auto callback_result = features::gallery::watcher::set_post_scan_callback_for_directory(
       app_state, new_watch_path, std::move(callback));
   if (!callback_result) {
     Logger().warn("Failed to set InfinityNikki gallery watcher callback for '{}': {}",
@@ -346,9 +348,9 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
 
   if (start_immediately) {
     if (requires_initial_scan) {
-      auto task_result = Extensions::InfinityNikki::TaskService::start_initial_scan_task(
+      auto task_result = extensions::infinity_nikki::task_service::start_initial_scan_task(
           app_state, make_initial_scan_options(new_watch_path),
-          [&app_state](const Features::Gallery::Types::ScanResult& result) {
+          [&app_state](const features::gallery::ScanResult& result) {
             // 通用后处理（硬链接同步 + 基于 changes 的静默增量提取）
             on_gallery_scan_complete(app_state, result);
             // 首次全量补偿：显式全量元数据提取
@@ -362,7 +364,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
       Logger().info("InfinityNikki initial scan task started: {}", task_result.value());
     } else {
       auto start_result =
-          Features::Gallery::Watcher::start_watcher_for_directory(app_state, new_watch_path, false);
+          features::gallery::watcher::start_watcher_for_directory(app_state, new_watch_path, false);
       if (!start_result) {
         Logger().warn("Failed to start InfinityNikki gallery watcher for '{}': {}",
                       new_watch_path.string(), start_result.error());
@@ -375,7 +377,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
   Logger().info("InfinityNikki gallery watcher registered: {}", new_watch_path.string());
 }
 
-auto register_from_settings(Core::State::AppState& app_state) -> void {
+auto register_from_settings(core::AppState& app_state) -> void {
   app_state.gallery->inherit_asset_data_callback = [&app_state](std::int64_t new_asset_id,
                                                                 std::int64_t source_asset_id) {
     return inherit_asset_data(app_state, new_asset_id, source_asset_id);
@@ -384,16 +386,14 @@ auto register_from_settings(Core::State::AppState& app_state) -> void {
 }
 
 // 根据当前的系统设置，动态刷新照片服务的监听行为
-auto refresh_from_settings(Core::State::AppState& app_state) -> void {
-  register_impl(app_state, true);
-}
+auto refresh_from_settings(core::AppState& app_state) -> void { register_impl(app_state, true); }
 
 // 在程序退出时执行清理和释放工作
-auto shutdown(Core::State::AppState& app_state) -> void {
+auto shutdown(core::AppState& app_state) -> void {
   auto& state = service_state();
   std::lock_guard<std::mutex> lock(state.mutex);
   if (!state.current_watch_path.empty()) {
-    auto remove_result = Features::Gallery::Watcher::remove_watcher_for_directory(
+    auto remove_result = features::gallery::watcher::remove_watcher_for_directory(
         app_state, state.current_watch_path);
     if (!remove_result) {
       Logger().warn("Failed to remove InfinityNikki gallery watcher during shutdown for '{}': {}",
@@ -403,4 +403,4 @@ auto shutdown(Core::State::AppState& app_state) -> void {
   }
 }
 
-}  // namespace Extensions::InfinityNikki::PhotoService
+}  // namespace extensions::infinity_nikki::photo_service

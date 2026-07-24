@@ -1,19 +1,21 @@
 #include "utils/media/encoder.hpp"
 
-#include <codecapi.h>
-#include <d3d11.h>
-#include <mfapi.h>
-#include <mferror.h>
-#include <mfidl.h>
-#include <mfreadwrite.h>
-#include <strmif.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/codecapi.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/mfapi.hpp"
+#include "vendor/windows/mferror.hpp"
+#include "vendor/windows/mfidl.hpp"
+#include "vendor/windows/mfreadwrite.hpp"
+#include "vendor/windows/strmif.hpp"
 
 #include "utils/logger/logger.hpp"
 #include "utils/media/hdr_convert.hpp"
 
-namespace Utils::Media::Encoder {
+namespace utils::media::encoder {
 
 // HDR10 静态元数据需要一个合理的 mastering display peak。DXGI 上报异常时回到常见 1000 nit。
 auto sanitize_hdr_peak_nits(std::uint32_t peak_nits) -> std::uint32_t {
@@ -46,14 +48,14 @@ auto calculate_video_buffer_size(GUID subtype, std::uint32_t width, std::uint32_
 
 // 辅助函数：创建输出媒体类型
 auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate,
-                              uint32_t keyframe_interval, Types::VideoCodec codec, bool enable_hdr,
+                              uint32_t keyframe_interval, VideoCodec codec, bool enable_hdr,
                               std::uint32_t hdr_target_peak_nits) -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
 
   // 根据 codec 选择编码格式
-  GUID subtype = (codec == Types::VideoCodec::H265) ? MFVideoFormat_HEVC : MFVideoFormat_H264;
+  GUID subtype = (codec == VideoCodec::H265) ? MFVideoFormat_HEVC : MFVideoFormat_H264;
   if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, subtype))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_AVG_BITRATE, bitrate))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
@@ -98,7 +100,7 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
       return nullptr;
 
     // 编码 Profile (H.264 High / H.265 Main，与 NVIDIA APP / OBS 一致)
-    if (codec == Types::VideoCodec::H265) {
+    if (codec == VideoCodec::H265) {
       if (FAILED(media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_8)))
         return nullptr;
     } else {
@@ -162,8 +164,8 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
 }
 
 // 辅助函数：添加音频流
-auto add_audio_stream(State::EncoderContext& encoder, WAVEFORMATEX* wave_format,
-                      uint32_t audio_bitrate) -> std::expected<void, std::string> {
+auto add_audio_stream(EncoderContext& encoder, WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
+    -> std::expected<void, std::string> {
   if (!encoder.sink_writer) {
     return std::unexpected("Sink writer not initialized");
   }
@@ -233,9 +235,8 @@ auto add_audio_stream(State::EncoderContext& encoder, WAVEFORMATEX* wave_format,
 }
 
 // 尝试创建 GPU 编码器
-auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& config,
-                            ID3D11Device* device, WAVEFORMATEX* wave_format)
-    -> std::expected<void, std::string> {
+auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID3D11Device* device,
+                            WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -281,9 +282,9 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   // 在创建 Sink Writer 前预设 Rate Control Mode
   UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  if (config.rate_control == Types::RateControlMode::VBR) {
+  if (config.rate_control == RateControlMode::VBR) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == RateControlMode::ManualQP) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
@@ -292,12 +293,12 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   }
 
   // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (config.rate_control == Types::RateControlMode::VBR) {
+  if (config.rate_control == RateControlMode::VBR) {
     if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
       Logger().warn("Failed to set quality attribute");
     }
     Logger().info("GPU encoder configured for VBR mode with quality: {}", config.quality);
-  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == RateControlMode::ManualQP) {
     // 尝试设置 QP 参数（可能不被所有编码器支持）
     if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
       Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
@@ -339,7 +340,7 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
 
   if (config.enable_hdr) {
     auto hdr_converter_result =
-        Utils::Media::HdrConvert::create_converter(device, config.width, config.height);
+        utils::media::hdr_convert::create_converter(device, config.width, config.height);
     if (!hdr_converter_result) {
       return std::unexpected(hdr_converter_result.error());
     }
@@ -374,8 +375,8 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
 }
 
 // 创建 CPU 编码器 (fallback)
-auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& config,
-                        WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
+auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFORMATEX* wave_format)
+    -> std::expected<void, std::string> {
   if (config.enable_hdr) {
     return std::unexpected("HDR recording requires GPU encoder");
   }
@@ -410,9 +411,9 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
   // 在创建 Sink Writer 前预设 Rate Control Mode
   UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  if (config.rate_control == Types::RateControlMode::VBR) {
+  if (config.rate_control == RateControlMode::VBR) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == RateControlMode::ManualQP) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
@@ -421,12 +422,12 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
   }
 
   // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (config.rate_control == Types::RateControlMode::VBR) {
+  if (config.rate_control == RateControlMode::VBR) {
     if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
       Logger().warn("Failed to set quality attribute");
     }
     Logger().info("CPU encoder configured for VBR mode with quality: {}", config.quality);
-  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == RateControlMode::ManualQP) {
     // 尝试设置 QP 参数（可能不被所有编码器支持）
     if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
       Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
@@ -487,17 +488,16 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
   return {};
 }
 
-auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
-                    WAVEFORMATEX* wave_format)
-    -> std::expected<State::EncoderContext, std::string> {
-  auto ctx = std::make_unique<State::EncoderContext>();
+auto create_encoder(const EncoderConfig& config, ID3D11Device* device, WAVEFORMATEX* wave_format)
+    -> std::expected<EncoderContext, std::string> {
+  auto ctx = std::make_unique<EncoderContext>();
 
   if (config.enable_hdr) {
     // HDR 不允许走 CPU fallback；这里再次兜底，防止旧配置或手写配置绕过前端限制。
-    if (config.codec != Types::VideoCodec::H265) {
+    if (config.codec != VideoCodec::H265) {
       return std::unexpected("HDR recording requires H.265 codec");
     }
-    if (config.encoder_mode == Types::EncoderMode::CPU) {
+    if (config.encoder_mode == EncoderMode::CPU) {
       return std::unexpected("HDR recording requires GPU encoder");
     }
     if (!device) {
@@ -505,11 +505,11 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
     }
   }
 
-  bool try_gpu = (config.encoder_mode == Types::EncoderMode::Auto ||
-                  config.encoder_mode == Types::EncoderMode::GPU) &&
-                 device != nullptr;
+  bool try_gpu =
+      (config.encoder_mode == EncoderMode::Auto || config.encoder_mode == EncoderMode::GPU) &&
+      device != nullptr;
 
-  const char* codec_name = (config.codec == Types::VideoCodec::H265) ? "H.265" : "H.264";
+  const char* codec_name = (config.codec == VideoCodec::H265) ? "H.265" : "H.264";
 
   if (try_gpu) {
     auto gpu_result = try_create_gpu_encoder(*ctx, config, device, wave_format);
@@ -522,20 +522,19 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
     // GPU 失败
     Logger().warn("Failed to create GPU encoder: {}", gpu_result.error());
 
-    if (config.encoder_mode == Types::EncoderMode::GPU || config.enable_hdr) {
+    if (config.encoder_mode == EncoderMode::GPU || config.enable_hdr) {
       // 强制 GPU 模式，不降级
       return std::unexpected(gpu_result.error());
     }
 
-    if (config.encoder_mode == Types::EncoderMode::Auto &&
-        config.codec == Types::VideoCodec::H265) {
+    if (config.encoder_mode == EncoderMode::Auto && config.codec == VideoCodec::H265) {
       // H.265 + Auto 仅尝试 GPU；失败不再落到 CPU（与前端「H.265 不选 CPU」一致）
       return std::unexpected(gpu_result.error());
     }
 
     // Auto + H.264：GPU 失败时降级到 CPU
     Logger().info("Falling back to CPU encoder");
-    ctx = std::make_unique<State::EncoderContext>();  // 重置 context
+    ctx = std::make_unique<EncoderContext>();  // 重置 context
   }
 
   // CPU 编码
@@ -549,11 +548,11 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
   return std::move(*ctx);
 }
 
-auto convert_scrgb_to_p010(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto convert_scrgb_to_p010(EncoderContext& encoder, ID3D11DeviceContext* context,
                            ID3D11Texture2D* frame_texture)
     -> std::expected<ID3D11Texture2D*, std::string> {
   auto convert_result =
-      Utils::Media::HdrConvert::convert_frame(encoder.hdr_converter, context, frame_texture);
+      utils::media::hdr_convert::convert_frame(encoder.hdr_converter, context, frame_texture);
   if (!convert_result) {
     return std::unexpected(convert_result.error());
   }
@@ -562,7 +561,7 @@ auto convert_scrgb_to_p010(State::EncoderContext& encoder, ID3D11DeviceContext* 
 
 // GPU 编码帧（内部函数）
 // 直通 DXGI surface：调用方必须保证 frame_texture 在 WriteSample 返回前保持有效。
-auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto encode_frame_gpu(EncoderContext& encoder, ID3D11DeviceContext* context,
                       ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
   ID3D11Texture2D* encoder_texture = frame_texture;
@@ -613,7 +612,7 @@ auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
 }
 
 // CPU 编码帧（内部函数）
-auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto encode_frame_cpu(EncoderContext& encoder, ID3D11DeviceContext* context,
                       ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
   // 1. 获取纹理描述
@@ -690,7 +689,7 @@ auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
   return {};
 }
 
-auto encode_frame(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto encode_frame(EncoderContext& encoder, ID3D11DeviceContext* context,
                   ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
   if (!encoder.sink_writer || !context || !frame_texture) {
@@ -705,7 +704,7 @@ auto encode_frame(State::EncoderContext& encoder, ID3D11DeviceContext* context,
   }
 }
 
-auto encode_audio(State::EncoderContext& encoder, const BYTE* audio_data, UINT32 num_frames,
+auto encode_audio(EncoderContext& encoder, const BYTE* audio_data, UINT32 num_frames,
                   UINT32 bytes_per_frame, int64_t timestamp_100ns)
     -> std::expected<void, std::string> {
   if (!encoder.sink_writer || !encoder.has_audio) {
@@ -751,7 +750,7 @@ auto encode_audio(State::EncoderContext& encoder, const BYTE* audio_data, UINT32
   return {};
 }
 
-auto finalize_encoder(State::EncoderContext& encoder) -> std::expected<void, std::string> {
+auto finalize_encoder(EncoderContext& encoder) -> std::expected<void, std::string> {
   if (encoder.sink_writer) {
     if (FAILED(encoder.sink_writer->Finalize())) {
       return std::unexpected("Failed to finalize sink writer");
@@ -770,4 +769,4 @@ auto finalize_encoder(State::EncoderContext& encoder) -> std::expected<void, std
   return {};
 }
 
-}  // namespace Utils::Media::Encoder
+}  // namespace utils::media::encoder

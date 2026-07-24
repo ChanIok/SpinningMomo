@@ -1,5 +1,9 @@
 #include "core/events/handlers/system_handlers.hpp"
 
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+
 #include "core/events/events.hpp"
 #include "core/state/app_state.hpp"
 #include "core/webview/events.hpp"
@@ -8,47 +12,46 @@
 #include "ui/floating_window/floating_window.hpp"
 #include "ui/webview_window/webview_window.hpp"
 #include "utils/logger/logger.hpp"
-#include "vendor/windows.hpp"
 
-namespace Core::Events::Handlers {
+namespace core::events::handlers {
 
 // 处理 hide 命令
-auto handle_hide_event(Core::State::AppState& state) -> void {
-  UI::FloatingWindow::hide_window(state);
-}
+auto handle_hide_event(core::AppState& state) -> void { ui::floating_window::hide_window(state); }
 
 // 处理退出事件
-auto handle_exit_event(Core::State::AppState& state) -> void {
+auto handle_exit_event(core::AppState& state) -> void {
   Logger().info("Exit event received, posting quit message");
-  Vendor::Windows::PostQuitMessage(0);
+  PostQuitMessage(0);
 }
 
 // 处理 toggle_visibility 命令
-auto handle_toggle_visibility_event(Core::State::AppState& state) -> void {
-  UI::FloatingWindow::toggle_visibility(state);
+auto handle_toggle_visibility_event(core::AppState& state) -> void {
+  ui::floating_window::toggle_visibility(state);
 }
 
-auto register_system_handlers(Core::State::AppState& app_state) -> void {
-  using namespace Core::Events;
+auto register_system_handlers(core::AppState& app_state) -> void {
+  using namespace core::events;
 
-  subscribe<UI::FloatingWindow::Events::HideEvent>(
-      app_state,
-      [&app_state](const UI::FloatingWindow::Events::HideEvent&) { handle_hide_event(app_state); });
+  subscribe<ui::floating_window::events::HideEvent>(
+      app_state, [&app_state](const ui::floating_window::events::HideEvent&) {
+        handle_hide_event(app_state);
+      });
 
-  subscribe<UI::FloatingWindow::Events::ExitEvent>(
-      app_state,
-      [&app_state](const UI::FloatingWindow::Events::ExitEvent&) { handle_exit_event(app_state); });
+  subscribe<ui::floating_window::events::ExitEvent>(
+      app_state, [&app_state](const ui::floating_window::events::ExitEvent&) {
+        handle_exit_event(app_state);
+      });
 
-  subscribe<UI::FloatingWindow::Events::ToggleVisibilityEvent>(
-      app_state, [&app_state](const UI::FloatingWindow::Events::ToggleVisibilityEvent&) {
+  subscribe<ui::floating_window::events::ToggleVisibilityEvent>(
+      app_state, [&app_state](const ui::floating_window::events::ToggleVisibilityEvent&) {
         handle_toggle_visibility_event(app_state);
       });
 
-  subscribe<Core::WebView::Events::WebViewResponseEvent>(
-      app_state, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
+  subscribe<core::webview::events::WebViewResponseEvent>(
+      app_state, [&app_state](const core::webview::events::WebViewResponseEvent& event) {
         try {
-          // 在UI线程上安全调用WebView API
-          Core::WebView::post_message(app_state, event.response);
+          // 在UI线程上安全调用webview API
+          core::webview::post_message(app_state, event.response);
 
         } catch (const std::exception& e) {
           Logger().error("Error processing WebView response event: {}", e.what());
@@ -56,4 +59,4 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
       });
 }
 
-}  // namespace Core::Events::Handlers
+}  // namespace core::events::handlers

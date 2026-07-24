@@ -1,15 +1,17 @@
 #pragma once
 
-#include <SQLiteCpp/SQLiteCpp.h>
+#include "vendor/std.hpp"
+
+#include "vendor/sqlite.hpp"
 
 #include "core/database/data_mapper.hpp"
 #include "core/database/types.hpp"
 #include "core/state/app_state.hpp"
 
-namespace Core::Database {
+namespace core::database {
 
 // 同步执行数据库任务。调用方会等待任务完成；事务内重入时由实现复用当前 worker 连接。
-auto run_database_job(Core::State::AppState& app_state,
+auto run_database_job(core::AppState& app_state,
                       std::move_only_function<void(SQLite::Database&)> job)
     -> std::expected<void, std::string>;
 
@@ -19,7 +21,7 @@ inline auto make_database_error(std::string error) -> Result {
 }
 
 template <typename Result, typename Func>
-inline auto run_on_database(Core::State::AppState& app_state, Func&& func) -> Result {
+inline auto run_on_database(core::AppState& app_state, Func&& func) -> Result {
   std::optional<Result> result;
   auto job_result = run_database_job(
       app_state, [&](SQLite::Database& connection) { result.emplace(func(connection)); });
@@ -35,13 +37,13 @@ inline auto run_on_database(Core::State::AppState& app_state, Func&& func) -> Re
 }
 
 // 初始化数据库连接
-auto initialize(Core::State::AppState& app_state, const std::filesystem::path& db_path)
+auto initialize(core::AppState& app_state, const std::filesystem::path& db_path)
     -> std::expected<void, std::string>;
 
-auto shutdown(Core::State::AppState& app_state) -> void;
+auto shutdown(core::AppState& app_state) -> void;
 
 // 从运行中的数据库生成一致快照，避免直接复制 WAL 数据库得到不完整文件。
-auto backup_to(Core::State::AppState& app_state, const std::filesystem::path& destination_path)
+auto backup_to(core::AppState& app_state, const std::filesystem::path& destination_path)
     -> std::expected<void, std::string>;
 
 // 用于 `... RETURNING id` 的通用单列行类型。多行返回时用 query<ReturningIdRow>() 计数。
@@ -50,15 +52,14 @@ struct ReturningIdRow {
 };
 
 // 执行非查询操作 (INSERT, UPDATE, DELETE)
-auto execute(Core::State::AppState& app_state, const std::string& sql)
+auto execute(core::AppState& app_state, const std::string& sql) -> std::expected<void, std::string>;
+auto execute(core::AppState& app_state, const std::string& sql, const std::vector<DbParam>& params)
     -> std::expected<void, std::string>;
-auto execute(Core::State::AppState& app_state, const std::string& sql,
-             const std::vector<Types::DbParam>& params) -> std::expected<void, std::string>;
 
 // 查询返回多个结果 (SELECT)
 template <typename T>
-inline auto query(Core::State::AppState& app_state, const std::string& sql,
-                  const std::vector<Types::DbParam>& params = {})
+inline auto query(core::AppState& app_state, const std::string& sql,
+                  const std::vector<DbParam>& params = {})
     -> std::expected<std::vector<T>, std::string> {
   return run_on_database<std::expected<std::vector<T>, std::string>>(
       app_state,
@@ -88,7 +89,7 @@ inline auto query(Core::State::AppState& app_state, const std::string& sql,
 
           std::vector<T> results;
           while (query.executeStep()) {
-            auto mapped_object = DataMapper::from_statement<T>(query);
+            auto mapped_object = data_mapper::from_statement<T>(query);
             if (mapped_object) {
               results.push_back(std::move(*mapped_object));
             } else {
@@ -106,8 +107,8 @@ inline auto query(Core::State::AppState& app_state, const std::string& sql,
 
 // 查询返回单个结果 (SELECT)
 template <typename T>
-inline auto query_single(Core::State::AppState& app_state, const std::string& sql,
-                         const std::vector<Types::DbParam>& params = {})
+inline auto query_single(core::AppState& app_state, const std::string& sql,
+                         const std::vector<DbParam>& params = {})
     -> std::expected<std::optional<T>, std::string> {
   auto results = query<T>(app_state, sql, params);
   if (!results) {
@@ -125,8 +126,8 @@ inline auto query_single(Core::State::AppState& app_state, const std::string& sq
 
 // 查询返回单个标量值
 template <typename T>
-inline auto query_scalar(Core::State::AppState& app_state, const std::string& sql,
-                         const std::vector<Types::DbParam>& params = {})
+inline auto query_scalar(core::AppState& app_state, const std::string& sql,
+                         const std::vector<DbParam>& params = {})
     -> std::expected<std::optional<T>, std::string> {
   return run_on_database<std::expected<std::optional<T>, std::string>>(
       app_state,
@@ -181,7 +182,7 @@ inline auto query_scalar(Core::State::AppState& app_state, const std::string& sq
 
 // 批量INSERT操作（自动分批处理）
 template <typename T, typename ParamExtractor>
-inline auto execute_batch_insert(Core::State::AppState& app_state, const std::string& insert_prefix,
+inline auto execute_batch_insert(core::AppState& app_state, const std::string& insert_prefix,
                                  const std::string& values_placeholder, const std::vector<T>& items,
                                  ParamExtractor param_extractor, size_t max_params_per_batch = 999)
     -> std::expected<std::vector<int64_t>, std::string> {
@@ -203,8 +204,7 @@ inline auto execute_batch_insert(Core::State::AppState& app_state, const std::st
 
   return execute_transaction(
       app_state,
-      [&](Core::State::AppState& txn_app_state)
-          -> std::expected<std::vector<int64_t>, std::string> {
+      [&](core::AppState& txn_app_state) -> std::expected<std::vector<int64_t>, std::string> {
         for (size_t batch_start = 0; batch_start < items.size();
              batch_start += max_items_per_batch) {
           size_t batch_end = std::min(batch_start + max_items_per_batch, items.size());
@@ -213,7 +213,7 @@ inline auto execute_batch_insert(Core::State::AppState& app_state, const std::st
           // 构建当前批次的SQL
           std::string batch_sql = insert_prefix;
           std::vector<std::string> value_clauses;
-          std::vector<Types::DbParam> all_params;
+          std::vector<DbParam> all_params;
 
           value_clauses.reserve(batch_size);
           all_params.reserve(batch_size * params_per_item);
@@ -247,9 +247,9 @@ inline auto execute_batch_insert(Core::State::AppState& app_state, const std::st
 
 // 事务管理：整个 lambda 会作为一个 DB task 执行；lambda 内的 execute/query 不会重新入队。
 template <typename Func>
-inline auto execute_transaction(Core::State::AppState& app_state, Func&& func)
-    -> std::invoke_result_t<Func, Core::State::AppState&> {
-  using ReturnType = std::decay_t<std::invoke_result_t<Func, Core::State::AppState&>>;
+inline auto execute_transaction(core::AppState& app_state, Func&& func)
+    -> std::invoke_result_t<Func, core::AppState&> {
+  using ReturnType = std::decay_t<std::invoke_result_t<Func, core::AppState&>>;
   return run_on_database<ReturnType>(
       app_state,
       [&app_state,
@@ -274,4 +274,4 @@ inline auto execute_transaction(Core::State::AppState& app_state, Func&& func)
       });
 }
 
-}  // namespace Core::Database
+}  // namespace core::database

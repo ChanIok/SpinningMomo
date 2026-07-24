@@ -1,18 +1,19 @@
 #include "utils/media/audio_capture.hpp"
 
-#include <audioclient.h>
-#include <audioclientactivationparams.h>
-#include <mmdeviceapi.h>
-#include <mmreg.h>
-#include <wil/com.h>
-#include <wil/resource.h>
-#include <windows.h>
-#include <wrl/implements.h>
-#include "AudioSessionTypes.h"
+#include "vendor/std.hpp"
 
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/audioclient.hpp"
+#include "vendor/windows/audioclientactivationparams.hpp"
+#include "vendor/windows/mmdeviceapi.hpp"
+#include "vendor/windows/mmreg.hpp"
+#include "vendor/windows/wrl/implements.hpp"
+
+#include "AudioSessionTypes.h"
 #include "utils/logger/logger.hpp"
 
-namespace {
+namespace utils::media::audio_capture::detail {
 
 // Process Loopback 激活回调类
 class ProcessLoopbackActivator
@@ -55,7 +56,7 @@ class ProcessLoopbackActivator
   }
 };
 
-auto create_capture_events(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+auto create_capture_events(utils::media::audio_capture::AudioCaptureContext& ctx,
                            std::string_view mode_name) -> std::expected<void, std::string> {
   ctx.audio_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
   ctx.stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
@@ -65,7 +66,7 @@ auto create_capture_events(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
   return {};
 }
 
-auto finish_audio_client_setup(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+auto finish_audio_client_setup(utils::media::audio_capture::AudioCaptureContext& ctx,
                                WAVEFORMATEX* format, DWORD stream_flags)
     -> std::expected<void, std::string> {
   constexpr REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms
@@ -119,7 +120,7 @@ auto create_pcm_wave_format(std::uint16_t channels, std::uint32_t sample_rate,
 }
 
 // Process Loopback 初始化
-auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+auto initialize_process_loopback(utils::media::audio_capture::AudioCaptureContext& ctx,
                                  std::uint32_t process_id) -> std::expected<void, std::string> {
   auto event_result = create_capture_events(ctx, "process loopback");
   if (!event_result) {
@@ -183,7 +184,7 @@ auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext
 }
 
 // System Loopback 初始化
-auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext& ctx)
+auto initialize_system_loopback(utils::media::audio_capture::AudioCaptureContext& ctx)
     -> std::expected<void, std::string> {
   auto event_result = create_capture_events(ctx, "system loopback");
   if (!event_result) {
@@ -235,9 +236,9 @@ auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext&
 }
 
 // 通用音频捕获循环
-auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+auto audio_capture_loop(utils::media::audio_capture::AudioCaptureContext& ctx,
                         std::stop_token stop_token,
-                        Utils::Media::AudioCapture::AudioPacketCallback on_packet) -> void {
+                        utils::media::audio_capture::AudioPacketCallback on_packet) -> void {
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
     std::stop_callback wake_on_stop(stop_token, [&ctx]() {
@@ -324,9 +325,9 @@ auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
   }
 }
 
-}  // namespace
+}  // namespace utils::media::audio_capture::detail
 
-namespace Utils::Media::AudioCapture {
+namespace utils::media::audio_capture {
 
 auto is_process_loopback_supported() -> bool {
   OSVERSIONINFOEXW osvi = {sizeof(osvi)};
@@ -351,11 +352,11 @@ auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t proc
 
   if (source == AudioSource::GameOnly) {
     Logger().info("Using Process Loopback mode (Game audio only)");
-    return initialize_process_loopback(ctx, process_id);
+    return detail::initialize_process_loopback(ctx, process_id);
   }
 
   Logger().info("Using System Loopback mode (All system audio)");
-  return initialize_system_loopback(ctx);
+  return detail::initialize_system_loopback(ctx);
 }
 
 auto start_capture_thread(AudioCaptureContext& ctx, AudioPacketCallback on_packet) -> void {
@@ -372,7 +373,7 @@ auto start_capture_thread(AudioCaptureContext& ctx, AudioPacketCallback on_packe
   ResetEvent(ctx.stop_event.get());
   ctx.capture_thread =
       std::jthread([&ctx, on_packet = std::move(on_packet)](std::stop_token stop_token) {
-        audio_capture_loop(ctx, stop_token, on_packet);
+        detail::audio_capture_loop(ctx, stop_token, on_packet);
       });
 }
 
@@ -400,4 +401,4 @@ auto cleanup(AudioCaptureContext& ctx) -> void {
   ctx.buffer_frame_count = 0;
 }
 
-}  // namespace Utils::Media::AudioCapture
+}  // namespace utils::media::audio_capture

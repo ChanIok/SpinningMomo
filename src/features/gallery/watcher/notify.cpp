@@ -1,6 +1,8 @@
 #include "features/gallery/watcher/notify.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
@@ -13,7 +15,7 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
-namespace Features::Gallery::Watcher::Notify {
+namespace features::gallery::watcher::notify {
 
 constexpr size_t kWatchBufferSize = 64 * 1024;
 
@@ -35,20 +37,20 @@ struct WatchReadResult {
   bool ok = false;
   DWORD bytes_returned = 0;
   DWORD error = 0;
-  State::DirectoryWatchBackend backend = State::DirectoryWatchBackend::Extended;
+  DirectoryWatchBackend backend = DirectoryWatchBackend::Extended;
 };
 
 auto build_ignore_key(const std::filesystem::path& path)
     -> std::expected<std::wstring, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(path);
+  auto normalized_result = utils::path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
   }
-  return Utils::Path::NormalizeForComparison(normalized_result.value());
+  return utils::path::NormalizeForComparison(normalized_result.value());
 }
 
 // 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
-auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state) -> void {
+auto cleanup_expired_manual_file_system_ignores(core::AppState& app_state) -> void {
   auto now = std::chrono::steady_clock::now();
   std::erase_if(app_state.gallery->manual_file_system_ignore_paths, [now](const auto& pair) {
     const auto& entry = pair.second;
@@ -57,7 +59,7 @@ auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state
 }
 
 // 判断路径是否在应用主动文件系统操作的忽略窗口内。
-auto is_path_in_manual_file_system_ignore(Core::State::AppState& app_state,
+auto is_path_in_manual_file_system_ignore(core::AppState& app_state,
                                           const std::filesystem::path& path) -> bool {
   auto key_result = build_ignore_key(path);
   if (!key_result) {
@@ -76,10 +78,10 @@ auto is_path_in_manual_file_system_ignore(Core::State::AppState& app_state,
 }
 
 // 在 Basic 通知无法识别已消失路径类型时，用目录索引与资产前缀判断是否需要全量对账。
-auto unknown_removed_path_requires_full_rescan(Core::State::AppState& app_state,
+auto unknown_removed_path_requires_full_rescan(core::AppState& app_state,
                                                const ParsedNotification& notification)
     -> std::expected<bool, std::string> {
-  auto folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
+  auto folder_result = features::gallery::folder::repository::get_folder_by_path(
       app_state, notification.path.string());
   if (!folder_result) {
     return std::unexpected(folder_result.error());
@@ -88,13 +90,12 @@ auto unknown_removed_path_requires_full_rescan(Core::State::AppState& app_state,
     return true;
   }
 
-  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
+  return features::gallery::asset::repository::has_assets_under_path_prefix(
       app_state, notification.path.string());
 }
 
-auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
-                                     State::FolderWatcherState& watcher)
-    -> std::expected<std::vector<Types::IgnoreRule>, std::string> {
+auto get_cached_watcher_ignore_rules(core::AppState& app_state, FolderWatcherState& watcher)
+    -> std::expected<std::vector<IgnoreRule>, std::string> {
   // 早期过滤只用于减少无效 watcher 工作量，不是最终入库依据；
   // apply_incremental_sync 仍会重新从 DB 加载规则做最终判断。
   const auto current_version =
@@ -110,7 +111,7 @@ auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
     }
   }
 
-  auto root_folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
+  auto root_folder_result = features::gallery::folder::repository::get_folder_by_path(
       app_state, watcher.root_path.string());
   if (!root_folder_result) {
     return std::unexpected("Failed to query root folder: " + root_folder_result.error());
@@ -122,7 +123,7 @@ auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
   }
 
   auto rules_result =
-      Features::Gallery::Ignore::Service::load_ignore_rules(app_state, root_folder_id);
+      features::gallery::ignore::service::load_ignore_rules(app_state, root_folder_id);
   if (!rules_result) {
     return std::unexpected("Failed to load ignore rules: " + rules_result.error());
   }
@@ -139,7 +140,7 @@ auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
 }
 
 auto read_directory_changes(HANDLE directory_handle, std::byte* buffer, DWORD buffer_size,
-                            DWORD filter, State::DirectoryWatchBackend backend) -> WatchReadResult {
+                            DWORD filter, DirectoryWatchBackend backend) -> WatchReadResult {
   WatchReadResult result{
       .ok = false,
       .bytes_returned = 0,
@@ -158,7 +159,7 @@ auto read_directory_changes(HANDLE directory_handle, std::byte* buffer, DWORD bu
                                  &result.bytes_returned, nullptr, nullptr) != FALSE;
   };
 
-  if (backend == State::DirectoryWatchBackend::Extended) {
+  if (backend == DirectoryWatchBackend::Extended) {
     if (read_extended()) {
       result.ok = true;
       return result;
@@ -167,7 +168,7 @@ auto read_directory_changes(HANDLE directory_handle, std::byte* buffer, DWORD bu
     result.error = GetLastError();
     if (result.error == ERROR_INVALID_FUNCTION) {
       // 某些卷不支持 ExW 扩展通知，退回到 W 基础通知继续尝试。
-      result.backend = State::DirectoryWatchBackend::Basic;
+      result.backend = DirectoryWatchBackend::Basic;
       result.bytes_returned = 0;
       if (read_basic()) {
         result.ok = true;
@@ -178,7 +179,7 @@ auto read_directory_changes(HANDLE directory_handle, std::byte* buffer, DWORD bu
     return result;
   }
 
-  if (backend == State::DirectoryWatchBackend::Basic) {
+  if (backend == DirectoryWatchBackend::Basic) {
     if (read_basic()) {
       result.ok = true;
     } else {
@@ -205,7 +206,7 @@ auto parse_extended_notification_buffer(const std::filesystem::path& root_path,
     std::wstring relative_name(info->FileName, filename_len);
 
     auto full_path = root_path / std::filesystem::path(relative_name);
-    auto normalized_result = Utils::Path::NormalizePath(full_path);
+    auto normalized_result = utils::path::NormalizePath(full_path);
     if (normalized_result) {
       parsed_notifications.push_back(ParsedNotification{
           .path = normalized_result.value(),
@@ -241,7 +242,7 @@ auto parse_basic_notification_buffer(const std::filesystem::path& root_path,
     std::wstring relative_name(info->FileName, filename_len);
 
     auto full_path = root_path / std::filesystem::path(relative_name);
-    auto normalized_result = Utils::Path::NormalizePath(full_path);
+    auto normalized_result = utils::path::NormalizePath(full_path);
     if (normalized_result) {
       auto entry_type = NotificationEntryType::Unknown;
       std::error_code type_error;
@@ -272,8 +273,7 @@ auto parse_basic_notification_buffer(const std::filesystem::path& root_path,
 }
 
 // 过滤并判断目录影响，再把文件通知转换为内部的 UPSERT/REMOVE 动作。
-auto process_watch_notifications(Core::State::AppState& app_state,
-                                 State::FolderWatcherState& watcher,
+auto process_watch_notifications(core::AppState& app_state, FolderWatcherState& watcher,
                                  const std::vector<ParsedNotification>& notifications) -> void {
   bool require_full_rescan = false;
   std::vector<ParsedNotification> effective_notifications;
@@ -292,9 +292,9 @@ auto process_watch_notifications(Core::State::AppState& app_state,
     return;
   }
 
-  if (Sync::is_sync_faulted(watcher)) {
+  if (sync::is_sync_faulted(watcher)) {
     // Faulted 后仍持续排空系统通知，但不再积累逐文件动作；只保留全量 dirty 标记。
-    Sync::request_full_rescan(app_state, watcher);
+    sync::request_full_rescan(app_state, watcher);
     return;
   }
 
@@ -354,14 +354,14 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   }
 
   if (require_full_rescan) {
-    Sync::request_full_rescan(app_state, watcher);
+    sync::request_full_rescan(app_state, watcher);
     return;
   }
 
-  auto options = Sync::get_watcher_scan_options(watcher);
+  auto options = sync::get_watcher_scan_options(watcher);
   const auto supported_extensions =
-      options.supported_extensions.value_or(Scanner::Common::default_supported_extensions());
-  std::optional<std::vector<Types::IgnoreRule>> ignore_rules;
+      options.supported_extensions.value_or(scanner::common::default_supported_extensions());
+  std::optional<std::vector<IgnoreRule>> ignore_rules;
   bool ignore_rules_load_failed = false;
   bool queued_changes = false;
 
@@ -380,7 +380,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
 
         const auto candidate_path = std::filesystem::path(normalized_path);
         // 扩展名过滤比 ignore rules 便宜，先用它拦住 .tmp/.bin 等一定不会入库的文件。
-        if (!Scanner::Common::is_supported_file(candidate_path, supported_extensions)) {
+        if (!scanner::common::is_supported_file(candidate_path, supported_extensions)) {
           break;
         }
 
@@ -398,13 +398,13 @@ auto process_watch_notifications(Core::State::AppState& app_state,
 
         // UPSERT 可以早过滤：被忽略的新文件本来就不应该进入图库。
         if (ignore_rules.has_value() &&
-            Features::Gallery::Ignore::Service::apply_ignore_rules(
+            features::gallery::ignore::service::apply_ignore_rules(
                 candidate_path, watcher.root_path, ignore_rules.value(), false)) {
           break;
         }
 
         // 文件刚出现或仍在写入时，先观察稳定性，再决定是否真正入库。
-        Sync::enqueue_file_upsert_for_stability(watcher, normalized_path);
+        sync::enqueue_file_upsert_for_stability(watcher, normalized_path);
         queued_changes = true;
         break;
       }
@@ -415,7 +415,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
         }
         // REMOVE 不按 ignore rules 丢弃：
         // 规则可能是在文件入库后才改的，删除事件仍需要机会清理历史数据库记录。
-        Sync::enqueue_file_change(watcher, normalized_path, State::PendingFileChangeAction::REMOVE);
+        sync::enqueue_file_change(watcher, normalized_path, PendingFileChangeAction::REMOVE);
         queued_changes = true;
         break;
       default:
@@ -424,15 +424,15 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   }
 
   if (queued_changes) {
-    Sync::schedule_sync_task(app_state, watcher);
+    sync::schedule_sync_task(app_state, watcher);
   }
 }
 
 // 目录监听主循环：阻塞读取文件变更，并把可用通知交给 Gallery 全局编排线程。
 // 按注册 key 定位一次线程状态；删除流程会取消 IO、join 本线程后再销毁结构体。
-auto run_watch_loop(Core::State::AppState& app_state, const std::string& watcher_key,
+auto run_watch_loop(core::AppState& app_state, const std::string& watcher_key,
                     std::stop_token stop_token) -> void {
-  State::FolderWatcherState* watcher_ptr = nullptr;
+  FolderWatcherState* watcher_ptr = nullptr;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
     auto it = app_state.gallery->folder_watchers.find(watcher_key);
@@ -481,15 +481,13 @@ auto run_watch_loop(Core::State::AppState& app_state, const std::string& watcher
       if (error == ERROR_NOTIFY_ENUM_DIR) {
         Logger().warn("Watcher overflow for '{}', scheduling full rescan",
                       watcher.root_path.string());
-        Sync::request_full_rescan(app_state, watcher);
+        sync::request_full_rescan(app_state, watcher);
         continue;
       }
 
-      if (watcher.watch_backend.load(std::memory_order_acquire) ==
-          State::DirectoryWatchBackend::Basic) {
+      if (watcher.watch_backend.load(std::memory_order_acquire) == DirectoryWatchBackend::Basic) {
         // 与产品策略一致：W 也不可用时直接停该 watcher，不做额外扫描兜底。
-        watcher.watch_backend.store(State::DirectoryWatchBackend::Disabled,
-                                    std::memory_order_release);
+        watcher.watch_backend.store(DirectoryWatchBackend::Disabled, std::memory_order_release);
         Logger().warn(
             "ReadDirectoryChangesW failed for '{}', error={}. Disabling watcher for this session.",
             watcher.root_path.string(), error);
@@ -502,12 +500,12 @@ auto run_watch_loop(Core::State::AppState& app_state, const std::string& watcher
     }
 
     if (read_result.bytes_returned == 0) {
-      Sync::request_full_rescan(app_state, watcher);
+      sync::request_full_rescan(app_state, watcher);
       continue;
     }
 
     auto notifications =
-        watcher.watch_backend.load(std::memory_order_acquire) == State::DirectoryWatchBackend::Basic
+        watcher.watch_backend.load(std::memory_order_acquire) == DirectoryWatchBackend::Basic
             ? parse_basic_notification_buffer(watcher.root_path, buffer.data(),
                                               read_result.bytes_returned)
             : parse_extended_notification_buffer(watcher.root_path, buffer.data(),
@@ -522,4 +520,4 @@ auto run_watch_loop(Core::State::AppState& app_state, const std::string& watcher
   Logger().info("Gallery watcher stopped: {}", watcher.root_path.string());
 }
 
-}  // namespace Features::Gallery::Watcher::Notify
+}  // namespace features::gallery::watcher::notify

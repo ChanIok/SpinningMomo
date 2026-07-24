@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Gallery::Color::Types {
+#include "vendor/std.hpp"
+
+namespace features::gallery::color {
 
 struct LabColor {
   float l = 0.0f;
@@ -37,4 +39,4 @@ struct MainColorExtractOptions {
   float ab_bin_size = 8.0f;
 };
 
-}  // namespace Features::Gallery::Color::Types
+}  // namespace features::gallery::color

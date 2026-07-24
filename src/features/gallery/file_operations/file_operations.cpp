@@ -1,5 +1,7 @@
 #include "features/gallery/file_operations/file_operations.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
 #include "features/gallery/folder/repository.hpp"
@@ -11,22 +13,22 @@
 #include "utils/string/string.hpp"
 #include "utils/system/system.hpp"
 
-namespace Features::Gallery::FileOperations {
+namespace features::gallery::file_operations {
 
 // ============= 资产项管理 =============
 
 // 按用户意图删除资产索引，并可选删除对应的物理文件。
-auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& params)
-    -> std::expected<Types::OperationResult, std::string> {
+auto delete_asset(core::AppState& app_state, const DeleteParams& params)
+    -> std::expected<OperationResult, std::string> {
   try {
     // 获取要删除的资产项
-    auto asset_result = Asset::Repository::get_asset_by_id(app_state, params.id);
+    auto asset_result = asset::repository::get_asset_by_id(app_state, params.id);
     if (!asset_result) {
       return std::unexpected("Failed to get asset item: " + asset_result.error());
     }
 
     if (!asset_result->has_value()) {
-      Types::OperationResult result;
+      OperationResult result;
       result.success = false;
       result.message = "Asset item not found";
       result.affected_count = 0;
@@ -50,9 +52,9 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
     }
 
     // 仅删除资产索引；按 hash 共享的缩略图由缓存对账确认无引用后统一回收。
-    auto delete_result = Asset::Repository::delete_asset(app_state, params.id);
+    auto delete_result = asset::repository::delete_asset(app_state, params.id);
 
-    Types::OperationResult result;
+    OperationResult result;
     if (delete_result) {
       result.success = true;
       result.message = params.delete_file.value_or(false)
@@ -73,15 +75,15 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 }
 
 // 使用系统默认应用打开指定资产文件。
-auto open_asset_with_default_app(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<Types::OperationResult, std::string> {
-  auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+auto open_asset_with_default_app(core::AppState& app_state, std::int64_t id)
+    -> std::expected<OperationResult, std::string> {
+  auto asset_result = asset::repository::get_asset_by_id(app_state, id);
   if (!asset_result) {
     return std::unexpected("Failed to get asset item: " + asset_result.error());
   }
 
   if (!asset_result->has_value()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Asset item not found",
         .affected_count = 0,
@@ -89,12 +91,12 @@ auto open_asset_with_default_app(Core::State::AppState& app_state, std::int64_t 
   }
 
   auto open_result =
-      Utils::System::open_file_with_default_app(std::filesystem::path(asset_result->value().path));
+      utils::system::open_file_with_default_app(std::filesystem::path(asset_result->value().path));
   if (!open_result) {
     return std::unexpected("Failed to open asset with default app: " + open_result.error());
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Asset opened with default app",
       .affected_count = 0,
@@ -102,15 +104,15 @@ auto open_asset_with_default_app(Core::State::AppState& app_state, std::int64_t 
 }
 
 // 在资源管理器中定位指定资产文件。
-auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<Types::OperationResult, std::string> {
-  auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+auto reveal_asset_in_explorer(core::AppState& app_state, std::int64_t id)
+    -> std::expected<OperationResult, std::string> {
+  auto asset_result = asset::repository::get_asset_by_id(app_state, id);
   if (!asset_result) {
     return std::unexpected("Failed to get asset item: " + asset_result.error());
   }
 
   if (!asset_result->has_value()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Asset item not found",
         .affected_count = 0,
@@ -118,12 +120,12 @@ auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
   }
 
   auto reveal_result =
-      Utils::System::reveal_file_in_explorer(std::filesystem::path(asset_result->value().path));
+      utils::system::reveal_file_in_explorer(std::filesystem::path(asset_result->value().path));
   if (!reveal_result) {
     return std::unexpected("Failed to reveal asset in explorer: " + reveal_result.error());
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Asset revealed in explorer",
       .affected_count = 0,
@@ -131,10 +133,10 @@ auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
 }
 
 // 按明确策略删除资产；确认交互由前端统一负责。
-auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsParams& params)
-    -> std::expected<Types::DeleteAssetsResult, std::string> {
+auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
+    -> std::expected<DeleteAssetsResult, std::string> {
   if (params.ids.empty()) {
-    return Types::DeleteAssetsResult{
+    return DeleteAssetsResult{
         .success = false,
         .message = "No assets selected",
         .affected_count = 0,
@@ -147,7 +149,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
   }
 
   struct DeleteCandidate {
-    Types::Asset asset;
+    Asset asset;
     std::filesystem::path file_path;
     bool file_exists = false;
     bool permanent = false;
@@ -161,28 +163,27 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
   std::int64_t skipped_not_found = 0;
   std::vector<std::string> errors;
   errors.reserve(unique_ids.size());
-  std::vector<Types::ScanChange> manual_changes;
+  std::vector<ScanChange> manual_changes;
   manual_changes.reserve(unique_ids.size());
   std::unordered_set<std::string> manual_change_keys;
   manual_change_keys.reserve(unique_ids.size());
 
-  auto append_manual_change = [&](const std::filesystem::path& path,
-                                  Types::ScanChangeAction action) {
-    auto normalized_key = Utils::Path::NormalizeForComparison(path);
+  auto append_manual_change = [&](const std::filesystem::path& path, ScanChangeAction action) {
+    auto normalized_key = utils::path::NormalizeForComparison(path);
     auto action_key =
-        action == Types::ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
-    auto key = action_key + Utils::String::ToUtf8(normalized_key);
+        action == ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
+    auto key = action_key + utils::string::ToUtf8(normalized_key);
     if (!manual_change_keys.insert(key).second) {
       return;
     }
-    manual_changes.push_back(Types::ScanChange{
+    manual_changes.push_back(ScanChange{
         .path = path.string(),
         .action = action,
     });
   };
 
   for (auto id : unique_ids) {
-    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    auto asset_result = asset::repository::get_asset_by_id(app_state, id);
     if (!asset_result) {
       errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
       continue;
@@ -195,8 +196,8 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
 
     const auto& asset = asset_result->value();
     std::filesystem::path file_path(asset.path);
-    const bool permanent = permanent_mode || Utils::Path::ClassifyPathStorageKind(file_path) ==
-                                                 Utils::Path::PathStorageKind::RemoteUnc;
+    const bool permanent = permanent_mode || utils::path::ClassifyPathStorageKind(file_path) ==
+                                                 utils::path::PathStorageKind::RemoteUnc;
     std::error_code ec;
     bool file_exists = std::filesystem::exists(file_path, ec);
     if (ec) {
@@ -219,7 +220,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
       continue;
     }
 
-    auto begin_ignore_result = Watcher::begin_manual_file_system_ignore(
+    auto begin_ignore_result = watcher::begin_manual_file_system_ignore(
         app_state, candidate.file_path, candidate.file_path);
     if (!begin_ignore_result) {
       Logger().warn("Failed to register watcher ignore for asset deletion '{}': {}",
@@ -235,7 +236,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
 
   std::unordered_set<std::int64_t> failed_file_ids;
   if (!recycle_paths.empty()) {
-    auto recycle_result = Utils::System::move_files_to_recycle_bin(recycle_paths);
+    auto recycle_result = utils::system::move_files_to_recycle_bin(recycle_paths);
     if (!recycle_result) {
       errors.push_back("Failed to move files to recycle bin: " + recycle_result.error());
       for (const auto& candidate : candidates) {
@@ -251,7 +252,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
     if (!candidate.permanent || !candidate.file_exists) {
       continue;
     }
-    auto delete_file_result = Utils::System::delete_file_permanently(candidate.file_path);
+    auto delete_file_result = utils::system::delete_file_permanently(candidate.file_path);
     if (!delete_file_result) {
       failed_file_ids.insert(candidate.asset.id);
       errors.push_back("Failed to permanently delete file " + candidate.asset.path + ": " +
@@ -273,7 +274,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
   std::int64_t permanently_deleted_count = 0;
 
   // 批量只删除资产索引，共享缩略图由缓存对账确认成为孤儿后统一回收。
-  auto delete_result = Asset::Repository::batch_delete_assets_by_ids(app_state, delete_ids);
+  auto delete_result = asset::repository::batch_delete_assets_by_ids(app_state, delete_ids);
   if (!delete_result) {
     errors.push_back("Failed to delete asset indexes: " + delete_result.error());
   } else {
@@ -288,13 +289,13 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
       } else {
         recycled_count++;
       }
-      append_manual_change(candidate.file_path, Types::ScanChangeAction::REMOVE);
+      append_manual_change(candidate.file_path, ScanChangeAction::REMOVE);
     }
 
     if (!manual_changes.empty()) {
       Logger().info("Gallery delete_assets: dispatching {} manual scan change(s)",
                     manual_changes.size());
-      auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+      auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
       if (!dispatch_result) {
         Logger().warn("Failed to dispatch manual scan changes after asset deletion: {}",
                       dispatch_result.error());
@@ -306,7 +307,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
     if (!candidate.manual_ignore_registered) {
       continue;
     }
-    if (auto complete_ignore_result = Watcher::complete_manual_file_system_ignore(
+    if (auto complete_ignore_result = watcher::complete_manual_file_system_ignore(
             app_state, candidate.file_path, candidate.file_path);
         !complete_ignore_result) {
       Logger().warn("Failed to complete watcher ignore for asset deletion '{}': {}",
@@ -314,7 +315,7 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
     }
   }
 
-  Types::DeleteAssetsResult result{
+  DeleteAssetsResult result{
       .success = errors.empty(),
       .message = "",
       .affected_count = affected_count,
@@ -348,11 +349,10 @@ auto delete_assets(Core::State::AppState& app_state, const Types::DeleteAssetsPa
 }
 
 // 将选中资产移动到目标图库文件夹，并同步更新路径索引。
-auto move_assets_to_folder(Core::State::AppState& app_state,
-                           const Types::MoveAssetsToFolderParams& params)
-    -> std::expected<Types::OperationResult, std::string> {
+auto move_assets_to_folder(core::AppState& app_state, const MoveAssetsToFolderParams& params)
+    -> std::expected<OperationResult, std::string> {
   if (params.ids.empty()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "No assets selected",
         .affected_count = 0,
@@ -360,7 +360,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   }
 
   if (params.target_folder_id <= 0) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Invalid target folder",
         .affected_count = 0,
@@ -368,12 +368,12 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   }
 
   auto target_folder_result =
-      Folder::Repository::get_folder_by_id(app_state, params.target_folder_id);
+      folder::repository::get_folder_by_id(app_state, params.target_folder_id);
   if (!target_folder_result) {
     return std::unexpected("Failed to query target folder: " + target_folder_result.error());
   }
   if (!target_folder_result->has_value()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Target folder not found",
         .affected_count = 0,
@@ -381,7 +381,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   }
 
   auto normalized_target_folder_result =
-      Utils::Path::NormalizePath(std::filesystem::path(target_folder_result->value().path));
+      utils::path::NormalizePath(std::filesystem::path(target_folder_result->value().path));
   if (!normalized_target_folder_result) {
     return std::unexpected("Failed to normalize target folder path: " +
                            normalized_target_folder_result.error());
@@ -394,28 +394,27 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   std::int64_t skipped_same_folder = 0;
   std::vector<std::string> errors;
   errors.reserve(unique_ids.size());
-  std::vector<Types::ScanChange> manual_changes;
+  std::vector<ScanChange> manual_changes;
   manual_changes.reserve(unique_ids.size() * 2);
   std::unordered_set<std::string> manual_change_keys;
   manual_change_keys.reserve(unique_ids.size() * 2);
 
-  auto append_manual_change = [&](const std::filesystem::path& path,
-                                  Types::ScanChangeAction action) {
-    auto normalized_key = Utils::Path::NormalizeForComparison(path);
+  auto append_manual_change = [&](const std::filesystem::path& path, ScanChangeAction action) {
+    auto normalized_key = utils::path::NormalizeForComparison(path);
     auto action_key =
-        action == Types::ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
-    auto key = action_key + Utils::String::ToUtf8(normalized_key);
+        action == ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
+    auto key = action_key + utils::string::ToUtf8(normalized_key);
     if (!manual_change_keys.insert(key).second) {
       return;
     }
-    manual_changes.push_back(Types::ScanChange{
+    manual_changes.push_back(ScanChange{
         .path = path.string(),
         .action = action,
     });
   };
 
   for (auto id : unique_ids) {
-    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    auto asset_result = asset::repository::get_asset_by_id(app_state, id);
     if (!asset_result) {
       errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
       continue;
@@ -426,7 +425,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
     }
 
     auto asset = asset_result->value();
-    auto normalized_source_result = Utils::Path::NormalizePath(std::filesystem::path(asset.path));
+    auto normalized_source_result = utils::path::NormalizePath(std::filesystem::path(asset.path));
     if (!normalized_source_result) {
       errors.push_back("Failed to normalize source path for asset " + std::to_string(asset.id) +
                        ": " + normalized_source_result.error());
@@ -435,7 +434,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
     auto source_path = normalized_source_result.value();
     auto destination_path = target_folder_path / source_path.filename();
-    auto normalized_destination_result = Utils::Path::NormalizePath(destination_path);
+    auto normalized_destination_result = utils::path::NormalizePath(destination_path);
     if (!normalized_destination_result) {
       errors.push_back("Failed to normalize destination path for asset " +
                        std::to_string(asset.id) + ": " + normalized_destination_result.error());
@@ -444,15 +443,15 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
     auto normalized_destination_path = normalized_destination_result.value();
     // 目标与源一致时不报错，按“跳过项”处理，便于批量操作给出可理解反馈。
-    if (Utils::Path::NormalizeForComparison(source_path) ==
-        Utils::Path::NormalizeForComparison(normalized_destination_path)) {
+    if (utils::path::NormalizeForComparison(source_path) ==
+        utils::path::NormalizeForComparison(normalized_destination_path)) {
       skipped_same_folder++;
       continue;
     }
 
     bool manual_ignore_registered = false;
     // 先注册 watcher ignore，再执行 move，避免 watcher 抢先对同一路径做重复分析。
-    if (auto begin_ignore_result = Watcher::begin_manual_file_system_ignore(
+    if (auto begin_ignore_result = watcher::begin_manual_file_system_ignore(
             app_state, source_path, normalized_destination_path);
         begin_ignore_result) {
       manual_ignore_registered = true;
@@ -466,7 +465,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
         return;
       }
       // 无论成功还是失败都尝试完成 ignore，防止 in-flight 计数泄漏。
-      if (auto complete_ignore_result = Watcher::complete_manual_file_system_ignore(
+      if (auto complete_ignore_result = watcher::complete_manual_file_system_ignore(
               app_state, source_path, normalized_destination_path);
           !complete_ignore_result) {
         Logger().warn("Failed to complete watcher ignore for manual move '{}': {}",
@@ -476,7 +475,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
     };
 
     auto move_result =
-        Utils::File::move_path_blocking(source_path, normalized_destination_path, false);
+        utils::file::move_path_blocking(source_path, normalized_destination_path, false);
     if (!move_result) {
       complete_manual_ignore();
       errors.push_back("Failed to move asset " + std::to_string(asset.id) + ": " +
@@ -485,7 +484,7 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
     }
 
     // 文件系统移动成功后再更新索引，保证 DB 记录与磁盘最终位置保持一致。
-    auto update_result = Asset::Repository::update_asset_location(
+    auto update_result = asset::repository::update_asset_location(
         app_state, asset.id, normalized_destination_path.filename().string(),
         normalized_destination_path.generic_string(), params.target_folder_id);
     if (!update_result) {
@@ -497,20 +496,20 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
     complete_manual_ignore();
 
-    append_manual_change(source_path, Types::ScanChangeAction::REMOVE);
-    append_manual_change(normalized_destination_path, Types::ScanChangeAction::UPSERT);
+    append_manual_change(source_path, ScanChangeAction::REMOVE);
+    append_manual_change(normalized_destination_path, ScanChangeAction::UPSERT);
     moved_count++;
   }
 
   if (!manual_changes.empty()) {
-    auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
     if (!dispatch_result) {
       Logger().warn("Failed to dispatch manual scan changes after folder move: {}",
                     dispatch_result.error());
     }
   }
 
-  Types::OperationResult result{
+  OperationResult result{
       .success = errors.empty(),
       .message = "",
       .affected_count = moved_count,
@@ -541,4 +540,4 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   return result;
 }
 
-}  // namespace Features::Gallery::FileOperations
+}  // namespace features::gallery::file_operations

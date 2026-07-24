@@ -1,5 +1,7 @@
 #include "features/gallery/tag/repository.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/database/database.hpp"
 #include "core/database/state.hpp"
 #include "core/database/types.hpp"
@@ -7,7 +9,7 @@
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Tag::Repository {
+namespace features::gallery::tag::repository {
 
 auto normalize_asset_ids(const std::vector<std::int64_t>& asset_ids)
     -> std::pair<std::vector<std::int64_t>, std::int64_t> {
@@ -32,7 +34,7 @@ auto normalize_asset_ids(const std::vector<std::int64_t>& asset_ids)
 
 // ============= 基本 CRUD 操作 =============
 
-auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& params)
+auto create_tag(core::AppState& app_state, const CreateTagParams& params)
     -> std::expected<std::int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO tags (name, parent_id, sort_order)
@@ -40,16 +42,16 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
             RETURNING id
         )";
 
-  std::vector<Core::Database::Types::DbParam> db_params;
+  std::vector<core::database::DbParam> db_params;
   db_params.push_back(params.name);
 
   db_params.push_back(params.parent_id.has_value()
-                          ? Core::Database::Types::DbParam{params.parent_id.value()}
-                          : Core::Database::Types::DbParam{std::monostate{}});
+                          ? core::database::DbParam{params.parent_id.value()}
+                          : core::database::DbParam{std::monostate{}});
 
   db_params.push_back(static_cast<std::int64_t>(params.sort_order.value_or(0)));
 
-  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, db_params);
+  auto result = core::database::query_scalar<std::int64_t>(app_state, sql, db_params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to create tag: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -58,17 +60,17 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
   return result->value();
 }
 
-auto get_tag_by_id(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<std::optional<Types::Tag>, std::string> {
+auto get_tag_by_id(core::AppState& app_state, std::int64_t id)
+    -> std::expected<std::optional<Tag>, std::string> {
   std::string sql = R"(
             SELECT id, name, parent_id, sort_order, created_at, updated_at
             FROM tags
             WHERE id = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::query_single<Types::Tag>(app_state, sql, params);
+  auto result = core::database::query_single<Tag>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query tag by id: " + result.error());
   }
@@ -76,11 +78,11 @@ auto get_tag_by_id(Core::State::AppState& app_state, std::int64_t id)
   return result.value();
 }
 
-auto get_tag_by_name(Core::State::AppState& app_state, const std::string& name,
+auto get_tag_by_name(core::AppState& app_state, const std::string& name,
                      std::optional<std::int64_t> parent_id)
-    -> std::expected<std::optional<Types::Tag>, std::string> {
+    -> std::expected<std::optional<Tag>, std::string> {
   std::string sql;
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
 
   if (parent_id.has_value()) {
     sql = R"(
@@ -101,7 +103,7 @@ auto get_tag_by_name(Core::State::AppState& app_state, const std::string& name,
     params.push_back(name);
   }
 
-  auto result = Core::Database::query_single<Types::Tag>(app_state, sql, params);
+  auto result = core::database::query_single<Tag>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query tag by name: " + result.error());
   }
@@ -109,11 +111,11 @@ auto get_tag_by_name(Core::State::AppState& app_state, const std::string& name,
   return result.value();
 }
 
-auto update_tag(Core::State::AppState& app_state, const Types::UpdateTagParams& params)
+auto update_tag(core::AppState& app_state, const UpdateTagParams& params)
     -> std::expected<void, std::string> {
   // 动态构建 UPDATE 语句
   std::vector<std::string> set_clauses;
-  std::vector<Core::Database::Types::DbParam> db_params;
+  std::vector<core::database::DbParam> db_params;
 
   if (params.name.has_value()) {
     set_clauses.push_back("name = ?");
@@ -143,7 +145,7 @@ auto update_tag(Core::State::AppState& app_state, const Types::UpdateTagParams& 
 
   db_params.push_back(params.id);
 
-  auto result = Core::Database::execute(app_state, sql, db_params);
+  auto result = core::database::execute(app_state, sql, db_params);
   if (!result) {
     return std::unexpected("Failed to update tag: " + result.error());
   }
@@ -151,13 +153,12 @@ auto update_tag(Core::State::AppState& app_state, const Types::UpdateTagParams& 
   return {};
 }
 
-auto delete_tag(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<void, std::string> {
+auto delete_tag(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string> {
   // 数据库中已设置 ON DELETE CASCADE，会自动删除子标签和 asset_tags 关联
   std::string sql = "DELETE FROM tags WHERE id = ?";
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to delete tag: " + result.error());
   }
@@ -165,15 +166,14 @@ auto delete_tag(Core::State::AppState& app_state, std::int64_t id)
   return {};
 }
 
-auto list_all_tags(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::Tag>, std::string> {
+auto list_all_tags(core::AppState& app_state) -> std::expected<std::vector<Tag>, std::string> {
   std::string sql = R"(
             SELECT id, name, parent_id, sort_order, created_at, updated_at
             FROM tags
             ORDER BY sort_order, name
         )";
 
-  auto result = Core::Database::query<Types::Tag>(app_state, sql);
+  auto result = core::database::query<Tag>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to list all tags: " + result.error());
   }
@@ -183,23 +183,23 @@ auto list_all_tags(Core::State::AppState& app_state)
 
 // ============= 资产-标签关联操作 =============
 
-auto add_tags_to_asset(Core::State::AppState& app_state, const Types::AddTagsToAssetParams& params)
+auto add_tags_to_asset(core::AppState& app_state, const AddTagsToAssetParams& params)
     -> std::expected<void, std::string> {
   if (params.tag_ids.empty()) {
     return {};  // 没有标签要添加，直接返回成功
   }
 
   // 使用事务批量插入，使用 INSERT OR IGNORE 避免重复
-  return Core::Database::execute_transaction(
-      app_state, [&](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+  return core::database::execute_transaction(
+      app_state, [&](core::AppState& txn_app_state) -> std::expected<void, std::string> {
         std::string sql = R"(
                 INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
                 VALUES (?, ?)
             )";
 
         for (const auto& tag_id : params.tag_ids) {
-          std::vector<Core::Database::Types::DbParam> db_params = {params.asset_id, tag_id};
-          auto result = Core::Database::execute(txn_app_state, sql, db_params);
+          std::vector<core::database::DbParam> db_params = {params.asset_id, tag_id};
+          auto result = core::database::execute(txn_app_state, sql, db_params);
           if (!result) {
             return std::unexpected("Failed to add tag to asset: " + result.error());
           }
@@ -209,8 +209,8 @@ auto add_tags_to_asset(Core::State::AppState& app_state, const Types::AddTagsToA
       });
 }
 
-auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAssetsParams& params)
-    -> std::expected<Types::OperationResult, std::string> {
+auto add_tag_to_assets(core::AppState& app_state, const AddTagToAssetsParams& params)
+    -> std::expected<OperationResult, std::string> {
   if (params.tag_id <= 0) {
     return std::unexpected("Tag id must be greater than 0");
   }
@@ -218,7 +218,7 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
   auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
 
   if (normalized_asset_ids.empty()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = true,
         .message = "No valid assets to tag",
         .affected_count = 0,
@@ -228,9 +228,8 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
     };
   }
 
-  auto write_result = Core::Database::execute_transaction(
-      app_state,
-      [&](Core::State::AppState& txn_app_state) -> std::expected<std::int64_t, std::string> {
+  auto write_result = core::database::execute_transaction(
+      app_state, [&](core::AppState& txn_app_state) -> std::expected<std::int64_t, std::string> {
         std::int64_t affected_count = 0;
         constexpr std::string_view kInsertSql = R"(
                 INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
@@ -239,7 +238,7 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
             )";
 
         for (const auto asset_id : normalized_asset_ids) {
-          auto insert_result = Core::Database::query_scalar<std::int64_t>(
+          auto insert_result = core::database::query_scalar<std::int64_t>(
               txn_app_state, std::string(kInsertSql), {asset_id, params.tag_id});
           if (!insert_result) {
             return std::unexpected("Failed to add tag to asset: " + insert_result.error());
@@ -259,7 +258,7 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
   const auto unchanged_count =
       static_cast<std::int64_t>(normalized_asset_ids.size()) - affected_count;
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Tag added to assets successfully",
       .affected_count = affected_count,
@@ -268,16 +267,15 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
   };
 }
 
-auto remove_tag_from_assets(Core::State::AppState& app_state,
-                            const Types::RemoveTagFromAssetsParams& params)
-    -> std::expected<Types::OperationResult, std::string> {
+auto remove_tag_from_assets(core::AppState& app_state, const RemoveTagFromAssetsParams& params)
+    -> std::expected<OperationResult, std::string> {
   if (params.tag_id <= 0) {
     return std::unexpected("Tag id must be greater than 0");
   }
 
   auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
   if (normalized_asset_ids.empty()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = true,
         .message = "No valid assets to remove tag from",
         .affected_count = 0,
@@ -305,14 +303,14 @@ auto remove_tag_from_assets(Core::State::AppState& app_state,
     std::int64_t asset_id = 0;
   };
 
-  std::vector<Core::Database::Types::DbParam> db_params;
+  std::vector<core::database::DbParam> db_params;
   db_params.reserve(normalized_asset_ids.size() + 1);
   db_params.push_back(params.tag_id);
   for (const auto asset_id : normalized_asset_ids) {
     db_params.push_back(asset_id);
   }
 
-  auto result = Core::Database::query<DeletedAssetId>(app_state, sql, db_params);
+  auto result = core::database::query<DeletedAssetId>(app_state, sql, db_params);
   if (!result) {
     return std::unexpected("Failed to remove tag from assets: " + result.error());
   }
@@ -321,7 +319,7 @@ auto remove_tag_from_assets(Core::State::AppState& app_state,
   const auto unchanged_count =
       static_cast<std::int64_t>(normalized_asset_ids.size()) - affected_count;
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Tag removed from assets successfully",
       .affected_count = affected_count,
@@ -330,8 +328,7 @@ auto remove_tag_from_assets(Core::State::AppState& app_state,
   };
 }
 
-auto remove_tags_from_asset(Core::State::AppState& app_state,
-                            const Types::RemoveTagsFromAssetParams& params)
+auto remove_tags_from_asset(core::AppState& app_state, const RemoveTagsFromAssetParams& params)
     -> std::expected<void, std::string> {
   if (params.tag_ids.empty()) {
     return {};  // 没有标签要移除，直接返回成功
@@ -346,13 +343,13 @@ auto remove_tags_from_asset(Core::State::AppState& app_state,
   std::string sql =
       std::format("DELETE FROM asset_tags WHERE asset_id = ? AND tag_id IN ({})", placeholders);
 
-  std::vector<Core::Database::Types::DbParam> db_params;
+  std::vector<core::database::DbParam> db_params;
   db_params.push_back(params.asset_id);
   for (const auto& tag_id : params.tag_ids) {
     db_params.push_back(tag_id);
   }
 
-  auto result = Core::Database::execute(app_state, sql, db_params);
+  auto result = core::database::execute(app_state, sql, db_params);
   if (!result) {
     return std::unexpected("Failed to remove tags from asset: " + result.error());
   }
@@ -360,8 +357,8 @@ auto remove_tags_from_asset(Core::State::AppState& app_state,
   return {};
 }
 
-auto get_asset_tags(Core::State::AppState& app_state, std::int64_t asset_id)
-    -> std::expected<std::vector<Types::Tag>, std::string> {
+auto get_asset_tags(core::AppState& app_state, std::int64_t asset_id)
+    -> std::expected<std::vector<Tag>, std::string> {
   std::string sql = R"(
             SELECT t.id, t.name, t.parent_id, t.sort_order, t.created_at, t.updated_at
             FROM tags t
@@ -370,9 +367,9 @@ auto get_asset_tags(Core::State::AppState& app_state, std::int64_t asset_id)
             ORDER BY t.sort_order, t.name
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {asset_id};
+  std::vector<core::database::DbParam> params = {asset_id};
 
-  auto result = Core::Database::query<Types::Tag>(app_state, sql, params);
+  auto result = core::database::query<Tag>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to get asset tags: " + result.error());
   }
@@ -380,11 +377,10 @@ auto get_asset_tags(Core::State::AppState& app_state, std::int64_t asset_id)
   return result.value();
 }
 
-auto get_tags_by_asset_ids(Core::State::AppState& app_state,
-                           const std::vector<std::int64_t>& asset_ids)
-    -> std::expected<std::unordered_map<std::int64_t, std::vector<Types::Tag>>, std::string> {
+auto get_tags_by_asset_ids(core::AppState& app_state, const std::vector<std::int64_t>& asset_ids)
+    -> std::expected<std::unordered_map<std::int64_t, std::vector<Tag>>, std::string> {
   if (asset_ids.empty()) {
-    return std::unordered_map<std::int64_t, std::vector<Types::Tag>>{};
+    return std::unordered_map<std::int64_t, std::vector<Tag>>{};
   }
 
   // 构建 IN 子句
@@ -402,7 +398,7 @@ auto get_tags_by_asset_ids(Core::State::AppState& app_state,
         )",
                                 placeholders);
 
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   for (const auto& asset_id : asset_ids) {
     params.push_back(asset_id);
   }
@@ -418,20 +414,20 @@ auto get_tags_by_asset_ids(Core::State::AppState& app_state,
     std::int64_t updated_at;
   };
 
-  auto result = Core::Database::query<AssetTagRow>(app_state, sql, params);
+  auto result = core::database::query<AssetTagRow>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to get tags by asset ids: " + result.error());
   }
 
   // 组织结果为映射
-  std::unordered_map<std::int64_t, std::vector<Types::Tag>> tag_map;
+  std::unordered_map<std::int64_t, std::vector<Tag>> tag_map;
   for (const auto& row : result.value()) {
-    Types::Tag tag{.id = row.id,
-                   .name = row.name,
-                   .parent_id = row.parent_id,
-                   .sort_order = row.sort_order,
-                   .created_at = row.created_at,
-                   .updated_at = row.updated_at};
+    Tag tag{.id = row.id,
+            .name = row.name,
+            .parent_id = row.parent_id,
+            .sort_order = row.sort_order,
+            .created_at = row.created_at,
+            .updated_at = row.updated_at};
     tag_map[row.asset_id].push_back(std::move(tag));
   }
 
@@ -440,8 +436,7 @@ auto get_tags_by_asset_ids(Core::State::AppState& app_state,
 
 // ============= 统计功能 =============
 
-auto get_tag_stats(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::TagStats>, std::string> {
+auto get_tag_stats(core::AppState& app_state) -> std::expected<std::vector<TagStats>, std::string> {
   std::string sql = R"(
             SELECT t.id as tag_id, t.name as tag_name, COUNT(a.id) as asset_count
             FROM tags t
@@ -451,7 +446,7 @@ auto get_tag_stats(Core::State::AppState& app_state)
             ORDER BY asset_count DESC, t.name
         )";
 
-  auto result = Core::Database::query<Types::TagStats>(app_state, sql);
+  auto result = core::database::query<TagStats>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to get tag stats: " + result.error());
   }
@@ -461,8 +456,8 @@ auto get_tag_stats(Core::State::AppState& app_state)
 
 // ============= 标签树构建 =============
 
-auto get_tag_tree(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::TagTreeNode>, std::string> {
+auto get_tag_tree(core::AppState& app_state)
+    -> std::expected<std::vector<TagTreeNode>, std::string> {
   // 1. 获取所有标签
   auto tags_result = list_all_tags(app_state);
   if (!tags_result) {
@@ -485,7 +480,7 @@ auto get_tag_tree(Core::State::AppState& app_state)
     std::int64_t count;
   };
 
-  auto count_result = Core::Database::query<TagAssetCount>(app_state, count_sql);
+  auto count_result = core::database::query<TagAssetCount>(app_state, count_sql);
   if (!count_result) {
     return std::unexpected("Failed to query asset counts: " + count_result.error());
   }
@@ -496,17 +491,17 @@ auto get_tag_tree(Core::State::AppState& app_state)
   }
 
   // 3. 创建 id -> TagTreeNode 的映射
-  std::unordered_map<std::int64_t, Types::TagTreeNode> node_map;
+  std::unordered_map<std::int64_t, TagTreeNode> node_map;
 
   // 第一次遍历：创建所有节点
   for (const auto& tag : tags) {
-    Types::TagTreeNode node{.id = tag.id,
-                            .name = tag.name,
-                            .parent_id = tag.parent_id,
-                            .sort_order = tag.sort_order,
-                            .created_at = tag.created_at,
-                            .updated_at = tag.updated_at,
-                            .children = {}};
+    TagTreeNode node{.id = tag.id,
+                     .name = tag.name,
+                     .parent_id = tag.parent_id,
+                     .sort_order = tag.sort_order,
+                     .created_at = tag.created_at,
+                     .updated_at = tag.updated_at,
+                     .children = {}};
 
     node_map[tag.id] = std::move(node);
   }
@@ -524,14 +519,14 @@ auto get_tag_tree(Core::State::AppState& app_state)
   }
 
   // 5. 递归构建树结构
-  auto build_tree = [&](this auto&& self, std::int64_t tag_id) -> Types::TagTreeNode {
+  auto build_tree = [&](this auto&& self, std::int64_t tag_id) -> TagTreeNode {
     auto node_it = node_map.find(tag_id);
     if (node_it == node_map.end()) {
       Logger().error("Tag {} not found in node_map", tag_id);
-      return Types::TagTreeNode{};
+      return TagTreeNode{};
     }
 
-    Types::TagTreeNode node = std::move(node_it->second);
+    TagTreeNode node = std::move(node_it->second);
 
     // 递归构建子节点
     auto children_it = parent_to_children.find(tag_id);
@@ -545,24 +540,23 @@ auto get_tag_tree(Core::State::AppState& app_state)
   };
 
   // 6. 构建所有根节点
-  std::vector<Types::TagTreeNode> root_nodes;
+  std::vector<TagTreeNode> root_nodes;
   for (std::int64_t root_id : root_ids) {
     root_nodes.push_back(build_tree(root_id));
   }
 
   // 7. 对根节点按 sort_order 和 name 排序
-  std::sort(root_nodes.begin(), root_nodes.end(),
-            [](const Types::TagTreeNode& a, const Types::TagTreeNode& b) {
-              if (a.sort_order != b.sort_order) {
-                return a.sort_order < b.sort_order;
-              }
-              return a.name < b.name;
-            });
+  std::sort(root_nodes.begin(), root_nodes.end(), [](const TagTreeNode& a, const TagTreeNode& b) {
+    if (a.sort_order != b.sort_order) {
+      return a.sort_order < b.sort_order;
+    }
+    return a.name < b.name;
+  });
 
   // 递归排序所有子节点
-  auto sort_children = [&](this auto&& self, Types::TagTreeNode& node) -> void {
+  auto sort_children = [&](this auto&& self, TagTreeNode& node) -> void {
     std::sort(node.children.begin(), node.children.end(),
-              [](const Types::TagTreeNode& a, const Types::TagTreeNode& b) {
+              [](const TagTreeNode& a, const TagTreeNode& b) {
                 if (a.sort_order != b.sort_order) {
                   return a.sort_order < b.sort_order;
                 }
@@ -579,7 +573,7 @@ auto get_tag_tree(Core::State::AppState& app_state)
   }
 
   // 8. 递归计算每个标签的 asset_count（包含所有子标签）
-  auto calculate_total_assets = [&](this auto&& self, Types::TagTreeNode& node) -> std::int64_t {
+  auto calculate_total_assets = [&](this auto&& self, TagTreeNode& node) -> std::int64_t {
     // 当前标签的直接资产数量
     std::int64_t total = 0;
     auto it = direct_asset_counts.find(node.id);
@@ -605,4 +599,4 @@ auto get_tag_tree(Core::State::AppState& app_state)
   return root_nodes;
 }
 
-}  // namespace Features::Gallery::Tag::Repository
+}  // namespace features::gallery::tag::repository

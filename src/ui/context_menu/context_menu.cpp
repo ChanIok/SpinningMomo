@@ -1,10 +1,12 @@
 #include "ui/context_menu/context_menu.hpp"
 
-#include <d2d1.h>
-#include <dwmapi.h>
-#include <dwrite.h>
-#include <windows.h>
-#include <wrl/client.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/dwrite.hpp"
+#include "vendor/windows/wrl/client.hpp"
 
 #include "core/commands/registry.hpp"
 #include "core/commands/types.hpp"
@@ -26,18 +28,17 @@
 #include "ui/floating_window/types.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
-#include "vendor/windows.hpp"
 
-namespace UI::ContextMenu {
+namespace ui::context_menu {
 
-auto cancel_open_animation_timer(Core::State::AppState& state) -> void {
+auto cancel_open_animation_timer(core::AppState& state) -> void {
   if (state.context_menu->hwnd) {
-    KillTimer(state.context_menu->hwnd, Types::OPEN_ANIMATION_TIMER_ID);
+    KillTimer(state.context_menu->hwnd, OPEN_ANIMATION_TIMER_ID);
   }
 }
 
 // 启动淡入动画：将 opacity 置零并启动帧定时器驱动后续渐变
-auto start_open_animation(Core::State::AppState& state, Types::MenuOpenAnimation& animation,
+auto start_open_animation(core::AppState& state, MenuOpenAnimation& animation,
                           std::chrono::milliseconds duration) -> void {
   animation.active = true;
   animation.start_time = std::chrono::steady_clock::now();
@@ -45,8 +46,8 @@ auto start_open_animation(Core::State::AppState& state, Types::MenuOpenAnimation
   animation.opacity = 0.0f;
 
   if (state.context_menu->hwnd) {
-    SetTimer(state.context_menu->hwnd, Types::OPEN_ANIMATION_TIMER_ID,
-             Types::OPEN_ANIMATION_FRAME_INTERVAL, nullptr);
+    SetTimer(state.context_menu->hwnd, OPEN_ANIMATION_TIMER_ID, OPEN_ANIMATION_FRAME_INTERVAL,
+             nullptr);
   }
 }
 
@@ -76,7 +77,7 @@ auto register_context_menu_class(HINSTANCE instance, WNDPROC wnd_proc) -> bool {
   return true;
 }
 
-auto create_context_menu_window(HINSTANCE instance, Core::State::AppState* app_state, HWND owner,
+auto create_context_menu_window(HINSTANCE instance, core::AppState* app_state, HWND owner,
                                 const POINT& position, const SIZE& size) -> HWND {
   HWND hwnd = CreateWindowExW(
       WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"SpinningMomoContextMenuClass",
@@ -93,7 +94,7 @@ auto create_context_menu_window(HINSTANCE instance, Core::State::AppState* app_s
 }
 
 // 隐藏并销毁菜单窗口
-void hide_and_destroy_menu(Core::State::AppState& state) {
+void hide_and_destroy_menu(core::AppState& state) {
   cancel_open_animation_timer(state);
 
   // 先销毁子菜单
@@ -101,7 +102,7 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
     DestroyWindow(state.context_menu->submenu_hwnd);
     state.context_menu->submenu_hwnd = nullptr;
     // 确保清理子菜单D2D资源
-    RenderContext::cleanup_submenu(state);
+    render_context::cleanup_submenu(state);
   }
 
   // 再销毁主菜单
@@ -109,11 +110,11 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
     DestroyWindow(state.context_menu->hwnd);
     state.context_menu->hwnd = nullptr;
     // 确保清理主菜单D2D资源
-    RenderContext::cleanup_context_menu(state);
+    render_context::cleanup_context_menu(state);
   }
 
   // 重置交互状态，避免旧菜单残留的hover/定时意图影响下一次显示。
-  UI::ContextMenu::Interaction::reset(state);
+  ui::context_menu::interaction::reset(state);
   // 动画一并归零，否则下次 Show 会残留上次的 opacity
   state.context_menu->main_animation = {};
   state.context_menu->submenu_animation = {};
@@ -121,36 +122,35 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
 }
 
 // 处理菜单命令
-void handle_menu_action(Core::State::AppState& state,
-                        const UI::ContextMenu::Types::MenuItem& item) {
+void handle_menu_action(core::AppState& state, const ui::context_menu::MenuItem& item) {
   if (!item.has_action()) {
-    Logger().warn("Menu item '{}' has no associated action", Utils::String::ToUtf8(item.text));
+    Logger().warn("Menu item '{}' has no associated action", utils::string::ToUtf8(item.text));
     return;
   }
   const auto& action = item.action.value();
 
   // 根据动作类型发送相应的事件
   switch (action.type) {
-    case UI::ContextMenu::Types::MenuAction::Type::WindowSelection: {
+    case ui::context_menu::MenuAction::Type::WindowSelection: {
       try {
-        auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
+        auto window_info = std::any_cast<features::window_control::WindowInfo>(action.data);
         // 使用新的事件系统发送窗口选择事件
-        Core::Events::send(state, UI::FloatingWindow::Events::WindowSelectionEvent{
+        core::events::send(state, ui::floating_window::events::WindowSelectionEvent{
                                       window_info.title, window_info.handle});
-        Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
+        Logger().info("Window selected: {}", utils::string::ToUtf8(window_info.title));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast window selection data: {}", e.what());
       }
       break;
     }
 
-    case UI::ContextMenu::Types::MenuAction::Type::RatioSelection: {
+    case ui::context_menu::MenuAction::Type::RatioSelection: {
       try {
-        auto ratio_data = std::any_cast<UI::ContextMenu::Types::RatioData>(action.data);
+        auto ratio_data = std::any_cast<ui::context_menu::RatioData>(action.data);
         // 使用新的事件系统发送比例改变事件
-        Core::Events::send(state, UI::FloatingWindow::Events::RatioChangeEvent{
+        core::events::send(state, ui::floating_window::events::RatioChangeEvent{
                                       ratio_data.index, ratio_data.name, ratio_data.ratio});
-        Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
+        Logger().info("Ratio selected: {} ({})", utils::string::ToUtf8(ratio_data.name),
                       ratio_data.ratio);
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast ratio selection data: {}", e.what());
@@ -158,26 +158,26 @@ void handle_menu_action(Core::State::AppState& state,
       break;
     }
 
-    case UI::ContextMenu::Types::MenuAction::Type::ResolutionSelection: {
+    case ui::context_menu::MenuAction::Type::ResolutionSelection: {
       try {
-        auto resolution_data = std::any_cast<UI::ContextMenu::Types::ResolutionData>(action.data);
+        auto resolution_data = std::any_cast<ui::context_menu::ResolutionData>(action.data);
         // 使用新的事件系统发送分辨率改变事件
-        Core::Events::send(state, UI::FloatingWindow::Events::ResolutionChangeEvent{
+        core::events::send(state, ui::floating_window::events::ResolutionChangeEvent{
                                       resolution_data.index, resolution_data.name});
-        Logger().info("Resolution selected: {}", Utils::String::ToUtf8(resolution_data.name));
+        Logger().info("Resolution selected: {}", utils::string::ToUtf8(resolution_data.name));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast resolution selection data: {}", e.what());
       }
       break;
     }
 
-    case UI::ContextMenu::Types::MenuAction::Type::FeatureToggle:
-    case UI::ContextMenu::Types::MenuAction::Type::SystemCommand: {
+    case ui::context_menu::MenuAction::Type::FeatureToggle:
+    case ui::context_menu::MenuAction::Type::SystemCommand: {
       // 两者都携带 action_id 字符串，走 Commands 注册表统一派发
       try {
         auto action_id = std::any_cast<std::string>(action.data);
 
-        Core::Commands::invoke_command(state, action_id);
+        core::commands::invoke_command(state, action_id);
 
         Logger().info("Feature action triggered: {}", action_id);
       } catch (const std::bad_any_cast& e) {
@@ -193,11 +193,11 @@ void handle_menu_action(Core::State::AppState& state,
 }
 
 // 隐藏子菜单
-auto hide_submenu(Core::State::AppState& state) -> void {
+auto hide_submenu(core::AppState& state) -> void {
   if (state.context_menu->submenu_hwnd) {
     state.context_menu->submenu_animation = {};
     DestroyWindow(state.context_menu->submenu_hwnd);
-    RenderContext::cleanup_submenu(state);
+    render_context::cleanup_submenu(state);
     state.context_menu->submenu_hwnd = nullptr;
     state.context_menu->submenu_parent_index = -1;
     state.context_menu->interaction.submenu_hover_index = -1;
@@ -205,7 +205,7 @@ auto hide_submenu(Core::State::AppState& state) -> void {
 }
 
 // 显示子菜单
-auto show_submenu(Core::State::AppState& state, int index) -> void {
+auto show_submenu(core::AppState& state, int index) -> void {
   auto& menu_state = *state.context_menu;
   Logger().debug("show_submenu called with index: {}", index);
 
@@ -219,7 +219,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
 
   const auto& item = menu_state.items[index];
   Logger().debug("Item at index {}: text='{}', has_submenu={}", index,
-                 Utils::String::ToUtf8(item.text), item.has_submenu());
+                 utils::string::ToUtf8(item.text), item.has_submenu());
 
   if (!item.has_submenu()) {
     return;
@@ -229,8 +229,8 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   menu_state.submenu_parent_index = index;
 
   // 计算子菜单尺寸和位置
-  Layout::calculate_submenu_size(state);
-  Layout::calculate_submenu_position(state, index);
+  layout::calculate_submenu_size(state);
+  layout::calculate_submenu_position(state, index);
 
   // 创建子菜单窗口
   HINSTANCE instance = state.floating_window->window.instance;
@@ -246,7 +246,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   Logger().debug("Created submenu window: {}", (void*)menu_state.submenu_hwnd);
 
   // 初始化D2D资源
-  if (!UI::ContextMenu::RenderContext::initialize_submenu(state, menu_state.submenu_hwnd)) {
+  if (!ui::context_menu::render_context::initialize_submenu(state, menu_state.submenu_hwnd)) {
     Logger().error("Failed to initialize D2D for submenu.");
     DestroyWindow(menu_state.submenu_hwnd);
     menu_state.submenu_hwnd = nullptr;
@@ -255,9 +255,9 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   }
 
   // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
-  start_open_animation(state, menu_state.submenu_animation, Types::OPEN_ANIMATION_DURATION);
+  start_open_animation(state, menu_state.submenu_animation, OPEN_ANIMATION_DURATION);
   RECT client_rect{0, 0, menu_state.submenu_size.cx, menu_state.submenu_size.cy};
-  UI::ContextMenu::Painter::paint_submenu(state, client_rect);
+  ui::context_menu::painter::paint_submenu(state, client_rect);
 
   // 显示窗口
   ShowWindow(menu_state.submenu_hwnd, SW_SHOW);
@@ -268,7 +268,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
 }
 
 // 注册菜单窗口类，应用启动时调用一次
-auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& app_state) -> std::expected<void, std::string> {
   try {
     // 初始化上下文菜单状态
     if (!app_state.context_menu) {
@@ -277,7 +277,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     // 注册窗口类
     if (!register_context_menu_class(app_state.floating_window->window.instance,
-                                     MessageHandler::static_window_proc)) {
+                                     message_handler::static_window_proc)) {
       return std::unexpected("Failed to register context menu window class");
     }
 
@@ -289,7 +289,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 }
 
 // 释放菜单子系统全部资源，应用退出时调用
-auto cleanup(Core::State::AppState& app_state) -> void {
+auto cleanup(core::AppState& app_state) -> void {
   // 清理上下文菜单资源
   if (app_state.context_menu) {
     // 销毁任何可能存在的窗口
@@ -306,9 +306,9 @@ auto cleanup(Core::State::AppState& app_state) -> void {
     }
 
     // 清理D2D资源
-    RenderContext::cleanup_submenu(app_state);
-    RenderContext::cleanup_context_menu(app_state);
-    UI::ContextMenu::Interaction::reset(app_state);
+    render_context::cleanup_submenu(app_state);
+    render_context::cleanup_context_menu(app_state);
+    ui::context_menu::interaction::reset(app_state);
     app_state.context_menu->main_animation = {};
     app_state.context_menu->submenu_animation = {};
     app_state.context_menu->submenu_parent_index = -1;
@@ -316,8 +316,7 @@ auto cleanup(Core::State::AppState& app_state) -> void {
 }
 
 // 主入口：回收旧实例 → 布局计算 → 创建窗口 → D2D 初始化 → 淡入 → 显示
-auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
-          const Vendor::Windows::POINT& position) -> void {
+auto Show(core::AppState& app_state, std::vector<MenuItem> items, const POINT& position) -> void {
   // 若已有菜单实例，先回收，确保状态机从干净状态重新开始。
   if (app_state.context_menu->hwnd || app_state.context_menu->submenu_hwnd) {
     hide_and_destroy_menu(app_state);
@@ -325,7 +324,7 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
 
   // 1. 更新菜单状态
   auto& menu_state = *app_state.context_menu;
-  UI::ContextMenu::Interaction::reset(app_state);
+  ui::context_menu::interaction::reset(app_state);
   menu_state.submenu_parent_index = -1;
   menu_state.items = std::move(items);
   menu_state.position = position;
@@ -341,14 +340,14 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   UINT dpi = app_state.floating_window->window.dpi;
   menu_state.layout.update_dpi_scaling(dpi);
 
-  if (!RenderContext::initialize_text_format(app_state)) {
+  if (!render_context::initialize_text_format(app_state)) {
     Logger().error("Failed to initialize text format for context menu.");
     return;
   }
 
   // 3. 计算布局和最终位置
-  Layout::calculate_menu_size(app_state);
-  menu_state.position = Layout::calculate_menu_position(app_state, position);
+  layout::calculate_menu_size(app_state);
+  menu_state.position = layout::calculate_menu_position(app_state, position);
 
   // 4. 创建窗口（直接使用最终位置和尺寸）
   HINSTANCE instance = app_state.floating_window->window.instance;
@@ -361,7 +360,7 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   }
 
   // 5. 初始化D2D资源
-  if (!RenderContext::initialize_context_menu(app_state, menu_state.hwnd)) {
+  if (!render_context::initialize_context_menu(app_state, menu_state.hwnd)) {
     Logger().error("Failed to initialize D2D for context menu.");
     DestroyWindow(menu_state.hwnd);
     menu_state.hwnd = nullptr;
@@ -369,13 +368,13 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   }
 
   // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
-  start_open_animation(app_state, menu_state.main_animation, Types::OPEN_ANIMATION_DURATION);
+  start_open_animation(app_state, menu_state.main_animation, OPEN_ANIMATION_DURATION);
   RECT client_rect{0, 0, menu_state.menu_size.cx, menu_state.menu_size.cy};
-  Painter::paint_context_menu(app_state, client_rect);
+  painter::paint_context_menu(app_state, client_rect);
 
   // 6. 显示窗口并设置为前景
   ShowWindow(menu_state.hwnd, SW_SHOWNA);
   SetForegroundWindow(menu_state.hwnd);
 }
 
-}  // namespace UI::ContextMenu
+}  // namespace ui::context_menu

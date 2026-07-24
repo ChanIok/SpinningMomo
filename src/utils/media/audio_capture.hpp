@@ -1,12 +1,13 @@
 #pragma once
 
-#include <audioclient.h>
-#include <mmdeviceapi.h>
-#include <wil/com.h>
-#include <wil/resource.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Media::AudioCapture {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/audioclient.hpp"
+#include "vendor/windows/mmdeviceapi.hpp"
+
+namespace utils::media::audio_capture {
 
 // 音频源类型
 enum class AudioSource {
@@ -58,4 +59,4 @@ auto stop(AudioCaptureContext& ctx) -> void;
 // 清理音频资源
 auto cleanup(AudioCaptureContext& ctx) -> void;
 
-}  // namespace Utils::Media::AudioCapture
+}  // namespace utils::media::audio_capture

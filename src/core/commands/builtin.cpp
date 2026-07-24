@@ -1,5 +1,9 @@
 
 
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+
 #include "core/commands/registry.hpp"
 #include "core/commands/state.hpp"
 #include "core/commands/types.hpp"
@@ -22,9 +26,8 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 #include "utils/system/system.hpp"
-#include "vendor/windows.hpp"
 
-namespace Core::Commands {
+namespace core::commands {
 
 // 注册单个内置命令：拒绝重复 ID，并把行为所有权移入注册表
 auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void {
@@ -43,7 +46,7 @@ auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -
 }
 
 // 注册所有内置命令
-auto register_builtin_commands(Core::State::AppState& state) -> void {
+auto register_builtin_commands(core::AppState& state) -> void {
   auto& registry = state.commands->registry;
   Logger().info("Registering builtin commands...");
 
@@ -55,7 +58,7 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                        .id = "app.main",
                        .i18n_key = "menu.app_main",
                        .is_toggle = false,
-                       .action = [&state]() { UI::WebViewWindow::activate_window(state); },
+                       .action = [&state]() { ui::webview_window::activate_window(state); },
                    });
 
   // 退出应用
@@ -63,7 +66,7 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                                  .id = "app.exit",
                                  .i18n_key = "menu.app_exit",
                                  .is_toggle = false,
-                                 .action = []() { Vendor::Windows::PostQuitMessage(0); },
+                                 .action = []() { PostQuitMessage(0); },
                              });
 
   // === 悬浮窗控制 ===
@@ -74,7 +77,7 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                        .id = "app.float",
                        .i18n_key = "menu.app_float",
                        .is_toggle = false,
-                       .action = [&state]() { UI::FloatingWindow::toggle_visibility(state); },
+                       .action = [&state]() { ui::floating_window::toggle_visibility(state); },
                        .hotkey =
                            HotkeyBinding{
                                .modifiers = 1,  // MOD_CONTROL
@@ -86,19 +89,18 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
   // === 截图功能 ===
 
   // 截图
-  register_command(registry,
-                   {
-                       .id = "screenshot.capture",
-                       .i18n_key = "menu.screenshot_capture",
-                       .is_toggle = false,
-                       .action = [&state]() { Features::Screenshot::UseCase::capture(state); },
-                       .hotkey =
-                           HotkeyBinding{
-                               .modifiers = 0,  // 无修饰键
-                               .key = 44,       // VK_SNAPSHOT (PrintScreen)
-                               .settings_path = "app.hotkey.screenshot",
-                           },
-                   });
+  register_command(registry, {
+                                 .id = "screenshot.capture",
+                                 .i18n_key = "menu.screenshot_capture",
+                                 .is_toggle = false,
+                                 .action = [&state]() { features::screenshot::capture(state); },
+                                 .hotkey =
+                                     HotkeyBinding{
+                                         .modifiers = 0,  // 无修饰键
+                                         .key = 44,       // VK_SNAPSHOT (PrintScreen)
+                                         .settings_path = "app.hotkey.screenshot",
+                                     },
+                             });
 
   // 打开输出目录
   register_command(
@@ -110,14 +112,14 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
           .action =
               [&state]() {
                 auto output_dir_result =
-                    Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+                    utils::path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
                 if (!output_dir_result) {
                   Logger().error("Failed to resolve output directory: {}",
                                  output_dir_result.error());
                   return;
                 }
 
-                auto open_result = Utils::System::open_directory(output_dir_result.value());
+                auto open_result = utils::system::open_directory(output_dir_result.value());
                 if (!open_result) {
                   Logger().error("Failed to open output directory: {}", open_result.error());
                 }
@@ -140,7 +142,7 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                   folder_to_open = external_album_path;
                 } else {
                   auto output_dir_result =
-                      Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+                      utils::path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
                   if (!output_dir_result) {
                     Logger().error("Failed to resolve fallback output directory: {}",
                                    output_dir_result.error());
@@ -149,7 +151,7 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                   folder_to_open = output_dir_result.value();
                 }
 
-                auto open_result = Utils::System::open_directory(folder_to_open);
+                auto open_result = utils::system::open_directory(folder_to_open);
                 if (!open_result) {
                   Logger().error("Failed to open external album directory: {}",
                                  open_result.error());
@@ -167,8 +169,8 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                     .is_toggle = true,
                     .action =
                         [&state]() {
-                          Features::Preview::UseCase::toggle_preview(state);
-                          UI::FloatingWindow::request_repaint(state);
+                          features::preview::toggle_preview(state);
+                          ui::floating_window::request_repaint(state);
                         },
                     .get_state = [&state]() -> bool {
                       return state.preview ? state.preview->running.load(std::memory_order_acquire)
@@ -183,8 +185,8 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                                  .is_toggle = true,
                                  .action =
                                      [&state]() {
-                                       Features::Overlay::UseCase::toggle_overlay(state);
-                                       UI::FloatingWindow::request_repaint(state);
+                                       features::overlay::toggle_overlay(state);
+                                       ui::floating_window::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
                                    return state.overlay && state.overlay->enabled;
@@ -199,8 +201,8 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                        .is_toggle = true,
                        .action =
                            [&state]() {
-                             Features::Photography::UseCase::toggle(state);
-                             UI::FloatingWindow::request_repaint(state);
+                             features::photography::toggle(state);
+                             ui::floating_window::request_repaint(state);
                            },
                        .get_state = [&state]() -> bool { return state.photography->enabled; },
                    });
@@ -212,8 +214,8 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                                  .is_toggle = true,
                                  .action =
                                      [&state]() {
-                                       Features::Letterbox::UseCase::toggle_letterbox(state);
-                                       UI::FloatingWindow::request_repaint(state);
+                                       features::letterbox::toggle_letterbox(state);
+                                       ui::floating_window::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
                                    return state.letterbox && state.letterbox->enabled;
@@ -228,11 +230,10 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                     .is_toggle = true,
                     .action =
                         [&state]() {
-                          if (auto result = Features::Recording::UseCase::toggle_recording(state);
-                              !result) {
+                          if (auto result = features::recording::toggle_recording(state); !result) {
                             Logger().error("Recording toggle failed: {}", result.error());
                           }
-                          UI::FloatingWindow::request_repaint(state);
+                          ui::floating_window::request_repaint(state);
                         },
                     .get_state = [&state]() -> bool {
                       if (!state.recording) {
@@ -240,9 +241,9 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                       }
 
                       const auto status = state.recording->status.load(std::memory_order_acquire);
-                      return status == Features::Recording::Types::RecordingStatus::Starting ||
-                             status == Features::Recording::Types::RecordingStatus::Recording ||
-                             status == Features::Recording::Types::RecordingStatus::Stopping;
+                      return status == features::recording::RecordingStatus::Starting ||
+                             status == features::recording::RecordingStatus::Recording ||
+                             status == features::recording::RecordingStatus::Stopping;
                     },
                     .hotkey =
                         HotkeyBinding{
@@ -261,10 +262,10 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
           .id = "window.reset",
           .i18n_key = "menu.window_reset",
           .is_toggle = false,
-          .action = [&state]() { Features::WindowControl::UseCase::reset_window_transform(state); },
+          .action = [&state]() { features::window_control::reset_window_transform(state); },
       });
 
   Logger().info("Registered {} builtin commands", registry.descriptors.size());
 }
 
-}  // namespace Core::Commands
+}  // namespace core::commands

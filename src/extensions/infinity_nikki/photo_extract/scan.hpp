@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Extensions::InfinityNikki::PhotoExtract::Scan {
+#include "vendor/std.hpp"
+
+namespace extensions::infinity_nikki::photo_extract::scan {
 
 struct CandidateAssetRow {
   std::int64_t id;
@@ -18,4 +20,4 @@ auto prepare_photo_extract_entry(const CandidateAssetRow& candidate,
                                  const std::optional<std::string>& uid_override = std::nullopt)
     -> std::expected<PreparedPhotoExtractEntry, std::string>;
 
-}  // namespace Extensions::InfinityNikki::PhotoExtract::Scan
+}  // namespace extensions::infinity_nikki::photo_extract::scan

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::State {
+namespace features::gallery {
 
 enum class PendingFileChangeAction { UPSERT, REMOVE };
 
@@ -39,7 +41,7 @@ struct FolderWatcherState {
   // 监听的根目录（Gallery 内部规范路径：absolute + lexical normal + generic slash）
   std::filesystem::path root_path;
   // watcher 同步时使用的运行时扫描选项（不包含 ignore_rules）。
-  Types::ScanOptions scan_options{};
+  ScanOptions scan_options{};
   // 监听线程只读取该 root 的文件系统通知。
   std::jthread watch_thread;
   // 串行监听线程的启动与停止，避免运行时移除和启动同时改写 jthread。
@@ -73,11 +75,11 @@ struct FolderWatcherState {
   // watcher 早期过滤使用的忽略规则缓存：
   // 文件系统事件可能非常密集，如果每个通知批次都查 DB 加载规则，会把“忽略目录里的
   // 大量无关文件变动”变成数据库压力。这里缓存最近一次加载结果，版本变化时再失效。
-  std::optional<std::vector<Types::IgnoreRule>> cached_ignore_rules;
+  std::optional<std::vector<IgnoreRule>> cached_ignore_rules;
   std::uint64_t cached_ignore_rules_version = 0;
 
   // 扫描完成后的回调（可选），由注册方注入，扫描有变化时触发
-  std::function<void(const Types::ScanResult&)> post_scan_callback;
+  std::function<void(const ScanResult&)> post_scan_callback;
 };
 
 struct GalleryState {
@@ -131,4 +133,4 @@ struct GalleryState {
       inherit_asset_data_callback;
 };
 
-}  // namespace Features::Gallery::State
+}  // namespace features::gallery

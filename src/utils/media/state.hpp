@@ -1,14 +1,16 @@
 #pragma once
 
-#include <d3d11.h>
-#include <mfidl.h>
-#include <mfreadwrite.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/mfidl.hpp"
+#include "vendor/windows/mfreadwrite.hpp"
 
 #include "utils/media/hdr_convert.hpp"
 
-namespace Utils::Media::Encoder::State {
+namespace utils::media::encoder {
 
 // 编码器上下文
 struct EncoderContext {
@@ -30,7 +32,7 @@ struct EncoderContext {
   UINT reset_token = 0;
   bool gpu_encoding = false;
   bool hdr_encoding = false;
-  Utils::Media::HdrConvert::ConverterContext hdr_converter;
+  utils::media::hdr_convert::ConverterContext hdr_converter;
 
   // 音频流
   DWORD audio_stream_index = 0;  // 音频流索引
@@ -39,4 +41,4 @@ struct EncoderContext {
   // 注：线程同步由调用方管理，因为 std::mutex 不可移动，无法放在 std::expected 返回值中
 };
 
-}  // namespace Utils::Media::Encoder::State
+}  // namespace utils::media::encoder

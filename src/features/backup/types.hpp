@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Backup::Types {
+#include "vendor/std.hpp"
+
+namespace features::backup {
 
 struct ExportParams {
   std::string destination_directory;
@@ -21,4 +23,4 @@ struct RestoreResult {
   bool scheduled = false;
 };
 
-}  // namespace Features::Backup::Types
+}  // namespace features::backup

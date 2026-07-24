@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Overlay::Shaders {
+#include "vendor/std.hpp"
+
+namespace features::overlay::shaders {
 
 // 基本渲染着色器（用于显示捕获的游戏画面）
 const std::string BASIC_VERTEX_SHADER = R"(
@@ -28,4 +30,4 @@ float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
 }
 )";
 
-}  // namespace Features::Overlay::Shaders
+}  // namespace features::overlay::shaders

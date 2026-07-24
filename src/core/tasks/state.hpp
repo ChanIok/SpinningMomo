@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::Tasks::State {
+#include "vendor/std.hpp"
+
+namespace core::tasks {
 
 struct TaskProgress {
   std::string stage;
@@ -30,4 +32,4 @@ struct TaskState {
   size_t history_limit = 30;
 };
 
-}  // namespace Core::Tasks::State
+}  // namespace core::tasks

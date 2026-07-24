@@ -1,19 +1,21 @@
 #include "core/http_server/sse_manager.hpp"
 
-#include <uwebsockets/App.h>
+#include "vendor/std.hpp"
+
+#include "vendor/uwebsockets.hpp"
 
 #include "core/http_server/state.hpp"
 #include "core/http_server/types.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::HttpServer::SseManager {
+namespace core::http_server::sse_manager {
 
 auto format_sse_message(const std::string& event_data) -> std::string {
   return std::format("data: {}\n\n", event_data);
 }
 
-auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* response,
+auto add_connection(core::AppState& state, uWS::HttpResponse<false>* response,
                     std::string allowed_origin) -> void {
   if (!state.http_server || !response) {
     Logger().error("Cannot add SSE connection: invalid state or response");
@@ -24,7 +26,7 @@ auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* resp
   auto& counter = state.http_server->client_counter;
   auto& mtx = state.http_server->sse_connections_mutex;
 
-  auto connection = std::make_shared<Types::SseConnection>();
+  auto connection = std::make_shared<SseConnection>();
   connection->response = response;
   connection->client_id = std::to_string(++counter);
   connection->connected_at = std::chrono::system_clock::now();
@@ -53,7 +55,7 @@ auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* resp
                 current_count);
 }
 
-auto remove_connection(Core::State::AppState& state, const std::string& client_id) -> void {
+auto remove_connection(core::AppState& state, const std::string& client_id) -> void {
   if (!state.http_server) {
     return;
   }
@@ -65,7 +67,7 @@ auto remove_connection(Core::State::AppState& state, const std::string& client_i
 
   auto old_size = connections.size();
   auto it = std::remove_if(connections.begin(), connections.end(),
-                           [&client_id](const std::shared_ptr<Types::SseConnection>& conn) {
+                           [&client_id](const std::shared_ptr<SseConnection>& conn) {
                              if (conn && conn->client_id == client_id) {
                                conn->is_closed = true;
                                return true;
@@ -79,7 +81,7 @@ auto remove_connection(Core::State::AppState& state, const std::string& client_i
   }
 }
 
-auto close_all_connections(Core::State::AppState& state) -> void {
+auto close_all_connections(core::AppState& state) -> void {
   if (!state.http_server) {
     return;
   }
@@ -87,7 +89,7 @@ auto close_all_connections(Core::State::AppState& state) -> void {
   auto& connections = state.http_server->sse_connections;
   auto& mtx = state.http_server->sse_connections_mutex;
 
-  std::vector<std::shared_ptr<Types::SseConnection>> snapshot;
+  std::vector<std::shared_ptr<SseConnection>> snapshot;
   {
     std::lock_guard<std::mutex> lock(mtx);
     snapshot.reserve(connections.size());
@@ -113,7 +115,7 @@ auto close_all_connections(Core::State::AppState& state) -> void {
   Logger().info("Closed {} SSE connections during shutdown", closed_count);
 }
 
-auto broadcast_event(Core::State::AppState& state, const std::string& event_data) -> void {
+auto broadcast_event(core::AppState& state, const std::string& event_data) -> void {
   if (!state.http_server || !state.http_server->is_running) {
     return;
   }
@@ -133,7 +135,7 @@ auto broadcast_event(Core::State::AppState& state, const std::string& event_data
     auto& connections = state.http_server->sse_connections;
     auto& mtx = state.http_server->sse_connections_mutex;
 
-    std::vector<std::shared_ptr<Types::SseConnection>> snapshot;
+    std::vector<std::shared_ptr<SseConnection>> snapshot;
     {
       std::lock_guard<std::mutex> lock(mtx);
       snapshot.reserve(connections.size());
@@ -160,7 +162,7 @@ auto broadcast_event(Core::State::AppState& state, const std::string& event_data
   });
 }
 
-auto get_connection_count(const Core::State::AppState& state) -> size_t {
+auto get_connection_count(const core::AppState& state) -> size_t {
   if (!state.http_server) {
     return 0;
   }
@@ -171,4 +173,4 @@ auto get_connection_count(const Core::State::AppState& state) -> size_t {
   std::lock_guard<std::mutex> lock(mtx);
   return connections.size();
 }
-}  // namespace Core::HttpServer::SseManager
+}  // namespace core::http_server::sse_manager

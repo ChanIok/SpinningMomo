@@ -1,7 +1,9 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 // 路径工具命名空间
-namespace Utils::Path {
+namespace utils::path {
 
 // 应用运行模式
 enum class AppMode {
@@ -85,4 +87,4 @@ auto NormalizeForComparison(const std::filesystem::path& path) -> std::wstring;
 auto IsPathWithinBase(const std::filesystem::path& target, const std::filesystem::path& base)
     -> bool;
 
-}  // namespace Utils::Path
+}  // namespace utils::path

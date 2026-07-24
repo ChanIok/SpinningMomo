@@ -1,7 +1,9 @@
 #include "core/rpc/endpoints/update/update.hpp"
 
-#include <asio.hpp>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
 
 #include "core/rpc/rpc.hpp"
 #include "core/rpc/state.hpp"
@@ -10,63 +12,61 @@
 #include "features/update/types.hpp"
 #include "features/update/update.hpp"
 
-namespace Core::RPC::Endpoints::Update {
+namespace core::rpc::endpoints::update {
 
-auto handle_check_for_update(Core::State::AppState& app_state,
-                             [[maybe_unused]] const rfl::Generic& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::CheckUpdateResult>> {
-  auto result = co_await Features::Update::check_for_update(app_state);
+auto handle_check_for_update(core::AppState& app_state, [[maybe_unused]] const rfl::Generic& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::update::CheckUpdateResult>> {
+  auto result = co_await features::update::check_for_update(app_state);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_start_download(Core::State::AppState& app_state,
-                           [[maybe_unused]] const rfl::Generic& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::StartDownloadUpdateResult>> {
-  auto result = co_await Features::Update::start_download_update_task(app_state);
+auto handle_start_download(core::AppState& app_state, [[maybe_unused]] const rfl::Generic& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::update::StartDownloadUpdateResult>> {
+  auto result = co_await features::update::start_download_update_task(app_state);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_install_update(Core::State::AppState& app_state,
-                           const Features::Update::Types::InstallUpdateParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::InstallUpdateResult>> {
-  auto result = Features::Update::install_update(app_state, params);
+auto handle_install_update(core::AppState& app_state,
+                           const features::update::InstallUpdateParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::update::InstallUpdateResult>> {
+  auto result = features::update::install_update(app_state, params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto register_all(Core::State::AppState& app_state) -> void {
-  Core::RPC::register_method<rfl::Generic, Features::Update::Types::CheckUpdateResult>(
+auto register_all(core::AppState& app_state) -> void {
+  core::rpc::register_method<rfl::Generic, features::update::CheckUpdateResult>(
       app_state, app_state.rpc->registry, "update.check_for_update", handle_check_for_update,
       "Check for available updates");
 
-  Core::RPC::register_method<rfl::Generic, Features::Update::Types::StartDownloadUpdateResult>(
+  core::rpc::register_method<rfl::Generic, features::update::StartDownloadUpdateResult>(
       app_state, app_state.rpc->registry, "update.start_download", handle_start_download,
       "Start downloading update package in background");
 
-  Core::RPC::register_method<Features::Update::Types::InstallUpdateParams,
-                             Features::Update::Types::InstallUpdateResult>(
+  core::rpc::register_method<features::update::InstallUpdateParams,
+                             features::update::InstallUpdateResult>(
       app_state, app_state.rpc->registry, "update.install_update", handle_install_update,
       "Install downloaded update");
 }
 
-}  // namespace Core::RPC::Endpoints::Update
+}  // namespace core::rpc::endpoints::update

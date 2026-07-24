@@ -1,5 +1,7 @@
 #include "features/gallery/watcher/sync.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/notifications/types.hpp"
@@ -18,18 +20,17 @@
 #include "utils/string/string.hpp"
 #include "utils/time.hpp"
 
-namespace Features::Gallery::Watcher::Sync {
+namespace features::gallery::watcher::sync {
 
 constexpr std::chrono::milliseconds kDebounceDelay{500};
 constexpr std::chrono::milliseconds kFileStabilityQuietPeriod{2000};
 
-auto schedule_sync_task(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void;
+auto schedule_sync_task(core::AppState& app_state, FolderWatcherState& watcher) -> void;
 
 // 待处理变更快照
 struct PendingSnapshot {
   bool require_full_rescan = false;
-  std::unordered_map<std::string, State::PendingFileChangeAction> file_changes;
+  std::unordered_map<std::string, PendingFileChangeAction> file_changes;
 };
 
 struct ProbedFileState {
@@ -37,15 +38,15 @@ struct ProbedFileState {
   std::int64_t modified_at = 0;
 };
 // 生成默认的目录扫描配置
-auto make_default_scan_options(const std::filesystem::path& root_path) -> Types::ScanOptions {
-  Types::ScanOptions options;
+auto make_default_scan_options(const std::filesystem::path& root_path) -> ScanOptions {
+  ScanOptions options;
   options.directory = root_path.string();
   return options;
 }
 
 // 更新监听器的扫描配置
-auto update_watcher_scan_options(State::FolderWatcherState& watcher,
-                                 const std::optional<Types::ScanOptions>& scan_options) -> void {
+auto update_watcher_scan_options(FolderWatcherState& watcher,
+                                 const std::optional<ScanOptions>& scan_options) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   watcher.scan_options = scan_options.value_or(make_default_scan_options(watcher.root_path));
   watcher.scan_options.directory = watcher.root_path.string();
@@ -56,9 +57,8 @@ auto update_watcher_scan_options(State::FolderWatcherState& watcher,
 }
 
 // 更新扫描完成后的回调函数
-auto update_post_scan_callback(State::FolderWatcherState& watcher,
-                               std::function<void(const Types::ScanResult&)> post_scan_callback)
-    -> void {
+auto update_post_scan_callback(FolderWatcherState& watcher,
+                               std::function<void(const ScanResult&)> post_scan_callback) -> void {
   if (!post_scan_callback) {
     return;
   }
@@ -68,14 +68,13 @@ auto update_post_scan_callback(State::FolderWatcherState& watcher,
 }
 
 // 获取监听器配置的扫描完成后回调函数
-auto get_post_scan_callback(State::FolderWatcherState& watcher)
-    -> std::function<void(const Types::ScanResult&)> {
+auto get_post_scan_callback(FolderWatcherState& watcher) -> std::function<void(const ScanResult&)> {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   return watcher.post_scan_callback;
 }
 
 // 获取监听器当前的扫描配置
-auto get_watcher_scan_options(State::FolderWatcherState& watcher) -> Types::ScanOptions {
+auto get_watcher_scan_options(FolderWatcherState& watcher) -> ScanOptions {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   auto options = watcher.scan_options;
   options.directory = watcher.root_path.string();
@@ -84,20 +83,19 @@ auto get_watcher_scan_options(State::FolderWatcherState& watcher) -> Types::Scan
 }
 
 // 判断当前 root 是否已暂停自动同步。
-auto is_sync_faulted(State::FolderWatcherState& watcher) -> bool {
+auto is_sync_faulted(FolderWatcherState& watcher) -> bool {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
-  return watcher.sync_state == State::WatcherSyncState::Faulted;
+  return watcher.sync_state == WatcherSyncState::Faulted;
 }
 
 // 暂停实时队列消费，让启动恢复先建立一致的索引基线。
-auto begin_startup_recovery(State::FolderWatcherState& watcher) -> void {
+auto begin_startup_recovery(FolderWatcherState& watcher) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   watcher.startup_recovery_in_progress = true;
 }
 
 // 结束启动恢复并唤醒全局编排线程处理期间积累的实时通知。
-auto finish_startup_recovery(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void {
+auto finish_startup_recovery(core::AppState& app_state, FolderWatcherState& watcher) -> void {
   {
     std::lock_guard<std::mutex> lock(watcher.pending_mutex);
     watcher.startup_recovery_in_progress = false;
@@ -106,16 +104,16 @@ auto finish_startup_recovery(Core::State::AppState& app_state, State::FolderWatc
 }
 
 // 将一次成功同步收敛为 Healthy，并清除上次错误。
-auto mark_sync_healthy(State::FolderWatcherState& watcher) -> void {
+auto mark_sync_healthy(FolderWatcherState& watcher) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
-  watcher.sync_state = State::WatcherSyncState::Healthy;
+  watcher.sync_state = WatcherSyncState::Healthy;
   watcher.last_sync_error.reset();
 }
 
 // 将增量失败升级为一次全量恢复，并丢弃已经不再可信的逐文件动作。
-auto prepare_full_recovery(State::FolderWatcherState& watcher, const std::string& error) -> void {
+auto prepare_full_recovery(FolderWatcherState& watcher, const std::string& error) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
-  watcher.sync_state = State::WatcherSyncState::Recovering;
+  watcher.sync_state = WatcherSyncState::Recovering;
   watcher.last_sync_error = error;
   watcher.require_full_rescan = true;
   watcher.pending_file_changes.clear();
@@ -123,9 +121,9 @@ auto prepare_full_recovery(State::FolderWatcherState& watcher, const std::string
 }
 
 // 将全量失败收敛为 Faulted，只保留后续必须全量对账的事实。
-auto mark_sync_faulted(State::FolderWatcherState& watcher, const std::string& error) -> void {
+auto mark_sync_faulted(FolderWatcherState& watcher, const std::string& error) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
-  watcher.sync_state = State::WatcherSyncState::Faulted;
+  watcher.sync_state = WatcherSyncState::Faulted;
   watcher.last_sync_error = error;
   // Faulted 期间不再保存逐文件动作，只保留“必须全量对账”的事实。
   watcher.require_full_rescan = true;
@@ -135,7 +133,7 @@ auto mark_sync_faulted(State::FolderWatcherState& watcher, const std::string& er
 
 // 响应用户重试：把 Faulted 切回 Recovering，并唤醒一次全量同步。
 // 根据当前注册表响应延迟到达的用户重试，已删除或正在停止的 root 直接忽略。
-auto retry_faulted_sync(Core::State::AppState& app_state, const std::string& watcher_key) -> bool {
+auto retry_faulted_sync(core::AppState& app_state, const std::string& watcher_key) -> bool {
   std::lock_guard<std::mutex> watcher_lock(app_state.gallery->folder_watchers_mutex);
   auto it = app_state.gallery->folder_watchers.find(watcher_key);
   if (it == app_state.gallery->folder_watchers.end()) {
@@ -151,11 +149,11 @@ auto retry_faulted_sync(Core::State::AppState& app_state, const std::string& wat
   {
     std::lock_guard<std::mutex> lock(watcher.pending_mutex);
     // 只接受 Faulted -> Recovering，避免重复点击制造额外任务。
-    if (watcher.sync_state != State::WatcherSyncState::Faulted) {
+    if (watcher.sync_state != WatcherSyncState::Faulted) {
       return false;
     }
 
-    watcher.sync_state = State::WatcherSyncState::Recovering;
+    watcher.sync_state = WatcherSyncState::Recovering;
     watcher.last_sync_error.reset();
     watcher.require_full_rescan = true;
     watcher.pending_file_changes.clear();
@@ -167,8 +165,8 @@ auto retry_faulted_sync(Core::State::AppState& app_state, const std::string& wat
 }
 
 // 读取当前语言文本；语言资源尚未就绪时使用调用方提供的默认文案。
-auto get_i18n_text(Core::State::AppState& app_state, std::string_view key,
-                   std::string_view fallback) -> std::string {
+auto get_i18n_text(core::AppState& app_state, std::string_view key, std::string_view fallback)
+    -> std::string {
   if (app_state.i18n) {
     if (auto it = app_state.i18n->texts.find(std::string(key)); it != app_state.i18n->texts.end()) {
       return it->second;
@@ -178,33 +176,33 @@ auto get_i18n_text(Core::State::AppState& app_state, std::string_view key,
 }
 
 // 通知用户当前文件夹已暂停自动同步，并提供一次显式重试入口。
-auto notify_sync_faulted(Core::State::AppState& app_state, State::FolderWatcherState& watcher,
+auto notify_sync_faulted(core::AppState& app_state, FolderWatcherState& watcher,
                          const std::string& error) -> void {
-  Core::Notifications::Types::NotificationOptions options;
+  core::notifications::NotificationOptions options;
   options.title =
-      Utils::String::FromUtf8(get_i18n_text(app_state, "label.app_name", "SpinningMomo"));
+      utils::string::FromUtf8(get_i18n_text(app_state, "label.app_name", "SpinningMomo"));
   auto message = get_i18n_text(
       app_state, "message.gallery_folder_sync_failed",
       "Automatic gallery sync for this folder has been paused. Resolve the problem, then retry.");
-  options.message = Utils::String::FromUtf8(
+  options.message = utils::string::FromUtf8(
       std::format("{}\n{}\n{}", message, watcher.root_path.string(), error));
   options.duration = std::chrono::milliseconds(15000);
 
   // 通知可能晚于 watcher 生命周期，只保存稳定 key，并在点击时按 AppState 当前事实重查。
   auto watcher_key = watcher.root_path.string();
-  options.action = Core::Notifications::Types::NotificationAction{
+  options.action = core::notifications::NotificationAction{
       .label =
-          Utils::String::FromUtf8(get_i18n_text(app_state, "notification.action.retry", "Retry")),
+          utils::string::FromUtf8(get_i18n_text(app_state, "notification.action.retry", "Retry")),
       .callback =
-          [watcher_key = std::move(watcher_key)](Core::State::AppState& callback_state) {
+          [watcher_key = std::move(watcher_key)](core::AppState& callback_state) {
             retry_faulted_sync(callback_state, watcher_key);
           },
   };
-  Core::Notifications::post_notification_request(app_state, std::move(options));
+  core::notifications::post_notification_request(app_state, std::move(options));
 }
 
 // 处理一次同步失败：增量失败升级全量，全量失败则暂停当前 root 等待用户介入。
-auto handle_sync_failure(Core::State::AppState& app_state, State::FolderWatcherState& watcher,
+auto handle_sync_failure(core::AppState& app_state, FolderWatcherState& watcher,
                          bool attempted_full_rescan, const std::string& error) -> void {
   // 关闭导致的取消不是业务故障，不应触发恢复或用户通知。
   if (watcher.stop_requested.load(std::memory_order_acquire) ||
@@ -229,19 +227,19 @@ auto handle_sync_failure(Core::State::AppState& app_state, State::FolderWatcherS
 }
 
 // 在已持有 pending_mutex 时判断是否仍有同步事实未消费。
-auto has_pending_changes_locked(const State::FolderWatcherState& watcher) -> bool {
+auto has_pending_changes_locked(const FolderWatcherState& watcher) -> bool {
   return watcher.require_full_rescan || !watcher.pending_file_changes.empty() ||
          !watcher.pending_stable_file_changes.empty();
 }
 
 // 检查是否有待处理的变更（包含全量重扫标记或文件变更）
-auto has_pending_changes(State::FolderWatcherState& watcher) -> bool {
+auto has_pending_changes(FolderWatcherState& watcher) -> bool {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   return has_pending_changes_locked(watcher);
 }
 
 // 获取并清空当前的待处理变更快照
-auto take_pending_snapshot(State::FolderWatcherState& watcher) -> PendingSnapshot {
+auto take_pending_snapshot(FolderWatcherState& watcher) -> PendingSnapshot {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
 
   PendingSnapshot snapshot;
@@ -255,7 +253,7 @@ auto take_pending_snapshot(State::FolderWatcherState& watcher) -> PendingSnapsho
 }
 
 // 标记当前监听器需要执行全量重扫，同时清空原本的增量变更队列
-auto mark_full_rescan(State::FolderWatcherState& watcher) -> void {
+auto mark_full_rescan(FolderWatcherState& watcher) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
   // 文件夹有变化时，直接全量扫，逻辑最稳。
   watcher.require_full_rescan = true;
@@ -292,17 +290,17 @@ auto probe_file_state(const std::filesystem::path& path)
 
   return ProbedFileState{
       .size = static_cast<std::int64_t>(file_size),
-      .modified_at = Utils::Time::file_time_to_millis(last_write_time),
+      .modified_at = utils::time::file_time_to_millis(last_write_time),
   };
 }
 
 // 将具体的文件变更动作加入到待处理队列，相同路径的新动作会覆盖之前的
-auto enqueue_file_change(State::FolderWatcherState& watcher, const std::string& normalized_path,
-                         State::PendingFileChangeAction action) -> void {
+auto enqueue_file_change(FolderWatcherState& watcher, const std::string& normalized_path,
+                         PendingFileChangeAction action) -> void {
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
 
   // Faulted 期间继续吸收通知，但不再积累可能失真的逐文件动作。
-  if (watcher.sync_state == State::WatcherSyncState::Faulted) {
+  if (watcher.sync_state == WatcherSyncState::Faulted) {
     watcher.require_full_rescan = true;
     watcher.pending_file_changes.clear();
     watcher.pending_stable_file_changes.clear();
@@ -315,7 +313,7 @@ auto enqueue_file_change(State::FolderWatcherState& watcher, const std::string& 
 }
 
 // 将 UPSERT 事件先放入稳定队列，避免录制中的文件被 watcher 当成成品反复分析。
-auto enqueue_file_upsert_for_stability(State::FolderWatcherState& watcher,
+auto enqueue_file_upsert_for_stability(FolderWatcherState& watcher,
                                        const std::string& normalized_path) -> void {
   auto now = std::chrono::steady_clock::now();
   auto probe_result = probe_file_state(std::filesystem::path(normalized_path));
@@ -323,7 +321,7 @@ auto enqueue_file_upsert_for_stability(State::FolderWatcherState& watcher,
   std::lock_guard<std::mutex> lock(watcher.pending_mutex);
 
   // Faulted 期间只记录后续恢复必须做全量对账。
-  if (watcher.sync_state == State::WatcherSyncState::Faulted) {
+  if (watcher.sync_state == WatcherSyncState::Faulted) {
     watcher.require_full_rescan = true;
     watcher.pending_file_changes.clear();
     watcher.pending_stable_file_changes.clear();
@@ -333,7 +331,7 @@ auto enqueue_file_upsert_for_stability(State::FolderWatcherState& watcher,
   watcher.pending_file_changes.erase(normalized_path);
 
   auto& pending = watcher.pending_stable_file_changes[normalized_path];
-  pending.action = State::PendingFileChangeAction::UPSERT;
+  pending.action = PendingFileChangeAction::UPSERT;
   pending.ready_not_before = now + kFileStabilityQuietPeriod;
 
   if (!probe_result) {
@@ -352,8 +350,8 @@ auto enqueue_file_upsert_for_stability(State::FolderWatcherState& watcher,
 
 // 二次探测到期候选：
 // 只有当文件在一个静默窗口后，大小和修改时间都没有继续变化，才提升为真正的 UPSERT。
-auto promote_stable_file_changes(State::FolderWatcherState& watcher) -> void {
-  std::vector<std::pair<std::string, State::PendingStableFileChange>> due_candidates;
+auto promote_stable_file_changes(FolderWatcherState& watcher) -> void {
+  std::vector<std::pair<std::string, PendingStableFileChange>> due_candidates;
   auto now = std::chrono::steady_clock::now();
 
   {
@@ -411,10 +409,10 @@ auto promote_stable_file_changes(State::FolderWatcherState& watcher) -> void {
 }
 
 // 将接收到的待处理快照应用到数据库的最终逻辑（增量模式）
-auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatcherState& watcher,
+auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watcher,
                             const PendingSnapshot& snapshot)
-    -> std::expected<Types::ScanResult, std::string> {
-  Types::ScanResult result{};
+    -> std::expected<ScanResult, std::string> {
+  ScanResult result{};
   auto options = get_watcher_scan_options(watcher);
   auto stop_token = app_state.gallery->scan_stop_source.get_token();
   // 增量同步同样使用媒体和缩略图资源，cleanup 会等待这段共享区自然结束。
@@ -423,7 +421,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
     return std::unexpected("Gallery scan cancelled");
   }
 
-  auto root_folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
+  auto root_folder_result = features::gallery::folder::repository::get_folder_by_path(
       app_state, watcher.root_path.string());
   if (!root_folder_result) {
     return std::unexpected("Failed to query root folder: " + root_folder_result.error());
@@ -435,29 +433,29 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
   }
 
   auto rules_result =
-      Features::Gallery::Ignore::Service::load_ignore_rules(app_state, root_folder_id);
+      features::gallery::ignore::service::load_ignore_rules(app_state, root_folder_id);
   if (!rules_result) {
     return std::unexpected("Failed to load ignore rules: " + rules_result.error());
   }
   auto ignore_rules = std::move(rules_result.value());
   const auto supported_extensions =
-      options.supported_extensions.value_or(Scanner::Common::default_supported_extensions());
+      options.supported_extensions.value_or(scanner::common::default_supported_extensions());
 
   std::vector<std::filesystem::path> upsert_paths;
   upsert_paths.reserve(snapshot.file_changes.size());
 
   // 先收集真正可能入库的 UPSERT 路径，避免被忽略或不支持的文件污染 folders 索引。
   for (const auto& [path, action] : snapshot.file_changes) {
-    if (action != State::PendingFileChangeAction::UPSERT) {
+    if (action != PendingFileChangeAction::UPSERT) {
       continue;
     }
 
     auto candidate_path = std::filesystem::path(path);
-    if (!Scanner::Common::is_supported_file(candidate_path, supported_extensions)) {
+    if (!scanner::common::is_supported_file(candidate_path, supported_extensions)) {
       continue;
     }
 
-    if (Features::Gallery::Ignore::Service::apply_ignore_rules(candidate_path, watcher.root_path,
+    if (features::gallery::ignore::service::apply_ignore_rules(candidate_path, watcher.root_path,
                                                                ignore_rules, false)) {
       continue;
     }
@@ -467,10 +465,10 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
 
   std::unordered_map<std::string, std::int64_t> folder_mapping;
   if (!upsert_paths.empty()) {
-    auto folder_paths = Features::Gallery::Folder::Service::extract_unique_folder_paths(
+    auto folder_paths = features::gallery::folder::service::extract_unique_folder_paths(
         upsert_paths, watcher.root_path);
     auto mapping_result =
-        Features::Gallery::Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
+        features::gallery::folder::service::batch_create_folders_for_paths(app_state, folder_paths);
     if (mapping_result) {
       folder_mapping = std::move(mapping_result.value());
     } else {
@@ -484,12 +482,12 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
       return std::unexpected("Gallery scan cancelled");
     }
 
-    if (action != State::PendingFileChangeAction::REMOVE) {
+    if (action != PendingFileChangeAction::REMOVE) {
       continue;
     }
 
     auto remove_result =
-        Scanner::AssetPipeline::mark_asset_missing_at_path(app_state, std::filesystem::path(path));
+        scanner::asset_pipeline::mark_asset_missing_at_path(app_state, std::filesystem::path(path));
     if (!remove_result) {
       // 路径级失败：本轮尽量继续，不升级全量。
       result.errors.push_back(std::format("{}: {}", path, remove_result.error()));
@@ -501,9 +499,9 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
     }
     // 无论索引里是否仍有该行（例如 RPC 已先行删库），都把 REMOVE 写入 changes：
     // ScanChange 表示监视根下的路径已从磁盘消失，供扩展做派生同步（如硬链接撤销）。
-    result.changes.push_back(Types::ScanChange{
+    result.changes.push_back(ScanChange{
         .path = path,
-        .action = Types::ScanChangeAction::REMOVE,
+        .action = ScanChangeAction::REMOVE,
     });
   }
 
@@ -512,11 +510,11 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
       return std::unexpected("Gallery scan cancelled");
     }
 
-    if (action != State::PendingFileChangeAction::UPSERT) {
+    if (action != PendingFileChangeAction::UPSERT) {
       continue;
     }
 
-    auto upsert_result = Scanner::AssetPipeline::upsert_asset_at_path(
+    auto upsert_result = scanner::asset_pipeline::upsert_asset_at_path(
         app_state, watcher.root_path, options, ignore_rules, folder_mapping,
         std::filesystem::path(path), stop_token);
     if (!upsert_result) {
@@ -525,30 +523,30 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
       continue;
     }
 
-    using Scanner::AssetPipeline::PathSyncOutcome;
+    using scanner::asset_pipeline::PathSyncOutcome;
     switch (upsert_result.value()) {
       case PathSyncOutcome::Created:
         result.new_items++;
         // NEW / UPDATED 对派生消费者来说都属于“应确保目标状态存在”的 UPSERT。
-        result.changes.push_back(Types::ScanChange{
+        result.changes.push_back(ScanChange{
             .path = path,
-            .action = Types::ScanChangeAction::UPSERT,
+            .action = ScanChangeAction::UPSERT,
         });
         break;
       case PathSyncOutcome::Updated:
       case PathSyncOutcome::Restored:
         result.updated_items++;
-        result.changes.push_back(Types::ScanChange{
+        result.changes.push_back(ScanChange{
             .path = path,
-            .action = Types::ScanChangeAction::UPSERT,
+            .action = ScanChangeAction::UPSERT,
         });
         break;
       case PathSyncOutcome::Missing:
         // UPSERT 路径上文件已消失：进入 missing 宽限期，并向扩展发 REMOVE。
         result.missing_items++;
-        result.changes.push_back(Types::ScanChange{
+        result.changes.push_back(ScanChange{
             .path = path,
-            .action = Types::ScanChangeAction::REMOVE,
+            .action = ScanChangeAction::REMOVE,
         });
         break;
       case PathSyncOutcome::Skipped:
@@ -562,9 +560,9 @@ auto apply_incremental_sync(Core::State::AppState& app_state, State::FolderWatch
   return result;
 }
 
-// 执行全量重扫逻辑（直接代理到 Scanner 模块）
-auto apply_full_rescan(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> std::expected<Types::ScanResult, std::string> {
+// 执行全量重扫逻辑（直接代理到 scanner 模块）
+auto apply_full_rescan(core::AppState& app_state, FolderWatcherState& watcher)
+    -> std::expected<ScanResult, std::string> {
   auto stop_token = app_state.gallery->scan_stop_source.get_token();
   // 一次全量同步全程持有共享锁，cleanup 会在释放媒体资源前等待它结束。
   std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
@@ -573,7 +571,7 @@ auto apply_full_rescan(Core::State::AppState& app_state, State::FolderWatcherSta
   }
 
   auto options = get_watcher_scan_options(watcher);
-  auto scan_result = Features::Gallery::Scanner::scan_asset_directory(app_state, options);
+  auto scan_result = features::gallery::scanner::scan_asset_directory(app_state, options);
   if (!scan_result) {
     return std::unexpected(scan_result.error());
   }
@@ -582,8 +580,8 @@ auto apply_full_rescan(Core::State::AppState& app_state, State::FolderWatcherSta
     return std::unexpected("Gallery scan cancelled");
   }
 
-  auto thumbnail_repair_result = Features::Gallery::Asset::Thumbnail::repair_missing_thumbnails(
-      app_state, watcher.root_path, Types::kDefaultThumbnailShortEdge);
+  auto thumbnail_repair_result = features::gallery::asset::thumbnail::repair_missing_thumbnails(
+      app_state, watcher.root_path, kDefaultThumbnailShortEdge);
   if (!thumbnail_repair_result) {
     Logger().warn("Gallery watcher thumbnail repair failed for '{}': {}",
                   watcher.root_path.string(), thumbnail_repair_result.error());
@@ -599,17 +597,16 @@ auto apply_full_rescan(Core::State::AppState& app_state, State::FolderWatcherSta
   return scan_result;
 }
 
-auto apply_offline_scan_changes(Core::State::AppState& app_state,
-                                State::FolderWatcherState& watcher,
-                                const std::vector<Types::ScanChange>& changes)
-    -> std::expected<Types::ScanResult, std::string> {
+auto apply_offline_scan_changes(core::AppState& app_state, FolderWatcherState& watcher,
+                                const std::vector<ScanChange>& changes)
+    -> std::expected<ScanResult, std::string> {
   // 启动恢复并不重新发明一套“离线同步逻辑”，
   // 而是把 USN 产出的 ScanChange 重新装配成 watcher 已有的增量输入。
   PendingSnapshot snapshot;
   for (const auto& change : changes) {
-    snapshot.file_changes[change.path] = change.action == Types::ScanChangeAction::REMOVE
-                                             ? State::PendingFileChangeAction::REMOVE
-                                             : State::PendingFileChangeAction::UPSERT;
+    snapshot.file_changes[change.path] = change.action == ScanChangeAction::REMOVE
+                                             ? PendingFileChangeAction::REMOVE
+                                             : PendingFileChangeAction::UPSERT;
   }
 
   auto result = apply_incremental_sync(app_state, watcher, snapshot);
@@ -621,8 +618,8 @@ auto apply_offline_scan_changes(Core::State::AppState& app_state,
   return result;
 }
 
-auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcherState& watcher,
-                          const Types::ScanResult& result, std::string_view mode,
+auto dispatch_scan_result(core::AppState& app_state, FolderWatcherState& watcher,
+                          const ScanResult& result, std::string_view mode,
                           bool force_gallery_changed) -> void {
   // 统一收口：日志、gallery.changed 通知、post_scan_callback 都在这里发。
   // 这样启动恢复与运行时增量可以共用同一套“扫描完成后处理”。
@@ -640,7 +637,7 @@ auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcher
 
   if (force_gallery_changed || result.new_items > 0 || result.updated_items > 0 ||
       result.missing_items > 0 || !result.changes.empty()) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   auto post_scan_callback = get_post_scan_callback(watcher);
@@ -651,8 +648,7 @@ auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcher
 }
 
 // 标记监听器为全量重扫状态并触发下次同步任务。
-auto request_full_rescan(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void {
+auto request_full_rescan(core::AppState& app_state, FolderWatcherState& watcher) -> void {
   mark_full_rescan(watcher);
   // Faulted 只更新 dirty 状态，必须由用户重试才能重新唤醒扫描。
   if (!is_sync_faulted(watcher)) {
@@ -661,7 +657,7 @@ auto request_full_rescan(Core::State::AppState& app_state, State::FolderWatcherS
 }
 
 // 启动阶段串行执行一次全量对账，并将失败收敛为当前 root 的 Faulted。
-auto run_startup_full_rescan(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
+auto run_startup_full_rescan(core::AppState& app_state, FolderWatcherState& watcher)
     -> std::expected<void, std::string> {
   // 调用方持有 sync_execution_mutex，启动恢复与运行时同步不会并行。
   // 启动恢复直接消费全量标记，避免全局编排线程重复执行同一轮扫描。
@@ -696,8 +692,7 @@ struct ScheduledWatcher {
 };
 
 // 从所有 root 中选出最早到期的同步任务，只返回稳定 key 而不携带状态指针。
-auto find_next_scheduled_watcher(Core::State::AppState& app_state)
-    -> std::optional<ScheduledWatcher> {
+auto find_next_scheduled_watcher(core::AppState& app_state) -> std::optional<ScheduledWatcher> {
   std::optional<ScheduledWatcher> next;
   const auto now = std::chrono::steady_clock::now();
 
@@ -710,8 +705,7 @@ auto find_next_scheduled_watcher(Core::State::AppState& app_state)
 
     std::lock_guard<std::mutex> pending_lock(watcher.pending_mutex);
     // 启动恢复先建立基线；Faulted root 等用户明确重试。
-    if (watcher.startup_recovery_in_progress ||
-        watcher.sync_state == State::WatcherSyncState::Faulted) {
+    if (watcher.startup_recovery_in_progress || watcher.sync_state == WatcherSyncState::Faulted) {
       continue;
     }
 
@@ -733,9 +727,9 @@ auto find_next_scheduled_watcher(Core::State::AppState& app_state)
 }
 
 // 按 key 重新定位 root，并在生命周期保护下执行一轮同步。
-auto process_scheduled_watcher(Core::State::AppState& app_state, const std::string& watcher_key,
+auto process_scheduled_watcher(core::AppState& app_state, const std::string& watcher_key,
                                std::stop_token stop_token) -> void {
-  State::FolderWatcherState* watcher_ptr = nullptr;
+  FolderWatcherState* watcher_ptr = nullptr;
   std::unique_lock<std::mutex> lifecycle_lock;
   {
     std::lock_guard<std::mutex> watcher_lock(app_state.gallery->folder_watchers_mutex);
@@ -797,7 +791,7 @@ auto process_scheduled_watcher(Core::State::AppState& app_state, const std::stri
 }
 
 // Gallery 全局同步编排循环：选择最早到期 root，无任务时事件驱动休眠。
-auto run_sync_coordinator(Core::State::AppState& app_state, std::stop_token stop_token) -> void {
+auto run_sync_coordinator(core::AppState& app_state, std::stop_token stop_token) -> void {
   while (!stop_token.stop_requested()) {
     std::uint64_t observed_generation = 0;
     {
@@ -827,8 +821,7 @@ auto run_sync_coordinator(Core::State::AppState& app_state, std::stop_token stop
 }
 
 // pending 状态是任务事实；调度只更新防抖期限并唤醒全局编排线程。
-auto schedule_sync_task(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void {
+auto schedule_sync_task(core::AppState& app_state, FolderWatcherState& watcher) -> void {
   {
     std::lock_guard<std::mutex> lock(watcher.pending_mutex);
     if (watcher.require_full_rescan || !watcher.pending_file_changes.empty()) {
@@ -843,4 +836,4 @@ auto schedule_sync_task(Core::State::AppState& app_state, State::FolderWatcherSt
   app_state.gallery->watcher_sync_condition.notify_one();
 }
 
-}  // namespace Features::Gallery::Watcher::Sync
+}  // namespace features::gallery::watcher::sync

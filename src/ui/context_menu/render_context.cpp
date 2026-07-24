@@ -1,12 +1,14 @@
 #include "ui/context_menu/render_context.hpp"
 
-#include <d2d1_3.h>
-#include <d3d11.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/settings/state.hpp"
@@ -15,7 +17,7 @@
 #include "ui/shared_render_resources/state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace UI::ContextMenu::RenderContext {
+namespace ui::context_menu::render_context {
 
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
@@ -61,8 +63,8 @@ auto force_opaque_hex_color(std::string hex_color) -> std::string {
   return has_hash ? "#" + color : color;
 }
 
-auto shared_resources(Core::State::AppState& state)
-    -> UI::SharedRenderResources::State::SharedRenderResourcesState& {
+auto shared_resources(core::AppState& state)
+    -> ui::shared_render_resources::SharedRenderResourcesState& {
   return *state.shared_render_resources;
 }
 
@@ -72,7 +74,7 @@ auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_c
                                                            brush.put()));
 }
 
-auto release_brushes(State::RenderResources& render_resources) -> void {
+auto release_brushes(RenderResources& render_resources) -> void {
   render_resources.background_brush.reset();
   render_resources.text_brush.reset();
   render_resources.separator_brush.reset();
@@ -80,14 +82,14 @@ auto release_brushes(State::RenderResources& render_resources) -> void {
   render_resources.indicator_brush.reset();
 }
 
-auto release_target_bitmap(State::RenderResources& render_resources) -> void {
+auto release_target_bitmap(RenderResources& render_resources) -> void {
   if (render_resources.device_context) {
     render_resources.device_context->SetTarget(nullptr);
   }
   render_resources.target_bitmap.reset();
 }
 
-auto cleanup_surface(State::RenderResources& render_resources) -> void {
+auto cleanup_surface(RenderResources& render_resources) -> void {
   release_brushes(render_resources);
   release_target_bitmap(render_resources);
   render_resources.device_context.reset();
@@ -98,8 +100,7 @@ auto cleanup_surface(State::RenderResources& render_resources) -> void {
   render_resources.is_ready = false;
 }
 
-auto create_brushes_for_surface(Core::State::AppState& state,
-                                State::RenderResources& render_resources) -> bool {
+auto create_brushes_for_surface(core::AppState& state, RenderResources& render_resources) -> bool {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
   return create_brush_from_hex(render_resources.device_context.get(),
                                force_opaque_hex_color(colors.background),
@@ -135,8 +136,7 @@ auto create_text_format(IDWriteFactory7* write_factory, float font_size)
   return text_format;
 }
 
-auto create_device_context(ID2D1Device* shared_device, State::RenderResources& render_resources)
-    -> bool {
+auto create_device_context(ID2D1Device* shared_device, RenderResources& render_resources) -> bool {
   if (!shared_device) {
     return false;
   }
@@ -158,7 +158,7 @@ auto create_device_context(ID2D1Device* shared_device, State::RenderResources& r
   return true;
 }
 
-auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderResources& render_resources,
+auto create_swap_chain(ID3D11Device* shared_d3d_device, RenderResources& render_resources,
                        const SIZE& size) -> bool {
   if (!shared_d3d_device) {
     return false;
@@ -186,8 +186,8 @@ auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderResources& 
          render_resources.swap_chain;
 }
 
-auto create_composition_tree(ID3D11Device* shared_d3d_device,
-                             State::RenderResources& render_resources, HWND hwnd) -> bool {
+auto create_composition_tree(ID3D11Device* shared_d3d_device, RenderResources& render_resources,
+                             HWND hwnd) -> bool {
   if (!shared_d3d_device || !render_resources.swap_chain) {
     return false;
   }
@@ -221,7 +221,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
          SUCCEEDED(composition_device->Commit());
 }
 
-auto create_target_bitmap(State::RenderResources& render_resources, const SIZE& size) -> bool {
+auto create_target_bitmap(RenderResources& render_resources, const SIZE& size) -> bool {
   release_target_bitmap(render_resources);
 
   wil::com_ptr<IDXGISurface> dxgi_surface;
@@ -244,10 +244,10 @@ auto create_target_bitmap(State::RenderResources& render_resources, const SIZE& 
   return true;
 }
 
-auto initialize_surface(Core::State::AppState& state, State::RenderResources& render_resources,
-                        HWND hwnd, const SIZE& size) -> bool {
+auto initialize_surface(core::AppState& state, RenderResources& render_resources, HWND hwnd,
+                        const SIZE& size) -> bool {
   auto& shared = shared_resources(state);
-  if (!UI::SharedRenderResources::ensure_initialized(state) || size.cx <= 0 || size.cy <= 0) {
+  if (!ui::shared_render_resources::ensure_initialized(state) || size.cx <= 0 || size.cy <= 0) {
     return false;
   }
 
@@ -271,7 +271,7 @@ auto initialize_surface(Core::State::AppState& state, State::RenderResources& re
   return true;
 }
 
-auto resize_surface(State::RenderResources& render_resources, const SIZE& new_size) -> bool {
+auto resize_surface(RenderResources& render_resources, const SIZE& new_size) -> bool {
   if (!render_resources.is_ready || !render_resources.swap_chain ||
       !render_resources.device_context || new_size.cx <= 0 || new_size.cy <= 0) {
     return false;
@@ -298,9 +298,9 @@ auto get_client_size(HWND hwnd) -> SIZE {
   return {rc.right - rc.left, rc.bottom - rc.top};
 }
 
-auto initialize_text_format(Core::State::AppState& state) -> bool {
+auto initialize_text_format(core::AppState& state) -> bool {
   auto& menu_state = *state.context_menu;
-  if (!UI::SharedRenderResources::ensure_initialized(state)) {
+  if (!ui::shared_render_resources::ensure_initialized(state)) {
     return false;
   }
 
@@ -310,7 +310,7 @@ auto initialize_text_format(Core::State::AppState& state) -> bool {
   return static_cast<bool>(menu_state.text_format);
 }
 
-auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
+auto initialize_context_menu(core::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (!menu_state.text_format && !initialize_text_format(state)) {
     return false;
@@ -319,12 +319,12 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
   return initialize_surface(state, menu_state.main_render_resources, hwnd, get_client_size(hwnd));
 }
 
-auto cleanup_context_menu(Core::State::AppState& state) -> void {
+auto cleanup_context_menu(core::AppState& state) -> void {
   cleanup_surface(state.context_menu->main_render_resources);
   state.context_menu->text_format.reset();
 }
 
-auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
+auto initialize_submenu(core::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (!menu_state.text_format && !initialize_text_format(state)) {
     return false;
@@ -334,16 +334,16 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
                             get_client_size(hwnd));
 }
 
-auto cleanup_submenu(Core::State::AppState& state) -> void {
+auto cleanup_submenu(core::AppState& state) -> void {
   cleanup_surface(state.context_menu->submenu_render_resources);
 }
 
-auto resize_context_menu(Core::State::AppState& state, const SIZE& new_size) -> bool {
+auto resize_context_menu(core::AppState& state, const SIZE& new_size) -> bool {
   return resize_surface(state.context_menu->main_render_resources, new_size);
 }
 
-auto resize_submenu(Core::State::AppState& state, const SIZE& new_size) -> bool {
+auto resize_submenu(core::AppState& state, const SIZE& new_size) -> bool {
   return resize_surface(state.context_menu->submenu_render_resources, new_size);
 }
 
-}  // namespace UI::ContextMenu::RenderContext
+}  // namespace ui::context_menu::render_context

@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::Database::Types {
+#include "vendor/std.hpp"
+
+namespace core::database {
 // 代表数据库中的一个值，可以是NULL、整数、浮点数、字符串或二进制数据
 using DbValue =
     std::variant<std::monostate, std::int64_t, double, std::string, std::vector<std::uint8_t>>;
@@ -8,4 +10,4 @@ using DbValue =
 // 用于参数化查询的参数类型
 using DbParam = DbValue;
 
-}  // namespace Core::Database::Types
+}  // namespace core::database

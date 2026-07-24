@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::HttpClient::Types {
+#include "vendor/std.hpp"
+
+namespace core::http_client {
 
 struct DownloadProgress {
   std::uint64_t downloaded_bytes = 0;
@@ -30,4 +32,4 @@ struct Response {
   std::vector<Header> headers;
 };
 
-}  // namespace Core::HttpClient::Types
+}  // namespace core::http_client

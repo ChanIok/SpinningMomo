@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Recovery::Types {
+namespace features::gallery::recovery {
 
 // 持久化到 DB 的恢复检查点，记录"下次启动时从哪里开始读 USN Journal"。
 struct WatchRootRecoveryState {
@@ -24,8 +26,8 @@ enum class StartupRecoveryMode {
 // 同时携带当前卷快照信息，watcher 可直接用于 persist 而无需重新查询。
 struct StartupRecoveryPlan {
   StartupRecoveryMode mode = StartupRecoveryMode::FullScan;
-  std::string reason;                                         // 决策原因（用于日志）
-  std::vector<Features::Gallery::Types::ScanChange> changes;  // USN 模式下收集到的离线变更
+  std::string reason;                                  // 决策原因（用于日志）
+  std::vector<features::gallery::ScanChange> changes;  // USN 模式下收集到的离线变更
   // 以下字段从当前卷快照中填充，供 watcher 在恢复完成后直接持久化检查点。
   std::string root_path;
   std::string volume_identity;
@@ -34,4 +36,4 @@ struct StartupRecoveryPlan {
   std::optional<std::int64_t> checkpoint_usn;
 };
 
-}  // namespace Features::Gallery::Recovery::Types
+}  // namespace features::gallery::recovery

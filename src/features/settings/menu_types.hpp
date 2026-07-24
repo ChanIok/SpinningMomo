@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Settings::Menu {
+#include "vendor/std.hpp"
+
+namespace features::settings::menu {
 
 struct RatioPreset {
   std::wstring name;
@@ -18,4 +20,4 @@ struct ResolutionPreset {
       : name(n), base_width(w), base_height(h) {}
 };
 
-}  // namespace Features::Settings::Menu
+}  // namespace features::settings::menu

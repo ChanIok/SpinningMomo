@@ -1,6 +1,8 @@
 #include "extensions/infinity_nikki/asset_service.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/database/database.hpp"
 #include "core/database/types.hpp"
@@ -13,7 +15,7 @@
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Extensions::InfinityNikki::AssetService {
+namespace extensions::infinity_nikki::asset_service {
 
 auto trim_ascii_copy(std::string_view value) -> std::string {
   auto is_space = [](unsigned char ch) { return std::isspace(ch) != 0; };
@@ -63,9 +65,9 @@ struct AssetIdRow {
   std::int64_t asset_id = 0;
 };
 
-auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
+auto read_user_record(core::AppState& app_state, std::int64_t asset_id)
     -> std::expected<InfinityNikkiUserRecord, std::string> {
-  auto rows_result = Core::Database::query<InfinityNikkiUserRecordRow>(app_state,
+  auto rows_result = core::database::query<InfinityNikkiUserRecordRow>(app_state,
                                                                        R"(
         SELECT record_key,
                record_value
@@ -82,7 +84,7 @@ auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
     if (row.record_key == "dye_code") {
       record.dye_code = row.record_value;
     } else if (row.record_key == "world_id") {
-      record.world_id = WorldArea::normalize_world_id(row.record_value);
+      record.world_id = world_area::normalize_world_id(row.record_value);
     }
   }
 
@@ -104,12 +106,12 @@ auto build_map_area(const InfinityNikkiMapConfig& map_config,
     return std::nullopt;
   }
 
-  const WorldArea::GamePoint game_point{
+  const world_area::GamePoint game_point{
       .x = *extracted->nikki_loc_x,
       .y = *extracted->nikki_loc_y,
       .z = extracted->nikki_loc_z,
   };
-  const auto* auto_world = WorldArea::resolve_world_or_default(map_config, game_point);
+  const auto* auto_world = world_area::resolve_world_or_default(map_config, game_point);
   if (auto_world == nullptr) {
     return std::nullopt;
   }
@@ -118,7 +120,7 @@ auto build_map_area(const InfinityNikkiMapConfig& map_config,
   std::optional<std::string> user_world_id;
   const auto* world = auto_world;
   if (user_record.world_id.has_value()) {
-    if (const auto* user_world = WorldArea::find_world(map_config, *user_record.world_id);
+    if (const auto* user_world = world_area::find_world(map_config, *user_record.world_id);
         user_world != nullptr) {
       user_world_id = user_world->world_id;
       world = user_world;
@@ -134,11 +136,11 @@ auto build_map_area(const InfinityNikkiMapConfig& map_config,
   };
 }
 
-auto upsert_user_record_key(Core::State::AppState& app_state, std::int64_t asset_id,
+auto upsert_user_record_key(core::AppState& app_state, std::int64_t asset_id,
                             std::string_view record_key, std::string_view record_value)
     -> std::expected<void, std::string> {
   auto result =
-      Core::Database::execute(app_state,
+      core::database::execute(app_state,
                               R"(
       INSERT INTO asset_infinity_nikki_user_record (asset_id, record_key, record_value)
       VALUES (?, ?, ?)
@@ -152,11 +154,11 @@ auto upsert_user_record_key(Core::State::AppState& app_state, std::int64_t asset
   return {};
 }
 
-auto delete_user_record_keys(Core::State::AppState& app_state, std::int64_t asset_id,
+auto delete_user_record_keys(core::AppState& app_state, std::int64_t asset_id,
                              const std::vector<std::string>& record_keys)
     -> std::expected<void, std::string> {
   for (const auto& record_key : record_keys) {
-    auto result = Core::Database::execute(
+    auto result = core::database::execute(
         app_state,
         "DELETE FROM asset_infinity_nikki_user_record WHERE asset_id = ? AND record_key = ?",
         {asset_id, record_key});
@@ -168,16 +170,16 @@ auto delete_user_record_keys(Core::State::AppState& app_state, std::int64_t asse
 }
 
 auto db_param_from_optional_string(const std::optional<std::string>& value)
-    -> Core::Database::Types::DbParam {
+    -> core::database::DbParam {
   if (!value.has_value()) {
     return std::monostate{};
   }
   return *value;
 }
 
-auto read_source_outfit_dye_state(Core::State::AppState& app_state, std::int64_t asset_id)
+auto read_source_outfit_dye_state(core::AppState& app_state, std::int64_t asset_id)
     -> std::expected<std::optional<InfinityNikkiSourceOutfitDyeStateRow>, std::string> {
-  auto result = Core::Database::query_single<InfinityNikkiSourceOutfitDyeStateRow>(app_state,
+  auto result = core::database::query_single<InfinityNikkiSourceOutfitDyeStateRow>(app_state,
                                                                                    R"(
         SELECT p.nikki_diy_json AS nikki_diy_json,
                (
@@ -198,11 +200,11 @@ auto read_source_outfit_dye_state(Core::State::AppState& app_state, std::int64_t
 }
 
 auto query_same_outfit_dye_code_fill_preview(
-    Core::State::AppState& app_state, std::int64_t source_asset_id,
+    core::AppState& app_state, std::int64_t source_asset_id,
     const InfinityNikkiSourceOutfitDyeStateRow& source_state)
     -> std::expected<InfinityNikkiSameOutfitDyeCodeFillPreview, std::string> {
   const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
-  auto stats_result = Core::Database::query_single<SameOutfitDyeCodeFillStatsRow>(
+  auto stats_result = core::database::query_single<SameOutfitDyeCodeFillStatsRow>(
       app_state,
       R"(
         SELECT COUNT(*) AS matched_count,
@@ -258,12 +260,12 @@ auto query_same_outfit_dye_code_fill_preview(
 }
 
 auto query_same_outfit_dye_code_target_asset_ids(
-    Core::State::AppState& app_state, std::int64_t source_asset_id,
+    core::AppState& app_state, std::int64_t source_asset_id,
     const InfinityNikkiSourceOutfitDyeStateRow& source_state)
     -> std::expected<std::vector<std::int64_t>, std::string> {
   const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
   auto rows_result =
-      Core::Database::query<AssetIdRow>(app_state,
+      core::database::query<AssetIdRow>(app_state,
                                         R"(
         SELECT p.asset_id AS asset_id
         FROM asset_infinity_nikki_params p
@@ -304,17 +306,16 @@ auto query_same_outfit_dye_code_target_asset_ids(
 // 查询指定世界下的照片地图点位。
 // 加载远端地图配置后，对每个点位进行世界归属判定和坐标变换，
 // 只返回属于请求 world_id 的点位，且每个点位已包含 lat/lng。
-auto query_photo_map_points(Core::State::AppState& app_state,
-                            const QueryPhotoMapPointsParams& params)
+auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPointsParams& params)
     -> asio::awaitable<std::expected<std::vector<PhotoMapPoint>, std::string>> {
   auto where_result =
-      Features::Gallery::Asset::QuerySupport::build_unified_where_clause(params.filters, "a");
+      features::gallery::asset::query_support::build_unified_where_clause(params.filters, "a");
   if (!where_result) {
     co_return std::unexpected(where_result.error());
   }
   auto [where_clause, query_params] = std::move(where_result.value());
 
-  auto order_config = Features::Gallery::Asset::QuerySupport::build_query_order_config(
+  auto order_config = features::gallery::asset::query_support::build_query_order_config(
       params.sort_by, params.sort_order);
 
   std::string sql = std::format(R"(
@@ -362,22 +363,22 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   )",
                                 where_clause, order_config.indexed_order_clause);
 
-  auto result = Core::Database::query<PhotoMapPointWithWorldRecord>(app_state, sql, query_params);
+  auto result = core::database::query<PhotoMapPointWithWorldRecord>(app_state, sql, query_params);
   if (!result) {
     co_return std::unexpected("Failed to query photo map points: " + result.error());
   }
 
-  const auto world_id = WorldArea::normalize_world_id(params.world_id);
+  const auto world_id = world_area::normalize_world_id(params.world_id);
   if (world_id.empty()) {
     co_return std::vector<PhotoMapPoint>{};
   }
 
-  auto map_config_result = co_await WorldArea::load_map_config(app_state);
+  auto map_config_result = co_await world_area::load_map_config(app_state);
   if (!map_config_result) {
     co_return std::unexpected(map_config_result.error());
   }
   const auto& map_config = map_config_result.value();
-  const auto* requested_world = WorldArea::find_world(map_config, world_id);
+  const auto* requested_world = world_area::find_world(map_config, world_id);
   if (requested_world == nullptr) {
     co_return std::vector<PhotoMapPoint>{};
   }
@@ -386,7 +387,7 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   filtered_points.reserve(result->size());
 
   for (const auto& point : result.value()) {
-    const WorldArea::GamePoint game_point{
+    const world_area::GamePoint game_point{
         .x = point.nikki_loc_x,
         .y = point.nikki_loc_y,
         .z = point.nikki_loc_z,
@@ -394,10 +395,10 @@ auto query_photo_map_points(Core::State::AppState& app_state,
 
     // 世界归属判定：优先使用用户手动设置的 world_id，否则根据坐标自动推断。
     const auto* resolved_world = point.user_world_id.has_value()
-                                     ? WorldArea::find_world(map_config, *point.user_world_id)
+                                     ? world_area::find_world(map_config, *point.user_world_id)
                                      : nullptr;
     if (resolved_world == nullptr) {
-      resolved_world = WorldArea::resolve_world_or_default(map_config, game_point);
+      resolved_world = world_area::resolve_world_or_default(map_config, game_point);
     }
     // 只保留属于请求世界的点位。
     if (resolved_world == nullptr || resolved_world->world_id != requested_world->world_id) {
@@ -406,7 +407,7 @@ auto query_photo_map_points(Core::State::AppState& app_state,
 
     // 将游戏坐标变换为地图经纬度，前端可直接用于标记点位。
     const auto map_coordinate =
-        WorldArea::transform_game_to_map_coordinates(game_point, *resolved_world);
+        world_area::transform_game_to_map_coordinates(game_point, *resolved_world);
     if (!map_coordinate) {
       co_return std::unexpected(map_coordinate.error());
     }
@@ -430,7 +431,7 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   co_return filtered_points;
 }
 
-auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetailsParams& params)
+auto get_details(core::AppState& app_state, const GetInfinityNikkiDetailsParams& params)
     -> asio::awaitable<std::expected<InfinityNikkiDetails, std::string>> {
   std::string extracted_sql = R"(
     SELECT camera_params,
@@ -463,7 +464,7 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
     WHERE asset_id = ?
   )";
 
-  auto extracted_result = Core::Database::query_single<InfinityNikkiExtractedParams>(
+  auto extracted_result = core::database::query_single<InfinityNikkiExtractedParams>(
       app_state, extracted_sql, {params.asset_id});
   if (!extracted_result) {
     co_return std::unexpected("Failed to query Infinity Nikki extracted params: " +
@@ -482,7 +483,7 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
   const auto& extracted = extracted_result.value();
   if (extracted.has_value() && extracted->nikki_loc_x.has_value() &&
       extracted->nikki_loc_y.has_value()) {
-    auto map_config_result = co_await WorldArea::load_map_config(app_state);
+    auto map_config_result = co_await world_area::load_map_config(app_state);
     if (map_config_result) {
       map_area = build_map_area(map_config_result.value(), extracted, user_record);
     } else {
@@ -500,8 +501,7 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
                                  .map_area = std::move(map_area)};
 }
 
-auto get_dye_code_asset_ids(Core::State::AppState& app_state,
-                            const GetDyeCodeAssetIdsParams& params)
+auto get_dye_code_asset_ids(core::AppState& app_state, const GetDyeCodeAssetIdsParams& params)
     -> std::expected<std::vector<std::int64_t>, std::string> {
   std::unordered_set<std::int64_t> unique_ids;
   for (const auto id : params.asset_ids) {
@@ -515,7 +515,7 @@ auto get_dye_code_asset_ids(Core::State::AppState& app_state,
 
   std::string placeholders;
   placeholders.reserve(unique_ids.size() * 2 - 1);
-  std::vector<Core::Database::Types::DbParam> db_params;
+  std::vector<core::database::DbParam> db_params;
   db_params.reserve(unique_ids.size());
   for (const auto id : unique_ids) {
     if (!placeholders.empty()) {
@@ -529,7 +529,7 @@ auto get_dye_code_asset_ids(Core::State::AppState& app_state,
     std::int64_t asset_id = 0;
   };
 
-  auto result = Core::Database::query<AssetIdRow>(app_state,
+  auto result = core::database::query<AssetIdRow>(app_state,
                                                   std::format(
                                                       R"(
             SELECT asset_id
@@ -553,26 +553,25 @@ auto get_dye_code_asset_ids(Core::State::AppState& app_state,
 }
 
 // 暴露给 RPC 层的地图配置获取入口，供前端直接调用。
-auto get_map_config(Core::State::AppState& app_state)
+auto get_map_config(core::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {
-  co_return co_await WorldArea::load_map_config(app_state);
+  co_return co_await world_area::load_map_config(app_state);
 }
 
-auto get_metadata_names(Core::State::AppState& app_state,
+auto get_metadata_names(core::AppState& app_state,
                         const GetInfinityNikkiMetadataNamesParams& params)
     -> asio::awaitable<std::expected<InfinityNikkiMetadataNames, std::string>> {
-  co_return co_await MetadataDict::resolve_metadata_names(app_state, params);
+  co_return co_await metadata_dict::resolve_metadata_names(app_state, params);
 }
 
-auto set_user_record(Core::State::AppState& app_state,
-                     const SetInfinityNikkiUserRecordParams& params)
-    -> std::expected<Features::Gallery::Types::OperationResult, std::string> {
+auto set_user_record(core::AppState& app_state, const SetInfinityNikkiUserRecordParams& params)
+    -> std::expected<features::gallery::OperationResult, std::string> {
   if (params.asset_id <= 0) {
     return std::unexpected("Asset id must be greater than 0");
   }
 
   auto asset_result =
-      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+      features::gallery::asset::repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
     return std::unexpected("Failed to load asset before updating Infinity Nikki user record: " +
                            asset_result.error());
@@ -590,8 +589,8 @@ auto set_user_record(Core::State::AppState& app_state,
     normalized_code_value = std::nullopt;
   }
 
-  auto write_result = Core::Database::execute_transaction(
-      app_state, [&](Core::State::AppState&) -> std::expected<void, std::string> {
+  auto write_result = core::database::execute_transaction(
+      app_state, [&](core::AppState&) -> std::expected<void, std::string> {
         if (normalized_code_value.has_value()) {
           auto value_result = upsert_user_record_key(app_state, params.asset_id, "dye_code",
                                                      normalized_code_value.value());
@@ -608,21 +607,21 @@ auto set_user_record(Core::State::AppState& app_state,
     return std::unexpected(write_result.error());
   }
 
-  return Features::Gallery::Types::OperationResult{
+  return features::gallery::OperationResult{
       .success = true,
       .message = "Infinity Nikki user record updated successfully",
       .affected_count = 1};
 }
 
 auto preview_same_outfit_dye_code_fill(
-    Core::State::AppState& app_state, const PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
+    core::AppState& app_state, const PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
     -> std::expected<InfinityNikkiSameOutfitDyeCodeFillPreview, std::string> {
   if (params.asset_id <= 0) {
     return std::unexpected("Asset id must be greater than 0");
   }
 
   auto asset_result =
-      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+      features::gallery::asset::repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
     return std::unexpected("Failed to load asset before previewing same outfit and dye fill: " +
                            asset_result.error());
@@ -649,7 +648,7 @@ auto preview_same_outfit_dye_code_fill(
   return query_same_outfit_dye_code_fill_preview(app_state, params.asset_id, source_state);
 }
 
-auto fill_same_outfit_dye_code(Core::State::AppState& app_state,
+auto fill_same_outfit_dye_code(core::AppState& app_state,
                                const FillInfinityNikkiSameOutfitDyeCodeParams& params)
     -> std::expected<InfinityNikkiSameOutfitDyeCodeFillResult, std::string> {
   if (params.asset_id <= 0) {
@@ -662,7 +661,7 @@ auto fill_same_outfit_dye_code(Core::State::AppState& app_state,
   }
 
   auto asset_result =
-      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+      features::gallery::asset::repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
     return std::unexpected("Failed to load asset before filling same outfit and dye records: " +
                            asset_result.error());
@@ -707,8 +706,8 @@ auto fill_same_outfit_dye_code(Core::State::AppState& app_state,
   }
 
   auto target_ids = std::move(target_ids_result.value());
-  auto write_result = Core::Database::execute_transaction(
-      app_state, [&](Core::State::AppState&) -> std::expected<void, std::string> {
+  auto write_result = core::database::execute_transaction(
+      app_state, [&](core::AppState&) -> std::expected<void, std::string> {
         for (const auto asset_id : target_ids) {
           auto value_result =
               upsert_user_record_key(app_state, asset_id, "dye_code", normalized_code_value);
@@ -734,15 +733,14 @@ auto fill_same_outfit_dye_code(Core::State::AppState& app_state,
   };
 }
 
-auto set_world_record(Core::State::AppState& app_state,
-                      const SetInfinityNikkiWorldRecordParams& params)
-    -> std::expected<Features::Gallery::Types::OperationResult, std::string> {
+auto set_world_record(core::AppState& app_state, const SetInfinityNikkiWorldRecordParams& params)
+    -> std::expected<features::gallery::OperationResult, std::string> {
   if (params.asset_id <= 0) {
     return std::unexpected("Asset id must be greater than 0");
   }
 
   auto asset_result =
-      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+      features::gallery::asset::repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
     return std::unexpected("Failed to load asset before updating Infinity Nikki world record: " +
                            asset_result.error());
@@ -754,7 +752,7 @@ auto set_world_record(Core::State::AppState& app_state,
 
   auto normalized_world_id =
       params.world_id.has_value()
-          ? std::optional<std::string>{WorldArea::normalize_world_id(params.world_id.value())}
+          ? std::optional<std::string>{world_area::normalize_world_id(params.world_id.value())}
           : std::nullopt;
   if (normalized_world_id.has_value() && normalized_world_id->empty()) {
     normalized_world_id = std::nullopt;
@@ -772,10 +770,10 @@ auto set_world_record(Core::State::AppState& app_state,
     return std::unexpected(write_result.error());
   }
 
-  return Features::Gallery::Types::OperationResult{
+  return features::gallery::OperationResult{
       .success = true,
       .message = "Infinity Nikki world record updated successfully",
       .affected_count = 1};
 }
 
-}  // namespace Extensions::InfinityNikki::AssetService
+}  // namespace extensions::infinity_nikki::asset_service

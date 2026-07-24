@@ -1,9 +1,11 @@
 #pragma once
 
-#include <asio.hpp>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
 
-namespace Core::RPC {
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
+
+namespace core::rpc {
 
 // JSON-RPC 2.0 标准错误码
 enum class ErrorCode {
@@ -81,4 +83,4 @@ struct MethodInfo {
 // 空参数结构，用于不需要参数的RPC方法
 struct EmptyParams {};
 
-}  // namespace Core::RPC
+}  // namespace core::rpc

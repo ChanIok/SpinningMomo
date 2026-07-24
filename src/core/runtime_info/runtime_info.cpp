@@ -1,22 +1,24 @@
 #include "core/runtime_info/runtime_info.hpp"
 
+#include "vendor/std.hpp"
+
+#include "core/build_config.hpp"
 #include "core/state/app_state.hpp"
 #include "core/state/runtime_info.hpp"
+#include "core/version.hpp"
 #include "core/webview/webview.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/media/audio_capture.hpp"
 #include "utils/path/path.hpp"
 #include "utils/system/system.hpp"
-#include "vendor/build_config.hpp"
-#include "vendor/version.hpp"
 
-namespace Core::RuntimeInfo::Detail {
+namespace core::runtime_info::detail {
 
-using RuntimeInfoState = Core::State::RuntimeInfo::RuntimeInfoState;
+using RuntimeInfoState = core::runtime_info::RuntimeInfoState;
 
 auto collect_app_version(RuntimeInfoState& runtime_info) -> void {
-  runtime_info.version = Vendor::Version::get_app_version();
+  runtime_info.version = core::version::get_app_version();
 
   auto parse_result = std::istringstream(runtime_info.version);
   char dot = '.';
@@ -33,7 +35,7 @@ auto collect_app_version(RuntimeInfoState& runtime_info) -> void {
 }
 
 auto collect_os_and_capabilities(RuntimeInfoState& runtime_info) -> void {
-  auto version_result = Utils::System::get_windows_version();
+  auto version_result = utils::system::get_windows_version();
   if (!version_result) {
     Logger().error("Failed to get OS version: {}", version_result.error());
     return;
@@ -46,20 +48,20 @@ auto collect_os_and_capabilities(RuntimeInfoState& runtime_info) -> void {
   runtime_info.os_major_version = version.major_version;
   runtime_info.os_minor_version = version.minor_version;
   runtime_info.os_build_number = version.build_number;
-  runtime_info.os_name = Utils::System::get_windows_name(version);
+  runtime_info.os_name = utils::system::get_windows_name(version);
 
   // Windows Graphics Capture 支持 (Windows 10 1903 / 18362+)
   runtime_info.is_capture_supported =
       (version.major_version > 10) ||
       (version.major_version == 10 && version.build_number >= 18362);
   runtime_info.is_cursor_capture_control_supported =
-      Utils::Graphics::Capture::is_cursor_capture_control_supported();
+      utils::graphics::capture::is_cursor_capture_control_supported();
   runtime_info.is_border_control_supported =
-      Utils::Graphics::Capture::is_border_control_supported();
+      utils::graphics::capture::is_border_control_supported();
 
   // Process Loopback 音频支持 (Windows 10 2004 / 19041+)
   runtime_info.is_process_loopback_audio_supported =
-      Utils::Media::AudioCapture::is_process_loopback_supported();
+      utils::media::audio_capture::is_process_loopback_supported();
 
   Logger().info("Capture support: {}, cursor control: {}, border control: {}, process loopback: {}",
                 runtime_info.is_capture_supported, runtime_info.is_cursor_capture_control_supported,
@@ -68,7 +70,7 @@ auto collect_os_and_capabilities(RuntimeInfoState& runtime_info) -> void {
 }
 
 auto collect_webview_info(RuntimeInfoState& runtime_info) -> void {
-  auto webview2_version = Core::WebView::get_runtime_version();
+  auto webview2_version = core::webview::get_runtime_version();
   if (!webview2_version) {
     runtime_info.is_webview2_available = false;
     runtime_info.webview2_version.clear();
@@ -81,24 +83,24 @@ auto collect_webview_info(RuntimeInfoState& runtime_info) -> void {
   Logger().info("WebView2 runtime: {}", runtime_info.webview2_version);
 }
 
-}  // namespace Core::RuntimeInfo::Detail
+}  // namespace core::runtime_info::detail
 
-namespace Core::RuntimeInfo {
+namespace core::runtime_info {
 
-auto collect(Core::State::AppState& app_state) -> void {
+auto collect(core::AppState& app_state) -> void {
   if (!app_state.runtime_info) {
     return;
   }
 
   auto& runtime_info = *app_state.runtime_info;
-  runtime_info.is_debug_build = Vendor::BuildConfig::is_debug_build();
-  Detail::collect_app_version(runtime_info);
-  Detail::collect_os_and_capabilities(runtime_info);
-  Detail::collect_webview_info(runtime_info);
+  runtime_info.is_debug_build = core::build_config::is_debug_build();
+  detail::collect_app_version(runtime_info);
+  detail::collect_os_and_capabilities(runtime_info);
+  detail::collect_webview_info(runtime_info);
 
-  if (auto app_data_result = Utils::Path::GetAppDataDirectory()) {
+  if (auto app_data_result = utils::path::GetAppDataDirectory()) {
     runtime_info.app_data_dir = app_data_result.value().string();
   }
 }
 
-}  // namespace Core::RuntimeInfo
+}  // namespace core::runtime_info

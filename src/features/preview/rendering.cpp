@@ -1,9 +1,11 @@
 #include "features/preview/rendering.hpp"
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
-#include <winerror.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/winerror.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/preview/shaders.hpp"
@@ -13,20 +15,20 @@
 #include "utils/graphics/d3d.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Preview::Rendering {
+namespace features::preview::rendering {
 
 auto create_basic_vertex_buffer(ID3D11Device* device)
     -> std::expected<wil::com_ptr<ID3D11Buffer>, std::string> {
   // 创建全屏四边形的顶点数据
-  Features::Preview::Types::Vertex vertices[] = {
+  features::preview::Vertex vertices[] = {
       {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
       {1.0f, 1.0f, 1.0f, 0.0f},    // 右上
       {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
       {1.0f, -1.0f, 1.0f, 1.0f}    // 右下
   };
 
-  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
-      device, vertices, 4, sizeof(Features::Preview::Types::Vertex));
+  auto buffer_result = utils::graphics::d3d::create_vertex_buffer(
+      device, vertices, 4, sizeof(features::preview::Vertex));
 
   if (!buffer_result) {
     return std::unexpected("Failed to create vertex buffer");
@@ -35,13 +37,13 @@ auto create_basic_vertex_buffer(ID3D11Device* device)
   return buffer_result.value();
 }
 
-auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, int height)
+auto initialize_rendering(core::AppState& state, HWND hwnd, int width, int height)
     -> std::expected<void, std::string> {
   auto& resources = state.preview->rendering_resources;
 
   // 创建D3D上下文
   auto d3d_result =
-      Utils::Graphics::D3D::create_d3d_context(hwnd, width, height, state.preview->enable_hdr);
+      utils::graphics::d3d::create_d3d_context(hwnd, width, height, state.preview->enable_hdr);
   if (!d3d_result) {
     Logger().error("Failed to create D3D context for preview rendering: {}", d3d_result.error());
     return std::unexpected(d3d_result.error().find("device") != std::string::npos
@@ -51,9 +53,9 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   resources.d3d_context = std::move(d3d_result.value());
 
   // 创建基本渲染着色器
-  auto basic_shader_result = Utils::Graphics::D3D::create_basic_shader_resources(
-      resources.d3d_context.device.get(), Features::Preview::Shaders::BASIC_VERTEX_SHADER,
-      Features::Preview::Shaders::BASIC_PIXEL_SHADER);
+  auto basic_shader_result = utils::graphics::d3d::create_basic_shader_resources(
+      resources.d3d_context.device.get(), features::preview::shaders::BASIC_VERTEX_SHADER,
+      features::preview::shaders::BASIC_PIXEL_SHADER);
 
   if (!basic_shader_result) {
     Logger().error("Failed to create basic shader resources");
@@ -62,9 +64,9 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   resources.basic_shaders = std::move(basic_shader_result.value());
 
   // 创建视口框着色器
-  auto viewport_shader_result = Utils::Graphics::D3D::create_viewport_shader_resources(
-      resources.d3d_context.device.get(), Features::Preview::Shaders::VIEWPORT_VERTEX_SHADER,
-      Features::Preview::Shaders::VIEWPORT_PIXEL_SHADER);
+  auto viewport_shader_result = utils::graphics::d3d::create_viewport_shader_resources(
+      resources.d3d_context.device.get(), features::preview::shaders::VIEWPORT_VERTEX_SHADER,
+      features::preview::shaders::VIEWPORT_PIXEL_SHADER);
 
   if (!viewport_shader_result) {
     Logger().error("Failed to create viewport shader resources");
@@ -85,18 +87,18 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   return {};
 }
 
-auto cleanup_rendering(Core::State::AppState& state) -> void {
+auto cleanup_rendering(core::AppState& state) -> void {
   auto& resources = state.preview->rendering_resources;
 
   resources.initialized.store(false, std::memory_order_release);
   resources.resources_busy.store(true, std::memory_order_release);
 
   // 清理着色器资源
-  Utils::Graphics::D3D::cleanup_shader_resources(resources.basic_shaders);
-  Utils::Graphics::D3D::cleanup_shader_resources(resources.viewport_shaders);
+  utils::graphics::d3d::cleanup_shader_resources(resources.basic_shaders);
+  utils::graphics::d3d::cleanup_shader_resources(resources.viewport_shaders);
 
   // 清理D3D上下文
-  Utils::Graphics::D3D::cleanup_d3d_context(resources.d3d_context);
+  utils::graphics::d3d::cleanup_d3d_context(resources.d3d_context);
 
   // 重置资源
   resources.capture_srv.reset();
@@ -107,7 +109,7 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
   Logger().info("Preview rendering resources cleaned up");
 }
 
-auto resize_rendering(Core::State::AppState& state, int width, int height)
+auto resize_rendering(core::AppState& state, int width, int height)
     -> std::expected<void, std::string> {
   if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
     return std::unexpected("D3D not initialized");
@@ -119,7 +121,7 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
 
   // 调整交换链大小
   auto resize_result =
-      Utils::Graphics::D3D::resize_swap_chain(resources.d3d_context, width, height);
+      utils::graphics::d3d::resize_swap_chain(resources.d3d_context, width, height);
 
   resources.resources_busy.store(false, std::memory_order_release);
 
@@ -132,7 +134,7 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
   return {};
 }
 
-auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
+auto update_capture_srv(core::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
   if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire) || !texture) {
     return std::unexpected("Invalid rendering resources or texture");
@@ -163,14 +165,14 @@ auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture
   return {};
 }
 
-auto render_basic_quad(const Features::Preview::Types::RenderingResources& resources) -> void {
+auto render_basic_quad(const features::preview::RenderingResources& resources) -> void {
   auto* context = resources.d3d_context.context.get();
 
   // 设置着色器和资源
   context->IASetInputLayout(resources.basic_shaders.input_layout.get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-  UINT stride = sizeof(Features::Preview::Types::Vertex);
+  UINT stride = sizeof(features::preview::Vertex);
   UINT offset = 0;
   ID3D11Buffer* vertex_buffer = resources.basic_vertex_buffer.get();
   context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
@@ -190,19 +192,18 @@ auto render_basic_quad(const Features::Preview::Types::RenderingResources& resou
   context->Draw(4, 0);
 }
 
-auto render_viewport_frame(Core::State::AppState& state,
-                           const Features::Preview::Types::RenderingResources& resources) -> void {
+auto render_viewport_frame(core::AppState& state,
+                           const features::preview::RenderingResources& resources) -> void {
   // 更新视口状态
-  Features::Preview::Viewport::update_viewport_rect(state);
+  features::preview::viewport::update_viewport_rect(state);
 
   // 渲染视口框
-  Features::Preview::Viewport::render_viewport_frame(
+  features::preview::viewport::render_viewport_frame(
       state, resources.d3d_context.context.get(), resources.viewport_shaders.vertex_shader,
       resources.viewport_shaders.pixel_shader, resources.viewport_shaders.input_layout);
 }
 
-auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture)
-    -> void {
+auto render_frame(core::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture) -> void {
   if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
     return;
   }
@@ -257,4 +258,4 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> ca
   resources.d3d_context.swap_chain->Present(0, 0);
 }
 
-}  // namespace Features::Preview::Rendering
+}  // namespace features::preview::rendering

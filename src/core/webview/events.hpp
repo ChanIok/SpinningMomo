@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::WebView::Events {
+#include "vendor/std.hpp"
+
+namespace core::webview::events {
 
 // WebView响应事件
 struct WebViewResponseEvent {
@@ -9,4 +11,4 @@ struct WebViewResponseEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-}  // namespace Core::WebView::Events
+}  // namespace core::webview::events

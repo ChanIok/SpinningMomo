@@ -1,10 +1,11 @@
 #include "utils/path/path.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include "vendor/shellapi.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/shlobj_core.hpp"
 
-namespace Utils::Path::Detail {
+namespace utils::path::detail {
 
 constexpr std::wstring_view kPortableMarker = L"portable";
 constexpr std::wstring_view kAppName = L"SpinningMomo";
@@ -100,7 +101,7 @@ auto sanitize_window_title(std::wstring_view title) -> std::wstring {
 
 auto ensure_path_exists(const std::filesystem::path& path)
     -> std::expected<std::filesystem::path, std::string> {
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(path);
+  auto ensure_result = utils::path::EnsureDirectoryExists(path);
   if (!ensure_result) {
     return std::unexpected(ensure_result.error());
   }
@@ -108,10 +109,10 @@ auto ensure_path_exists(const std::filesystem::path& path)
   return path;
 }
 
-}  // namespace Utils::Path::Detail
+}  // namespace utils::path::detail
 
 // 获取当前程序的完整路径
-auto Utils::Path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {
+auto utils::path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {
   // 静态缓存，只在第一次调用时初始化
   static std::optional<std::filesystem::path> cached_path;
   static std::optional<std::string> cached_error;
@@ -153,7 +154,7 @@ auto Utils::Path::GetExecutablePath() -> std::expected<std::filesystem::path, st
 }
 
 // 获取当前程序所在的目录路径
-auto Utils::Path::GetExecutableDirectory() -> std::expected<std::filesystem::path, std::string> {
+auto utils::path::GetExecutableDirectory() -> std::expected<std::filesystem::path, std::string> {
   auto pathResult = GetExecutablePath();
   if (!pathResult) {
     return std::unexpected(pathResult.error());
@@ -166,55 +167,54 @@ auto Utils::Path::GetExecutableDirectory() -> std::expected<std::filesystem::pat
   }
 }
 
-auto Utils::Path::GetAppMode() -> AppMode {
+auto utils::path::GetAppMode() -> AppMode {
   auto exe_dir_result = GetExecutableDirectory();
   if (!exe_dir_result) {
     return AppMode::Portable;
   }
 
-  return std::filesystem::exists(exe_dir_result.value() / Detail::kPortableMarker)
+  return std::filesystem::exists(exe_dir_result.value() / detail::kPortableMarker)
              ? AppMode::Portable
              : AppMode::Installed;
 }
 
-auto Utils::Path::GetAppDataDirectory() -> std::expected<std::filesystem::path, std::string> {
+auto utils::path::GetAppDataDirectory() -> std::expected<std::filesystem::path, std::string> {
   if (GetAppMode() == AppMode::Portable) {
     auto exe_dir_result = GetExecutableDirectory();
     if (!exe_dir_result) {
       return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
     }
 
-    return Detail::ensure_path_exists(exe_dir_result.value() / "data");
+    return detail::ensure_path_exists(exe_dir_result.value() / "data");
   }
 
   PWSTR local_app_data_raw = nullptr;
-  const auto hr = Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_LocalAppData,
-                                                         0, nullptr, &local_app_data_raw);
+  const auto hr = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local_app_data_raw);
   if (FAILED(hr) || !local_app_data_raw) {
     if (local_app_data_raw) {
-      Vendor::ShellApi::CoTaskMemFree(local_app_data_raw);
+      CoTaskMemFree(local_app_data_raw);
     }
     return std::unexpected("Failed to get LocalAppData directory, HRESULT: " + std::to_string(hr));
   }
 
   std::filesystem::path app_data_root =
-      std::filesystem::path(local_app_data_raw) / Detail::kAppName;
-  Vendor::ShellApi::CoTaskMemFree(local_app_data_raw);
-  return Detail::ensure_path_exists(app_data_root);
+      std::filesystem::path(local_app_data_raw) / detail::kAppName;
+  CoTaskMemFree(local_app_data_raw);
+  return detail::ensure_path_exists(app_data_root);
 }
 
-auto Utils::Path::GetAppDataSubdirectory(std::string_view name)
+auto utils::path::GetAppDataSubdirectory(std::string_view name)
     -> std::expected<std::filesystem::path, std::string> {
   auto app_data_dir_result = GetAppDataDirectory();
   if (!app_data_dir_result) {
     return std::unexpected(app_data_dir_result.error());
   }
 
-  return Detail::ensure_path_exists(app_data_dir_result.value() /
+  return detail::ensure_path_exists(app_data_dir_result.value() /
                                     std::filesystem::path(std::string{name}));
 }
 
-auto Utils::Path::GetAppDataFilePath(std::string_view filename)
+auto utils::path::GetAppDataFilePath(std::string_view filename)
     -> std::expected<std::filesystem::path, std::string> {
   auto app_data_dir_result = GetAppDataDirectory();
   if (!app_data_dir_result) {
@@ -224,7 +224,7 @@ auto Utils::Path::GetAppDataFilePath(std::string_view filename)
   return app_data_dir_result.value() / std::filesystem::path(std::string{filename});
 }
 
-auto Utils::Path::GetEmbeddedWebRootDirectory()
+auto utils::path::GetEmbeddedWebRootDirectory()
     -> std::expected<std::filesystem::path, std::string> {
   auto exe_dir_result = GetExecutableDirectory();
   if (!exe_dir_result) {
@@ -235,7 +235,7 @@ auto Utils::Path::GetEmbeddedWebRootDirectory()
 }
 
 // 确保目录存在，如果不存在则创建
-auto Utils::Path::EnsureDirectoryExists(const std::filesystem::path& dir)
+auto utils::path::EnsureDirectoryExists(const std::filesystem::path& dir)
     -> std::expected<void, std::string> {
   try {
     if (!std::filesystem::exists(dir)) {
@@ -250,7 +250,7 @@ auto Utils::Path::EnsureDirectoryExists(const std::filesystem::path& dir)
 // 解析边界输入路径为绝对路径，默认相对于程序目录。
 // 会访问文件系统以解析现有路径段；适用于用户输入、配置输入、
 // watcher/recovery root 等需要拿到真实文件系统语义的入口。
-auto Utils::Path::ResolvePath(const std::filesystem::path& path,
+auto utils::path::ResolvePath(const std::filesystem::path& path,
                               std::optional<std::filesystem::path> base)
     -> std::expected<std::filesystem::path, std::string> {
   try {
@@ -291,7 +291,7 @@ auto Utils::Path::ResolvePath(const std::filesystem::path& path,
 // 纯 lexical 路径规范化：不访问文件系统，统一为正斜杠绝对路径。
 // 适用于图库内部已知路径语义（DB path / watcher path / scan change path /
 // relative 推导等）；需要解析 symlink / 盘符映射时请用 ResolvePath。
-auto Utils::Path::NormalizePath(const std::filesystem::path& path,
+auto utils::path::NormalizePath(const std::filesystem::path& path,
                                 std::optional<std::filesystem::path> base)
     -> std::expected<std::filesystem::path, std::string> {
   try {
@@ -325,7 +325,7 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
   }
 }
 
-auto Utils::Path::TryParseUncServer(const std::filesystem::path& path)
+auto utils::path::TryParseUncServer(const std::filesystem::path& path)
     -> std::optional<std::wstring> {
   auto value = path.wstring();
   std::ranges::replace(value, L'\\', L'/');
@@ -353,13 +353,13 @@ auto Utils::Path::TryParseUncServer(const std::filesystem::path& path)
   return server;
 }
 
-auto Utils::Path::ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind {
+auto utils::path::ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind {
   return TryParseUncServer(path).has_value() ? PathStorageKind::RemoteUnc : PathStorageKind::Local;
 }
 
 // 把路径转成适合比较的统一形式：先 lexically_normal 消除冗余分隔符，
 // 再转小写、统一为正斜杠。用于 Windows 大小写不敏感的前缀匹配场景。
-auto Utils::Path::NormalizeForComparison(const std::filesystem::path& path) -> std::wstring {
+auto utils::path::NormalizeForComparison(const std::filesystem::path& path) -> std::wstring {
   auto value = path.lexically_normal().generic_wstring();
   std::ranges::transform(value, value.begin(),
                          [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
@@ -369,7 +369,7 @@ auto Utils::Path::NormalizeForComparison(const std::filesystem::path& path) -> s
 // 判断 target 是否位于 base 目录内部（大小写不敏感，Windows 语义）。
 // 通过前缀匹配实现，匹配后确认紧随字符为 '/' 或路径刚好等长，
 // 防止 /foo/bar 被误判为 /foo/ba 的子目录。
-auto Utils::Path::IsPathWithinBase(const std::filesystem::path& target,
+auto utils::path::IsPathWithinBase(const std::filesystem::path& target,
                                    const std::filesystem::path& base) -> bool {
   auto normalized_base = NormalizeForComparison(base);
   auto normalized_target = NormalizeForComparison(target);
@@ -391,21 +391,20 @@ auto Utils::Path::IsPathWithinBase(const std::filesystem::path& target,
 }
 
 // 获取用户视频文件夹路径 (FOLDERID_Videos)
-auto Utils::Path::GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string> {
+auto utils::path::GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string> {
   PWSTR path = nullptr;
-  HRESULT hr =
-      Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_Videos, 0, nullptr, &path);
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_Videos, 0, nullptr, &path);
   if (FAILED(hr) || !path) {
-    if (path) Vendor::ShellApi::CoTaskMemFree(path);
+    if (path) CoTaskMemFree(path);
     return std::unexpected("Failed to get user Videos directory, HRESULT: " + std::to_string(hr));
   }
 
   std::filesystem::path result(path);
-  Vendor::ShellApi::CoTaskMemFree(path);
+  CoTaskMemFree(path);
   return result;
 }
 
-auto Utils::Path::GetOutputDirectory(const std::string& configured_output_dir_path)
+auto utils::path::GetOutputDirectory(const std::string& configured_output_dir_path)
     -> std::expected<std::filesystem::path, std::string> {
   if (!configured_output_dir_path.empty()) {
     std::filesystem::path configured_path = configured_output_dir_path;
@@ -441,7 +440,7 @@ auto Utils::Path::GetOutputDirectory(const std::string& configured_output_dir_pa
 }
 
 // 解析根输出目录 → 清洗窗口标题 → 创建对应子目录
-auto Utils::Path::GetOutputDirectoryForWindowTitle(const std::string& configured_output_dir_path,
+auto utils::path::GetOutputDirectoryForWindowTitle(const std::string& configured_output_dir_path,
                                                    std::wstring_view window_title)
     -> std::expected<std::filesystem::path, std::string> {
   // 先沿用统一规则解析用户配置或默认根输出目录
@@ -451,7 +450,7 @@ auto Utils::Path::GetOutputDirectoryForWindowTitle(const std::string& configured
   }
 
   // 标题只作为一个路径段，清洗后再拼接，不能改变根目录结构
-  auto output_dir = *output_dir_result / Detail::sanitize_window_title(window_title);
+  auto output_dir = *output_dir_result / detail::sanitize_window_title(window_title);
   // 捕获开始前确保目标目录可写入，失败时交给上层明确中止
   auto ensure_result = EnsureDirectoryExists(output_dir);
   if (!ensure_result) {

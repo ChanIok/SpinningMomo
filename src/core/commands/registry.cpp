@@ -1,6 +1,8 @@
 #include "core/commands/registry.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/commands/state.hpp"
 #include "core/commands/types.hpp"
@@ -8,16 +10,16 @@
 #include "features/settings/state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::Commands {
+namespace core::commands {
 
-static Core::Commands::State::CommandState* g_mouse_hotkey_state = nullptr;
+static core::commands::CommandState* g_mouse_hotkey_state = nullptr;
 
 // 这个钩子故意不消费任何按键消息，只保留一个最小的全局键盘挂载。
 LRESULT CALLBACK keyboard_keepalive_proc(int code, WPARAM wParam, LPARAM lParam) {
   return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
-auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
+auto install_keyboard_keepalive_hook(core::AppState& state) -> void {
   auto& cmd_state = *state.commands;
   if (cmd_state.keyboard_keepalive_hook) {
     return;
@@ -36,7 +38,7 @@ auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
   Logger().info("Keyboard keepalive hook installed");
 }
 
-auto uninstall_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
+auto uninstall_keyboard_keepalive_hook(core::AppState& state) -> void {
   auto& cmd_state = *state.commands;
   if (!cmd_state.keyboard_keepalive_hook) {
     return;
@@ -101,7 +103,7 @@ LRESULT CALLBACK mouse_hotkey_proc(int code, WPARAM wParam, LPARAM lParam) {
   return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
-auto install_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state, HWND hwnd) -> bool {
+auto install_mouse_hotkey_hook(core::commands::CommandState& cmd_state, HWND hwnd) -> bool {
   if (cmd_state.mouse_hotkey_hook) {
     cmd_state.mouse_hotkey_target_hwnd = hwnd;
     g_mouse_hotkey_state = &cmd_state;
@@ -122,7 +124,7 @@ auto install_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state, H
   return true;
 }
 
-auto uninstall_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state) -> void {
+auto uninstall_mouse_hotkey_hook(core::commands::CommandState& cmd_state) -> void {
   if (cmd_state.mouse_hotkey_hook) {
     UnhookWindowsHookEx(cmd_state.mouse_hotkey_hook);
     cmd_state.mouse_hotkey_hook = nullptr;
@@ -137,7 +139,7 @@ auto uninstall_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state)
 }
 
 // 按 ID 调用注册命令，并把查找失败或执行异常统一转换为 false
-auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool {
+auto invoke_command(core::AppState& state, const std::string& id) -> bool {
   auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
@@ -161,8 +163,7 @@ auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool
 }
 
 // 获取注册表中的命令描述符只读视图，不复制内部回调
-auto get_command(const Core::State::AppState& state, const std::string& id)
-    -> const CommandDescriptor* {
+auto get_command(const core::AppState& state, const std::string& id) -> const CommandDescriptor* {
   const auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
@@ -172,7 +173,7 @@ auto get_command(const Core::State::AppState& state, const std::string& id)
 }
 
 // 按注册顺序生成命令元数据快照，不复制注册表持有的行为
-auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptorData> {
+auto get_all_commands(const core::AppState& state) -> std::vector<CommandDescriptorData> {
   const auto& registry = state.commands->registry;
   std::vector<CommandDescriptorData> result;
   result.reserve(registry.registration_order.size());
@@ -193,7 +194,7 @@ auto get_all_commands(const Core::State::AppState& state) -> std::vector<Command
 }
 
 // 查询 toggle 命令的实时状态，无状态读取器或普通命令统一返回 false
-auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> bool {
+auto is_toggle_on(const core::AppState& state, const std::string& id) -> bool {
   const auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
@@ -207,7 +208,7 @@ auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> 
 }
 
 // 从 settings 获取热键配置（根据 settings_path）
-auto get_hotkey_from_settings(const Core::State::AppState& state, const HotkeyBinding& binding)
+auto get_hotkey_from_settings(const core::AppState& state, const HotkeyBinding& binding)
     -> std::pair<UINT, UINT> {
   const auto& settings = state.settings->raw;
 
@@ -237,7 +238,7 @@ auto get_hotkey_from_settings(const Core::State::AppState& state, const HotkeyBi
   return {binding.modifiers, binding.key};
 }
 
-auto register_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
+auto register_all_hotkeys(core::AppState& state, HWND hwnd) -> void {
   Logger().info("=== Starting hotkey registration ===");
 
   if (!hwnd) {
@@ -314,7 +315,7 @@ auto register_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
                 cmd_state.hotkey_to_command.size());
 }
 
-auto unregister_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
+auto unregister_all_hotkeys(core::AppState& state, HWND hwnd) -> void {
   auto& cmd_state = *state.commands;
 
   uninstall_mouse_hotkey_hook(cmd_state);
@@ -330,7 +331,7 @@ auto unregister_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
   cmd_state.next_hotkey_id = 1;
 }
 
-auto handle_hotkey(Core::State::AppState& state, int hotkey_id) -> std::optional<std::string> {
+auto handle_hotkey(core::AppState& state, int hotkey_id) -> std::optional<std::string> {
   Logger().debug("Received hotkey event, hotkey_id={}", hotkey_id);
 
   auto& cmd_state = *state.commands;
@@ -347,4 +348,4 @@ auto handle_hotkey(Core::State::AppState& state, int hotkey_id) -> std::optional
   return std::nullopt;
 }
 
-}  // namespace Core::Commands
+}  // namespace core::commands

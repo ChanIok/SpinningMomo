@@ -1,9 +1,11 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 // 字符串工具命名空间
-namespace Utils::String {
+namespace utils::string {
 
 // 将宽字符串转换为UTF-8编码字符串
 [[nodiscard]] inline auto ToUtf8(const std::wstring& wide_str) noexcept -> std::string {
@@ -183,4 +185,4 @@ constexpr char kBase64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstu
   return true;
 }
 
-}  // namespace Utils::String
+}  // namespace utils::string

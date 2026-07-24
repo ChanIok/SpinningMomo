@@ -1,49 +1,49 @@
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+
 #include "app.hpp"
 #include "features/settings/settings.hpp"
 #include "utils/crash_dump/crash_dump.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/system/system.hpp"
-#include "vendor/windows.hpp"
 
 // Win32 入口
-auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
-                        [[maybe_unused]] Vendor::Windows::HINSTANCE hPrevInstance,
-                        Vendor::Windows::LPWSTR lpCmdLine, [[maybe_unused]] int nCmdShow) -> int {
+auto __stdcall wWinMain(HINSTANCE hInstance, [[maybe_unused]] HINSTANCE hPrevInstance,
+                        LPWSTR lpCmdLine, [[maybe_unused]] int nCmdShow) -> int {
   auto ui_com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
   // 尽早安装崩溃转储处理器
-  Utils::CrashDump::install();
+  utils::crash_dump::install();
 
-  const auto startup_settings = Features::Settings::load_startup_settings();
+  const auto startup_settings = features::settings::load_startup_settings();
 
   // 尽早初始化日志，覆盖单实例、提权与启动早期故障
-  if (auto result = Utils::Logging::initialize(startup_settings.logger_level); !result) {
+  if (auto result = utils::logging::initialize(startup_settings.logger_level); !result) {
     const auto error_message = "Logger Failed: " + result.error();
-    Vendor::Windows::MessageBoxA(nullptr, error_message.c_str(), "Fatal Error",
-                                 Vendor::Windows::kMB_ICONERROR);
+    MessageBoxA(nullptr, error_message.c_str(), "Fatal Error", MB_ICONERROR);
     return -1;
   }
 
   // 单实例检查（需早于提权流程）
-  if (!Utils::System::acquire_single_instance_lock()) {
+  if (!utils::system::acquire_single_instance_lock()) {
     Logger().info("Existing instance detected, activating the running instance");
     // 已有实例时激活并退出
-    Utils::System::activate_existing_instance();
-    Utils::Logging::shutdown();
+    utils::system::activate_existing_instance();
+    utils::logging::shutdown();
     return 0;
   }
 
   // 需要管理员权限时尝试提权重启
-  if (startup_settings.always_run_as_admin && !Utils::System::is_process_elevated()) {
+  if (startup_settings.always_run_as_admin && !utils::system::is_process_elevated()) {
     Logger().info("Elevation required by settings, attempting restart as elevated");
     // 提权前先释放单实例锁，避免提权后的新进程误判为“已有实例”
-    Utils::System::release_single_instance_lock();
+    utils::system::release_single_instance_lock();
 
-    if (Utils::System::restart_as_elevated(lpCmdLine)) {
+    if (utils::system::restart_as_elevated(lpCmdLine)) {
       Logger().info("Elevated process started successfully, current process exits");
-      Utils::Logging::shutdown();
+      utils::logging::shutdown();
       // 提权进程已启动，当前进程退出
       return 0;
     }
@@ -51,10 +51,10 @@ auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
     Logger().warn("Elevation was cancelled or failed, continuing without admin privileges");
 
     // 取消 UAC 或启动失败：重新获取单实例锁后继续普通权限
-    if (!Utils::System::acquire_single_instance_lock()) {
+    if (!utils::system::acquire_single_instance_lock()) {
       Logger().info("Existing instance detected after elevation fallback, activating it");
-      Utils::System::activate_existing_instance();
-      Utils::Logging::shutdown();
+      utils::system::activate_existing_instance();
+      utils::logging::shutdown();
       return 0;
     }
   }
@@ -66,8 +66,7 @@ auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
 
     if (!app.Initialize(hInstance)) {
       Logger().critical("Failed to initialize application");
-      Vendor::Windows::MessageBoxW(nullptr, L"Failed to initialize application", L"Error",
-                                   Vendor::Windows::kMB_ICONERROR);
+      MessageBoxW(nullptr, L"Failed to initialize application", L"Error", MB_ICONERROR);
       exit_code = -1;
     } else {
       exit_code = app.Run();
@@ -75,11 +74,11 @@ auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
 
   } catch (const std::exception& e) {
     Logger().critical("Unhandled exception: {}", e.what());
-    Vendor::Windows::MessageBoxA(nullptr, e.what(), "Fatal Error", Vendor::Windows::kMB_ICONERROR);
+    MessageBoxA(nullptr, e.what(), "Fatal Error", MB_ICONERROR);
     exit_code = -1;
   }
 
   // 退出前关闭日志
-  Utils::Logging::shutdown();
+  utils::logging::shutdown();
   return exit_code;
 }

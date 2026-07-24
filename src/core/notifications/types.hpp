@@ -1,10 +1,12 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::Notifications::Types {
+namespace core::notifications {
 
-using NotificationActionCallback = std::function<void(Core::State::AppState&)>;
+using NotificationActionCallback = std::function<void(core::AppState&)>;
 
 struct NotificationAction {
   std::wstring label;
@@ -18,4 +20,4 @@ struct NotificationOptions {
   std::chrono::milliseconds duration = std::chrono::milliseconds(3000);
 };
 
-}  // namespace Core::Notifications::Types
+}  // namespace core::notifications

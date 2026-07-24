@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Vendor::BuildConfig {
+#include "vendor/std.hpp"
+
+namespace core::build_config {
 
 constexpr bool is_debug_build() noexcept {
 #ifdef NDEBUG
@@ -14,4 +16,4 @@ constexpr bool is_debug_build() noexcept {
 // 本地开发 Playground 时改为 true 后全量重编。
 constexpr bool rpc_json_schema_enabled() noexcept { return false; }
 
-}  // namespace Vendor::BuildConfig
+}  // namespace core::build_config

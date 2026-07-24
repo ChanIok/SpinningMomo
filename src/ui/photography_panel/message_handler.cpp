@@ -1,8 +1,10 @@
 #include "ui/photography_panel/message_handler.hpp"
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/photography/long_exposure.hpp"
@@ -12,7 +14,7 @@
 #include "ui/photography_panel/render_context.hpp"
 #include "ui/photography_panel/state.hpp"
 
-namespace UI::PhotographyPanel::MessageHandler {
+namespace ui::photography_panel::message_handler {
 
 enum class SliderHitPart {
   None,
@@ -28,29 +30,29 @@ auto ratio_from_x(const RECT& rect, int x) -> float {
 // 将鼠标 X 坐标映射到最近的帧数档位（0/30/60/120/300/1000）
 auto shutter_from_x(const RECT& rect, int x) -> int {
   const float ratio = ratio_from_x(rect, x);
-  const auto stops = Features::Photography::LongExposure::frame_stops();
+  const auto stops = features::photography::long_exposure::frame_stops();
   const int max_index = static_cast<int>(stops.size()) - 1;
   const int index = std::clamp(static_cast<int>(std::round(ratio * max_index)), 0, max_index);
   return stops[static_cast<std::size_t>(index)];
 }
 
 auto point_hits_slider_knob(const RECT& rect, int frames, POINT point) -> bool {
-  const float knob_x = UI::PhotographyPanel::Painter::shutter_to_x(rect, frames);
+  const float knob_x = ui::photography_panel::painter::shutter_to_x(rect, frames);
   const float knob_y = static_cast<float>(rect.top + rect.bottom) * 0.5f;
   const float dx = static_cast<float>(point.x) - knob_x;
   const float dy = static_cast<float>(point.y) - knob_y;
-  return dx * dx + dy * dy <= State::kSliderKnobRadius * State::kSliderKnobRadius;
+  return dx * dx + dy * dy <= kSliderKnobRadius * kSliderKnobRadius;
 }
 
 auto point_hits_slider_track(const RECT& rect, POINT point) -> bool {
   const int center_y = (rect.top + rect.bottom) / 2;
   return point.x >= rect.left && point.x <= rect.right &&
-         std::abs(point.y - center_y) <= State::kSliderTrackHitHalfHeight;
+         std::abs(point.y - center_y) <= kSliderTrackHitHalfHeight;
 }
 
 // 按实际绘制几何做命中测试，避免两端露出轨道外的旋钮看起来能点却抓不住
-auto hit_test_slider(const Core::State::AppState& state, POINT point) -> SliderHitPart {
-  const RECT rect = UI::PhotographyPanel::Painter::compute_panel_layout(state).slider_rect;
+auto hit_test_slider(const core::AppState& state, POINT point) -> SliderHitPart {
+  const RECT rect = ui::photography_panel::painter::compute_panel_layout(state).slider_rect;
   const int frames = state.photography->shutter_frames.load(std::memory_order_acquire);
   if (point_hits_slider_knob(rect, frames, point)) {
     return SliderHitPart::Knob;
@@ -62,7 +64,7 @@ auto hit_test_slider(const Core::State::AppState& state, POINT point) -> SliderH
 }
 
 // 只给旋钮保留 hover 视觉状态，避免轨道区域也抢走交互重点
-auto update_knob_hover_state(Core::State::AppState& state, SliderHitPart hit_part) -> void {
+auto update_knob_hover_state(core::AppState& state, SliderHitPart hit_part) -> void {
   const bool hovered = hit_part == SliderHitPart::Knob;
   if (state.photography_panel->knob_hovered == hovered) {
     return;
@@ -75,10 +77,10 @@ auto update_knob_hover_state(Core::State::AppState& state, SliderHitPart hit_par
 }
 
 // 根据鼠标位置更新帧数，值变化时刷新面板
-auto update_long_exposure_from_x(Core::State::AppState& state, int x) -> void {
-  const RECT rect = UI::PhotographyPanel::Painter::compute_panel_layout(state).slider_rect;
+auto update_long_exposure_from_x(core::AppState& state, int x) -> void {
+  const RECT rect = ui::photography_panel::painter::compute_panel_layout(state).slider_rect;
   const int next_frames =
-      Features::Photography::LongExposure::nearest_frame_stop(shutter_from_x(rect, x));
+      features::photography::long_exposure::nearest_frame_stop(shutter_from_x(rect, x));
   const int current = state.photography->shutter_frames.load(std::memory_order_acquire);
   if (next_frames == current) {
     return;
@@ -91,8 +93,8 @@ auto update_long_exposure_from_x(Core::State::AppState& state, int x) -> void {
 }
 
 // 关闭面板：禁用摄影模式 → 隐藏窗口 → 刷新悬浮窗状态
-auto close_panel(Core::State::AppState& state) -> void {
-  Features::Photography::UseCase::handle_panel_close(state);
+auto close_panel(core::AppState& state) -> void {
+  features::photography::handle_panel_close(state);
   if (state.photography_panel->hwnd) {
     ShowWindow(state.photography_panel->hwnd, SW_HIDE);
   }
@@ -102,8 +104,8 @@ auto close_panel(Core::State::AppState& state) -> void {
 }
 
 // 面板窗口过程：标题栏拖拽、长曝光滑块拖动、D3D resize
-auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM w_param,
-                      LPARAM l_param) -> LRESULT {
+auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)
+    -> LRESULT {
   auto& panel = *state.photography_panel;
   switch (msg) {
     case WM_ERASEBKGND:
@@ -112,7 +114,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_PAINT: {
       PAINTSTRUCT ps{};
       BeginPaint(hwnd, &ps);
-      UI::PhotographyPanel::Painter::paint(state, hwnd);
+      ui::photography_panel::painter::paint(state, hwnd);
       EndPaint(hwnd, &ps);
       return 0;
     }
@@ -120,7 +122,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_NCHITTEST: {
       POINT point{GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param)};
       ScreenToClient(hwnd, &point);
-      return point.y < UI::PhotographyPanel::Painter::compute_panel_layout(state).title_rect.bottom
+      return point.y < ui::photography_panel::painter::compute_panel_layout(state).title_rect.bottom
                  ? HTCAPTION
                  : HTCLIENT;
     }
@@ -165,7 +167,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_SIZE: {
       SIZE new_size{LOWORD(l_param), HIWORD(l_param)};
-      if (UI::PhotographyPanel::RenderContext::resize_render_context(state, new_size)) {
+      if (ui::photography_panel::render_context::resize_render_context(state, new_size)) {
         InvalidateRect(hwnd, nullptr, FALSE);
       }
       return 0;
@@ -176,7 +178,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       return 0;
 
     case WM_NCDESTROY:
-      UI::PhotographyPanel::RenderContext::cleanup_render_context(state);
+      ui::photography_panel::render_context::cleanup_render_context(state);
       panel.hwnd = nullptr;
       panel.is_visible = false;
       panel.dragging_long_exposure = false;
@@ -189,17 +191,17 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
 // Win32 静态回调：通过 GWLP_USERDATA 把 HWND 绑定到 AppState，之后委托给 window_procedure
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
-  Core::State::AppState* app_state = nullptr;
+  core::AppState* app_state = nullptr;
 
   if (msg == WM_NCCREATE) {
     const auto* create_struct = reinterpret_cast<CREATESTRUCTW*>(l_param);
-    app_state = static_cast<Core::State::AppState*>(create_struct->lpCreateParams);
+    app_state = static_cast<core::AppState*>(create_struct->lpCreateParams);
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app_state));
     if (app_state && app_state->photography_panel) {
       app_state->photography_panel->hwnd = hwnd;
     }
   } else {
-    app_state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    app_state = reinterpret_cast<core::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   }
 
   if (app_state && app_state->photography_panel) {
@@ -209,4 +211,4 @@ LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM 
   return DefWindowProcW(hwnd, msg, w_param, l_param);
 }
 
-}  // namespace UI::PhotographyPanel::MessageHandler
+}  // namespace ui::photography_panel::message_handler

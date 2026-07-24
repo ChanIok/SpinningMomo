@@ -1,10 +1,12 @@
 #pragma once
 
-// Auto-generated SQL schema module
+#include "vendor/std.hpp"
+
+// Auto-generated SQL schema header
 // DO NOT EDIT - This file is generated from
 // src/migrations/004_infinity_nikki_user_record_key_value.sql
 
-namespace Core::Migration::Schema {
+namespace core::migration::schema {
 
 struct V004 {
   static constexpr std::array<std::string_view, 9> statements = {
@@ -86,4 +88,4 @@ END
         )SQL"};
 };
 
-}  // namespace Core::Migration::Schema
+}  // namespace core::migration::schema

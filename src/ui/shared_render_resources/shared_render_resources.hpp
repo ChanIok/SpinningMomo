@@ -1,10 +1,12 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace UI::SharedRenderResources {
+namespace ui::shared_render_resources {
 
-auto ensure_initialized(Core::State::AppState& state) -> bool;
-auto cleanup(Core::State::AppState& state) -> void;
+auto ensure_initialized(core::AppState& state) -> bool;
+auto cleanup(core::AppState& state) -> void;
 
-}  // namespace UI::SharedRenderResources
+}  // namespace ui::shared_render_resources

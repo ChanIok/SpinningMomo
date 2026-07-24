@@ -1,10 +1,11 @@
 #include "core/webview/webview.hpp"
 
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <WebView2.h>  // 必须放最后面
-#include <windowsx.h>
+#include "vendor/webview2.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/windowsx.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/webview/host.hpp"
@@ -12,7 +13,7 @@
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 
-namespace Core::WebView::Detail {
+namespace core::webview::detail {
 
 auto to_mouse_virtual_keys(WPARAM wparam) -> COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS {
   COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS keys = COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS_NONE;
@@ -94,15 +95,15 @@ auto to_non_client_hit_test(COREWEBVIEW2_NON_CLIENT_REGION_KIND kind) -> LRESULT
   }
 }
 
-}  // namespace Core::WebView::Detail
+}  // namespace core::webview::detail
 
-namespace Core::WebView {
+namespace core::webview {
 
-namespace Detail {
+namespace detail {
 
-auto snapshot_virtual_host_folder_mappings(Core::State::AppState& state)
-    -> std::pair<std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>,
-                 std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>> {
+auto snapshot_virtual_host_folder_mappings(core::AppState& state)
+    -> std::pair<std::unordered_map<std::wstring, core::webview::VirtualHostFolderMapping>,
+                 std::unordered_map<std::wstring, core::webview::VirtualHostFolderMapping>> {
   auto& resources = state.webview->resources;
 
   std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
@@ -110,23 +111,23 @@ auto snapshot_virtual_host_folder_mappings(Core::State::AppState& state)
 }
 
 auto store_applied_virtual_host_folder_mappings(
-    Core::State::AppState& state,
-    std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>
-        applied_mappings) -> void {
+    core::AppState& state,
+    std::unordered_map<std::wstring, core::webview::VirtualHostFolderMapping> applied_mappings)
+    -> void {
   auto& resources = state.webview->resources;
 
   std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
   resources.applied_virtual_host_folder_mappings = std::move(applied_mappings);
 }
 
-auto clear_applied_virtual_host_folder_mappings(Core::State::AppState& state) -> void {
+auto clear_applied_virtual_host_folder_mappings(core::AppState& state) -> void {
   auto& resources = state.webview->resources;
 
   std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
   resources.applied_virtual_host_folder_mappings.clear();
 }
 
-}  // namespace Detail
+}  // namespace detail
 
 auto get_runtime_version() -> std::expected<std::string, std::string> {
   LPWSTR version_raw = nullptr;
@@ -141,13 +142,12 @@ auto get_runtime_version() -> std::expected<std::string, std::string> {
     return std::unexpected("WebView2 runtime version string is empty");
   }
 
-  std::string version = Utils::String::ToUtf8(version_raw);
+  std::string version = utils::string::ToUtf8(version_raw);
   CoTaskMemFree(version_raw);
   return version;
 }
 
-auto initialize(Core::State::AppState& state, HWND webview_hwnd)
-    -> std::expected<void, std::string> {
+auto initialize(core::AppState& state, HWND webview_hwnd) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
   if (webview_state.is_initialized) {
@@ -155,7 +155,7 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
   }
 
   try {
-    auto init_result = Core::WebView::Host::start_environment_creation(state, webview_hwnd);
+    auto init_result = core::webview::host::start_environment_creation(state, webview_hwnd);
     if (!init_result) {
       return std::unexpected(init_result.error());
     }
@@ -176,7 +176,7 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
   }
 }
 
-auto resize_webview(Core::State::AppState& state, int width, int height) -> void {
+auto resize_webview(core::AppState& state, int width, int height) -> void {
   auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
@@ -189,7 +189,7 @@ auto resize_webview(Core::State::AppState& state, int width, int height) -> void
   }
 }
 
-auto navigate_to_url(Core::State::AppState& state, const std::wstring& url)
+auto navigate_to_url(core::AppState& state, const std::wstring& url)
     -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
@@ -203,11 +203,11 @@ auto navigate_to_url(Core::State::AppState& state, const std::wstring& url)
   }
 
   webview_state.resources.current_url = url;
-  Logger().info("Navigating to: {}", Utils::String::ToUtf8(url));
+  Logger().info("Navigating to: {}", utils::string::ToUtf8(url));
   return {};
 }
 
-auto shutdown(Core::State::AppState& state) -> void {
+auto shutdown(core::AppState& state) -> void {
   auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
@@ -219,8 +219,8 @@ auto shutdown(Core::State::AppState& state) -> void {
   webview_state.resources.composition_controller.reset();
   webview_state.resources.controller.reset();
   webview_state.resources.environment.reset();
-  Detail::clear_applied_virtual_host_folder_mappings(state);
-  Core::WebView::Host::reset_host_runtime(state);
+  detail::clear_applied_virtual_host_folder_mappings(state);
+  core::webview::host::reset_host_runtime(state);
 
   webview_state.is_initialized = false;
   webview_state.is_ready = false;
@@ -231,18 +231,18 @@ auto shutdown(Core::State::AppState& state) -> void {
   Logger().info("WebView shutdown completed");
 }
 
-auto post_message(Core::State::AppState& state, const std::string& message) -> void {
+auto post_message(core::AppState& state, const std::string& message) -> void {
   auto& webview_state = *state.webview;
 
   if (webview_state.is_ready) {
-    std::wstring wmessage = Utils::String::FromUtf8(message);
+    std::wstring wmessage = utils::string::FromUtf8(message);
     webview_state.resources.webview.get()->PostWebMessageAsJson(wmessage.c_str());
     Logger().debug("Posted message to WebView");
   }
 }
 
 // 注册 WebView 消息处理器：同一消息类型的新处理器替换旧处理器
-auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
+auto register_message_handler(core::AppState& state, const std::string& message_type,
                               std::move_only_function<void(const std::string&) const> handler)
     -> void {
   auto& webview_state = *state.webview;
@@ -253,7 +253,7 @@ auto register_message_handler(Core::State::AppState& state, const std::string& m
   Logger().debug("Registered message handler for type: {}", message_type);
 }
 
-auto register_document_created_script(Core::State::AppState& state, std::string script_id,
+auto register_document_created_script(core::AppState& state, std::string script_id,
                                       std::wstring script_source) -> void {
   if (!state.webview) {
     return;
@@ -262,7 +262,7 @@ auto register_document_created_script(Core::State::AppState& state, std::string 
   auto& resources = state.webview->resources;
   {
     std::lock_guard<std::mutex> lock(resources.document_created_scripts_mutex);
-    resources.document_created_scripts[script_id] = Core::WebView::State::DocumentCreatedScript{
+    resources.document_created_scripts[script_id] = core::webview::DocumentCreatedScript{
         .id = std::move(script_id),
         .script = std::move(script_source),
     };
@@ -273,14 +273,15 @@ auto register_document_created_script(Core::State::AppState& state, std::string 
 
 // 注册一条“虚拟 host -> 本地目录”的映射。
 // 这里只登记状态；真正的 WebView COM 调用必须统一回到 WebView 所在线程执行。
-auto register_virtual_host_folder_mapping(
-    Core::State::AppState& state, std::wstring host_name, std::wstring folder_path,
-    Core::WebView::State::VirtualHostResourceAccessKind access_kind) -> void {
+auto register_virtual_host_folder_mapping(core::AppState& state, std::wstring host_name,
+                                          std::wstring folder_path,
+                                          core::webview::VirtualHostResourceAccessKind access_kind)
+    -> void {
   auto& resources = state.webview->resources;
   bool mapping_changed = false;
   {
     std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
-    auto new_mapping = Core::WebView::State::VirtualHostFolderMapping{
+    auto new_mapping = core::webview::VirtualHostFolderMapping{
         .folder_path = folder_path,
         .access_kind = access_kind,
     };
@@ -296,15 +297,15 @@ auto register_virtual_host_folder_mapping(
 
   if (mapping_changed) {
     Logger().debug("Queued WebView virtual host mapping: {} -> {}",
-                   Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path));
+                   utils::string::ToUtf8(host_name), utils::string::ToUtf8(folder_path));
     request_virtual_host_folder_mapping_reconcile(state);
   }
 }
 
 // 注销一条虚拟 host 映射。
 // root watch 被移除时，需要把对应的 r-<rootId>.test 一并移除，避免旧 URL 继续生效。
-auto unregister_virtual_host_folder_mapping(Core::State::AppState& state,
-                                            std::wstring_view host_name) -> void {
+auto unregister_virtual_host_folder_mapping(core::AppState& state, std::wstring_view host_name)
+    -> void {
   auto& resources = state.webview->resources;
   {
     std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
@@ -312,13 +313,13 @@ auto unregister_virtual_host_folder_mapping(Core::State::AppState& state,
   }
 
   Logger().debug("Removed queued WebView virtual host mapping: {}",
-                 Utils::String::ToUtf8(std::wstring(host_name)));
+                 utils::string::ToUtf8(std::wstring(host_name)));
   request_virtual_host_folder_mapping_reconcile(state);
 }
 
 // 请求协调虚拟主机映射。
 // 通过 PostMessage 将任务发布到 WebView 窗口消息队列，确保 WebView COM 调用在正确的线程上执行。
-auto request_virtual_host_folder_mapping_reconcile(Core::State::AppState& state) -> void {
+auto request_virtual_host_folder_mapping_reconcile(core::AppState& state) -> void {
   if (!state.webview) {
     return;
   }
@@ -328,7 +329,7 @@ auto request_virtual_host_folder_mapping_reconcile(Core::State::AppState& state)
     return;
   }
 
-  if (!PostMessageW(hwnd, Core::WebView::State::kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS, 0, 0)) {
+  if (!PostMessageW(hwnd, core::webview::kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS, 0, 0)) {
     Logger().debug("Skipped WebView virtual host mapping reconcile request: hwnd={} err={}",
                    reinterpret_cast<std::uintptr_t>(hwnd), GetLastError());
   }
@@ -339,18 +340,18 @@ auto request_virtual_host_folder_mapping_reconcile(Core::State::AppState& state)
 // - 已应用但不在期望中的映射调用 ClearVirtualHostNameToFolderMapping 清除
 // - 期望中但未应用的映射调用 SetVirtualHostNameToFolderMapping 添加
 // - 已应用且仍在期望中的映射保持不变
-auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> void {
+auto reconcile_virtual_host_folder_mappings(core::AppState& state) -> void {
   if (!state.webview) {
     return;
   }
 
   auto* webview = state.webview->resources.webview.get();
   if (!webview) {
-    Detail::clear_applied_virtual_host_folder_mappings(state);
+    detail::clear_applied_virtual_host_folder_mappings(state);
     return;
   }
 
-  auto [desired_mappings, applied_mappings] = Detail::snapshot_virtual_host_folder_mappings(state);
+  auto [desired_mappings, applied_mappings] = detail::snapshot_virtual_host_folder_mappings(state);
 
   wil::com_ptr<ICoreWebView2_3> webview3;
   auto hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
@@ -369,12 +370,12 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
     hr = webview3->ClearVirtualHostNameToFolderMapping(applied_host.c_str());
     if (FAILED(hr)) {
       Logger().warn("Failed to clear WebView virtual host mapping {}: {}",
-                    Utils::String::ToUtf8(applied_host), hr);
+                    utils::string::ToUtf8(applied_host), hr);
       continue;
     }
 
     next_applied_mappings.erase(applied_host);
-    Logger().info("Cleared WebView virtual host mapping: {}", Utils::String::ToUtf8(applied_host));
+    Logger().info("Cleared WebView virtual host mapping: {}", utils::string::ToUtf8(applied_host));
   }
 
   for (const auto& [host_name, mapping] : desired_mappings) {
@@ -390,45 +391,45 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
         static_cast<COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND>(mapping.access_kind));
     if (FAILED(hr)) {
       Logger().warn("Failed to apply WebView virtual host mapping {} -> {}: {}",
-                    Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path),
+                    utils::string::ToUtf8(host_name), utils::string::ToUtf8(mapping.folder_path),
                     hr);
       continue;
     }
 
     next_applied_mappings[host_name] = mapping;
     Logger().info("Applied WebView virtual host mapping: {} -> {}",
-                  Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path));
+                  utils::string::ToUtf8(host_name), utils::string::ToUtf8(mapping.folder_path));
   }
 
-  Detail::store_applied_virtual_host_folder_mappings(state, std::move(next_applied_mappings));
+  detail::store_applied_virtual_host_folder_mappings(state, std::move(next_applied_mappings));
 }
 
-auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
-  Core::WebView::Host::apply_background_mode_from_settings(state);
+auto apply_background_mode_from_settings(core::AppState& state) -> void {
+  core::webview::host::apply_background_mode_from_settings(state);
 }
 
-auto get_loading_background_color(Core::State::AppState& state) -> COLORREF {
-  return Core::WebView::Host::get_loading_background_color(state);
+auto get_loading_background_color(core::AppState& state) -> COLORREF {
+  return core::webview::host::get_loading_background_color(state);
 }
 
-auto is_composition_active(Core::State::AppState& state) -> bool {
+auto is_composition_active(core::AppState& state) -> bool {
   return state.webview->resources.composition_controller != nullptr;
 }
 
-auto forward_mouse_message(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wparam,
-                           LPARAM lparam) -> bool {
+auto forward_mouse_message(core::AppState& state, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+    -> bool {
   auto& webview_state = *state.webview;
   auto* composition_controller = webview_state.resources.composition_controller.get();
   if (!composition_controller) {
     return false;
   }
 
-  auto event_kind = Detail::to_mouse_event_kind(msg);
+  auto event_kind = detail::to_mouse_event_kind(msg);
   if (!event_kind) {
     return false;
   }
 
-  COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS keys = Detail::to_mouse_virtual_keys(wparam);
+  COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS keys = detail::to_mouse_virtual_keys(wparam);
 
   UINT32 mouse_data = 0;
   if (msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL) {
@@ -448,7 +449,7 @@ auto forward_mouse_message(Core::State::AppState& state, HWND hwnd, UINT msg, WP
   return true;
 }
 
-auto forward_non_client_right_button_message(Core::State::AppState& state, HWND hwnd, UINT msg,
+auto forward_non_client_right_button_message(core::AppState& state, HWND hwnd, UINT msg,
                                              WPARAM wparam, LPARAM lparam) -> bool {
   (void)wparam;
 
@@ -486,7 +487,7 @@ auto forward_non_client_right_button_message(Core::State::AppState& state, HWND 
   return true;
 }
 
-auto hit_test_non_client_region(Core::State::AppState& state, HWND hwnd, LPARAM lparam)
+auto hit_test_non_client_region(core::AppState& state, HWND hwnd, LPARAM lparam)
     -> std::optional<LRESULT> {
   auto& webview_state = *state.webview;
   auto* composition_controller4 = webview_state.resources.composition_controller4.get();
@@ -505,14 +506,14 @@ auto hit_test_non_client_region(Core::State::AppState& state, HWND hwnd, LPARAM 
     return std::nullopt;
   }
 
-  return Detail::to_non_client_hit_test(region_kind);
+  return detail::to_non_client_hit_test(region_kind);
 }
 
-auto send_message(Core::State::AppState& state, const std::string& message)
+auto send_message(core::AppState& state, const std::string& message)
     -> std::expected<std::string, std::string> {
   // 这是一个简化版本，实际应该实现完整的请求-响应机制
   post_message(state, message);
   return std::string("Message sent");
 }
 
-}  // namespace Core::WebView
+}  // namespace core::webview

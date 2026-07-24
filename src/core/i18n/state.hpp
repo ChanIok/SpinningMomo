@@ -1,13 +1,15 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/i18n/types.hpp"
 
-namespace Core::I18n::State {
+namespace core::i18n {
 
 struct I18nState {
-  Types::Language current_language = Types::Language::EnUS;
-  Types::TextData texts;
+  Language current_language = Language::EnUS;
+  TextData texts;
   bool is_initialized = false;
 };
 
-}  // namespace Core::I18n::State
+}  // namespace core::i18n

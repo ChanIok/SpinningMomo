@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Core::Events::State {
+#include "vendor/windows.hpp"
+
+namespace core::events {
 
 struct EventsState {
   std::unordered_map<std::type_index,
@@ -15,4 +17,4 @@ struct EventsState {
   HWND notify_hwnd = nullptr;
 };
 
-}  // namespace Core::Events::State
+}  // namespace core::events

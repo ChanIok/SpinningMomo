@@ -1,15 +1,17 @@
 #include "core/migration/migration.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/migration/scripts/scripts.hpp"
 #include "core/state/app_state.hpp"
+#include "core/version.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
-#include "vendor/version.hpp"
 
-namespace Core::Migration {
+namespace core::migration {
 
 auto get_version_file_path() -> std::expected<std::filesystem::path, std::string> {
-  return Utils::Path::GetAppDataFilePath("app_version.txt");
+  return utils::path::GetAppDataFilePath("app_version.txt");
 }
 
 auto get_last_version() -> std::expected<std::string, std::string> {
@@ -111,10 +113,10 @@ auto compare_versions(const std::string& v1, const std::string& v2) -> int {
   return 0;
 }
 
-auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
+auto run_migration_if_needed(core::AppState& app_state) -> bool {
   Logger().info("=== Migration Check Started ===");
 
-  auto current_version = Vendor::Version::get_app_version();
+  auto current_version = core::version::get_app_version();
   auto last_version_result = get_last_version();
   if (!last_version_result) {
     Logger().error("Failed to get last version: {}", last_version_result.error());
@@ -133,8 +135,8 @@ auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   }
 
   // 收集需要执行的迁移脚本
-  const auto& all_migrations = Scripts::get_all_migrations();
-  std::vector<const Scripts::MigrationScript*> scripts_to_run;
+  const auto& all_migrations = scripts::get_all_migrations();
+  std::vector<const scripts::MigrationScript*> scripts_to_run;
 
   for (const auto& script : all_migrations) {
     if (is_fresh_install && !script.run_on_fresh_install) {
@@ -197,4 +199,4 @@ auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   return true;
 }
 
-}  // namespace Core::Migration
+}  // namespace core::migration

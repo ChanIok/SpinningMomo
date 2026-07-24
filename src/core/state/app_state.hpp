@@ -1,166 +1,167 @@
 #pragma once
 
-namespace Core::RPC::State {
+#include "vendor/std.hpp"
+
+namespace core::rpc {
 struct RpcState;
 }
 
-namespace Core::Async::State {
+namespace core::async {
 struct AsyncState;
 }
 
-namespace Core::DialogService::State {
+namespace core::dialog_service {
 struct DialogServiceState;
 }
 
-namespace Core::Events::State {
+namespace core::events {
 struct EventsState;
 }
 
-namespace Core::I18n::State {
+namespace core::i18n {
 struct I18nState;
 }
 
-namespace Core::WebView::State {
+namespace core::webview {
 struct WebViewState;
 }
 
-namespace Core::State::RuntimeInfo {
+namespace core::runtime_info {
 struct RuntimeInfoState;
 }
 
-namespace Core::Database::State {
+namespace core::database {
 struct DatabaseState;
 }
 
-namespace Core::HttpServer::State {
+namespace core::http_server {
 struct HttpServerState;
 }
 
-namespace Core::HttpClient::State {
+namespace core::http_client {
 struct HttpClientState;
 }
 
-namespace Core::WorkerPool::State {
+namespace core::worker_pool {
 struct WorkerPoolState;
 }
 
-namespace Core::Commands::State {
+namespace core::commands {
 struct CommandState;
 }
 
-namespace Core::Tasks::State {
+namespace core::tasks {
 struct TaskState;
 }
 
-namespace Features::Settings::State {
+namespace features::settings {
 struct SettingsState;
 }
 
-namespace Features::Update::State {
+namespace features::update {
 struct UpdateState;
 }
 
-namespace UI::SharedRenderResources::State {
+namespace ui::shared_render_resources {
 struct SharedRenderResourcesState;
 }
 
-namespace UI::FloatingWindow::State {
+namespace ui::floating_window {
 struct FloatingWindowState;
 }
 
-namespace UI::TrayIcon::State {
+namespace ui::tray_icon {
 struct TrayIconState;
 }
 
-namespace UI::ContextMenu::State {
+namespace ui::context_menu {
 struct ContextMenuState;
 }
 
-namespace UI::NotificationWindow::State {
+namespace ui::notification_window {
 struct NotificationWindowState;
 }
 
-namespace UI::PhotographyPanel::State {
+namespace ui::photography_panel {
 struct PhotographyPanelState;
 }
 
-namespace Features::Letterbox::State {
+namespace features::letterbox {
 struct LetterboxState;
 }
 
-namespace Features::Gallery::State {
+namespace features::gallery {
 struct GalleryState;
 }
 
-namespace Features::Overlay::State {
+namespace features::overlay {
 struct OverlayState;
 }
 
-namespace Features::Preview::State {
+namespace features::preview {
 struct PreviewState;
 }
 
-namespace Features::WindowControl::State {
+namespace features::window_control {
 struct WindowControlState;
 }
 
-namespace Features::Screenshot::State {
+namespace features::screenshot {
 struct ScreenshotState;
 }
 
-namespace Features::Recording::State {
+namespace features::recording {
 struct RecordingState;
 }
 
-namespace Features::Photography::State {
+namespace features::photography {
 struct PhotographyState;
 }
 
-namespace Core::State {
+namespace core {
 
 struct AppState {
   AppState();
   ~AppState();
 
   // 应用级状态
-  std::unique_ptr<Core::RPC::State::RpcState> rpc;
-  std::unique_ptr<Core::Async::State::AsyncState> async;
-  std::unique_ptr<Core::DialogService::State::DialogServiceState> dialog_service;
-  std::unique_ptr<Core::Events::State::EventsState> events;
-  std::unique_ptr<Core::I18n::State::I18nState> i18n;
-  std::unique_ptr<Core::WebView::State::WebViewState> webview;
-  std::unique_ptr<Core::State::RuntimeInfo::RuntimeInfoState> runtime_info;
-  std::unique_ptr<Core::Database::State::DatabaseState> database;
-  std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
-  std::unique_ptr<Core::HttpClient::State::HttpClientState> http_client;
-  std::unique_ptr<Core::WorkerPool::State::WorkerPoolState> worker_pool;
-  std::unique_ptr<Core::Commands::State::CommandState> commands;
-  std::unique_ptr<Core::Tasks::State::TaskState> tasks;
+  std::unique_ptr<core::rpc::RpcState> rpc;
+  std::unique_ptr<core::async::AsyncState> async;
+  std::unique_ptr<core::dialog_service::DialogServiceState> dialog_service;
+  std::unique_ptr<core::events::EventsState> events;
+  std::unique_ptr<core::i18n::I18nState> i18n;
+  std::unique_ptr<core::webview::WebViewState> webview;
+  std::unique_ptr<core::runtime_info::RuntimeInfoState> runtime_info;
+  std::unique_ptr<core::database::DatabaseState> database;
+  std::unique_ptr<core::http_server::HttpServerState> http_server;
+  std::unique_ptr<core::http_client::HttpClientState> http_client;
+  std::unique_ptr<core::worker_pool::WorkerPoolState> worker_pool;
+  std::unique_ptr<core::commands::CommandState> commands;
+  std::unique_ptr<core::tasks::TaskState> tasks;
 
   // 应用设置状态（包含配置和计算状态）
-  std::unique_ptr<Features::Settings::State::SettingsState> settings;
+  std::unique_ptr<features::settings::SettingsState> settings;
 
   // 更新模块状态
-  std::unique_ptr<Features::Update::State::UpdateState> update;
+  std::unique_ptr<features::update::UpdateState> update;
 
   // UI状态
-  std::unique_ptr<UI::SharedRenderResources::State::SharedRenderResourcesState>
-      shared_render_resources;
-  std::unique_ptr<UI::FloatingWindow::State::FloatingWindowState> floating_window;
-  std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
-  std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;
-  std::unique_ptr<UI::NotificationWindow::State::NotificationWindowState> notification_window;
-  std::unique_ptr<UI::PhotographyPanel::State::PhotographyPanelState> photography_panel;
+  std::unique_ptr<ui::shared_render_resources::SharedRenderResourcesState> shared_render_resources;
+  std::unique_ptr<ui::floating_window::FloatingWindowState> floating_window;
+  std::unique_ptr<ui::tray_icon::TrayIconState> tray_icon;
+  std::unique_ptr<ui::context_menu::ContextMenuState> context_menu;
+  std::unique_ptr<ui::notification_window::NotificationWindowState> notification_window;
+  std::unique_ptr<ui::photography_panel::PhotographyPanelState> photography_panel;
 
   // 功能模块状态
-  std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;
-  std::unique_ptr<Features::Gallery::State::GalleryState> gallery;
-  std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
-  std::unique_ptr<Features::Preview::State::PreviewState> preview;
-  std::unique_ptr<Features::WindowControl::State::WindowControlState> window_control;
-  std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
-  std::unique_ptr<Features::Recording::State::RecordingState> recording;
-  std::unique_ptr<Features::Photography::State::PhotographyState> photography;
+  std::unique_ptr<features::letterbox::LetterboxState> letterbox;
+  std::unique_ptr<features::gallery::GalleryState> gallery;
+  std::unique_ptr<features::overlay::OverlayState> overlay;
+  std::unique_ptr<features::preview::PreviewState> preview;
+  std::unique_ptr<features::window_control::WindowControlState> window_control;
+  std::unique_ptr<features::screenshot::ScreenshotState> screenshot;
+  std::unique_ptr<features::recording::RecordingState> recording;
+  std::unique_ptr<features::photography::PhotographyState> photography;
 };
 
-}  // namespace Core::State
+}  // namespace core

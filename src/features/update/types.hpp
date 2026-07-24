@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Update::Types {
+#include "vendor/std.hpp"
+
+namespace features::update {
 
 // === 响应类型定义 ===
 // Update模块的公共API响应类型
@@ -29,4 +31,4 @@ struct InstallUpdateResult {
   std::string message;  // 结果消息
 };
 
-}  // namespace Features::Update::Types
+}  // namespace features::update

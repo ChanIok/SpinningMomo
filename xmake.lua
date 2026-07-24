@@ -29,11 +29,9 @@ target("SpinningMomo")
     set_kind("binary")
     set_plat("windows")
     set_arch("x64")
-    
     -- 设置预编译头文件
     set_pcxxheader("src/pch.hpp")
     add_cxflags("-Wno-microsoft-include")
-    -- set_policy("build.c++.modules.non_cascading_changes", true)
 
     -- Release 也保留调试符号，便于分析生产崩溃 dump
     if is_mode("release") then

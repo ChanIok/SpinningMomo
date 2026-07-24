@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Recording::Time {
+#include "vendor/std.hpp"
+
+namespace features::recording::time {
 
 // 统一把 QPC 转成 100ns，录制时间线、音频时间戳、收尾目标都基于同一套时钟。
 auto query_qpc_100ns() -> std::int64_t;
@@ -12,4 +14,4 @@ auto elapsed_since_start_100ns(std::int64_t start_qpc_100ns) -> std::int64_t;
 auto relative_timestamp_100ns(std::int64_t start_qpc_100ns, std::int64_t absolute_qpc_100ns)
     -> std::int64_t;
 
-}  // namespace Features::Recording::Time
+}  // namespace features::recording::time

@@ -1,7 +1,9 @@
 #include "ui/context_menu/painter.hpp"
 
-#include <d2d1_3.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/context_menu/interaction.hpp"
@@ -10,17 +12,17 @@
 #include "ui/context_menu/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace UI::ContextMenu::Painter {
+namespace ui::context_menu::painter {
 
 struct AnimationAlphaState {
-  State::RenderResources* resources = nullptr;
+  RenderResources* resources = nullptr;
   float original_alpha = 1.0f;
   bool applied = false;
 };
 
 // 临时将所有 brush 的 alpha 乘以动画 opacity，返回可恢复的快照
-auto apply_animation_alpha(State::RenderResources& resources,
-                           const Types::MenuOpenAnimation& animation) -> AnimationAlphaState {
+auto apply_animation_alpha(RenderResources& resources, const MenuOpenAnimation& animation)
+    -> AnimationAlphaState {
   if (!resources.device_context) {
     return {};
   }
@@ -81,7 +83,7 @@ auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
                      static_cast<float>(rect.right), static_cast<float>(rect.bottom));
 }
 
-auto present_surface(State::RenderResources& render_resources, const char* label) -> void {
+auto present_surface(RenderResources& render_resources, const char* label) -> void {
   if (!render_resources.swap_chain) {
     return;
   }
@@ -93,7 +95,7 @@ auto present_surface(State::RenderResources& render_resources, const char* label
 }
 
 // 绘制主菜单一帧：透明清屏 → 叠动画 alpha → 背景+菜单项 → 恢复 alpha → 提交
-auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -> void {
+auto paint_context_menu(core::AppState& state, const RECT& client_rect) -> void {
   auto& menu_state = *state.context_menu;
   auto& render_resources = menu_state.main_render_resources;
   if (!render_resources.is_ready || !render_resources.device_context || !menu_state.text_format) {
@@ -115,7 +117,7 @@ auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -
   // GPU 设备丢失时重建 D2D 资源，下次 paint 会正常
   if (hr == D2DERR_RECREATE_TARGET) {
     Logger().warn("Main menu render target needs recreation");
-    UI::ContextMenu::RenderContext::initialize_context_menu(state, menu_state.hwnd);
+    ui::context_menu::render_context::initialize_context_menu(state, menu_state.hwnd);
     return;
   }
   if (FAILED(hr)) {
@@ -126,20 +128,20 @@ auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -
   present_surface(render_resources, "Main menu");
 }
 
-auto draw_menu_background(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_menu_background(core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render_resources = state.context_menu->main_render_resources;
   render_resources.device_context->FillRectangle(rect, render_resources.background_brush.get());
 }
 
-auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_menu_items(core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
-  const int highlight_index = UI::ContextMenu::Interaction::get_main_highlight_index(state);
+  const int highlight_index = ui::context_menu::interaction::get_main_highlight_index(state);
   float current_y = rect.top + static_cast<float>(layout.padding);
   for (size_t i = 0; i < menu_state.items.size(); ++i) {
     const auto& item = menu_state.items[i];
     const bool is_hovered = static_cast<int>(i) == highlight_index;
-    if (item.type == Types::MenuItemType::Separator) {
+    if (item.type == MenuItemType::Separator) {
       const float separator_height = static_cast<float>(layout.separator_height);
       const D2D1_RECT_F separator_rect = D2D1::RectF(
           rect.left + static_cast<float>(layout.text_padding), current_y,
@@ -156,7 +158,7 @@ auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> v
   }
 }
 
-auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& item,
+auto draw_single_menu_item(core::AppState& state, const MenuItem& item,
                            const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
   const auto& render_resources = menu_state.main_render_resources;
@@ -201,14 +203,14 @@ auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& 
   }
 }
 
-auto draw_separator(Core::State::AppState& state, const D2D1_RECT_F& separator_rect) -> void {
+auto draw_separator(core::AppState& state, const D2D1_RECT_F& separator_rect) -> void {
   const auto& render_resources = state.context_menu->main_render_resources;
   render_resources.device_context->FillRectangle(separator_rect,
                                                  render_resources.separator_brush.get());
 }
 
 // 绘制子菜单一帧，流程与 paint_context_menu 对称
-auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> void {
+auto paint_submenu(core::AppState& state, const RECT& client_rect) -> void {
   auto& menu_state = *state.context_menu;
   auto& render_resources = menu_state.submenu_render_resources;
   if (!render_resources.is_ready || !render_resources.device_context || !menu_state.text_format) {
@@ -229,7 +231,7 @@ auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> voi
   const HRESULT hr = render_resources.device_context->EndDraw();
   if (hr == D2DERR_RECREATE_TARGET) {
     Logger().warn("Submenu render target needs recreation");
-    UI::ContextMenu::RenderContext::initialize_submenu(state, menu_state.submenu_hwnd);
+    ui::context_menu::render_context::initialize_submenu(state, menu_state.submenu_hwnd);
     return;
   }
   if (FAILED(hr)) {
@@ -240,12 +242,12 @@ auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> voi
   present_surface(render_resources, "Submenu");
 }
 
-auto draw_submenu_background(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_submenu_background(core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render_resources = state.context_menu->submenu_render_resources;
   render_resources.device_context->FillRectangle(rect, render_resources.background_brush.get());
 }
 
-auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_submenu_items(core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
   const auto& current_submenu = menu_state.get_current_submenu();
@@ -253,7 +255,7 @@ auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -
   for (size_t i = 0; i < current_submenu.size(); ++i) {
     const auto& item = current_submenu[i];
     const bool is_hovered = static_cast<int>(i) == menu_state.interaction.submenu_hover_index;
-    if (item.type == Types::MenuItemType::Separator) {
+    if (item.type == MenuItemType::Separator) {
       const float separator_height = static_cast<float>(layout.separator_height);
       const D2D1_RECT_F separator_rect = D2D1::RectF(
           rect.left + static_cast<float>(layout.text_padding), current_y,
@@ -270,7 +272,7 @@ auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -
   }
 }
 
-auto draw_submenu_single_item(Core::State::AppState& state, const Types::MenuItem& item,
+auto draw_submenu_single_item(core::AppState& state, const MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
   const auto& render_resources = menu_state.submenu_render_resources;
@@ -300,11 +302,10 @@ auto draw_submenu_single_item(Core::State::AppState& state, const Types::MenuIte
   }
 }
 
-auto draw_submenu_separator(Core::State::AppState& state, const D2D1_RECT_F& separator_rect)
-    -> void {
+auto draw_submenu_separator(core::AppState& state, const D2D1_RECT_F& separator_rect) -> void {
   const auto& render_resources = state.context_menu->submenu_render_resources;
   render_resources.device_context->FillRectangle(separator_rect,
                                                  render_resources.separator_brush.get());
 }
 
-}  // namespace UI::ContextMenu::Painter
+}  // namespace ui::context_menu::painter

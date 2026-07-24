@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Utils::System {
+#include "vendor/std.hpp"
+
+namespace utils::system {
 
 // Windows 系统版本信息结构体
 struct WindowsVersionInfo {
@@ -85,4 +87,4 @@ auto activate_existing_instance() noexcept -> void;
 // 自定义消息：通知已运行实例显示窗口
 constexpr unsigned int WM_SPINNINGMOMO_SHOW = 0x8000 + 100;  // 跨进程消息范围
 
-}  // namespace Utils::System
+}  // namespace utils::system

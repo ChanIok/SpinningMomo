@@ -1,40 +1,38 @@
 #include "core/i18n/i18n.hpp"
 
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
 
+#include "vendor/rfl.hpp"
+
+#include "core/i18n/embedded/en_us.hpp"
+#include "core/i18n/embedded/zh_cn.hpp"
 #include "core/i18n/state.hpp"
 #include "core/i18n/types.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/logger/logger.hpp"
 
-// 导入生成的嵌入模块
-#include "core/i18n/embedded/en_us.hpp"
-#include "core/i18n/embedded/zh_cn.hpp"
+namespace core::i18n {
 
-namespace Core::I18n {
-
-auto load_embedded_language_data(Types::Language lang)
-    -> std::expected<std::string_view, std::string> {
+auto load_embedded_language_data(Language lang) -> std::expected<std::string_view, std::string> {
   switch (lang) {
-    case Types::Language::ZhCN:
-      if (EmbeddedLocales::zh_cn_json.empty()) {
+    case Language::ZhCN:
+      if (embedded_locales::zh_cn_json.empty()) {
         return std::unexpected("Chinese language data is empty");
       }
-      return EmbeddedLocales::zh_cn_json;
+      return embedded_locales::zh_cn_json;
 
-    case Types::Language::EnUS:
-      if (EmbeddedLocales::en_us_json.empty()) {
+    case Language::EnUS:
+      if (embedded_locales::en_us_json.empty()) {
         return std::unexpected("English language data is empty");
       }
-      return EmbeddedLocales::en_us_json;
+      return embedded_locales::en_us_json;
 
     default:
       return std::unexpected("Unsupported language");
   }
 }
 
-auto load_language(State::I18nState& i18n_state, Types::Language lang)
-    -> std::expected<void, std::string> {
+auto load_language(I18nState& i18n_state, Language lang) -> std::expected<void, std::string> {
   try {
     // 获取嵌入的语言数据
     auto data_result = load_embedded_language_data(lang);
@@ -43,7 +41,7 @@ auto load_language(State::I18nState& i18n_state, Types::Language lang)
     }
 
     // 解析JSON
-    auto config_result = rfl::json::read<Types::TextData>(data_result.value());
+    auto config_result = rfl::json::read<TextData>(data_result.value());
     if (!config_result) {
       return std::unexpected("Failed to parse text data: " + config_result.error().what());
     }
@@ -58,8 +56,7 @@ auto load_language(State::I18nState& i18n_state, Types::Language lang)
   }
 }
 
-auto initialize(Core::State::AppState& state, Types::Language default_lang)
-    -> std::expected<void, std::string> {
+auto initialize(core::AppState& state, Language default_lang) -> std::expected<void, std::string> {
   if (!state.i18n) {
     return std::unexpected("I18nState is not initialized");
   }
@@ -79,8 +76,7 @@ auto initialize(Core::State::AppState& state, Types::Language default_lang)
   }
 }
 
-auto load_language(Core::State::AppState& state, Types::Language lang)
-    -> std::expected<void, std::string> {
+auto load_language(core::AppState& state, Language lang) -> std::expected<void, std::string> {
   if (!state.i18n) {
     return std::unexpected("I18nState is not initialized");
   }
@@ -88,26 +84,26 @@ auto load_language(Core::State::AppState& state, Types::Language lang)
   return load_language(*state.i18n, lang);
 }
 
-auto load_language_by_locale(Core::State::AppState& state, std::string_view locale)
+auto load_language_by_locale(core::AppState& state, std::string_view locale)
     -> std::expected<void, std::string> {
   if (locale == "zh-CN") {
-    return load_language(state, Types::Language::ZhCN);
+    return load_language(state, Language::ZhCN);
   }
   if (locale == "en-US") {
-    return load_language(state, Types::Language::EnUS);
+    return load_language(state, Language::EnUS);
   }
   return std::unexpected("Unsupported locale: " + std::string(locale));
 }
 
-auto get_current_language(const Core::State::AppState& state) -> Types::Language {
+auto get_current_language(const core::AppState& state) -> Language {
   if (!state.i18n) {
-    return Types::Language::EnUS;
+    return Language::EnUS;
   }
   const auto& i18n = *state.i18n;
   return i18n.current_language;
 }
 
-auto is_initialized(const Core::State::AppState& state) -> bool {
+auto is_initialized(const core::AppState& state) -> bool {
   if (!state.i18n) {
     return false;
   }
@@ -115,4 +111,4 @@ auto is_initialized(const Core::State::AppState& state) -> bool {
   return i18n.is_initialized;
 }
 
-}  // namespace Core::I18n
+}  // namespace core::i18n

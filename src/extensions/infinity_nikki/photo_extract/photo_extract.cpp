@@ -1,6 +1,8 @@
 #include "extensions/infinity_nikki/photo_extract/photo_extract.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/worker_pool/worker_pool.hpp"
@@ -9,7 +11,7 @@
 #include "extensions/infinity_nikki/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Extensions::InfinityNikki::PhotoExtract {
+namespace extensions::infinity_nikki::photo_extract {
 
 constexpr std::size_t kMaxErrorMessages = 50;
 constexpr std::size_t kExtractBatchSize = 50;
@@ -28,12 +30,12 @@ struct ExtractProgressState {
 };
 
 struct PrepareTaskOutcome {
-  std::optional<Scan::PreparedPhotoExtractEntry> entry;
+  std::optional<scan::PreparedPhotoExtractEntry> entry;
   std::optional<std::string> error;
 };
 
 struct BatchExtractOutcome {
-  std::expected<std::vector<Infra::ExtractBatchPhotoParamsRecord>, std::string> result =
+  std::expected<std::vector<infra::ExtractBatchPhotoParamsRecord>, std::string> result =
       std::unexpected("Batch result unavailable");
 };
 
@@ -183,7 +185,7 @@ auto wait_for_slot_ready(
 }
 
 auto apply_batch_result(
-    Core::State::AppState& app_state, const std::vector<Scan::PreparedPhotoExtractEntry>& entries,
+    core::AppState& app_state, const std::vector<scan::PreparedPhotoExtractEntry>& entries,
     BatchExtractOutcome& batch_outcome, InfinityNikkiExtractPhotoParamsResult& result,
     ExtractProgressState& progress,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
@@ -213,7 +215,7 @@ auto apply_batch_result(
     return;
   }
 
-  std::unordered_map<std::string, std::vector<Infra::ParsedPhotoParamsBatchItem>> items_by_uid;
+  std::unordered_map<std::string, std::vector<infra::ParsedPhotoParamsBatchItem>> items_by_uid;
 
   auto& records = batch_outcome.result.value();
   for (std::size_t index = 0; index < entries.size(); ++index) {
@@ -225,7 +227,7 @@ auto apply_batch_result(
       continue;
     }
 
-    items_by_uid[entry.uid].push_back(Infra::ParsedPhotoParamsBatchItem{
+    items_by_uid[entry.uid].push_back(infra::ParsedPhotoParamsBatchItem{
         .asset_id = entry.asset_id,
         .record = std::move(*records[index].record),
     });
@@ -237,7 +239,7 @@ auto apply_batch_result(
     if (items.empty()) {
       continue;
     }
-    auto save_result = Infra::upsert_photo_params_batch(app_state, uid, items);
+    auto save_result = infra::upsert_photo_params_batch(app_state, uid, items);
     if (!save_result) {
       Logger().error("apply_batch_result: DB batch upsert failed (uid={}, count={}): {}", uid,
                      items.size(), save_result.error());
@@ -261,7 +263,7 @@ auto apply_batch_result(
 }
 
 auto send_extract_batch(
-    Core::State::AppState& app_state, std::vector<Scan::PreparedPhotoExtractEntry> batch,
+    core::AppState& app_state, std::vector<scan::PreparedPhotoExtractEntry> batch,
     InfinityNikkiExtractPhotoParamsResult& result, ExtractProgressState& progress,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
     -> asio::awaitable<void> {
@@ -275,12 +277,12 @@ auto send_extract_batch(
   Logger().debug("extract_photo_params: sending batch (unique_uids={}, count={})", uid_set.size(),
                  batch.size());
   BatchExtractOutcome batch_outcome;
-  batch_outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
+  batch_outcome.result = co_await infra::extract_batch_photo_params(app_state, batch);
   apply_batch_result(app_state, batch, batch_outcome, result, progress, progress_callback);
 }
 
 auto extract_photo_params_from_candidates(
-    Core::State::AppState& app_state, std::vector<Scan::CandidateAssetRow> candidates,
+    core::AppState& app_state, std::vector<scan::CandidateAssetRow> candidates,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback,
     std::string_view mode_tag, const std::optional<std::string>& uid_override)
     -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
@@ -304,7 +306,7 @@ auto extract_photo_params_from_candidates(
   report_processing_progress(progress_callback, progress, result, true,
                              std::format("Preparing {} candidate photos", result.candidate_count));
 
-  if (!Core::WorkerPool::is_running(app_state)) {
+  if (!core::worker_pool::is_running(app_state)) {
     co_return std::unexpected("Worker pool is not available for photo extract preparation");
   }
 
@@ -318,10 +320,10 @@ auto extract_photo_params_from_candidates(
 
   auto* slot_ready_ptr = slot_ready.get();
   for (std::size_t index = 0; index < candidate_count; ++index) {
-    auto submitted = Core::WorkerPool::submit_task(
+    auto submitted = core::worker_pool::submit_task(
         app_state, [outcomes, completed_prepare, slot_ready_ptr, candidate = candidates[index],
                     uid_override, index]() mutable {
-          auto prepared_result = Scan::prepare_photo_extract_entry(candidate, uid_override);
+          auto prepared_result = scan::prepare_photo_extract_entry(candidate, uid_override);
           if (prepared_result) {
             (*outcomes)[index].entry = std::move(prepared_result.value());
           } else {
@@ -339,7 +341,7 @@ auto extract_photo_params_from_candidates(
     }
   }
 
-  std::vector<Scan::PreparedPhotoExtractEntry> pending_batch;
+  std::vector<scan::PreparedPhotoExtractEntry> pending_batch;
   pending_batch.reserve(kExtractBatchSize);
 
   for (std::size_t index = 0; index < candidate_count; ++index) {
@@ -383,7 +385,7 @@ auto extract_photo_params_from_candidates(
 }
 
 auto extract_photo_params(
-    Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
+    core::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
     -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
   // 整个流程：
@@ -405,7 +407,7 @@ auto extract_photo_params(
   report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
                           "Loading candidate assets");
 
-  auto candidates_result = Infra::load_candidate_assets(app_state, request);
+  auto candidates_result = infra::load_candidate_assets(app_state, request);
   if (!candidates_result) {
     co_return std::unexpected(candidates_result.error());
   }
@@ -418,7 +420,7 @@ auto extract_photo_params(
 }
 
 auto extract_photo_params_silent_incremental(
-    Core::State::AppState& app_state, const InfinityNikkiSilentExtractPhotoParamsRequest& request,
+    core::AppState& app_state, const InfinityNikkiSilentExtractPhotoParamsRequest& request,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
     -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
   if (!app_state.database) {
@@ -431,7 +433,7 @@ auto extract_photo_params_silent_incremental(
                  request.candidate_asset_ids.size());
 
   auto candidates_result =
-      Infra::load_candidate_assets_by_ids(app_state, request.candidate_asset_ids);
+      infra::load_candidate_assets_by_ids(app_state, request.candidate_asset_ids);
   if (!candidates_result) {
     co_return std::unexpected(candidates_result.error());
   }
@@ -444,4 +446,4 @@ auto extract_photo_params_silent_incremental(
       app_state, std::move(candidates), progress_callback, "silent_incremental", std::nullopt);
 }
 
-}  // namespace Extensions::InfinityNikki::PhotoExtract
+}  // namespace extensions::infinity_nikki::photo_extract

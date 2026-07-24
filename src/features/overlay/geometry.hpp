@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Features::Overlay::Geometry {
+#include "vendor/windows.hpp"
+
+namespace features::overlay::geometry {
 
 // 计算窗口尺寸
 auto calculate_overlay_dimensions(int game_width, int game_height, int screen_width,
@@ -19,4 +21,4 @@ auto get_window_dimensions(HWND hwnd) -> std::expected<std::pair<int, int>, std:
 auto calculate_letterbox_area(int screen_width, int screen_height, int game_width, int game_height)
     -> std::tuple<int, int, int, int>;
 
-}  // namespace Features::Overlay::Geometry
+}  // namespace features::overlay::geometry

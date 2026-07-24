@@ -1,9 +1,11 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace UI::PhotographyPanel::MessageHandler {
+#include "vendor/windows.hpp"
+
+namespace ui::photography_panel::message_handler {
 
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
 
-}  // namespace UI::PhotographyPanel::MessageHandler
+}  // namespace ui::photography_panel::message_handler

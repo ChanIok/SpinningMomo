@@ -1,24 +1,25 @@
 #pragma once
 
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <WebView2.h>
+#include "vendor/webview2.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/webview/state.hpp"
 #include "core/webview/types.hpp"
 
-namespace Core::WebView::Static {
+namespace core::webview::static_content {
 
 // 注册 WebView 资源解析器（接受 AppState）
-auto register_web_resource_resolver(Core::State::AppState& state, std::wstring prefix,
-                                    Types::WebResourceResolver resolver) -> void;
+auto register_web_resource_resolver(core::AppState& state, std::wstring prefix,
+                                    WebResourceResolver resolver) -> void;
 
 // 设置 WebResourceRequested 拦截
-auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* webview,
+auto setup_resource_interception(core::AppState& state, ICoreWebView2* webview,
                                  ICoreWebView2Environment* environment,
-                                 Core::WebView::State::CoreResources& resources,
-                                 Core::WebView::State::WebViewConfig& config) -> HRESULT;
+                                 core::webview::CoreResources& resources,
+                                 core::webview::WebViewConfig& config) -> HRESULT;
 
-}  // namespace Core::WebView::Static
+}  // namespace core::webview::static_content

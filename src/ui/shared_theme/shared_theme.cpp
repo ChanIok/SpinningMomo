@@ -1,12 +1,14 @@
 #include "ui/shared_theme/shared_theme.hpp"
 
-#include <d2d1_3.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/settings/state.hpp"
 
-namespace UI::SharedTheme {
+namespace ui::shared_theme {
 
 auto hex_char_to_int(char c) -> int {
   if (c >= '0' && c <= '9') return c - '0';
@@ -53,7 +55,7 @@ auto parse_hex_color(std::string_view hex_color, D2D1_COLOR_F fallback) -> D2D1_
 }
 
 // 把浮窗设置里的颜色统一解析成 D2D token，避免各个窗口各自解释同名配置
-auto resolve_floating_window_theme_colors(const Core::State::AppState& state)
+auto resolve_floating_window_theme_colors(const core::AppState& state)
     -> FloatingWindowThemeColors {
   FloatingWindowThemeColors colors{
       .background = D2D1::ColorF(0.12f, 0.12f, 0.12f, 0.70f),
@@ -78,4 +80,4 @@ auto resolve_floating_window_theme_colors(const Core::State::AppState& state)
   return colors;
 }
 
-}  // namespace UI::SharedTheme
+}  // namespace ui::shared_theme

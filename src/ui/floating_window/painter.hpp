@@ -1,25 +1,27 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/floating_window/types.hpp"
 
-namespace UI::FloatingWindow::Painter {
+namespace ui::floating_window::painter {
 
 // 内部函数声明
-auto draw_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
-auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
-auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
-auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
-auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
+auto draw_background(const core::AppState& state, const D2D1_RECT_F& rect) -> void;
+auto draw_title_bar(const core::AppState& state, const D2D1_RECT_F& rect) -> void;
+auto draw_separators(const core::AppState& state, const D2D1_RECT_F& rect) -> void;
+auto draw_items(core::AppState& state, const D2D1_RECT_F& rect) -> void;
+auto draw_single_item(core::AppState& state, const ui::floating_window::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
-auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
+auto draw_scroll_indicator(const core::AppState& state, const D2D1_RECT_F& column_rect,
                            size_t total_items, size_t scroll_offset, bool is_hovered,
                            bool is_last_column) -> void;
 
 // 主绘制函数
-auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void;
+auto paint(core::AppState& state, HWND hwnd, const RECT& client_rect) -> void;
 
-}  // namespace UI::FloatingWindow::Painter
+}  // namespace ui::floating_window::painter

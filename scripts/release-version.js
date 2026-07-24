@@ -45,18 +45,18 @@ function updateAppRc(filePath, version4Parts) {
   fs.writeFileSync(filePath, updated, "utf8");
 }
 
-function updateVersionModule(filePath, version4Parts) {
+function updateVersionHeader(filePath, version4Parts) {
   const content = fs.readFileSync(filePath, "utf8");
   const versionStr = version4Parts.join(".");
-  const pattern = /export auto get_app_version\(\) -> std::string \{ return ".*"; \}/;
+  const pattern = /inline auto get_app_version\(\) -> std::string \{ return ".*"; \}/;
 
   if (!pattern.test(content)) {
-    throw new Error("src/vendor/version.ixx format is unexpected. get_app_version() not found.");
+    throw new Error("src/core/version.hpp format is unexpected. get_app_version() not found.");
   }
 
   const updated = content.replace(
     pattern,
-    `export auto get_app_version() -> std::string { return "${versionStr}"; }`
+    `inline auto get_app_version() -> std::string { return "${versionStr}"; }`
   );
 
   fs.writeFileSync(filePath, updated, "utf8");
@@ -77,7 +77,7 @@ function main() {
   const projectRoot = path.join(__dirname, "..");
   const versionJsonPath = path.join(projectRoot, "version.json");
   const appRcPath = path.join(projectRoot, "resources", "app.rc");
-  const versionModulePath = path.join(projectRoot, "src", "vendor", "version.ixx");
+  const versionHeaderPath = path.join(projectRoot, "src", "core", "version.hpp");
   const versionTxtPath = path.join(projectRoot, "docs", "public", "version.txt");
   process.chdir(projectRoot);
 
@@ -87,7 +87,7 @@ function main() {
 
   updateVersionJson(versionJsonPath, version);
   updateAppRc(appRcPath, version4Parts);
-  updateVersionModule(versionModulePath, version4Parts);
+  updateVersionHeader(versionHeaderPath, version4Parts);
   updateVersionTxt(versionTxtPath, version);
 
   console.log("");
@@ -95,7 +95,7 @@ function main() {
   console.log("Updated:");
   console.log(`- version.json -> ${version}`);
   console.log(`- resources/app.rc -> ${version4Parts.join(".")}`);
-  console.log(`- src/vendor/version.ixx -> ${version4Parts.join(".")}`);
+  console.log(`- src/core/version.hpp -> ${version4Parts.join(".")}`);
   console.log(`- docs/public/version.txt -> ${version}`);
   console.log("");
   console.log("Next:");

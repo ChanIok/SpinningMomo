@@ -1,15 +1,16 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/photography_panel/state.hpp"
 
-namespace UI::PhotographyPanel::Painter {
+namespace ui::photography_panel::painter {
 
-auto compute_panel_layout(const Core::State::AppState& state)
-    -> UI::PhotographyPanel::State::PanelLayoutMetrics;
+auto compute_panel_layout(const core::AppState& state) -> ui::photography_panel::PanelLayoutMetrics;
 auto shutter_to_x(const RECT& rect, int frames) -> float;
-auto paint(Core::State::AppState& state, HWND hwnd) -> void;
+auto paint(core::AppState& state, HWND hwnd) -> void;
 
-}  // namespace UI::PhotographyPanel::Painter
+}  // namespace ui::photography_panel::painter

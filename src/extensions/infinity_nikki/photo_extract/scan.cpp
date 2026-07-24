@@ -1,15 +1,16 @@
 #include "extensions/infinity_nikki/photo_extract/scan.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <bcrypt.h>
+#include "vendor/windows.hpp"
+#include "vendor/windows/bcrypt.hpp"
 
 #include "utils/string/string.hpp"
 
-namespace Extensions::InfinityNikki::PhotoExtract::Scan {
+namespace extensions::infinity_nikki::photo_extract::scan {
 
 auto to_filesystem_path(const std::string& utf8_path) -> std::filesystem::path {
-  return std::filesystem::path(Utils::String::FromUtf8(utf8_path));
+  return std::filesystem::path(utils::string::FromUtf8(utf8_path));
 }
 
 auto normalize_path_for_matching(std::string path) -> std::string {
@@ -276,8 +277,8 @@ auto build_photo_tuple(const std::vector<std::uint8_t>& payload, const std::stri
     return std::unexpected("Embedded segments are not valid Base64 text");
   }
 
-  auto hash_buf_chars = Utils::String::FromBase64(bhash);
-  auto data_buf_chars = Utils::String::FromBase64(bdata);
+  auto hash_buf_chars = utils::string::FromBase64(bhash);
+  auto data_buf_chars = utils::string::FromBase64(bdata);
   if (hash_buf_chars.empty() || data_buf_chars.empty()) {
     return std::unexpected("Failed to decode embedded Base64 segments");
   }
@@ -299,7 +300,7 @@ auto build_photo_tuple(const std::vector<std::uint8_t>& payload, const std::stri
   buf.insert(buf.end(), hash_buf.begin(), hash_buf.end());
   buf.insert(buf.end(), data_buf.begin(), data_buf.end());
 
-  auto encoded = Utils::String::ToBase64(to_chars(buf));
+  auto encoded = utils::string::ToBase64(to_chars(buf));
   std::size_t md5_start = 0;
   std::size_t md5_length = static_cast<std::size_t>(roi1);
   if (parsed_bhash->v2_md5_window.has_value()) {
@@ -353,4 +354,4 @@ auto prepare_photo_extract_entry(const CandidateAssetRow& candidate,
   };
 }
 
-}  // namespace Extensions::InfinityNikki::PhotoExtract::Scan
+}  // namespace extensions::infinity_nikki::photo_extract::scan

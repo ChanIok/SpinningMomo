@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::RPC::Endpoints::File {
+namespace core::rpc::endpoints::file {
 
-auto register_all(Core::State::AppState& state) -> void;
+auto register_all(core::AppState& state) -> void;
 
-}  // namespace Core::RPC::Endpoints::File
+}  // namespace core::rpc::endpoints::file

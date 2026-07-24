@@ -1,13 +1,15 @@
 #pragma once
 
-// Auto-generated embedded English locale module
+#include "vendor/std.hpp"
+
+// Auto-generated embedded English locale header
 // DO NOT EDIT - This file contains embedded locale data
 //
 // Source: src/locales/en-US.json
-// Module: Core.I18n.Embedded.EnUS
 // Variable: en_us_json
 
-namespace EmbeddedLocales {
+namespace embedded_locales {
+
 // Embedded English JSON content as string_view
 // Size: 4249 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
@@ -90,4 +92,5 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "label.language_en_us": "English"
 }
 )EmbeddedJson";
-}  // namespace EmbeddedLocales
+
+}  // namespace embedded_locales

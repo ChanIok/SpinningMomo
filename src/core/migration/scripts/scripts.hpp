@@ -1,18 +1,20 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::Migration::Scripts {
+namespace core::migration::scripts {
 
 // MigrationScript 定义
 struct MigrationScript {
   std::string target_version;
   std::string description;
   bool run_on_fresh_install = true;
-  std::function<std::expected<void, std::string>(Core::State::AppState&)> migration_fn;
+  std::function<std::expected<void, std::string>(core::AppState&)> migration_fn;
 };
 
 // 获取所有迁移脚本
 auto get_all_migrations() -> const std::vector<MigrationScript>&;
 
-}  // namespace Core::Migration::Scripts
+}  // namespace core::migration::scripts

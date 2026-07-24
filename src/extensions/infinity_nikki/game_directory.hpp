@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "extensions/infinity_nikki/types.hpp"
 
-namespace Extensions::InfinityNikki::GameDirectory {
+namespace extensions::infinity_nikki::game_directory {
 
 auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::string>;
 
-}  // namespace Extensions::InfinityNikki::GameDirectory
+}  // namespace extensions::infinity_nikki::game_directory

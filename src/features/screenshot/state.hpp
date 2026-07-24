@@ -1,7 +1,9 @@
 #pragma once
 
-#include <d3d11.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
@@ -9,13 +11,13 @@
 #include "utils/image/image.hpp"
 #include "utils/timer/timeout.hpp"
 
-namespace Features::Screenshot::State {
+namespace features::screenshot {
 
 // 截图请求结构体
 struct ScreenshotRequest {
   HWND target_window = nullptr;
   std::wstring file_path;
-  Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG;
+  utils::image::ImageFormat format = utils::image::ImageFormat::PNG;
   float jpeg_quality = 1.0f;
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
@@ -27,16 +29,16 @@ struct ScreenshotRequest {
 
 // 会话信息结构体
 struct SessionInfo {
-  Utils::Graphics::Capture::CaptureSession session;
+  utils::graphics::capture::CaptureSession session;
   ScreenshotRequest request;
-  std::optional<Utils::Graphics::PhotoProcessing::AverageAccumulator> average_accumulator;
+  std::optional<utils::graphics::photo_processing::AverageAccumulator> average_accumulator;
   std::chrono::steady_clock::time_point created_time = std::chrono::steady_clock::now();
 };
 
 // 截图系统状态
 struct ScreenshotState {
   // D3D资源
-  std::optional<Utils::Graphics::D3D::D3DContext> d3d_context;
+  std::optional<utils::graphics::d3d::D3DContext> d3d_context;
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
   bool d3d_initialized = false;
 
@@ -56,7 +58,7 @@ struct ScreenshotState {
   std::atomic<size_t> next_session_id{1};
 
   // 清理定时器
-  std::optional<Utils::Timeout::Timeout> cleanup_timer;
+  std::optional<utils::timeout::Timeout> cleanup_timer;
 
   // 请求D3D资源清理（线程安全）
   inline auto request_d3d_cleanup() -> void {
@@ -71,8 +73,8 @@ struct ScreenshotState {
         ShowCursor(TRUE);
       }
 
-      Utils::Graphics::Capture::stop_capture(session_info.session);
-      Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+      utils::graphics::capture::stop_capture(session_info.session);
+      utils::graphics::capture::cleanup_capture_session(session_info.session);
 
       // 通知调用者会话被取消
       if (session_info.request.completion_callback) {
@@ -88,7 +90,7 @@ struct ScreenshotState {
     cleanup_active_sessions();
     winrt_device = nullptr;
     if (d3d_context) {
-      Utils::Graphics::D3D::cleanup_d3d_context(*d3d_context);
+      utils::graphics::d3d::cleanup_d3d_context(*d3d_context);
       d3d_context.reset();
     }
     d3d_initialized = false;
@@ -105,4 +107,4 @@ struct ScreenshotState {
   }
 };
 
-}  // namespace Features::Screenshot::State
+}  // namespace features::screenshot

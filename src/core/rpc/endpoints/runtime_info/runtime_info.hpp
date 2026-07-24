@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::RPC::Endpoints::RuntimeInfo {
+namespace core::rpc::endpoints::runtime_info {
 
-auto register_all(Core::State::AppState& app_state) -> void;
+auto register_all(core::AppState& app_state) -> void;
 
-}  // namespace Core::RPC::Endpoints::RuntimeInfo
+}  // namespace core::rpc::endpoints::runtime_info

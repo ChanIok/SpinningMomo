@@ -1,10 +1,12 @@
 #include "utils/graphics/capture_region.hpp"
 
-#include <d3d11.h>
-#include <dwmapi.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Graphics::CaptureRegion {
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dwmapi.hpp"
+
+namespace utils::graphics::capture_region {
 
 auto get_capture_window_rect(HWND target_window, RECT& window_rect) -> bool {
   return SUCCEEDED(DwmGetWindowAttribute(target_window, DWMWA_EXTENDED_FRAME_BOUNDS, &window_rect,
@@ -142,4 +144,4 @@ auto crop_texture_to_region(ID3D11Device* device, ID3D11DeviceContext* context,
   return output_texture.get();
 }
 
-}  // namespace Utils::Graphics::CaptureRegion
+}  // namespace utils::graphics::capture_region

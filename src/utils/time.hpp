@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Utils::Time {
+namespace utils::time {
 
 // 获取当前毫秒时间戳
 inline auto current_millis() -> std::int64_t {
@@ -33,18 +35,17 @@ inline auto file_time_to_seconds(const std::filesystem::file_time_type& file_tim
 // 获取文件创建时间的毫秒时间戳
 inline auto get_file_creation_time_millis(const std::filesystem::path& file_path)
     -> std::expected<std::int64_t, std::string> {
-  Vendor::Windows::WIN32_FILE_ATTRIBUTE_DATA fileAttr;
+  WIN32_FILE_ATTRIBUTE_DATA fileAttr;
 
-  if (!Vendor::Windows::GetFileAttributesExW(file_path.c_str(),
-                                             Vendor::Windows::kGetFileExInfoStandard, &fileAttr)) {
-    Vendor::Windows::DWORD error = Vendor::Windows::GetLastError();
+  if (!GetFileAttributesExW(file_path.c_str(), GetFileExInfoStandard, &fileAttr)) {
+    DWORD error = GetLastError();
     return std::unexpected(std::format("Failed to get file attributes: {}", error));
   }
 
   // 转换创建时间
-  Vendor::Windows::FILETIME& creationTime = fileAttr.ftCreationTime;
+  FILETIME& creationTime = fileAttr.ftCreationTime;
 
-  Vendor::Windows::ULARGE_INTEGER ull;
+  ULARGE_INTEGER ull;
   ull.LowPart = creationTime.dwLowDateTime;
   ull.HighPart = creationTime.dwHighDateTime;
 
@@ -56,4 +57,4 @@ inline auto get_file_creation_time_millis(const std::filesystem::path& file_path
   return static_cast<std::int64_t>(unix_time_millis);
 }
 
-}  // namespace Utils::Time
+}  // namespace utils::time

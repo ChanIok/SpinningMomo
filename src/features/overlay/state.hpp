@@ -1,16 +1,18 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/overlay/types.hpp"
 
-namespace Features::Overlay::State {
+namespace features::overlay {
 
 // 叠加层完整状态
 struct OverlayState {
-  Types::WindowState window;
-  Types::RenderingState rendering;
-  Types::CaptureState capture_state;
-  Types::InteractionState interaction;
-  Types::ThreadState threads;
+  WindowState window;
+  RenderingState rendering;
+  CaptureState capture_state;
+  InteractionState interaction;
+  ThreadState threads;
   bool enable_hdr = false;
 
   std::condition_variable frame_available;
@@ -23,4 +25,4 @@ struct OverlayState {
   std::atomic<bool> freeze_after_first_frame = false;  // 首帧渲染后自动冻结
 };
 
-}  // namespace Features::Overlay::State
+}  // namespace features::overlay

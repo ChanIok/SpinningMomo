@@ -1,5 +1,7 @@
 #include "features/gallery/asset/thumbnail.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/database/database.hpp"
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/service.hpp"
@@ -10,7 +12,7 @@
 #include "utils/media/video_asset.hpp"
 #include "utils/path/path.hpp"
 
-namespace Features::Gallery::Asset::Thumbnail {
+namespace features::gallery::asset::thumbnail {
 
 // “一个缩略图 hash 应该如何被满足”的最小工作单元。
 // 一个 hash 可能对应多个源文件路径；修复时只需找到其中任意一个仍存在的源文件。
@@ -32,18 +34,18 @@ struct MissingThumbnailRepairSummary {
 auto extract_hash_from_thumbnail(const std::filesystem::path& thumbnail_path)
     -> std::optional<std::string>;
 
-auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
-                              const Utils::Image::BGRABitmapData& bitmap_data, bool force_overwrite)
+auto save_thumbnail_from_bgra(core::AppState& app_state, const std::string& file_hash,
+                              const utils::image::BGRABitmapData& bitmap_data, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string>;
 
-auto make_thumbnail_webp_options() -> Utils::Image::WebPEncodeOptions {
-  Utils::Image::WebPEncodeOptions options;
+auto make_thumbnail_webp_options() -> utils::image::WebPEncodeOptions {
+  utils::image::WebPEncodeOptions options;
   options.quality = 80.0f;
   return options;
 }
 
-auto query_thumbnail_candidates(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::Asset>, std::string> {
+auto query_thumbnail_candidates(core::AppState& app_state)
+    -> std::expected<std::vector<Asset>, std::string> {
   std::string sql = R"(
     SELECT id, name, path, type,
            NULL AS dominant_color_hex,
@@ -60,7 +62,7 @@ auto query_thumbnail_candidates(Core::State::AppState& app_state)
       AND path != ''
   )";
 
-  auto result = Core::Database::query<Types::Asset>(app_state, sql);
+  auto result = core::database::query<Asset>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to query thumbnail candidates: " + result.error());
   }
@@ -75,7 +77,7 @@ auto normalize_thumbnail_root_filter(std::optional<std::filesystem::path> root_d
     return std::optional<std::filesystem::path>{std::nullopt};
   }
 
-  auto normalized_root_result = Utils::Path::NormalizePath(root_directory.value());
+  auto normalized_root_result = utils::path::NormalizePath(root_directory.value());
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize thumbnail repair root: " +
                            normalized_root_result.error());
@@ -85,7 +87,7 @@ auto normalize_thumbnail_root_filter(std::optional<std::filesystem::path> root_d
 }
 
 // 从 DB 收集“理论上应当存在缩略图”的集合，并按 hash 去重。
-auto collect_expected_thumbnail_entries(Core::State::AppState& app_state,
+auto collect_expected_thumbnail_entries(core::AppState& app_state,
                                         std::optional<std::filesystem::path> root_directory)
     -> std::expected<std::unordered_map<std::string, ExpectedThumbnailEntry>, std::string> {
   auto normalized_root_result = normalize_thumbnail_root_filter(root_directory);
@@ -107,7 +109,7 @@ auto collect_expected_thumbnail_entries(Core::State::AppState& app_state,
 
     std::filesystem::path asset_path(asset.path);
     if (normalized_root_directory.has_value() &&
-        !Utils::Path::IsPathWithinBase(asset_path, normalized_root_directory.value())) {
+        !utils::path::IsPathWithinBase(asset_path, normalized_root_directory.value())) {
       continue;
     }
 
@@ -123,7 +125,7 @@ auto collect_expected_thumbnail_entries(Core::State::AppState& app_state,
 }
 
 // 从缩略图目录扫描“当前实际存在的缩略图集合”。
-auto scan_existing_thumbnail_files(Core::State::AppState& app_state)
+auto scan_existing_thumbnail_files(core::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, std::filesystem::path>, std::string> {
   if (app_state.gallery->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
@@ -169,14 +171,14 @@ auto scan_existing_thumbnail_files(Core::State::AppState& app_state)
 // 只负责补“缺失缩略图”；孤儿删除由上层全局对账处理。
 // 如果调用方已经事先拿到了 existing_hashes，就不必再逐个 hash 查磁盘了。
 auto repair_expected_thumbnail_entries(
-    Core::State::AppState& app_state,
+    core::AppState& app_state,
     const std::unordered_map<std::string, ExpectedThumbnailEntry>& expected_entries,
     const std::unordered_set<std::string>* existing_hashes, std::uint32_t short_edge_size,
     std::stop_token stop_token) -> MissingThumbnailRepairSummary {
   MissingThumbnailRepairSummary stats;
   stats.candidate_hashes = static_cast<int>(expected_entries.size());
 
-  std::optional<Utils::Image::WICFactory> wic_factory;
+  std::optional<utils::image::WICFactory> wic_factory;
 
   for (const auto& [hash, entry] : expected_entries) {
     // 当前文件自然完成，停止后不再开始修复下一个缩略图。
@@ -233,7 +235,7 @@ auto repair_expected_thumbnail_entries(
 
     if (entry.type == "photo") {
       if (!wic_factory.has_value()) {
-        auto wic_result = Utils::Image::get_thread_wic_factory();
+        auto wic_result = utils::image::get_thread_wic_factory();
         if (!wic_result) {
           stats.failed_repairs++;
           Logger().warn("Failed to initialize WIC factory for thumbnail repair: {}",
@@ -258,7 +260,7 @@ auto repair_expected_thumbnail_entries(
 
     if (entry.type == "video") {
       auto video_result =
-          Utils::Media::VideoAsset::analyze_video_file(*source_path, short_edge_size);
+          utils::media::video_asset::analyze_video_file(*source_path, short_edge_size);
       if (!video_result) {
         stats.failed_repairs++;
         Logger().warn("Failed to analyze video during thumbnail repair '{}': {}",
@@ -306,12 +308,12 @@ auto extract_hash_from_thumbnail(const std::filesystem::path& thumbnail_path)
   return stem;
 }
 
-auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
+auto ensure_thumbnails_directory_exists(core::AppState& app_state)
     -> std::expected<void, std::string> {
   // 如果状态中已经有缩略图目录路径，确保目录存在
   if (!app_state.gallery->thumbnails_directory.empty()) {
     auto ensure_dir_result =
-        Utils::Path::EnsureDirectoryExists(app_state.gallery->thumbnails_directory);
+        utils::path::EnsureDirectoryExists(app_state.gallery->thumbnails_directory);
     if (!ensure_dir_result) {
       return std::unexpected("Failed to ensure thumbnails directory exists: " +
                              ensure_dir_result.error());
@@ -320,7 +322,7 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
   }
 
   // 否则，计算路径、创建目录并保存到状态中
-  auto thumbnails_dir_result = Utils::Path::GetAppDataSubdirectory("thumbnails");
+  auto thumbnails_dir_result = utils::path::GetAppDataSubdirectory("thumbnails");
   if (!thumbnails_dir_result) {
     return std::unexpected("Failed to get thumbnails directory: " + thumbnails_dir_result.error());
   }
@@ -333,7 +335,7 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
 }
 
 // 确保缩略图路径存在
-auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash)
+auto ensure_thumbnail_path(core::AppState& app_state, const std::string& file_hash)
     -> std::expected<std::filesystem::path, std::string> {
   // 检查缩略图目录是否已初始化
   if (app_state.gallery->thumbnails_directory.empty()) {
@@ -357,7 +359,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
   return thumbnail_path;
 }
 
-auto repair_missing_thumbnails(Core::State::AppState& app_state,
+auto repair_missing_thumbnails(core::AppState& app_state,
                                std::optional<std::filesystem::path> root_directory,
                                std::uint32_t short_edge_size)
     -> std::expected<ThumbnailRepairStats, std::string> {
@@ -386,7 +388,7 @@ auto repair_missing_thumbnails(Core::State::AppState& app_state,
                               .skipped_missing_sources = summary.skipped_missing_sources};
 }
 
-auto reconcile_thumbnail_cache(Core::State::AppState& app_state, std::uint32_t short_edge_size)
+auto reconcile_thumbnail_cache(core::AppState& app_state, std::uint32_t short_edge_size)
     -> std::expected<ThumbnailCacheReconcileStats, std::string> {
   auto ensure_result = ensure_thumbnails_directory_exists(app_state);
   if (!ensure_result) {
@@ -456,8 +458,7 @@ auto reconcile_thumbnail_cache(Core::State::AppState& app_state, std::uint32_t s
 
 // ============= 缩略图清理功能 =============
 
-auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
-    -> std::expected<int, std::string> {
+auto cleanup_orphaned_thumbnails(core::AppState& app_state) -> std::expected<int, std::string> {
   // 直接从状态中获取缩略图目录路径
   if (app_state.gallery->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
@@ -471,7 +472,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 
   // 使用 load_asset_cache 获取所有资产的文件哈希集合
   std::unordered_set<std::string> all_file_hashes;
-  auto cache_result = Service::load_asset_cache(app_state);
+  auto cache_result = service::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {
@@ -515,7 +516,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
   return deleted_count;
 }
 
-auto measure_thumbnail_storage(Core::State::AppState& app_state,
+auto measure_thumbnail_storage(core::AppState& app_state,
                                const std::unordered_set<std::string>& hashes)
     -> std::expected<ThumbnailStorageStats, std::string> {
   if (app_state.gallery->thumbnails_directory.empty()) {
@@ -552,7 +553,7 @@ auto measure_thumbnail_storage(Core::State::AppState& app_state,
   return stats;
 }
 
-auto remove_thumbnail_files(Core::State::AppState& app_state,
+auto remove_thumbnail_files(core::AppState& app_state,
                             const std::unordered_set<std::string>& hashes)
     -> std::expected<ThumbnailStorageStats, std::string> {
   if (app_state.gallery->thumbnails_directory.empty()) {
@@ -600,7 +601,7 @@ auto remove_thumbnail_files(Core::State::AppState& app_state,
 // ============= 基于哈希的缩略图生成 =============
 
 // 使用文件哈希生成缩略图（按短边等比例缩放）
-auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+auto generate_thumbnail(core::AppState& app_state, utils::image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
                         std::uint32_t short_edge_size, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string> {
@@ -618,7 +619,7 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
     }
 
     auto bitmap_data_result =
-        Utils::Image::load_scaled_bgra_bitmap_data(wic_factory.get(), source_file, short_edge_size);
+        utils::image::load_scaled_bgra_bitmap_data(wic_factory.get(), source_file, short_edge_size);
     if (!bitmap_data_result) {
       return std::unexpected("Failed to load thumbnail bitmap data: " + bitmap_data_result.error());
     }
@@ -631,8 +632,8 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
   }
 }
 
-auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
-                              const Utils::Image::BGRABitmapData& bitmap_data, bool force_overwrite)
+auto save_thumbnail_from_bgra(core::AppState& app_state, const std::string& file_hash,
+                              const utils::image::BGRABitmapData& bitmap_data, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string> {
   auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
   if (!thumbnail_path_result) {
@@ -645,7 +646,7 @@ auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::strin
     return thumbnail_path;
   }
 
-  auto webp_result = Utils::Image::encode_bgra_to_webp(bitmap_data, make_thumbnail_webp_options());
+  auto webp_result = utils::image::encode_bgra_to_webp(bitmap_data, make_thumbnail_webp_options());
   if (!webp_result) {
     return std::unexpected("Failed to encode WebP thumbnail: " + webp_result.error());
   }
@@ -655,8 +656,8 @@ auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::strin
 
 // 将已编码 WebP 写入按 file_hash
 // 命名的路径；图片解码与视频抽帧共用。存在则跳过，减少扫描并发重复写。
-auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
-                         const Utils::Image::WebPEncodedResult& webp_data, bool force_overwrite)
+auto save_thumbnail_data(core::AppState& app_state, const std::string& file_hash,
+                         const utils::image::WebPEncodedResult& webp_data, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string> {
   auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
   if (!thumbnail_path_result) {
@@ -688,7 +689,7 @@ auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& fi
 
 // ============= 缩略图统计功能 =============
 
-auto get_thumbnail_stats(Core::State::AppState& app_state)
+auto get_thumbnail_stats(core::AppState& app_state)
     -> std::expected<AssetThumbnailStats, std::string> {
   AssetThumbnailStats stats = {};
 
@@ -706,7 +707,7 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
 
   // 使用 load_asset_cache 获取所有资产的文件哈希集合
   std::unordered_set<std::string> all_file_hashes;
-  auto cache_result = Service::load_asset_cache(app_state);
+  auto cache_result = service::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {
@@ -754,4 +755,4 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   return stats;
 }
 
-}  // namespace Features::Gallery::Asset::Thumbnail
+}  // namespace features::gallery::asset::thumbnail

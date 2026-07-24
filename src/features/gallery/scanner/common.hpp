@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Gallery::Scanner::Common {
+#include "vendor/std.hpp"
+
+namespace features::gallery::scanner::common {
 
 auto default_supported_extensions() -> const std::vector<std::string>&;
 
@@ -16,4 +18,4 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
                                    std::stop_token stop_token)
     -> std::expected<std::string, std::string>;
 
-}  // namespace Features::Gallery::Scanner::Common
+}  // namespace features::gallery::scanner::common

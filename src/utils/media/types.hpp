@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Utils::Media::Encoder::Types {
+#include "vendor/std.hpp"
+
+namespace utils::media::encoder {
 
 // 码率控制模式
 enum class RateControlMode {
@@ -62,4 +64,4 @@ struct EncoderConfig {
   std::uint32_t audio_bitrate = 256'000;  // 音频码率 (默认 256kbps)
 };
 
-}  // namespace Utils::Media::Encoder::Types
+}  // namespace utils::media::encoder

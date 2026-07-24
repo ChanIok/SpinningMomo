@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Gallery::Types {
+#include "vendor/std.hpp"
+
+namespace features::gallery {
 
 // ============= 核心数据类型 =============
 
@@ -180,7 +182,7 @@ struct ScanOptions {
   std::string directory;
   std::optional<bool> force_reanalyze = false;
   std::optional<bool> rebuild_thumbnails = false;
-  // 留空时统一回落到 Scanner::Common::default_supported_extensions()，避免多处维护默认列表。
+  // 留空时统一回落到 scanner::common::default_supported_extensions()，避免多处维护默认列表。
   std::optional<std::vector<std::string>> supported_extensions;
   std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
@@ -507,4 +509,4 @@ struct UpdateAssetsDescriptionParams {
 
 struct GetTagStatsParams {};
 
-}  // namespace Features::Gallery::Types
+}  // namespace features::gallery

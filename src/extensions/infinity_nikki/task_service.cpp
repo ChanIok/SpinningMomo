@@ -1,10 +1,8 @@
 #include "extensions/infinity_nikki/task_service.hpp"
 
-// TaskService 实现：把无限暖暖相关的重活挂到 Asio 协程上，并对接 Core::Tasks（前端「后台任务」）。
-// 约定：对外只暴露 start_* / schedule_silent_*；launch_* 为内部 co_spawn
-// 入口，不校验「是否已有同类任务」 （重复校验在各自的 start_* 里通过 has_active_task_of_type +
-// create_task 完成）。
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/async/async.hpp"
 #include "core/rpc/notification_hub.hpp"
@@ -19,7 +17,11 @@
 #include "features/settings/state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Extensions::InfinityNikki::TaskService {
+// TaskService 实现：把无限暖暖相关的重活挂到 Asio 协程上，并对接 core::tasks（前端「后台任务」）。
+// 约定：对外只暴露 start_* / schedule_silent_*；launch_* 为内部 co_spawn
+// 入口，不校验「是否已有同类任务」 （重复校验在各自的 start_* 里通过 has_active_task_of_type +
+// create_task 完成）。
+namespace extensions::infinity_nikki::task_service {
 
 // 与前端 AppHeader / taskStore 的 type 字段一致，勿随意改名。
 constexpr auto kInitialScanTaskType = "extensions.infinityNikki.initialScan";
@@ -41,9 +43,9 @@ auto is_numeric_uid(std::string_view uid) -> bool {
 }
 
 // 图库 scan_directory 的进度结构 -> 任务系统统一字段。
-auto make_task_progress(const Features::Gallery::Types::ScanProgress& progress)
-    -> Core::Tasks::TaskProgress {
-  return Core::Tasks::TaskProgress{
+auto make_task_progress(const features::gallery::ScanProgress& progress)
+    -> core::tasks::TaskProgress {
+  return core::tasks::TaskProgress{
       .stage = progress.stage,
       .current = progress.current,
       .total = progress.total,
@@ -75,7 +77,7 @@ auto append_task_error_details(std::string& message, const std::vector<std::stri
 }
 
 auto make_media_hardlinks_task_error_message(
-    const Extensions::InfinityNikki::InfinityNikkiInitializeMediaHardlinksResult& summary)
+    const extensions::infinity_nikki::InfinityNikkiInitializeMediaHardlinksResult& summary)
     -> std::string {
   auto message = std::format(
       "Infinity Nikki media hardlinks initialize failed: encountered {} error(s) while "
@@ -89,17 +91,17 @@ auto make_media_hardlinks_task_error_message(
 // launch_*：已由 start_* 创建好 task_id，此处只负责丢进 io_context 并驱动到完成/失败。
 
 auto launch_initial_scan_task(
-    Core::State::AppState& app_state, const Features::Gallery::Types::ScanOptions& options,
+    core::AppState& app_state, const features::gallery::ScanOptions& options,
     const std::string& task_id,
-    std::function<void(const Features::Gallery::Types::ScanResult&)> post_scan_callback) -> void {
+    std::function<void(const features::gallery::ScanResult&)> post_scan_callback) -> void {
   if (!app_state.async) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
+    core::tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
+    core::tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
   }
 
@@ -109,25 +111,25 @@ auto launch_initial_scan_task(
        post_scan_callback = std::move(post_scan_callback)]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
 
-        Core::Tasks::mark_task_running(app_state, task_id);
+        core::tasks::mark_task_running(app_state, task_id);
 
-        auto progress_callback =
-            [&app_state, &task_id](const Features::Gallery::Types::ScanProgress& progress) {
-              Core::Tasks::update_task_progress(app_state, task_id, make_task_progress(progress));
-            };
+        auto progress_callback = [&app_state,
+                                  &task_id](const features::gallery::ScanProgress& progress) {
+          core::tasks::update_task_progress(app_state, task_id, make_task_progress(progress));
+        };
 
-        auto scan_result = Features::Gallery::scan_directory(app_state, options, progress_callback);
+        auto scan_result = features::gallery::scan_directory(app_state, options, progress_callback);
         if (!scan_result) {
           auto error_message = "Infinity Nikki initial scan failed: " + scan_result.error();
           Logger().error("{}", error_message);
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          core::tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
 
         const auto& result = scan_result.value();
-        Core::Tasks::update_task_progress(
+        core::tasks::update_task_progress(
             app_state, task_id,
-            Core::Tasks::TaskProgress{
+            core::tasks::TaskProgress{
                 .stage = "completed",
                 .current = result.total_files,
                 .total = result.total_files,
@@ -136,8 +138,8 @@ auto launch_initial_scan_task(
                     std::format("Scanned {}, new {}, updated {}, missing {}", result.total_files,
                                 result.new_items, result.updated_items, result.missing_items),
             });
-        Core::Tasks::complete_task_success(app_state, task_id);
-        Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+        core::tasks::complete_task_success(app_state, task_id);
+        core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
 
         if (post_scan_callback) {
           post_scan_callback(result);
@@ -146,20 +148,20 @@ auto launch_initial_scan_task(
       asio::detached_t{});
 }
 
-// 走 PhotoExtract::extract_photo_params；有进度回调写任务；成功发
+// 走 photo_extract::extract_photo_params；有进度回调写任务；成功发
 // gallery.changed；部分失败整任务算失败。
 auto launch_extract_photo_params_task(
-    Core::State::AppState& app_state,
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request,
+    core::AppState& app_state,
+    const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsRequest& request,
     const std::string& task_id) -> void {
   if (!app_state.async) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
+    core::tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
+    core::tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
   }
 
@@ -167,37 +169,37 @@ auto launch_extract_photo_params_task(
       *io_context,
       [&app_state, request, task_id]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
-        Core::Tasks::mark_task_running(app_state, task_id);
+        core::tasks::mark_task_running(app_state, task_id);
 
         auto progress_callback =
             [&app_state,
-             &task_id](const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsProgress&
+             &task_id](const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsProgress&
                            progress) {
-              Core::Tasks::TaskProgress task_progress{
+              core::tasks::TaskProgress task_progress{
                   .stage = progress.stage,
                   .current = progress.current,
                   .total = progress.total,
                   .percent = progress.percent,
                   .message = progress.message,
               };
-              Core::Tasks::update_task_progress(app_state, task_id, task_progress);
+              core::tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
         auto extract_result =
-            co_await Extensions::InfinityNikki::PhotoExtract::extract_photo_params(
+            co_await extensions::infinity_nikki::photo_extract::extract_photo_params(
                 app_state, request, progress_callback);
         if (!extract_result) {
           auto error_message =
               "Infinity Nikki photo params extract failed: " + extract_result.error();
           Logger().error("{}", error_message);
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          core::tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
 
         const auto& summary = extract_result.value();
-        Core::Tasks::update_task_progress(
+        core::tasks::update_task_progress(
             app_state, task_id,
-            Core::Tasks::TaskProgress{
+            core::tasks::TaskProgress{
                 .stage = "completed",
                 .current = summary.processed_count,
                 .total = summary.candidate_count,
@@ -209,7 +211,7 @@ auto launch_extract_photo_params_task(
             });
 
         if (summary.saved_count > 0) {
-          Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+          core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
         }
 
         if (summary.failed_count > 0) {
@@ -221,7 +223,7 @@ auto launch_extract_photo_params_task(
           Logger().warn("{}", warning_message);
         }
 
-        Core::Tasks::complete_task_success(app_state, task_id);
+        core::tasks::complete_task_success(app_state, task_id);
       },
       asio::detached_t{});
 }
@@ -229,15 +231,15 @@ auto launch_extract_photo_params_task(
 // 与 launch_extract_photo_params_task 共用同一套解析逻辑，但不绑定 task_id、无进度条；仅日志 +
 // gallery.changed。
 auto schedule_silent_extract_photo_params(
-    Core::State::AppState& app_state,
-    Extensions::InfinityNikki::InfinityNikkiSilentExtractPhotoParamsRequest request) -> void {
+    core::AppState& app_state,
+    extensions::infinity_nikki::InfinityNikkiSilentExtractPhotoParamsRequest request) -> void {
   if (!app_state.async) {
     Logger().warn(
         "Silent Infinity Nikki photo params extract skipped: async state is not initialized");
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn(
         "Silent Infinity Nikki photo params extract skipped: async runtime is not available");
@@ -249,7 +251,7 @@ auto schedule_silent_extract_photo_params(
       [&app_state, request = std::move(request)]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
 
-        if (Core::Tasks::has_active_task_of_type(app_state, kExtractPhotoParamsTaskType)) {
+        if (core::tasks::has_active_task_of_type(app_state, kExtractPhotoParamsTaskType)) {
           Logger().debug(
               "Silent Infinity Nikki photo params extract skipped: user-initiated extract task is "
               "active");
@@ -257,7 +259,7 @@ auto schedule_silent_extract_photo_params(
         }
 
         // 静默增量与手动任务共享执行管线，但候选输入是显式 asset_id 列表。
-        auto extract_result = co_await Extensions::InfinityNikki::PhotoExtract::
+        auto extract_result = co_await extensions::infinity_nikki::photo_extract::
             extract_photo_params_silent_incremental(app_state, request, {});
 
         if (!extract_result) {
@@ -285,7 +287,7 @@ auto schedule_silent_extract_photo_params(
         }
 
         if (summary.saved_count > 0) {
-          Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+          core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
         }
 
         co_return;
@@ -295,16 +297,16 @@ auto schedule_silent_extract_photo_params(
 
 // 全量建立/校正 Infinity Nikki 媒体硬链接；完成后可能把设置里 manage_media_hardlinks
 // 置为 true。
-auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
-                                            const std::string& task_id) -> void {
+auto launch_initialize_media_hardlinks_task(core::AppState& app_state, const std::string& task_id)
+    -> void {
   if (!app_state.async) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
+    core::tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
-    Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
+    core::tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
   }
 
@@ -312,13 +314,13 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
       *io_context,
       [&app_state, task_id]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
-        Core::Tasks::mark_task_running(app_state, task_id);
+        core::tasks::mark_task_running(app_state, task_id);
 
         auto last_emit_at = std::chrono::steady_clock::time_point{};
         auto last_percent = -1;
         auto progress_callback =
             [&app_state, &task_id, &last_emit_at, &last_percent](
-                const Extensions::InfinityNikki::InfinityNikkiInitializeMediaHardlinksProgress&
+                const extensions::infinity_nikki::InfinityNikkiInitializeMediaHardlinksProgress&
                     progress) {
               auto percent = static_cast<int>(std::floor(progress.percent.value_or(0.0)));
               auto now = std::chrono::steady_clock::now();
@@ -337,30 +339,30 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
 
               last_emit_at = now;
               last_percent = std::max(last_percent, percent);
-              Core::Tasks::TaskProgress task_progress{
+              core::tasks::TaskProgress task_progress{
                   .stage = progress.stage,
                   .current = progress.current,
                   .total = progress.total,
                   .percent = progress.percent,
                   .message = progress.message,
               };
-              Core::Tasks::update_task_progress(app_state, task_id, task_progress);
+              core::tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
         auto initialize_result =
-            Extensions::InfinityNikki::MediaHardlinks::initialize(app_state, progress_callback);
+            extensions::infinity_nikki::media_hardlinks::initialize(app_state, progress_callback);
         if (!initialize_result) {
           auto error_message =
               "Infinity Nikki media hardlinks initialize failed: " + initialize_result.error();
           Logger().error("{}", error_message);
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          core::tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
 
         const auto& summary = initialize_result.value();
-        Core::Tasks::update_task_progress(
+        core::tasks::update_task_progress(
             app_state, task_id,
-            Core::Tasks::TaskProgress{
+            core::tasks::TaskProgress{
                 .stage = "completed",
                 .current = summary.source_count,
                 .total = summary.source_count,
@@ -374,7 +376,7 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
         if (!summary.errors.empty()) {
           auto error_message = make_media_hardlinks_task_error_message(summary);
           Logger().error("{}", error_message);
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          core::tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
 
@@ -382,14 +384,14 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
             !app_state.settings->raw.extensions.infinity_nikki.manage_media_hardlinks) {
           auto next_settings = app_state.settings->raw;
           next_settings.extensions.infinity_nikki.manage_media_hardlinks = true;
-          if (auto save_result = Features::Settings::update_settings(app_state, next_settings);
+          if (auto save_result = features::settings::update_settings(app_state, next_settings);
               !save_result) {
             Logger().warn("Failed to persist Infinity Nikki media hardlink setting: {}",
                           save_result.error());
           }
         }
 
-        Core::Tasks::complete_task_success(app_state, task_id);
+        core::tasks::complete_task_success(app_state, task_id);
       },
       asio::detached_t{});
 }
@@ -398,14 +400,14 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
 // start_*：对外 API；先防重（同类任务已活跃则直接报错），再 create_task，最后 launch_*。
 
 auto start_initial_scan_task(
-    Core::State::AppState& app_state, const Features::Gallery::Types::ScanOptions& options,
-    std::function<void(const Features::Gallery::Types::ScanResult&)> post_scan_callback)
+    core::AppState& app_state, const features::gallery::ScanOptions& options,
+    std::function<void(const features::gallery::ScanResult&)> post_scan_callback)
     -> std::expected<std::string, std::string> {
-  if (Core::Tasks::has_active_task_of_type(app_state, kInitialScanTaskType)) {
+  if (core::tasks::has_active_task_of_type(app_state, kInitialScanTaskType)) {
     return std::unexpected("Another Infinity Nikki initial scan task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kInitialScanTaskType, options.directory);
+  auto task_id = core::tasks::create_task(app_state, kInitialScanTaskType, options.directory);
   if (task_id.empty()) {
     return std::unexpected("Failed to create Infinity Nikki initial scan task");
   }
@@ -417,14 +419,14 @@ auto start_initial_scan_task(
 // 与 schedule_silent_extract_photo_params 互斥体现在：静默路径会查 has_active_task_of_type，
 // 此处则禁止两个「带任务的解析」并行；不阻止静默协程与任务解析在理论上重叠（接受偶尔重复解析）。
 auto start_extract_photo_params_task(
-    Core::State::AppState& app_state,
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
+    core::AppState& app_state,
+    const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::string, std::string> {
-  if (Core::Tasks::has_active_task_of_type(app_state, kExtractPhotoParamsTaskType)) {
+  if (core::tasks::has_active_task_of_type(app_state, kExtractPhotoParamsTaskType)) {
     return std::unexpected("Another Infinity Nikki extract task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kExtractPhotoParamsTaskType);
+  auto task_id = core::tasks::create_task(app_state, kExtractPhotoParamsTaskType);
   if (task_id.empty()) {
     return std::unexpected("Failed to create Infinity Nikki extract task");
   }
@@ -435,8 +437,8 @@ auto start_extract_photo_params_task(
 
 // RPC / 图库菜单「提取元数据」入口；业务参数收敛到 InfinityNikkiExtractPhotoParamsRequest。
 auto start_extract_photo_params_for_folder_task(
-    Core::State::AppState& app_state,
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsForFolderRequest& request)
+    core::AppState& app_state,
+    const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsForFolderRequest& request)
     -> std::expected<std::string, std::string> {
   if (request.folder_id <= 0) {
     return std::unexpected("Invalid folder id for manual Infinity Nikki extract");
@@ -447,20 +449,20 @@ auto start_extract_photo_params_for_folder_task(
   }
 
   return start_extract_photo_params_task(
-      app_state, Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest{
+      app_state, extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsRequest{
                      .only_missing = request.only_missing,
                      .folder_id = request.folder_id,
                      .uid_override = request.uid,
                  });
 }
 
-auto start_initialize_media_hardlinks_task(Core::State::AppState& app_state)
+auto start_initialize_media_hardlinks_task(core::AppState& app_state)
     -> std::expected<std::string, std::string> {
-  if (Core::Tasks::has_active_task_of_type(app_state, kInitializeMediaHardlinksTaskType)) {
+  if (core::tasks::has_active_task_of_type(app_state, kInitializeMediaHardlinksTaskType)) {
     return std::unexpected("Another Infinity Nikki media hardlink task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kInitializeMediaHardlinksTaskType);
+  auto task_id = core::tasks::create_task(app_state, kInitializeMediaHardlinksTaskType);
   if (task_id.empty()) {
     return std::unexpected("Failed to create Infinity Nikki media hardlink task");
   }
@@ -469,4 +471,4 @@ auto start_initialize_media_hardlinks_task(Core::State::AppState& app_state)
   return task_id;
 }
 
-}  // namespace Extensions::InfinityNikki::TaskService
+}  // namespace extensions::infinity_nikki::task_service

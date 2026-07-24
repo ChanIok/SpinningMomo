@@ -1,7 +1,9 @@
 #include "ui/notification_window/message_handler.hpp"
 
-#include <windows.h>
-#include <windowsx.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/windowsx.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/notification_window/notification_window.hpp"
@@ -10,13 +12,13 @@
 #include "ui/notification_window/state.hpp"
 #include "ui/notification_window/types.hpp"
 
-auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM w_param,
-                      LPARAM l_param) -> LRESULT {
+auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)
+    -> LRESULT {
   switch (msg) {
     case WM_PAINT: {
       PAINTSTRUCT ps{};
       BeginPaint(hwnd, &ps);
-      UI::NotificationWindow::Painter::paint_notifications(state);
+      ui::notification_window::painter::paint_notifications(state);
       EndPaint(hwnd, &ps);
       return 0;
     }
@@ -24,16 +26,16 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_NCHITTEST: {
       POINT point{GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param)};
       ScreenToClient(hwnd, &point);
-      const auto target = UI::NotificationWindow::hit_test_notifications(state, point);
-      return target.kind == UI::NotificationWindow::NotificationHitKind::None ? HTTRANSPARENT
-                                                                              : HTCLIENT;
+      const auto target = ui::notification_window::hit_test_notifications(state, point);
+      return target.kind == ui::notification_window::NotificationHitKind::None ? HTTRANSPARENT
+                                                                               : HTCLIENT;
     }
 
     case WM_MOUSEMOVE: {
       POINT point{GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param)};
-      const auto target = UI::NotificationWindow::hit_test_notifications(state, point);
-      if (UI::NotificationWindow::update_hover_state(state, target)) {
-        UI::NotificationWindow::request_repaint(state);
+      const auto target = ui::notification_window::hit_test_notifications(state, point);
+      if (ui::notification_window::update_hover_state(state, target)) {
+        ui::notification_window::request_repaint(state);
       }
 
       TRACKMOUSEEVENT tme{sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd, 0};
@@ -42,19 +44,19 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_MOUSELEAVE:
-      if (UI::NotificationWindow::update_hover_state(state, {})) {
-        UI::NotificationWindow::request_repaint(state);
+      if (ui::notification_window::update_hover_state(state, {})) {
+        ui::notification_window::request_repaint(state);
       }
       return 0;
 
     case WM_LBUTTONDOWN: {
       POINT point{GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param)};
-      const auto target = UI::NotificationWindow::hit_test_notifications(state, point);
-      if (target.kind == UI::NotificationWindow::NotificationHitKind::Content ||
-          target.kind == UI::NotificationWindow::NotificationHitKind::Action) {
+      const auto target = ui::notification_window::hit_test_notifications(state, point);
+      if (target.kind == ui::notification_window::NotificationHitKind::Content ||
+          target.kind == ui::notification_window::NotificationHitKind::Action) {
         state.notification_window->pressed_target = target;
         SetCapture(hwnd);
-        UI::NotificationWindow::request_repaint(state);
+        ui::notification_window::request_repaint(state);
       }
       return 0;
     }
@@ -64,22 +66,22 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
         ReleaseCapture();
       }
       POINT point{GET_X_LPARAM(l_param), GET_Y_LPARAM(l_param)};
-      UI::NotificationWindow::handle_click_release(
-          state, UI::NotificationWindow::hit_test_notifications(state, point));
+      ui::notification_window::handle_click_release(
+          state, ui::notification_window::hit_test_notifications(state, point));
       return 0;
     }
 
     case WM_TIMER:
-      if (w_param == UI::NotificationWindow::ANIMATION_TIMER_ID) {
-        UI::NotificationWindow::update_notifications(state);
+      if (w_param == ui::notification_window::ANIMATION_TIMER_ID) {
+        ui::notification_window::update_notifications(state);
         return 0;
       }
       break;
 
     case WM_SIZE: {
       SIZE new_size{LOWORD(l_param), HIWORD(l_param)};
-      if (UI::NotificationWindow::RenderContext::resize_render_context(state, new_size)) {
-        UI::NotificationWindow::request_repaint(state);
+      if (ui::notification_window::render_context::resize_render_context(state, new_size)) {
+        ui::notification_window::request_repaint(state);
       }
       return 0;
     }
@@ -87,13 +89,13 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_DPICHANGED:
     case WM_DISPLAYCHANGE:
     case WM_SETTINGCHANGE:
-      UI::NotificationWindow::update_host_bounds(state);
-      UI::NotificationWindow::relayout_notifications(state, std::chrono::steady_clock::now());
-      UI::NotificationWindow::request_repaint(state);
+      ui::notification_window::update_host_bounds(state);
+      ui::notification_window::relayout_notifications(state, std::chrono::steady_clock::now());
+      ui::notification_window::request_repaint(state);
       return 0;
 
     case WM_NCDESTROY:
-      UI::NotificationWindow::RenderContext::cleanup_render_context(state);
+      ui::notification_window::render_context::cleanup_render_context(state);
       state.notification_window->host_hwnd = nullptr;
       state.notification_window->animation_timer_active = false;
       return 0;
@@ -102,20 +104,20 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
   return DefWindowProcW(hwnd, msg, w_param, l_param);
 }
 
-namespace UI::NotificationWindow::MessageHandler {
+namespace ui::notification_window::message_handler {
 
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param) {
-  Core::State::AppState* app_state = nullptr;
+  core::AppState* app_state = nullptr;
 
   if (msg == WM_NCCREATE) {
     const auto* create_struct = reinterpret_cast<CREATESTRUCTW*>(l_param);
-    app_state = static_cast<Core::State::AppState*>(create_struct->lpCreateParams);
+    app_state = static_cast<core::AppState*>(create_struct->lpCreateParams);
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app_state));
     if (app_state) {
       app_state->notification_window->host_hwnd = hwnd;
     }
   } else {
-    app_state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    app_state = reinterpret_cast<core::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   }
 
   if (app_state) {
@@ -125,4 +127,4 @@ LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM 
   return DefWindowProcW(hwnd, msg, w_param, l_param);
 }
 
-}  // namespace UI::NotificationWindow::MessageHandler
+}  // namespace ui::notification_window::message_handler

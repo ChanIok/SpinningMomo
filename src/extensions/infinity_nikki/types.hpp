@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/gallery/types.hpp"
 
-namespace Extensions::InfinityNikki {
+namespace extensions::infinity_nikki {
 
 struct InfinityNikkiGameDirResult {
   std::optional<std::string> game_dir;  // 游戏目录，null 表示未找到
@@ -81,7 +83,7 @@ struct PhotoMapPoint {
 };
 
 struct QueryPhotoMapPointsParams {
-  Features::Gallery::Types::QueryAssetsFilters filters;
+  features::gallery::QueryAssetsFilters filters;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
   std::string world_id;
@@ -249,4 +251,4 @@ struct SetInfinityNikkiWorldRecordParams {
   std::optional<std::string> world_id;
 };
 
-}  // namespace Extensions::InfinityNikki
+}  // namespace extensions::infinity_nikki

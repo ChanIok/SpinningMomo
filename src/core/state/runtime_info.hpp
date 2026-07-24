@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::State::RuntimeInfo {
+#include "vendor/std.hpp"
+
+namespace core::runtime_info {
 
 // 应用基本信息结构
 struct RuntimeInfoState {
@@ -34,4 +36,4 @@ struct RuntimeInfoState {
   std::string app_data_dir;
 };
 
-}  // namespace Core::State::RuntimeInfo
+}  // namespace core::runtime_info

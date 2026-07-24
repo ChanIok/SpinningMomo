@@ -1,15 +1,17 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "ui/floating_window/types.hpp"
 
-namespace UI::PhotographyPanel::State {
+namespace ui::photography_panel {
 
 constexpr wchar_t kWindowClassName[] = L"SpinningMomoPhotographyPanelClass";
 constexpr int kPanelWidth = 340;
@@ -58,4 +60,4 @@ struct PhotographyPanelState {
   RenderResources render_resources;
 };
 
-}  // namespace UI::PhotographyPanel::State
+}  // namespace ui::photography_panel

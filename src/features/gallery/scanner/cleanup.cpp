@@ -1,5 +1,7 @@
 #include "features/gallery/scanner/cleanup.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/folder/repository.hpp"
 #include "features/gallery/scanner/asset_pipeline.hpp"
@@ -7,7 +9,7 @@
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Scanner::Cleanup {
+namespace features::gallery::scanner::cleanup {
 
 // 判断 candidate 是否在 root 下（含 root 自身；路径使用正斜杠规范）
 auto is_path_under_root(const std::string& candidate_path, const std::string& root_path) -> bool {
@@ -32,10 +34,10 @@ struct CleanupRemovedAssetsResult {
 };
 
 // 对磁盘已消失的资产开启 missing 宽限期；已有 missing 记录不重复计数或重置时间。
-auto cleanup_removed_assets(Core::State::AppState& app_state,
+auto cleanup_removed_assets(core::AppState& app_state,
                             const std::filesystem::path& normalized_scan_root,
-                            const std::vector<Types::FileSystemInfo>& file_infos,
-                            const std::unordered_map<std::string, Types::Metadata>& asset_cache)
+                            const std::vector<FileSystemInfo>& file_infos,
+                            const std::unordered_map<std::string, Metadata>& asset_cache)
     -> CleanupRemovedAssetsResult {
   auto root_str = normalized_scan_root.string();
 
@@ -45,7 +47,7 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
     existing_paths.insert(file_info.path.string());
   }
 
-  std::vector<Types::Metadata> removed_assets;
+  std::vector<Metadata> removed_assets;
   for (const auto& [cached_path, metadata] : asset_cache) {
     if (!is_path_under_root(cached_path, root_str)) {
       continue;
@@ -64,7 +66,7 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
   }
 
   for (const auto& metadata : removed_assets) {
-    auto missing_result = AssetPipeline::mark_asset_missing_at_path(app_state, metadata.path);
+    auto missing_result = asset_pipeline::mark_asset_missing_at_path(app_state, metadata.path);
     if (!missing_result) {
       Logger().warn("Failed to mark removed asset {} missing: {}", metadata.id,
                     missing_result.error());
@@ -97,10 +99,10 @@ auto build_expected_folder_paths(const std::vector<std::filesystem::path>& folde
 }
 
 // 删除扫描根下不在真实目录库存中的 folder 记录（先深后浅）。
-auto cleanup_missing_folders(Core::State::AppState& app_state,
+auto cleanup_missing_folders(core::AppState& app_state,
                              const std::filesystem::path& normalized_scan_root,
                              const std::vector<std::filesystem::path>& folder_paths) -> int {
-  auto all_folders_result = Folder::Repository::list_all_folders(app_state);
+  auto all_folders_result = folder::repository::list_all_folders(app_state);
   if (!all_folders_result) {
     Logger().warn("Failed to list folders for cleanup: {}", all_folders_result.error());
     return 0;
@@ -136,7 +138,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
 
   int deleted_folders = 0;
   for (const auto& folder : missing_folders) {
-    auto delete_result = Folder::Repository::delete_folder(app_state, folder.id);
+    auto delete_result = folder::repository::delete_folder(app_state, folder.id);
     if (!delete_result) {
       Logger().debug("Skip folder cleanup for '{}' (id={}): {}", folder.path, folder.id,
                      delete_result.error());
@@ -153,14 +155,13 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
 }
 
 // 对账阶段：缺失文件进入宽限期，目录库存仍按真实文件系统收敛。
-auto run_cleanup_phase(Core::State::AppState& app_state,
-                       const std::filesystem::path& normalized_scan_root,
-                       const std::vector<Types::FileSystemInfo>& file_infos,
+auto run_cleanup_phase(core::AppState& app_state, const std::filesystem::path& normalized_scan_root,
+                       const std::vector<FileSystemInfo>& file_infos,
                        const std::vector<std::filesystem::path>& folder_paths,
-                       const std::unordered_map<std::string, Types::Metadata>& asset_cache,
-                       const std::function<void(const Types::ScanProgress&)>& progress_callback)
+                       const std::unordered_map<std::string, Metadata>& asset_cache,
+                       const std::function<void(const ScanProgress&)>& progress_callback)
     -> CleanupPhaseResult {
-  Progress::report_scan_progress(progress_callback, "cleanup", 0, 1, Progress::kCleanupPercent,
+  progress::report_scan_progress(progress_callback, "cleanup", 0, 1, progress::kCleanupPercent,
                                  "Reconciling deleted files");
 
   auto removed_assets_result =
@@ -173,4 +174,4 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
   };
 }
 
-}  // namespace Features::Gallery::Scanner::Cleanup
+}  // namespace features::gallery::scanner::cleanup

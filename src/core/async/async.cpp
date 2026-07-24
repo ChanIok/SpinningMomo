@@ -1,14 +1,16 @@
 #include "core/async/async.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/async/state.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::Async {
+namespace core::async {
 
-auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
+auto start(core::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
   if (!state.async) {
     return std::unexpected("AsyncState is not initialized");
   }
@@ -62,7 +64,7 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
   }
 }
 
-auto stop(Core::State::AppState& state) -> void {
+auto stop(core::AppState& state) -> void {
   if (!state.async) {
     return;
   }
@@ -101,7 +103,7 @@ auto stop(Core::State::AppState& state) -> void {
   }
 }
 
-auto is_running(const Core::State::AppState& state) -> bool {
+auto is_running(const core::AppState& state) -> bool {
   if (!state.async) {
     return false;
   }
@@ -109,7 +111,7 @@ auto is_running(const Core::State::AppState& state) -> bool {
   return runtime.is_running.load();
 }
 
-auto get_io_context(Core::State::AppState& state) -> asio::io_context* {
+auto get_io_context(core::AppState& state) -> asio::io_context* {
   if (!state.async) {
     return nullptr;
   }
@@ -120,4 +122,4 @@ auto get_io_context(Core::State::AppState& state) -> asio::io_context* {
   return std::addressof(*runtime.io_context);
 }
 
-}  // namespace Core::Async
+}  // namespace core::async

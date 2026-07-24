@@ -1,7 +1,9 @@
 #include "features/gallery/recovery/service.hpp"
 
-#include <windows.h>
-#include <winioctl.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/winioctl.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
@@ -16,7 +18,7 @@
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
 
-namespace Features::Gallery::Recovery::Service::Detail {
+namespace features::gallery::recovery::service::detail {
 
 // RAII 句柄包装，避免提前 return 时泄漏 HANDLE。
 struct UniqueHandle {
@@ -79,12 +81,12 @@ struct UsnRecordView {
 
 struct PendingScanChange {
   std::string path;
-  Features::Gallery::Types::ScanChangeAction action;
+  features::gallery::ScanChangeAction action;
 };
 
 auto make_path_compare_key(const std::filesystem::path& path) -> std::string {
   // 路径比较只需要稳定的 lexical 形态，不需要再同步访问文件系统。
-  return Utils::String::ToUtf8(Utils::Path::NormalizeForComparison(path));
+  return utils::string::ToUtf8(utils::path::NormalizeForComparison(path));
 }
 
 auto is_path_under_root(const std::string& path_key, const std::string& root_key) -> bool {
@@ -101,7 +103,7 @@ auto is_path_under_root(const std::string& path_key, const std::string& root_key
 
 auto is_unc_root(const std::filesystem::path& root_path) -> bool {
   // USN 是本地 NTFS 卷语义；UNC 的结论可由路径形态直接决定，不能先碰卷 API。
-  return Utils::Path::ClassifyPathStorageKind(root_path) == Utils::Path::PathStorageKind::RemoteUnc;
+  return utils::path::ClassifyPathStorageKind(root_path) == utils::path::PathStorageKind::RemoteUnc;
 }
 
 auto strip_extended_path_prefix(std::wstring value) -> std::wstring {
@@ -179,7 +181,7 @@ auto query_journal_snapshot(const std::filesystem::path& root_path)
   }
 
   auto file_system =
-      Utils::String::ToLowerAscii(Utils::String::ToUtf8(std::wstring(file_system_name)));
+      utils::string::ToLowerAscii(utils::string::ToUtf8(std::wstring(file_system_name)));
   if (file_system != "ntfs") {
     snapshot.reason = "only NTFS volumes use USN startup recovery";
     return snapshot;
@@ -215,15 +217,15 @@ auto query_journal_snapshot(const std::filesystem::path& root_path)
 }
 
 // 加载指定 root 的全部忽略规则（global + root-specific）。root_path 必须已归一化。
-auto get_root_rules(Core::State::AppState& app_state, const std::filesystem::path& root_path)
-    -> std::expected<std::vector<Features::Gallery::Types::IgnoreRule>, std::string> {
+auto get_root_rules(core::AppState& app_state, const std::filesystem::path& root_path)
+    -> std::expected<std::vector<features::gallery::IgnoreRule>, std::string> {
   // fingerprint 需要覆盖所有影响扫描结果的规则，因此合并 global 和 root-specific 规则。
-  auto global_rules_result = Features::Gallery::Ignore::Repository::get_global_rules(app_state);
+  auto global_rules_result = features::gallery::ignore::repository::get_global_rules(app_state);
   if (!global_rules_result) {
     return std::unexpected(global_rules_result.error());
   }
 
-  auto root_rules_result = Features::Gallery::Ignore::Repository::get_rules_by_directory_path(
+  auto root_rules_result = features::gallery::ignore::repository::get_rules_by_directory_path(
       app_state, root_path.string());
   if (!root_rules_result) {
     return std::unexpected(root_rules_result.error());
@@ -236,8 +238,8 @@ auto get_root_rules(Core::State::AppState& app_state, const std::filesystem::pat
   return rules;
 }
 
-auto make_rule_fingerprint(Core::State::AppState& app_state, const std::filesystem::path& root_path,
-                           const Features::Gallery::Types::ScanOptions& scan_options)
+auto make_rule_fingerprint(core::AppState& app_state, const std::filesystem::path& root_path,
+                           const features::gallery::ScanOptions& scan_options)
     -> std::expected<std::string, std::string> {
   // v1 不需要加密哈希，稳定排序后拼为文本即可。目标是检测扫描规则是否变化。
   std::vector<std::string> lines;
@@ -245,9 +247,9 @@ auto make_rule_fingerprint(Core::State::AppState& app_state, const std::filesyst
   auto supported_extensions =
       scan_options.supported_extensions.has_value()
           ? *scan_options.supported_extensions
-          : Features::Gallery::Scanner::Common::default_supported_extensions();
+          : features::gallery::scanner::common::default_supported_extensions();
   for (auto& extension : supported_extensions) {
-    extension = Utils::String::ToLowerAscii(extension);
+    extension = utils::string::ToLowerAscii(extension);
   }
   std::ranges::sort(supported_extensions);
   for (const auto& extension : supported_extensions) {
@@ -380,12 +382,12 @@ auto resolve_parent_based_path(
 
 auto add_or_replace_change(std::unordered_map<std::string, PendingScanChange>& changes_by_path,
                            const std::string& path_key, const std::string& normalized_path,
-                           Features::Gallery::Types::ScanChangeAction action) -> void {
+                           features::gallery::ScanChangeAction action) -> void {
   // 同一路径离线期间可能被多次修改，只保留最终需要达到的状态。
   changes_by_path[path_key] = PendingScanChange{.path = normalized_path, .action = action};
 }
 
-auto directory_record_requires_full_rescan(Core::State::AppState& app_state,
+auto directory_record_requires_full_rescan(core::AppState& app_state,
                                            const std::string& directory_path, DWORD reason)
     -> std::expected<bool, std::string> {
   // 目录“创建”本身不会让已有资产失真：后续真正重要的是里面是否出现文件记录。
@@ -396,17 +398,17 @@ auto directory_record_requires_full_rescan(Core::State::AppState& app_state,
   }
 
   // 如果这个目录前缀下根本没有已入库资产，就没必要因为它回退 full scan。
-  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(app_state,
+  return features::gallery::asset::repository::has_assets_under_path_prefix(app_state,
                                                                             directory_path);
 }
 
-auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem::path& root_path,
+auto collect_usn_changes(core::AppState& app_state, const std::filesystem::path& root_path,
                          std::int64_t start_usn, const JournalSnapshot& snapshot)
-    -> std::expected<std::vector<Features::Gallery::Types::ScanChange>, std::string> {
+    -> std::expected<std::vector<features::gallery::ScanChange>, std::string> {
   // 核心流程：从上次检查点 start_usn 开始读取 Journal，
   // 筛出当前 root 下的文件变更，翻译成 ScanChange 列表。
   if (start_usn >= snapshot.next_usn) {
-    return std::vector<Features::Gallery::Types::ScanChange>{};
+    return std::vector<features::gallery::ScanChange>{};
   }
 
   auto volume_handle_result = open_volume_handle(snapshot.volume_device_path);
@@ -519,14 +521,14 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
 
       if ((record.reason & (USN_REASON_FILE_DELETE | USN_REASON_RENAME_OLD_NAME)) != 0) {
         add_or_replace_change(changes_by_path, candidate_key, normalized_candidate_path,
-                              Features::Gallery::Types::ScanChangeAction::REMOVE);
+                              features::gallery::ScanChangeAction::REMOVE);
       }
 
       if ((record.reason & (USN_REASON_FILE_CREATE | USN_REASON_DATA_OVERWRITE |
                             USN_REASON_DATA_EXTEND | USN_REASON_DATA_TRUNCATION |
                             USN_REASON_BASIC_INFO_CHANGE | USN_REASON_RENAME_NEW_NAME)) != 0) {
         add_or_replace_change(changes_by_path, candidate_key, normalized_candidate_path,
-                              Features::Gallery::Types::ScanChangeAction::UPSERT);
+                              features::gallery::ScanChangeAction::UPSERT);
       }
 
       offset += common_header->RecordLength;
@@ -538,49 +540,47 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
     read_data.StartUsn = next_start_usn;
   }
 
-  std::vector<Features::Gallery::Types::ScanChange> changes;
+  std::vector<features::gallery::ScanChange> changes;
   changes.reserve(changes_by_path.size());
   for (const auto& [_, change] : changes_by_path) {
-    changes.push_back(
-        Features::Gallery::Types::ScanChange{.path = change.path, .action = change.action});
+    changes.push_back(features::gallery::ScanChange{.path = change.path, .action = change.action});
   }
   std::ranges::sort(changes, [](const auto& lhs, const auto& rhs) { return lhs.path < rhs.path; });
   return changes;
 }
 
-}  // namespace Features::Gallery::Recovery::Service::Detail
+}  // namespace features::gallery::recovery::service::detail
 
-namespace Features::Gallery::Recovery::Service {
+namespace features::gallery::recovery::service {
 
-auto prepare_startup_recovery(Core::State::AppState& app_state,
-                              const std::filesystem::path& root_path,
-                              const Features::Gallery::Types::ScanOptions& scan_options)
-    -> std::expected<Types::StartupRecoveryPlan, std::string> {
-  Types::StartupRecoveryPlan plan;
+auto prepare_startup_recovery(core::AppState& app_state, const std::filesystem::path& root_path,
+                              const features::gallery::ScanOptions& scan_options)
+    -> std::expected<StartupRecoveryPlan, std::string> {
+  StartupRecoveryPlan plan;
 
   // 返回启动恢复决策：当前 root 应走 USN 增量还是 FullScan？
   // 只做决策，不启动 watcher。
 
-  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
+  auto normalized_root_result = utils::path::NormalizePath(root_path);
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
   }
   plan.root_path = normalized_root_result->string();
 
-  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
-                                                                 *normalized_root_result)) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+  if (features::gallery::root_availability::is_remote_unreachable(app_state,
+                                                                  *normalized_root_result)) {
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "remote root is unavailable in this session";
     return plan;
   }
 
-  if (Detail::is_unc_root(*normalized_root_result)) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+  if (detail::is_unc_root(*normalized_root_result)) {
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "UNC roots do not use USN startup recovery";
     return plan;
   }
 
-  auto journal_snapshot_result = Detail::query_journal_snapshot(*normalized_root_result);
+  auto journal_snapshot_result = detail::query_journal_snapshot(*normalized_root_result);
   if (!journal_snapshot_result) {
     return std::unexpected("Failed to inspect journal capability: " +
                            journal_snapshot_result.error());
@@ -596,77 +596,76 @@ auto prepare_startup_recovery(Core::State::AppState& app_state,
 
   if (!snapshot.available) {
     // 不支持 USN 不是错误，只是正常的 FullScan 回退路径。
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason =
         snapshot.reason.empty() ? "journal is not available for this root" : snapshot.reason;
     return plan;
   }
 
   auto fingerprint_result =
-      Detail::make_rule_fingerprint(app_state, *normalized_root_result, scan_options);
+      detail::make_rule_fingerprint(app_state, *normalized_root_result, scan_options);
   if (!fingerprint_result) {
     return std::unexpected(fingerprint_result.error());
   }
   plan.rule_fingerprint = *fingerprint_result;
 
   auto stored_state_result =
-      Repository::get_state_by_root_path(app_state, normalized_root_result->string());
+      repository::get_state_by_root_path(app_state, normalized_root_result->string());
   if (!stored_state_result) {
     return std::unexpected(stored_state_result.error());
   }
 
   if (!stored_state_result->has_value()) {
     // 没有历史检查点，可能是首次运行或旧状态已丢失，只能全量扫描。
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "no persisted recovery checkpoint";
     return plan;
   }
 
   const auto& stored_state = stored_state_result->value();
   if (stored_state.volume_identity != snapshot.volume_identity) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "volume identity changed";
     return plan;
   }
 
   if (!stored_state.journal_id.has_value() || *stored_state.journal_id != snapshot.journal_id) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "journal identity changed";
     return plan;
   }
 
   if (stored_state.rule_fingerprint != *fingerprint_result) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "scan rules changed";
     return plan;
   }
 
   if (!stored_state.checkpoint_usn.has_value()) {
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "checkpoint is missing";
     return plan;
   }
 
-  auto changes_result = Detail::collect_usn_changes(app_state, *normalized_root_result,
+  auto changes_result = detail::collect_usn_changes(app_state, *normalized_root_result,
                                                     *stored_state.checkpoint_usn, snapshot);
   if (!changes_result) {
     // 离线追账出现不确定情况，宁可回退全量扫描也不猜测增量。
-    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.mode = StartupRecoveryMode::FullScan;
     plan.reason = "USN recovery fallback: " + changes_result.error();
     return plan;
   }
 
-  plan.mode = Types::StartupRecoveryMode::UsnJournal;
+  plan.mode = StartupRecoveryMode::UsnJournal;
   plan.reason = "USN recovery is available";
   plan.changes = std::move(changes_result.value());
   return plan;
 }
 
 // 保存已经成功应用的启动恢复边界，避免 checkpoint 越过尚未消费的实时事件。
-auto persist_recovery_state(Core::State::AppState& app_state,
-                            const Types::WatchRootRecoveryState& state)
+auto persist_recovery_state(core::AppState& app_state, const WatchRootRecoveryState& state)
     -> std::expected<void, std::string> {
-  return Repository::upsert_state(app_state, state);
+  return repository::upsert_state(app_state, state);
 }
 
-}  // namespace Features::Gallery::Recovery::Service
+}  // namespace features::gallery::recovery::service

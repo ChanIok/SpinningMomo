@@ -1,10 +1,12 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "features/preview/types.hpp"
 
-namespace Features::Preview::State {
+namespace features::preview {
 
 // 预览窗口完整状态
 struct PreviewState {
@@ -16,21 +18,21 @@ struct PreviewState {
   bool is_first_show = true;
 
   // 尺寸相关
-  Features::Preview::Types::WindowSizeState size;
-  Features::Preview::Types::DpiDependentSizes dpi_sizes;
+  features::preview::WindowSizeState size;
+  features::preview::DpiDependentSizes dpi_sizes;
 
   // 交互状态
-  Features::Preview::Types::InteractionState interaction;
-  Features::Preview::Types::ViewportState viewport;
+  features::preview::InteractionState interaction;
+  features::preview::ViewportState viewport;
 
   // 渲染状态
   std::atomic<bool> running = false;
   std::atomic<bool> create_new_srv = true;
   bool enable_hdr = false;
-  Features::Preview::Types::RenderingResources rendering_resources;
+  features::preview::RenderingResources rendering_resources;
 
   // 捕获状态
-  Features::Preview::Types::CaptureState capture_state;
+  features::preview::CaptureState capture_state;
 
   // 游戏窗口缓存信息
   RECT game_window_rect{};
@@ -40,4 +42,4 @@ struct PreviewState {
   bool has_screen_rect = false;
 };
 
-}  // namespace Features::Preview::State
+}  // namespace features::preview

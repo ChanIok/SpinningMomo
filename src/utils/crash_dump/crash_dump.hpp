@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Utils::CrashDump {
+#include "vendor/std.hpp"
+
+namespace utils::crash_dump {
 
 // 安装崩溃转储处理器（SEH + terminate）
 auto install() -> void;
@@ -9,4 +11,4 @@ auto install() -> void;
 auto write_dump(void* exception_pointers, std::string_view reason)
     -> std::expected<std::filesystem::path, std::string>;
 
-}  // namespace Utils::CrashDump
+}  // namespace utils::crash_dump

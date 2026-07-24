@@ -1,8 +1,10 @@
 #include "utils/powershell/powershell.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::PowerShell::Detail {
+#include "vendor/windows.hpp"
+
+namespace utils::powershell::detail {
 
 // 按 Windows CommandLineToArgvW 规则引用单个参数，保证空格和引号不改变参数边界。
 auto quote_argument(std::wstring_view argument) -> std::wstring {
@@ -137,15 +139,15 @@ auto start_process(const std::filesystem::path& script_path,
   return std::optional<std::uint32_t>{static_cast<std::uint32_t>(exit_code)};
 }
 
-}  // namespace Utils::PowerShell::Detail
+}  // namespace utils::powershell::detail
 
-namespace Utils::PowerShell {
+namespace utils::powershell {
 
 // 同步执行 PowerShell 脚本并返回退出码，供调用方确认脚本结果。
 auto run_script_and_wait(const std::filesystem::path& script_path,
                          const std::vector<std::wstring>& arguments)
     -> std::expected<std::uint32_t, std::string> {
-  auto result = Detail::start_process(script_path, arguments, true);
+  auto result = detail::start_process(script_path, arguments, true);
   if (!result) {
     return std::unexpected(result.error());
   }
@@ -158,11 +160,11 @@ auto run_script_and_wait(const std::filesystem::path& script_path,
 // 后台启动 PowerShell 脚本，供需要等待当前进程退出的更新和恢复任务使用。
 auto launch_script(const std::filesystem::path& script_path,
                    const std::vector<std::wstring>& arguments) -> std::expected<void, std::string> {
-  auto result = Detail::start_process(script_path, arguments, false);
+  auto result = detail::start_process(script_path, arguments, false);
   if (!result) {
     return std::unexpected(result.error());
   }
   return {};
 }
 
-}  // namespace Utils::PowerShell
+}  // namespace utils::powershell

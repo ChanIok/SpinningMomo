@@ -1,22 +1,24 @@
 #pragma once
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "core/http_client/types.hpp"
 #include "core/state/app_state.hpp"
 
-namespace Core::HttpClient {
+namespace core::http_client {
 
-auto initialize(Core::State::AppState& state) -> std::expected<void, std::string>;
+auto initialize(core::AppState& state) -> std::expected<void, std::string>;
 
-auto shutdown(Core::State::AppState& state) -> void;
+auto shutdown(core::AppState& state) -> void;
 
-auto fetch(Core::State::AppState& state, const Core::HttpClient::Types::Request& request)
-    -> asio::awaitable<std::expected<Core::HttpClient::Types::Response, std::string>>;
+auto fetch(core::AppState& state, const core::http_client::Request& request)
+    -> asio::awaitable<std::expected<core::http_client::Response, std::string>>;
 
-auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Types::Request& request,
+auto download_to_file(core::AppState& state, const core::http_client::Request& request,
                       const std::filesystem::path& output_path,
-                      Core::HttpClient::Types::DownloadProgressCallback progress_callback = nullptr)
+                      core::http_client::DownloadProgressCallback progress_callback = nullptr)
     -> asio::awaitable<std::expected<void, std::string>>;
 
-}  // namespace Core::HttpClient
+}  // namespace core::http_client

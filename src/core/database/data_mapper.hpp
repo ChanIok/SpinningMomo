@@ -1,11 +1,13 @@
 #pragma once
 
-#include <SQLiteCpp/SQLiteCpp.h>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/rfl.hpp"
+#include "vendor/sqlite.hpp"
 
 #include "core/database/types.hpp"
 
-namespace Core::Database::DataMapper {
+namespace core::database::data_mapper {
 
 enum class MappingErrorType {
   field_not_found,
@@ -176,4 +178,4 @@ inline auto from_statement(SQLite::Statement& query) -> std::expected<T, std::st
 
   return object;
 }
-}  // namespace Core::Database::DataMapper
+}  // namespace core::database::data_mapper

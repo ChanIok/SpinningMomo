@@ -1,7 +1,9 @@
 #include "features/gallery/scanner/analysis.hpp"
 
-#include <wil/resource.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/worker_pool/worker_pool.hpp"
@@ -11,30 +13,30 @@
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Scanner::Analysis {
+namespace features::gallery::scanner::analysis {
 
 // 用 size/mtime（及 force）把文件标成 NEW / NEEDS_HASH_CHECK / UNCHANGED
-auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
-                          const std::unordered_map<std::string, Types::Metadata>& asset_cache,
-                          bool force_reanalyze) -> std::vector<Types::FileAnalysisResult> {
-  std::vector<Types::FileAnalysisResult> results;
+auto analyze_file_changes(const std::vector<FileSystemInfo>& file_infos,
+                          const std::unordered_map<std::string, Metadata>& asset_cache,
+                          bool force_reanalyze) -> std::vector<FileAnalysisResult> {
+  std::vector<FileAnalysisResult> results;
   results.reserve(file_infos.size());
 
   for (const auto& file_info : file_infos) {
-    Types::FileAnalysisResult analysis;
+    FileAnalysisResult analysis;
     analysis.file_info = file_info;
 
     auto it = asset_cache.find(file_info.path.string());
     if (it == asset_cache.end()) {
       // 库中无此路径 → 全新文件
-      analysis.status = Types::FileStatus::NEW;
+      analysis.status = FileStatus::NEW;
     } else {
       const auto& cached_metadata = it->second;
       analysis.existing_metadata = cached_metadata;
 
       if (force_reanalyze) {
         // 强制重分析也先算指纹，避免后续缩略图流程拿到空 hash
-        analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
+        analysis.status = FileStatus::NEEDS_HASH_CHECK;
         results.push_back(std::move(analysis));
         continue;
       }
@@ -42,9 +44,9 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
       // 缺指纹或 size/mtime 变化才重算，正常扫描避免重复读媒体
       if (cached_metadata.hash.empty() || cached_metadata.size != file_info.size ||
           cached_metadata.file_modified_at != file_info.file_modified_millis) {
-        analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
+        analysis.status = FileStatus::NEEDS_HASH_CHECK;
       } else {
-        analysis.status = Types::FileStatus::UNCHANGED;
+        analysis.status = FileStatus::UNCHANGED;
       }
     }
 
@@ -55,17 +57,17 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 }
 
 // 并行计算 NEW / NEEDS_HASH_CHECK 的内容指纹，并写回 analysis 状态
-auto calculate_hash_for_targets(Core::State::AppState& app_state,
-                                std::vector<Types::FileAnalysisResult>& analysis_results,
-                                Progress::HashProgressTracker* progress_tracker,
+auto calculate_hash_for_targets(core::AppState& app_state,
+                                std::vector<FileAnalysisResult>& analysis_results,
+                                progress::HashProgressTracker* progress_tracker,
                                 std::stop_token stop_token)
     -> std::expected<std::size_t, std::string> {
   // 保留原始下标，便于并发写回
   auto targets_with_index = analysis_results | std::views::enumerate |
                             std::views::filter([](const auto& pair) {
                               const auto& [idx, analysis] = pair;
-                              return analysis.status == Types::FileStatus::NEW ||
-                                     analysis.status == Types::FileStatus::NEEDS_HASH_CHECK;
+                              return analysis.status == FileStatus::NEW ||
+                                     analysis.status == FileStatus::NEEDS_HASH_CHECK;
                             }) |
                             std::ranges::to<std::vector>();
 
@@ -83,7 +85,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   std::size_t submitted_batches = 0;
 
   for (const auto& batch : batches) {
-    bool submitted = Core::WorkerPool::submit_task(
+    bool submitted = core::worker_pool::submit_task(
         app_state, [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results,
                     progress_tracker, stop_token]() {
           auto finish_batch =
@@ -96,7 +98,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
               std::views::transform([progress_tracker, stop_token](const auto& pair)
                                         -> std::optional<std::pair<size_t, std::string>> {
                 const auto& [idx, analysis] = pair;
-                auto hash_result = Common::calculate_content_fingerprint(
+                auto hash_result = common::calculate_content_fingerprint(
                     analysis.file_info.path, analysis.file_info.size, stop_token);
                 if (progress_tracker) {
                   progress_tracker->mark_item_hashed();
@@ -142,14 +144,14 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     auto& analysis = analysis_results[idx];
     analysis.file_info.hash = hash;
 
-    if (analysis.status == Types::FileStatus::NEEDS_HASH_CHECK) {
+    if (analysis.status == FileStatus::NEEDS_HASH_CHECK) {
       const bool hash_unchanged = analysis.existing_metadata &&
                                   !analysis.existing_metadata->hash.empty() &&
                                   analysis.existing_metadata->hash == hash;
 
       if (hash_unchanged) {
         // 内容未变也要写回最新 size/mtime，否则下次扫描会再次算同一指纹
-        auto update_result = Asset::Repository::update_asset_file_state(
+        auto update_result = asset::repository::update_asset_file_state(
             app_state, analysis.existing_metadata->id, analysis.file_info.size,
             analysis.file_info.file_modified_millis);
         if (!update_result) {
@@ -157,7 +159,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
         }
       }
 
-      analysis.status = hash_unchanged ? Types::FileStatus::UNCHANGED : Types::FileStatus::MODIFIED;
+      analysis.status = hash_unchanged ? FileStatus::UNCHANGED : FileStatus::MODIFIED;
     }
   }
 
@@ -165,31 +167,31 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
 }
 
 // 指纹分析阶段：size/mtime 粗判 → 并行内容指纹 → 产出 NEW/MODIFIED 待处理列表
-auto run_hash_analysis_phase(
-    Core::State::AppState& app_state, const std::vector<Types::FileSystemInfo>& file_infos,
-    const std::unordered_map<std::string, Types::Metadata>& asset_cache,
-    const Types::ScanOptions& options,
-    const std::function<void(const Types::ScanProgress&)>& progress_callback,
-    std::stop_token stop_token)
-    -> std::expected<std::vector<Types::FileAnalysisResult>, std::string> {
+auto run_hash_analysis_phase(core::AppState& app_state,
+                             const std::vector<FileSystemInfo>& file_infos,
+                             const std::unordered_map<std::string, Metadata>& asset_cache,
+                             const ScanOptions& options,
+                             const std::function<void(const ScanProgress&)>& progress_callback,
+                             std::stop_token stop_token)
+    -> std::expected<std::vector<FileAnalysisResult>, std::string> {
   auto analysis_results =
       analyze_file_changes(file_infos, asset_cache, options.force_reanalyze.value_or(false));
 
   const auto hash_candidate_count = static_cast<std::size_t>(
-      std::ranges::count_if(analysis_results, [](const Types::FileAnalysisResult& analysis) {
-        return analysis.status == Types::FileStatus::NEW ||
-               analysis.status == Types::FileStatus::NEEDS_HASH_CHECK;
+      std::ranges::count_if(analysis_results, [](const FileAnalysisResult& analysis) {
+        return analysis.status == FileStatus::NEW ||
+               analysis.status == FileStatus::NEEDS_HASH_CHECK;
       }));
   const auto metadata_unchanged_skip_count = analysis_results.size() - hash_candidate_count;
 
-  std::optional<Progress::HashProgressTracker> hash_tracker;
+  std::optional<progress::HashProgressTracker> hash_tracker;
   if (hash_candidate_count > 0) {
     hash_tracker.emplace(progress_callback, static_cast<std::int64_t>(hash_candidate_count),
-                         Progress::kHashingStartPercent, Progress::kHashingEndPercent);
+                         progress::kHashingStartPercent, progress::kHashingEndPercent);
     hash_tracker->report(false);
   } else {
-    Progress::report_scan_progress(progress_callback, "hashing", 0, 0,
-                                   Progress::kHashingStartPercent,
+    progress::report_scan_progress(progress_callback, "hashing", 0, 0,
+                                   progress::kHashingStartPercent,
                                    "No files require fingerprint calculation");
   }
 
@@ -204,7 +206,7 @@ auto run_hash_analysis_phase(
   if (options.force_reanalyze.value_or(false)) {
     for (auto& analysis : analysis_results) {
       if (analysis.existing_metadata.has_value()) {
-        analysis.status = Types::FileStatus::MODIFIED;
+        analysis.status = FileStatus::MODIFIED;
       }
     }
   }
@@ -212,9 +214,9 @@ auto run_hash_analysis_phase(
   if (hash_tracker) {
     hash_tracker->report(true);
   } else {
-    Progress::report_scan_progress(
+    progress::report_scan_progress(
         progress_callback, "hashing", static_cast<std::int64_t>(hashed_count),
-        static_cast<std::int64_t>(hash_candidate_count), Progress::kHashingEndPercent,
+        static_cast<std::int64_t>(hash_candidate_count), progress::kHashingEndPercent,
         "Fingerprint calculation completed");
   }
 
@@ -234,15 +236,14 @@ auto run_hash_analysis_phase(
     }
   }
 
-  std::vector<Types::FileAnalysisResult> files_to_process;
-  std::ranges::copy_if(analysis_results, std::back_inserter(files_to_process),
-                       [](const Types::FileAnalysisResult& result) {
-                         return result.status == Types::FileStatus::NEW ||
-                                result.status == Types::FileStatus::MODIFIED;
-                       });
+  std::vector<FileAnalysisResult> files_to_process;
+  std::ranges::copy_if(
+      analysis_results, std::back_inserter(files_to_process), [](const FileAnalysisResult& result) {
+        return result.status == FileStatus::NEW || result.status == FileStatus::MODIFIED;
+      });
 
   Logger().info("Found {} files that need processing", files_to_process.size());
   return files_to_process;
 }
 
-}  // namespace Features::Gallery::Scanner::Analysis
+}  // namespace features::gallery::scanner::analysis

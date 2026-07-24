@@ -1,5 +1,8 @@
 #include "features/gallery/static_resolver.hpp"
 
+#include "vendor/std.hpp"
+
+#include "core/build_config.hpp"
 #include "core/http_server/static.hpp"
 #include "core/http_server/types.hpp"
 #include "core/state/app_state.hpp"
@@ -10,9 +13,8 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
-#include "vendor/build_config.hpp"
 
-namespace Features::Gallery::StaticResolver {
+namespace features::gallery::static_resolver {
 
 // 从 URL 提取相对路径（通用模板版本）
 template <typename CharT>
@@ -139,12 +141,12 @@ auto validate_asset_file(const std::filesystem::path& path) -> bool {
 
 // ============= HTTP 静态服务解析器 =============
 
-auto register_http_resolvers(Core::State::AppState& state) -> void {
+auto register_http_resolvers(core::AppState& state) -> void {
   // 缩略图解析器
-  Core::HttpServer::Static::register_path_resolver(
+  core::http_server::static_content::register_path_resolver(
       state,  // 传递 AppState
       "/static/assets/thumbnails/",
-      [&state](std::string_view url_path) -> Core::HttpServer::Types::PathResolution {
+      [&state](std::string_view url_path) -> core::http_server::PathResolution {
         auto relative_path = extract_relative_path(url_path, "/static/assets/thumbnails/");
         if (!relative_path) {
           return std::unexpected("Invalid thumbnail path");
@@ -156,7 +158,7 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         auto full_path = state.gallery->thumbnails_directory / *relative_path;
 
-        if (!Utils::Path::IsPathWithinBase(full_path, state.gallery->thumbnails_directory)) {
+        if (!utils::path::IsPathWithinBase(full_path, state.gallery->thumbnails_directory)) {
           Logger().warn("Unsafe thumbnail path requested: {}", full_path.string());
           return std::unexpected("Unsafe thumbnail path");
         }
@@ -166,7 +168,7 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
         }
 
         Logger().debug("Resolved thumbnail path: {}", full_path.string());
-        return Core::HttpServer::Types::PathResolutionData{
+        return core::http_server::PathResolutionData{
             .file_path = full_path,
             .cache_duration = std::chrono::seconds{86400},
             .cache_control_header = std::string{"public, max-age=31536000, immutable"}};
@@ -174,16 +176,16 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
   // 原图解析器（基于 root_id + relative_path）。
   // 这条链路主要给浏览器 dev 环境使用；release WebView 会尽量直接走 root host mapping。
-  Core::HttpServer::Static::register_path_resolver(
+  core::http_server::static_content::register_path_resolver(
       state, "/static/assets/originals/by-root/",
-      [&state](std::string_view url_path) -> Core::HttpServer::Types::PathResolution {
+      [&state](std::string_view url_path) -> core::http_server::PathResolution {
         auto locator =
             extract_original_request_locator(url_path, "/static/assets/originals/by-root/");
         if (!locator) {
           return std::unexpected("Invalid original locator");
         }
 
-        auto path_result = Features::Gallery::OriginalLocator::resolve_original_file_path(
+        auto path_result = features::gallery::original_locator::resolve_original_file_path(
             state, locator->root_id, locator->relative_path);
         if (!path_result) {
           Logger().warn("Failed to resolve original locator {}/{}: {}", locator->root_id,
@@ -198,7 +200,7 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         Logger().debug("Resolved original locator {}/{} to {}", locator->root_id,
                        locator->relative_path, path_result->string());
-        return Core::HttpServer::Types::PathResolutionData{
+        return core::http_server::PathResolutionData{
             .file_path = *path_result,
             .cache_duration = std::chrono::seconds{0},
             .cache_control_header = std::string{"private, no-cache"}};
@@ -209,7 +211,7 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
 // ============= WebView 资源解析器 =============
 
-auto register_webview_resolvers(Core::State::AppState& state) -> void {
+auto register_webview_resolvers(core::AppState& state) -> void {
   if (!state.webview) {
     Logger().warn("WebView state not initialized, skipping resolver registration");
     return;
@@ -220,30 +222,31 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
     return;
   }
 
-  if (!Vendor::BuildConfig::is_debug_build()) {
+  if (!core::build_config::is_debug_build()) {
     // Release WebView 直接把整个缩略图目录映射成独立 host。
     // 这样 `<img src>` 会直接从文件夹读取，不再绕回 static.test 的动态拦截链路。
-    Core::WebView::register_virtual_host_folder_mapping(
+    core::webview::register_virtual_host_folder_mapping(
         state, state.webview->config.thumbnail_host_name,
         state.gallery->thumbnails_directory.wstring(),
-        Core::WebView::State::VirtualHostResourceAccessKind::allow);
+        core::webview::VirtualHostResourceAccessKind::allow);
 
     Logger().info("Registered WebView thumbnail host mapping: {} -> {}",
-                  Utils::String::ToUtf8(state.webview->config.thumbnail_host_name),
+                  utils::string::ToUtf8(state.webview->config.thumbnail_host_name),
                   state.gallery->thumbnails_directory.string());
   }
 }
 // ============= 清理函数 =============
 
-auto unregister_all_resolvers(Core::State::AppState& state) -> void {
-  Core::HttpServer::Static::unregister_path_resolver(state, "/static/assets/thumbnails/");
-  Core::HttpServer::Static::unregister_path_resolver(state, "/static/assets/originals/by-root/");
+auto unregister_all_resolvers(core::AppState& state) -> void {
+  core::http_server::static_content::unregister_path_resolver(state, "/static/assets/thumbnails/");
+  core::http_server::static_content::unregister_path_resolver(state,
+                                                              "/static/assets/originals/by-root/");
 
   if (state.webview) {
-    Core::WebView::unregister_virtual_host_folder_mapping(
+    core::webview::unregister_virtual_host_folder_mapping(
         state, state.webview->config.thumbnail_host_name);
   }
 
   Logger().info("Unregistered gallery static resolvers");
 }
-}  // namespace Features::Gallery::StaticResolver
+}  // namespace features::gallery::static_resolver

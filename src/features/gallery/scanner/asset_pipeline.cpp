@@ -1,5 +1,7 @@
 #include "features/gallery/scanner/asset_pipeline.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/database/database.hpp"
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
@@ -17,14 +19,13 @@
 #include "utils/string/string.hpp"
 #include "utils/time.hpp"
 
-namespace Features::Gallery::Scanner::AssetPipeline {
+namespace features::gallery::scanner::asset_pipeline {
 
 // 已知指纹与文件状态后：填 Asset + 缩略图/主色，不写库
-auto prepare_media_asset(Core::State::AppState& app_state,
-                         const std::filesystem::path& normalized_path,
-                         const Types::ScanOptions& options, const MediaPrepareInput& input)
+auto prepare_media_asset(core::AppState& app_state, const std::filesystem::path& normalized_path,
+                         const ScanOptions& options, const MediaPrepareInput& input)
     -> std::expected<PreparedAsset, std::string> {
-  auto asset_type = Common::detect_asset_type(normalized_path);
+  auto asset_type = common::detect_asset_type(normalized_path);
 
   PreparedAsset prepared;
   prepared.is_update = input.existing_asset_id.has_value();
@@ -45,20 +46,20 @@ auto prepare_media_asset(Core::State::AppState& app_state,
   asset.mime_type = "application/octet-stream";
 
   if (normalized_path.has_extension()) {
-    asset.extension = Utils::String::ToLowerAscii(normalized_path.extension().string());
+    asset.extension = utils::string::ToLowerAscii(normalized_path.extension().string());
   } else {
     asset.extension = std::nullopt;
   }
 
   if (asset_type == "photo") {
     // 照片分支直接获取线程局部工厂：首次调用才初始化，后续照片自动复用。
-    auto wic_factory_result = Utils::Image::get_thread_wic_factory();
+    auto wic_factory_result = utils::image::get_thread_wic_factory();
     if (!wic_factory_result) {
       return std::unexpected("Failed to get thread WIC factory: " + wic_factory_result.error());
     }
     auto& photo_wic_factory = wic_factory_result.value();
 
-    auto image_info_result = Utils::Image::get_image_info(photo_wic_factory.get(), normalized_path);
+    auto image_info_result = utils::image::get_image_info(photo_wic_factory.get(), normalized_path);
     if (image_info_result) {
       auto image_info = std::move(*image_info_result);
       asset.width = image_info.width;
@@ -72,11 +73,11 @@ auto prepare_media_asset(Core::State::AppState& app_state,
       asset.mime_type = "application/octet-stream";
     }
 
-    std::optional<Utils::Image::BGRABitmapData> thumbnail_bitmap_data;
+    std::optional<utils::image::BGRABitmapData> thumbnail_bitmap_data;
 
     // 缩略图像素同时供主色复用，避免同一照片重复解码缩放
-    auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
-        photo_wic_factory.get(), normalized_path, Types::kDefaultThumbnailShortEdge);
+    auto bitmap_data_result = utils::image::load_scaled_bgra_bitmap_data(
+        photo_wic_factory.get(), normalized_path, kDefaultThumbnailShortEdge);
     if (!bitmap_data_result) {
       Logger().warn("Failed to load thumbnail bitmap data for {}: {}", normalized_path.string(),
                     bitmap_data_result.error());
@@ -86,7 +87,7 @@ auto prepare_media_asset(Core::State::AppState& app_state,
       if (input.hash.empty()) {
         Logger().warn("Skip thumbnail generation for {}: empty hash", normalized_path.string());
       } else {
-        auto thumbnail_result = Asset::Thumbnail::save_thumbnail_from_bgra(
+        auto thumbnail_result = asset::thumbnail::save_thumbnail_from_bgra(
             app_state, input.hash, thumbnail_bitmap_data.value(),
             options.rebuild_thumbnails.value_or(false));
         if (!thumbnail_result) {
@@ -96,13 +97,13 @@ auto prepare_media_asset(Core::State::AppState& app_state,
       }
     }
 
-    const Features::Gallery::Color::Types::MainColorExtractOptions color_extract_options{
-        .sample_short_edge = Types::kDefaultThumbnailShortEdge,
+    const features::gallery::color::MainColorExtractOptions color_extract_options{
+        .sample_short_edge = kDefaultThumbnailShortEdge,
     };
     auto color_result = thumbnail_bitmap_data.has_value()
-                            ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
+                            ? features::gallery::color::extractor::extract_main_colors_from_bgra(
                                   thumbnail_bitmap_data.value(), color_extract_options)
-                            : Features::Gallery::Color::Extractor::extract_main_colors(
+                            : features::gallery::color::extractor::extract_main_colors(
                                   photo_wic_factory, normalized_path, color_extract_options);
     if (color_result) {
       prepared.colors = std::move(color_result.value());
@@ -113,8 +114,8 @@ auto prepare_media_asset(Core::State::AppState& app_state,
     }
   } else if (asset_type == "video") {
     // MF：分辨率/时长 + 封面；失败时兜底写入，避免单文件拖垮整批
-    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
-        normalized_path, Types::kDefaultThumbnailShortEdge);
+    auto video_result =
+        utils::media::video_asset::analyze_video_file(normalized_path, kDefaultThumbnailShortEdge);
     if (video_result) {
       asset.width = static_cast<std::int32_t>(video_result->width);
       asset.height = static_cast<std::int32_t>(video_result->height);
@@ -125,7 +126,7 @@ auto prepare_media_asset(Core::State::AppState& app_state,
           Logger().warn("Skip video thumbnail save for {}: empty hash", normalized_path.string());
         } else {
           auto save_result =
-              Asset::Thumbnail::save_thumbnail_data(app_state, input.hash, *video_result->thumbnail,
+              asset::thumbnail::save_thumbnail_data(app_state, input.hash, *video_result->thumbnail,
                                                     options.rebuild_thumbnails.value_or(false));
           if (!save_result) {
             Logger().warn("Failed to save video thumbnail for {}: {}", normalized_path.string(),
@@ -153,31 +154,30 @@ auto prepare_media_asset(Core::State::AppState& app_state,
 }
 
 // 外部路径消失只进入 missing 宽限期；重复 REMOVE 不重置 missing_at。
-auto mark_asset_missing_at_path(Core::State::AppState& app_state, const std::filesystem::path& path)
+auto mark_asset_missing_at_path(core::AppState& app_state, const std::filesystem::path& path)
     -> std::expected<bool, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(path);
+  auto normalized_result = utils::path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize path: " + normalized_result.error());
   }
-  return Asset::Repository::mark_asset_missing_by_path(app_state, normalized_result->string());
+  return asset::repository::mark_asset_missing_by_path(app_state, normalized_result->string());
 }
 
 // 在一个事务中写入单个资产及颜色，避免指纹已提交但颜色仍停留在旧状态。
-auto persist_prepared_asset(Core::State::AppState& app_state, PreparedAsset& prepared)
+auto persist_prepared_asset(core::AppState& app_state, PreparedAsset& prepared)
     -> std::expected<PathSyncOutcome, std::string> {
-  return Core::Database::execute_transaction(
+  return core::database::execute_transaction(
       app_state,
-      [&prepared](
-          Core::State::AppState& txn_app_state) -> std::expected<PathSyncOutcome, std::string> {
+      [&prepared](core::AppState& txn_app_state) -> std::expected<PathSyncOutcome, std::string> {
         if (prepared.is_update) {
           auto update_result =
-              Asset::Repository::update_asset_scanner_fields(txn_app_state, prepared.asset);
+              asset::repository::update_asset_scanner_fields(txn_app_state, prepared.asset);
           if (!update_result) {
             return std::unexpected("Failed to update asset: " + update_result.error());
           }
 
           auto color_result =
-              Features::Gallery::Color::Repository::replace_asset_colors_in_transaction(
+              features::gallery::color::repository::replace_asset_colors_in_transaction(
                   txn_app_state, prepared.asset.id, prepared.colors);
           if (!color_result) {
             return std::unexpected("Failed to update asset colors: " + color_result.error());
@@ -185,7 +185,7 @@ auto persist_prepared_asset(Core::State::AppState& app_state, PreparedAsset& pre
           return PathSyncOutcome::Updated;
         }
 
-        auto create_result = Asset::Repository::create_asset_with_inherited_data_in_transaction(
+        auto create_result = asset::repository::create_asset_with_inherited_data_in_transaction(
             txn_app_state, prepared.asset);
         if (!create_result) {
           return std::unexpected("Failed to create asset: " + create_result.error());
@@ -193,7 +193,7 @@ auto persist_prepared_asset(Core::State::AppState& app_state, PreparedAsset& pre
         prepared.asset.id = create_result.value();
 
         auto color_result =
-            Features::Gallery::Color::Repository::replace_asset_colors_in_transaction(
+            features::gallery::color::repository::replace_asset_colors_in_transaction(
                 txn_app_state, prepared.asset.id, prepared.colors);
         if (!color_result) {
           return std::unexpected("Failed to create asset colors: " + color_result.error());
@@ -203,13 +203,12 @@ auto persist_prepared_asset(Core::State::AppState& app_state, PreparedAsset& pre
 }
 
 // 增量路径：过滤 → 粗判 → 指纹 → 媒体 → 单条写库
-auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesystem::path& root_path,
-                          const Types::ScanOptions& options,
-                          const std::vector<Types::IgnoreRule>& ignore_rules,
+auto upsert_asset_at_path(core::AppState& app_state, const std::filesystem::path& root_path,
+                          const ScanOptions& options, const std::vector<IgnoreRule>& ignore_rules,
                           const std::unordered_map<std::string, std::int64_t>& folder_mapping,
                           const std::filesystem::path& path, std::stop_token stop_token)
     -> std::expected<PathSyncOutcome, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(path);
+  auto normalized_result = utils::path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize path: " + normalized_result.error());
   }
@@ -227,12 +226,12 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
   }
 
   const auto supported_extensions =
-      options.supported_extensions.value_or(Common::default_supported_extensions());
-  if (!Common::is_supported_file(normalized, supported_extensions)) {
+      options.supported_extensions.value_or(common::default_supported_extensions());
+  if (!common::is_supported_file(normalized, supported_extensions)) {
     return PathSyncOutcome::Skipped;
   }
 
-  if (Ignore::Service::apply_ignore_rules(normalized, root_path, ignore_rules, false)) {
+  if (ignore::service::apply_ignore_rules(normalized, root_path, ignore_rules, false)) {
     return PathSyncOutcome::Skipped;
   }
 
@@ -246,24 +245,24 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
     return std::unexpected("Failed to read file modified time: " + ec.message());
   }
 
-  auto creation_time_result = Utils::Time::get_file_creation_time_millis(normalized);
+  auto creation_time_result = utils::time::get_file_creation_time_millis(normalized);
   if (!creation_time_result) {
     return std::unexpected("Failed to read file creation time: " + creation_time_result.error());
   }
 
-  auto existing_result = Asset::Repository::get_asset_by_path(app_state, normalized.string());
+  auto existing_result = asset::repository::get_asset_by_path(app_state, normalized.string());
   if (!existing_result) {
     return std::unexpected("Failed to query existing asset: " + existing_result.error());
   }
 
   auto existing_asset = existing_result.value();
-  auto file_modified_millis = Utils::Time::file_time_to_millis(last_write_time);
+  auto file_modified_millis = utils::time::file_time_to_millis(last_write_time);
   auto size_i64 = static_cast<std::int64_t>(file_size);
 
   // 相同路径始终代表同一资产；即使编辑器采用删除后替换，也先恢复原行。
   bool restored = false;
   if (existing_asset) {
-    auto restore_result = Asset::Repository::restore_asset_by_id(app_state, existing_asset->id);
+    auto restore_result = asset::repository::restore_asset_by_id(app_state, existing_asset->id);
     if (!restore_result) {
       return std::unexpected(restore_result.error());
     }
@@ -280,7 +279,7 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
     return std::unexpected("Gallery scan cancelled");
   }
 
-  auto hash_result = Common::calculate_content_fingerprint(normalized, size_i64, stop_token);
+  auto hash_result = common::calculate_content_fingerprint(normalized, size_i64, stop_token);
   if (!hash_result) {
     return std::unexpected(hash_result.error());
   }
@@ -293,7 +292,7 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
   // 指纹未变：只回写 size/mtime，避免反复读媒体
   if (existing_asset && existing_asset->hash.has_value() && !existing_asset->hash->empty() &&
       existing_asset->hash.value() == hash) {
-    auto update_result = Asset::Repository::update_asset_file_state(app_state, existing_asset->id,
+    auto update_result = asset::repository::update_asset_file_state(app_state, existing_asset->id,
                                                                     size_i64, file_modified_millis);
     if (!update_result) {
       return std::unexpected(update_result.error());
@@ -329,4 +328,4 @@ auto upsert_asset_at_path(Core::State::AppState& app_state, const std::filesyste
   return persist_prepared_asset(app_state, prepared_result.value());
 }
 
-}  // namespace Features::Gallery::Scanner::AssetPipeline
+}  // namespace features::gallery::scanner::asset_pipeline

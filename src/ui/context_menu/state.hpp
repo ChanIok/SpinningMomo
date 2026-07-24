@@ -1,15 +1,17 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "ui/context_menu/types.hpp"
 
-namespace UI::ContextMenu::State {
+namespace ui::context_menu {
 
 struct RenderResources {
   wil::com_ptr<IDXGISwapChain1> swap_chain;
@@ -41,11 +43,11 @@ struct ContextMenuState {
   wil::com_ptr<IDWriteTextFormat> text_format;
 
   // 菜单数据和布局
-  std::vector<Types::MenuItem> items;
-  Types::LayoutConfig layout;
-  Types::InteractionState interaction;
-  Types::MenuOpenAnimation main_animation;
-  Types::MenuOpenAnimation submenu_animation;
+  std::vector<MenuItem> items;
+  LayoutConfig layout;
+  InteractionState interaction;
+  MenuOpenAnimation main_animation;
+  MenuOpenAnimation submenu_animation;
   SIZE menu_size{};
   POINT position{};
 
@@ -55,14 +57,14 @@ struct ContextMenuState {
   POINT submenu_position{};
 
   // 获取当前子菜单项的安全访问方法
-  inline auto get_current_submenu() const -> const std::vector<Types::MenuItem>& {
+  inline auto get_current_submenu() const -> const std::vector<MenuItem>& {
     if (submenu_parent_index >= 0 && submenu_parent_index < static_cast<int>(items.size()) &&
         items[submenu_parent_index].has_submenu()) {
       return items[submenu_parent_index].submenu_items;
     }
-    static const std::vector<Types::MenuItem> empty_submenu;
+    static const std::vector<MenuItem> empty_submenu;
     return empty_submenu;
   }
 };
 
-}  // namespace UI::ContextMenu::State
+}  // namespace ui::context_menu

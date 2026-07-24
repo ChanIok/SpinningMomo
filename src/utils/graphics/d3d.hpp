@@ -1,10 +1,12 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Graphics::D3D {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+
+namespace utils::graphics::d3d {
 
 // D3D设备上下文
 struct D3DContext {
@@ -76,4 +78,4 @@ auto cleanup_d3d_context(D3DContext& context) -> void;
 // 清理着色器资源
 auto cleanup_shader_resources(ShaderResources& resources) -> void;
 
-}  // namespace Utils::Graphics::D3D
+}  // namespace utils::graphics::d3d

@@ -1,18 +1,19 @@
 #include "ui/context_menu/layout.hpp"
 
-#include <dwrite_3.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwrite_3.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/context_menu/state.hpp"
 #include "ui/context_menu/types.hpp"
 #include "ui/shared_render_resources/state.hpp"
-#include "vendor/windows.hpp"
 
-namespace UI::ContextMenu::Layout {
+namespace ui::context_menu::layout {
 
-auto calculate_text_width(const Core::State::AppState& state, const std::wstring& text) -> int {
+auto calculate_text_width(const core::AppState& state, const std::wstring& text) -> int {
   const auto& menu_state = *state.context_menu;
   if (!state.shared_render_resources) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
@@ -36,14 +37,14 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
   return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
 }
 
-auto calculate_menu_size(Core::State::AppState& state) -> void {
+auto calculate_menu_size(core::AppState& state) -> void {
   auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
   int total_height = layout.padding * 2;
   int max_width = layout.min_width;
 
   for (const auto& item : menu_state.items) {
-    if (item.type == Types::MenuItemType::Separator) {
+    if (item.type == MenuItemType::Separator) {
       total_height += layout.separator_height;
     } else {
       total_height += layout.item_height;
@@ -58,15 +59,14 @@ auto calculate_menu_size(Core::State::AppState& state) -> void {
   menu_state.menu_size = {max_width, total_height};
 }
 
-auto calculate_menu_position(const Core::State::AppState& state,
-                             const Vendor::Windows::POINT& cursor_pos) -> Vendor::Windows::POINT {
+auto calculate_menu_position(const core::AppState& state, const POINT& cursor_pos) -> POINT {
   const auto& menu_state = *state.context_menu;
   HMONITOR monitor = MonitorFromPoint({cursor_pos.x, cursor_pos.y}, MONITOR_DEFAULTTONEAREST);
   MONITORINFO monitor_info{sizeof(MONITORINFO)};
   GetMonitorInfoW(monitor, &monitor_info);
   const auto& work_area = monitor_info.rcWork;
 
-  Vendor::Windows::POINT position = cursor_pos;
+  POINT position = cursor_pos;
   if (position.x + menu_state.menu_size.cx > work_area.right) {
     position.x = cursor_pos.x - menu_state.menu_size.cx;
   }
@@ -78,16 +78,14 @@ auto calculate_menu_position(const Core::State::AppState& state,
   return position;
 }
 
-auto get_menu_item_at_point(const Core::State::AppState& state, const POINT& pt) -> int {
+auto get_menu_item_at_point(const core::AppState& state, const POINT& pt) -> int {
   const auto& menu_state = *state.context_menu;
   int current_y = menu_state.layout.padding;
   for (size_t i = 0; i < menu_state.items.size(); ++i) {
     const auto& item = menu_state.items[i];
-    int item_height = (item.type == Types::MenuItemType::Separator)
-                          ? menu_state.layout.separator_height
-                          : menu_state.layout.item_height;
-    if (pt.y >= current_y && pt.y < current_y + item_height &&
-        item.type == Types::MenuItemType::Normal) {
+    int item_height = (item.type == MenuItemType::Separator) ? menu_state.layout.separator_height
+                                                             : menu_state.layout.item_height;
+    if (pt.y >= current_y && pt.y < current_y + item_height && item.type == MenuItemType::Normal) {
       return static_cast<int>(i);
     }
     current_y += item_height;
@@ -96,7 +94,7 @@ auto get_menu_item_at_point(const Core::State::AppState& state, const POINT& pt)
 }
 
 // 计算子菜单尺寸
-auto calculate_submenu_size(Core::State::AppState& state) -> void {
+auto calculate_submenu_size(core::AppState& state) -> void {
   auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
   const auto& current_submenu = menu_state.get_current_submenu();
@@ -111,7 +109,7 @@ auto calculate_submenu_size(Core::State::AppState& state) -> void {
   int total_height = layout.padding * 2;
 
   for (const auto& item : current_submenu) {
-    if (item.type == Types::MenuItemType::Separator) {
+    if (item.type == MenuItemType::Separator) {
       total_height += layout.separator_height;
     } else {
       total_height += layout.item_height;
@@ -128,7 +126,7 @@ auto calculate_submenu_size(Core::State::AppState& state) -> void {
 }
 
 // 计算子菜单位置
-auto calculate_submenu_position(Core::State::AppState& state, int parent_index) -> void {
+auto calculate_submenu_position(core::AppState& state, int parent_index) -> void {
   auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
 
@@ -136,7 +134,7 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
   int parent_y = layout.padding;
   for (int i = 0; i < parent_index; ++i) {
     const auto& item = menu_state.items[i];
-    if (item.type == Types::MenuItemType::Separator) {
+    if (item.type == MenuItemType::Separator) {
       parent_y += layout.separator_height;
     } else {
       parent_y += layout.item_height;
@@ -173,4 +171,4 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
   }
 }
 
-}  // namespace UI::ContextMenu::Layout
+}  // namespace ui::context_menu::layout

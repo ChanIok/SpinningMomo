@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Preview::Shaders {
+#include "vendor/std.hpp"
+
+namespace features::preview::shaders {
 
 // 基本渲染着色器（用于显示捕获的游戏画面）
 const std::string BASIC_VERTEX_SHADER = R"(
@@ -59,4 +61,4 @@ float4 main(PS_INPUT input) : SV_Target {
 }
 )";
 
-}  // namespace Features::Preview::Shaders
+}  // namespace features::preview::shaders

@@ -1,10 +1,11 @@
 #include "utils/crypto/crypto.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <bcrypt.h>
+#include "vendor/windows.hpp"
+#include "vendor/windows/bcrypt.hpp"
 
-namespace Utils::Crypto {
+namespace utils::crypto {
 
 auto is_nt_success(NTSTATUS status) -> bool { return status >= 0; }
 
@@ -110,4 +111,4 @@ auto sha256_file(const std::filesystem::path& file_path)
   return output.str();
 }
 
-}  // namespace Utils::Crypto
+}  // namespace utils::crypto

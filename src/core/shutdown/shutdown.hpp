@@ -1,9 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Core::Shutdown {
+namespace core::shutdown {
 
-auto shutdown_application(Core::State::AppState& state) -> void;
+auto shutdown_application(core::AppState& state) -> void;
 
 }

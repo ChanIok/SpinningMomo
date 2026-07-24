@@ -1,14 +1,16 @@
 #include "utils/file/file.hpp"
 
-#include <windows.h>
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/windows.hpp"
 
 #include "utils/file/mime.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 #include "utils/time.hpp"
 
-namespace Utils::File {
+namespace utils::file {
 
 auto is_cross_device_error(const std::error_code& error_code) -> bool {
   if (!error_code) {
@@ -108,7 +110,7 @@ auto read_file(const std::filesystem::path& file_path)
 
     FileReadResult result;
     result.path = file_path.string();
-    result.mime_type = Mime::get_mime_type(file_path);
+    result.mime_type = mime::get_mime_type(file_path);
     result.original_size = file_size;
 
     if (file_size == 0) {
@@ -164,7 +166,7 @@ auto read_file_and_encode(const std::filesystem::path& file_path)
   bool is_text = is_text_mime_type(result.mime_type);
   if (!is_text) {
     // 对于未知类型，尝试UTF-8验证
-    is_text = Utils::String::IsValidUtf8(raw_data.data);
+    is_text = utils::string::IsValidUtf8(raw_data.data);
   }
 
   if (is_text) {
@@ -175,7 +177,7 @@ auto read_file_and_encode(const std::filesystem::path& file_path)
                    result.content.size(), result.mime_type);
   } else {
     // 二进制文件：Base64编码
-    result.content = Utils::String::ToBase64(raw_data.data);
+    result.content = utils::string::ToBase64(raw_data.data);
     result.is_binary = true;
     Logger().debug(
         "Read binary file: {}, original size: {} bytes, encoded size: {} chars, mime: {}",
@@ -214,7 +216,7 @@ auto write_file(const std::filesystem::path& file_path, const std::string& conte
     size_t bytes_written = 0;
     if (is_binary) {
       // 二进制文件：从base64解码后写入
-      auto binary_data = Utils::String::FromBase64(content);
+      auto binary_data = utils::string::FromBase64(content);
       if (!binary_data.empty()) {
         bytes_written =
             co_await asio::async_write(file, asio::buffer(binary_data), asio::use_awaitable);
@@ -262,7 +264,7 @@ auto list_directory(const std::filesystem::path& dir_path,
                                .path = entry.path().string()};
 
       auto last_write_time = std::filesystem::last_write_time(entry.path());
-      dir_entry.last_modified = Utils::Time::file_time_to_millis(last_write_time);
+      dir_entry.last_modified = utils::time::file_time_to_millis(last_write_time);
 
       if (entry.is_directory()) {
         dir_entry.type = "directory";
@@ -308,7 +310,7 @@ auto get_file_info(const std::filesystem::path& file_path)
     }
 
     auto last_write_time = std::filesystem::last_write_time(file_path);
-    result.last_modified = Utils::Time::file_time_to_millis(last_write_time);
+    result.last_modified = utils::time::file_time_to_millis(last_write_time);
 
     Logger().debug("Successfully got file info: {}", file_path.string());
     co_return result;
@@ -545,4 +547,4 @@ auto copy_path(const std::filesystem::path& source_path,
   }
 }
 
-}  // namespace Utils::File
+}  // namespace utils::file

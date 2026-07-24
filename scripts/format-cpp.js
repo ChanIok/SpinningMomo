@@ -54,7 +54,7 @@ function main() {
     files = args;
   } else {
     // 默认模式：在 Node 里自己展开 glob，避免 Windows shell 不展开通配符的问题
-    files = fg.sync(["src/**/*.cpp", "src/**/*.ixx", "src/**/*.h", "src/**/*.hpp"], {
+    files = fg.sync(["src/**/*.cpp", "src/**/*.h", "src/**/*.hpp"], {
       dot: false,
       onlyFiles: true,
       unique: true,

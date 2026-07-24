@@ -1,9 +1,11 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
-#include <winrt/Windows.Graphics.Capture.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/winrt/windows_graphics_capture.hpp"
 
 #include "features/recording/types.hpp"
 #include "utils/graphics/capture.hpp"
@@ -11,28 +13,28 @@
 #include "utils/media/state.hpp"
 #include "utils/timer/timeout.hpp"
 
-namespace Features::Recording::State {
+namespace features::recording {
 
 // 录制完整状态
 struct RecordingState {
-  Features::Recording::Types::RecordingConfig config;
+  features::recording::RecordingConfig config;
   std::filesystem::path working_output_path;
   HWND target_window = nullptr;
-  Features::Recording::Types::CapturePlan capture_plan;
+  features::recording::CapturePlan capture_plan;
 
   // 状态标志 - 使用 atomic 避免锁竞争
-  std::atomic<Features::Recording::Types::RecordingStatus> status{
-      Features::Recording::Types::RecordingStatus::Idle};
+  std::atomic<features::recording::RecordingStatus> status{
+      features::recording::RecordingStatus::Idle};
 
   // D3D / WGC / 音频 / 编码器资源
   wil::com_ptr<ID3D11Device> device;
   wil::com_ptr<ID3D11DeviceContext> context;
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
   bool d3d_initialized = false;
-  Utils::Graphics::Capture::CaptureSession capture_session;
+  utils::graphics::capture::CaptureSession capture_session;
   wil::com_ptr<ID3D11Texture2D> cropped_texture;
-  Utils::Media::AudioCapture::AudioCaptureContext audio;
-  Utils::Media::Encoder::State::EncoderContext encoder;
+  utils::media::audio_capture::AudioCaptureContext audio;
+  utils::media::encoder::EncoderContext encoder;
 
   // 帧和队列状态
   std::int64_t start_qpc_100ns = 0;
@@ -47,7 +49,7 @@ struct RecordingState {
 
   int last_frame_width = 0;
   int last_frame_height = 0;
-  std::deque<Features::Recording::Types::QueuedAudioPacket> audio_queue;
+  std::deque<features::recording::QueuedAudioPacket> audio_queue;
   std::atomic<std::uint64_t> dropped_audio_packets{0};
   std::uint64_t discarded_tail_audio_packets = 0;
   std::uint64_t skipped_video_frames_due_to_encoding_lag = 0;
@@ -71,9 +73,9 @@ struct RecordingState {
   // 控制线程当前是否正在执行 start/stop/restart；用户 toggle 忙时会被忽略。
   std::atomic<bool> control_action_running{false};
   // 控制请求只用单槽合并；用户 start 请求的参数也挂在这里，避免窗口拖拽时堆积任务。
-  Features::Recording::Types::RecordingControlAction pending_action{
-      Features::Recording::Types::RecordingControlAction::None};
-  std::optional<Features::Recording::Types::StartRequest> pending_start_request;
+  features::recording::RecordingControlAction pending_action{
+      features::recording::RecordingControlAction::None};
+  std::optional<features::recording::StartRequest> pending_start_request;
   // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
   std::atomic<bool> shutdown_requested{false};
 
@@ -90,7 +92,7 @@ struct RecordingState {
   std::condition_variable control_cv;
 
   // 延迟释放可复用 D3D 资源，优化高频启停体验。
-  std::optional<Utils::Timeout::Timeout> cleanup_timer;
+  std::optional<utils::timeout::Timeout> cleanup_timer;
 };
 
-}  // namespace Features::Recording::State
+}  // namespace features::recording

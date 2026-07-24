@@ -1,12 +1,14 @@
 #pragma once
 
-#include <d3d11.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
 // Ultra HDR（JPEG_R）编码：将捕获到的 R16G16B16A16_FLOAT 纹理写成带增益图的 JPEG。
 // 实现拆在多个 .cpp 中，本接口文件只保留调用方需要的类型与入口。
 
-namespace Features::Screenshot::HdrEncoder {
+namespace features::screenshot::hdr_encoder {
 
 struct UltraHdrEncodeOptions {
   // 底图（SDR 兼容预览）JPEG 量化质量，0–100。
@@ -66,4 +68,4 @@ auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring&
                                    const UltraHdrEncodeOptions& options = {})
     -> std::expected<void, std::string>;
 
-}  // namespace Features::Screenshot::HdrEncoder
+}  // namespace features::screenshot::hdr_encoder

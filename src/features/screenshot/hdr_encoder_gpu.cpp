@@ -1,17 +1,17 @@
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <wil/resource.h>
-#include <wil/result.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
 #include "features/screenshot/hdr_encoder.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Screenshot::HdrEncoder {
+namespace features::screenshot::hdr_encoder {
 
-namespace GpuPreprocess {
+namespace gpu_preprocess {
 
 // 这条链路现在的边界是：
 // 1) GPU 负责 HDR->SDR 预处理、RGB gain 计算、tile 范围归约、量化；
@@ -598,7 +598,7 @@ auto create_compute_shader(ID3D11Device* device, const std::string& shader_code,
     return std::unexpected("D3D device is null");
   }
 
-  auto blob_result = Utils::Graphics::D3D::compile_shader(shader_code, "main", "cs_5_0");
+  auto blob_result = utils::graphics::d3d::compile_shader(shader_code, "main", "cs_5_0");
   if (!blob_result) {
     return std::unexpected(
         std::format("Failed to compile {} compute shader: {}", name, blob_result.error()));
@@ -1093,7 +1093,7 @@ auto dispatch_gain_quantize(ID3D11Device* device, ID3D11DeviceContext* context,
   return gainmap_result;
 }
 
-}  // namespace GpuPreprocess
+}  // namespace gpu_preprocess
 
 auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
     -> std::expected<UltraHdrPreparedImages, std::string> {
@@ -1120,7 +1120,7 @@ auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
     device->GetImmediateContext(context.put());
     THROW_HR_IF_NULL(E_POINTER, context);
 
-    auto source_srv_result = GpuPreprocess::create_source_srv(device.get(), texture);
+    auto source_srv_result = gpu_preprocess::create_source_srv(device.get(), texture);
     if (!source_srv_result) {
       return std::unexpected(source_srv_result.error());
     }
@@ -1128,7 +1128,7 @@ auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
     auto total_start = std::chrono::steady_clock::now();
 
     auto histogram_start = std::chrono::steady_clock::now();
-    auto histogram_result = GpuPreprocess::dispatch_histogram(
+    auto histogram_result = gpu_preprocess::dispatch_histogram(
         device.get(), context.get(), source_srv_result->get(), desc.Width, desc.Height);
     if (!histogram_result) {
       return std::unexpected(histogram_result.error());
@@ -1136,71 +1136,71 @@ auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
 
     const auto pixel_count = static_cast<std::uint64_t>(desc.Width) * desc.Height;
     const float content_peak_linear =
-        GpuPreprocess::compute_content_peak_linear(histogram_result.value(), pixel_count);
-    const auto histogram_ms = GpuPreprocess::elapsed_ms(histogram_start);
+        gpu_preprocess::compute_content_peak_linear(histogram_result.value(), pixel_count);
+    const auto histogram_ms = gpu_preprocess::elapsed_ms(histogram_start);
 
     auto preprocess_start = std::chrono::steady_clock::now();
     auto preprocess_result =
-        GpuPreprocess::dispatch_preprocess(device.get(), context.get(), source_srv_result->get(),
-                                           desc.Width, desc.Height, content_peak_linear);
+        gpu_preprocess::dispatch_preprocess(device.get(), context.get(), source_srv_result->get(),
+                                            desc.Width, desc.Height, content_peak_linear);
     if (!preprocess_result) {
       return std::unexpected(preprocess_result.error());
     }
-    const auto preprocess_ms = GpuPreprocess::elapsed_ms(preprocess_start);
+    const auto preprocess_ms = gpu_preprocess::elapsed_ms(preprocess_start);
 
     auto gain_compute_start = std::chrono::steady_clock::now();
-    auto gain_compute_result = GpuPreprocess::dispatch_gain_compute(
+    auto gain_compute_result = gpu_preprocess::dispatch_gain_compute(
         device.get(), context.get(), preprocess_result.value(), desc.Width, desc.Height);
     if (!gain_compute_result) {
       return std::unexpected(gain_compute_result.error());
     }
-    const auto gain_compute_ms = GpuPreprocess::elapsed_ms(gain_compute_start);
+    const auto gain_compute_ms = gpu_preprocess::elapsed_ms(gain_compute_start);
 
     auto gain_range_start = std::chrono::steady_clock::now();
-    auto gain_range_result = GpuPreprocess::merge_gain_range_from_tiles(
+    auto gain_range_result = gpu_preprocess::merge_gain_range_from_tiles(
         device.get(), context.get(), gain_compute_result.value());
     if (!gain_range_result) {
       return std::unexpected(gain_range_result.error());
     }
-    const auto gain_range_ms = GpuPreprocess::elapsed_ms(gain_range_start);
+    const auto gain_range_ms = gpu_preprocess::elapsed_ms(gain_range_start);
 
     auto gain_quantize_start = std::chrono::steady_clock::now();
-    auto gainmap_buffer_result = GpuPreprocess::dispatch_gain_quantize(
+    auto gainmap_buffer_result = gpu_preprocess::dispatch_gain_quantize(
         device.get(), context.get(), gain_compute_result.value(), desc.Width, desc.Height,
         gain_range_result->first, gain_range_result->second);
     if (!gainmap_buffer_result) {
       return std::unexpected(gainmap_buffer_result.error());
     }
-    const auto gain_quantize_ms = GpuPreprocess::elapsed_ms(gain_quantize_start);
+    const auto gain_quantize_ms = gpu_preprocess::elapsed_ms(gain_quantize_start);
 
     // gain 链路只依赖 GPU 上的 base/hdr buffer；base 读回放到 quantize 之后，避免挡住后续
     // dispatch。
     auto base_readback_start = std::chrono::steady_clock::now();
-    auto base_bgra8_result = GpuPreprocess::read_buffer_bytes(
+    auto base_bgra8_result = gpu_preprocess::read_buffer_bytes(
         device.get(), context.get(), preprocess_result->base_bgra8_buffer.buffer.get(),
         static_cast<std::size_t>(preprocess_result->base_bgra8_buffer.element_count) *
-            GpuPreprocess::kBaseBytesPerPixel);
+            gpu_preprocess::kBaseBytesPerPixel);
     if (!base_bgra8_result) {
       return std::unexpected(base_bgra8_result.error());
     }
-    const auto base_readback_ms = GpuPreprocess::elapsed_ms(base_readback_start);
+    const auto base_readback_ms = gpu_preprocess::elapsed_ms(base_readback_start);
 
     auto gain_readback_start = std::chrono::steady_clock::now();
-    auto gainmap_bgra8_result = GpuPreprocess::read_buffer_bytes(
+    auto gainmap_bgra8_result = gpu_preprocess::read_buffer_bytes(
         device.get(), context.get(), gainmap_buffer_result->buffer.get(),
         static_cast<std::size_t>(gainmap_buffer_result->element_count) *
-            GpuPreprocess::kGainMapBytesPerPixel);
+            gpu_preprocess::kGainMapBytesPerPixel);
     if (!gainmap_bgra8_result) {
       return std::unexpected(gainmap_bgra8_result.error());
     }
-    const auto gain_readback_ms = GpuPreprocess::elapsed_ms(gain_readback_start);
+    const auto gain_readback_ms = gpu_preprocess::elapsed_ms(gain_readback_start);
 
     Logger().debug(
         "HDR preprocess: histogram={} ms, preprocess={} ms, gain_compute={} ms, "
         "gain_range={} ms, gain_quantize={} ms, base_readback={} ms, gain_readback={} ms, "
         "total={} ms, content_peak_linear={:.4f}, gain_range=[{:.4f}, {:.4f}]",
         histogram_ms, preprocess_ms, gain_compute_ms, gain_range_ms, gain_quantize_ms,
-        base_readback_ms, gain_readback_ms, GpuPreprocess::elapsed_ms(total_start),
+        base_readback_ms, gain_readback_ms, gpu_preprocess::elapsed_ms(total_start),
         content_peak_linear, gain_range_result->first, gain_range_result->second);
 
     return UltraHdrPreparedImages{
@@ -1216,4 +1216,4 @@ auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
   }
 }
 
-}  // namespace Features::Screenshot::HdrEncoder
+}  // namespace features::screenshot::hdr_encoder

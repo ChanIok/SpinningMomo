@@ -1,12 +1,14 @@
 #pragma once
 
-#include "vendor/shellapi.hpp"
+#include "vendor/std.hpp"
 
-namespace UI::TrayIcon::State {
+#include "vendor/windows/shellapi.hpp"
+
+namespace ui::tray_icon {
 
 struct TrayIconState {
-  Vendor::ShellApi::NOTIFYICONDATAW nid{};
+  NOTIFYICONDATAW nid{};
   bool is_created = false;
 };
 
-}  // namespace UI::TrayIcon::State
+}  // namespace ui::tray_icon

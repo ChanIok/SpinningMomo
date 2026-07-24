@@ -1,10 +1,12 @@
 #pragma once
 
-#include <wil/com.h>
-#include <wincodec.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Image {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/wincodec.hpp"
+
+namespace utils::image {
 // WIC工厂类型别名
 using WICFactory = wil::com_ptr<IWICImagingFactory>;
 
@@ -115,4 +117,4 @@ auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_d
                              uint32_t height, uint32_t row_pitch, const std::wstring& file_path,
                              ImageFormat format = ImageFormat::PNG, float jpeg_quality = 1.0f)
     -> std::expected<void, std::string>;
-}  // namespace Utils::Image
+}  // namespace utils::image

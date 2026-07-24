@@ -1,8 +1,10 @@
 #pragma once
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
 
-namespace Utils::Network {
+#include "vendor/asio.hpp"
+
+namespace utils::network {
 
 struct TcpProbeResult {
   bool reachable = false;
@@ -15,4 +17,4 @@ struct TcpProbeResult {
 auto probe_tcp_port(const std::wstring& server, const std::wstring& port,
                     std::chrono::milliseconds timeout) -> asio::awaitable<TcpProbeResult>;
 
-}  // namespace Utils::Network
+}  // namespace utils::network

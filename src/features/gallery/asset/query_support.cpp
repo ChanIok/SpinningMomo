@@ -1,12 +1,14 @@
 #include "features/gallery/asset/query_support.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/database/database.hpp"
 #include "core/database/types.hpp"
 #include "core/state/app_state.hpp"
 #include "features/gallery/color/filter.hpp"
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Asset::QuerySupport {
+namespace features::gallery::asset::query_support {
 
 auto validate_month_format(const std::string& month) -> bool {
   if (month.length() != 7 || month[4] != '-') {
@@ -112,12 +114,11 @@ auto build_query_order_config(std::optional<std::string> sort_by_param,
   return config;
 }
 
-auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilters& filters,
+auto build_unified_where_clause(const features::gallery::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias)
-    -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
-                     std::string> {
+    -> std::expected<std::pair<std::string, std::vector<core::database::DbParam>>, std::string> {
   std::vector<std::string> conditions;
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   const auto folder_id_column = qualify_asset_column("folder_id", asset_table_alias);
   const auto file_created_at_column = qualify_asset_column("file_created_at", asset_table_alias);
   const auto created_at_column = qualify_asset_column("created_at", asset_table_alias);
@@ -235,7 +236,7 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
     }
   }
 
-  auto color_filter_result = Features::Gallery::Color::Filter::append_color_filter_conditions(
+  auto color_filter_result = features::gallery::color::filter::append_color_filter_conditions(
       filters, conditions, params, asset_table_alias);
   if (!color_filter_result) {
     return std::unexpected(color_filter_result.error());
@@ -253,8 +254,8 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
   return std::make_pair(where_clause, params);
 }
 
-auto find_active_asset_index(Core::State::AppState& app_state,
-                             const Features::Gallery::Types::QueryAssetsFilters& filters,
+auto find_active_asset_index(core::AppState& app_state,
+                             const features::gallery::QueryAssetsFilters& filters,
                              const QueryOrderConfig& order_config, std::int64_t active_asset_id)
     -> std::expected<std::optional<std::int64_t>, std::string> {
   auto where_result = build_unified_where_clause(filters);
@@ -290,7 +291,7 @@ auto find_active_asset_index(Core::State::AppState& app_state,
 
   query_params.push_back(active_asset_id);
 
-  auto index_result = Core::Database::query_scalar<std::int64_t>(app_state, sql, query_params);
+  auto index_result = core::database::query_scalar<std::int64_t>(app_state, sql, query_params);
   if (!index_result) {
     return std::unexpected("Failed to query active asset index: " + index_result.error());
   }
@@ -298,4 +299,4 @@ auto find_active_asset_index(Core::State::AppState& app_state,
   return index_result.value();
 }
 
-}  // namespace Features::Gallery::Asset::QuerySupport
+}  // namespace features::gallery::asset::query_support

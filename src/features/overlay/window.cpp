@@ -1,7 +1,9 @@
 #include "features/overlay/window.hpp"
 
-#include <dwmapi.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/overlay/geometry.hpp"
@@ -10,18 +12,18 @@
 #include "features/overlay/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Overlay::Window {
+namespace features::overlay::window {
 
 // 窗口过程 - 使用GWLP_USERDATA模式获取状态
 LRESULT CALLBACK overlay_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  core::AppState* state = nullptr;
 
   if (message == WM_NCCREATE) {
     const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = reinterpret_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   if (!state) {
@@ -30,7 +32,7 @@ LRESULT CALLBACK overlay_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPA
 
   // 调用交互模块处理消息
   auto [handled, result] =
-      Interaction::handle_overlay_message(*state, hwnd, message, wParam, lParam);
+      interaction::handle_overlay_message(*state, hwnd, message, wParam, lParam);
   if (handled) {
     return result;
   }
@@ -59,7 +61,7 @@ auto unregister_overlay_window_class(HINSTANCE instance) -> void {
   UnregisterClassW(L"OverlayWindowClass", instance);
 }
 
-auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
+auto create_overlay_window(HINSTANCE instance, core::AppState& state)
     -> std::expected<HWND, std::string> {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.screen_width <= 0 || overlay_state.window.screen_height <= 0) {
@@ -94,7 +96,7 @@ auto set_window_layered_attributes(HWND hwnd) -> std::expected<void, std::string
   return {};
 }
 
-auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance)
+auto initialize_overlay_window(core::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {
   // 注册窗口类
   if (auto result = register_overlay_window_class(instance); !result) {
@@ -110,7 +112,7 @@ auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance)
   return {};
 }
 
-auto hide_overlay_window(Core::State::AppState& state) -> void {
+auto hide_overlay_window(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_HIDE);
@@ -119,8 +121,7 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
   overlay_state.window.overlay_window_shown = false;
 }
 
-auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
-    -> void {
+auto set_overlay_window_size(core::AppState& state, int game_width, int game_height) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.screen_width <= 0 || overlay_state.window.screen_height <= 0) {
     Logger().error("Overlay screen metrics are not initialized");
@@ -136,7 +137,7 @@ auto set_overlay_window_size(Core::State::AppState& state, int game_width, int g
     overlay_state.window.window_width = overlay_state.window.screen_width;
     overlay_state.window.window_height = overlay_state.window.screen_height;
   } else {
-    auto [window_width, window_height] = Geometry::calculate_overlay_dimensions(
+    auto [window_width, window_height] = geometry::calculate_overlay_dimensions(
         game_width, game_height, overlay_state.window.screen_width,
         overlay_state.window.screen_height);
 
@@ -172,7 +173,7 @@ auto set_overlay_window_size(Core::State::AppState& state, int game_width, int g
   }
 }
 
-auto destroy_overlay_window(Core::State::AppState& state) -> void {
+auto destroy_overlay_window(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     DestroyWindow(overlay_state.window.overlay_hwnd);
@@ -180,8 +181,7 @@ auto destroy_overlay_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto show_overlay_window_first_time(Core::State::AppState& state)
-    -> std::expected<void, std::string> {
+auto show_overlay_window_first_time(core::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
   // 显示叠加层窗口
@@ -202,7 +202,7 @@ auto show_overlay_window_first_time(Core::State::AppState& state)
   return {};
 }
 
-auto restore_game_window(Core::State::AppState& state) -> void {
+auto restore_game_window(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (!overlay_state.window.target_window) return;
 
@@ -211,7 +211,7 @@ auto restore_game_window(Core::State::AppState& state) -> void {
   SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, ex_style & ~WS_EX_LAYERED);
 
   // 获取窗口尺寸
-  auto dimensions_result = Geometry::get_window_dimensions(overlay_state.window.target_window);
+  auto dimensions_result = geometry::get_window_dimensions(overlay_state.window.target_window);
   if (!dimensions_result) {
     return;
   }
@@ -226,4 +226,4 @@ auto restore_game_window(Core::State::AppState& state) -> void {
   SetForegroundWindow(overlay_state.window.target_window);
 }
 
-}  // namespace Features::Overlay::Window
+}  // namespace features::overlay::window

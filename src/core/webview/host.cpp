@@ -1,15 +1,18 @@
 #include "core/webview/host.hpp"
 
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <WebView2.h>  // 必须放最后面
-#include <d3d11.h>
-#include <dcomp.h>
-#include <dxgi.h>
-#include <wrl.h>
-#include <rfl/json.hpp>
+#include "vendor/rfl.hpp"
+#include "vendor/webview2.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dxgi.hpp"
+#include "vendor/windows/shellapi.hpp"
+#include "vendor/windows/wrl.hpp"
 
+#include "core/build_config.hpp"
 #include "core/state/app_state.hpp"
 #include "core/webview/rpc_bridge.hpp"
 #include "core/webview/state.hpp"
@@ -18,17 +21,15 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
-#include "vendor/build_config.hpp"
-#include "vendor/shellapi.hpp"
 
-namespace Core::WebView::Host::Detail {
+namespace core::webview::host::detail {
 
 struct DirectWindowBridgeMessage {
   std::string type;
   std::optional<std::string> edge;
 };
 
-auto clear_host_runtime(Core::WebView::State::HostRuntime& host_runtime) -> void {
+auto clear_host_runtime(core::webview::HostRuntime& host_runtime) -> void {
   host_runtime.dcomp_root_visual.reset();
   host_runtime.dcomp_target.reset();
   host_runtime.dcomp_device.reset();
@@ -63,8 +64,8 @@ auto resize_edge_to_wmsz(std::string_view edge) -> std::optional<WPARAM> {
   return std::nullopt;
 }
 
-auto try_handle_direct_window_bridge_message(Core::State::AppState& state,
-                                             const std::string& message) -> bool {
+auto try_handle_direct_window_bridge_message(core::AppState& state, const std::string& message)
+    -> bool {
   auto bridge_message_result = rfl::json::read<DirectWindowBridgeMessage>(message);
   if (!bridge_message_result) {
     return false;
@@ -97,7 +98,7 @@ auto try_handle_direct_window_bridge_message(Core::State::AppState& state,
     return true;
   }
 
-  if (!PostMessageW(hwnd, Core::WebView::State::kWM_APP_BEGIN_RESIZE, *resize_edge, 0)) {
+  if (!PostMessageW(hwnd, core::webview::kWM_APP_BEGIN_RESIZE, *resize_edge, 0)) {
     Logger().warn("Failed to post deferred resize message for edge: {}", *bridge_message.edge);
     return true;
   }
@@ -106,7 +107,7 @@ auto try_handle_direct_window_bridge_message(Core::State::AppState& state,
   return true;
 }
 
-auto create_composition_host(HWND hwnd, Core::WebView::State::HostRuntime& host_runtime)
+auto create_composition_host(HWND hwnd, core::webview::HostRuntime& host_runtime)
     -> std::expected<void, std::string> {
   clear_host_runtime(host_runtime);
 
@@ -194,7 +195,7 @@ auto resolve_opaque_background_color(std::string_view theme_mode) -> COREWEBVIEW
   return is_system_light_theme() ? light_color : dark_color;
 }
 
-auto read_background_mode(Core::State::AppState& state) -> std::pair<bool, std::string> {
+auto read_background_mode(core::AppState& state) -> std::pair<bool, std::string> {
   bool transparent_enabled = false;
   std::string theme_mode = "system";
   if (state.settings) {
@@ -204,7 +205,7 @@ auto read_background_mode(Core::State::AppState& state) -> std::pair<bool, std::
   return {transparent_enabled, std::move(theme_mode)};
 }
 
-auto use_composition_host_from_settings(Core::State::AppState& state) -> bool {
+auto use_composition_host_from_settings(core::AppState& state) -> bool {
   if (!state.settings) {
     return false;
   }
@@ -259,10 +260,10 @@ class NavigationStartingEventHandler
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
           ICoreWebView2NavigationStartingEventHandler> {
  private:
-  Core::State::AppState* m_state;
+  core::AppState* m_state;
 
  public:
-  explicit NavigationStartingEventHandler(Core::State::AppState* state) : m_state(state) {}
+  explicit NavigationStartingEventHandler(core::AppState* state) : m_state(state) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender,
                                    ICoreWebView2NavigationStartingEventArgs* args) {
@@ -280,10 +281,10 @@ class NavigationCompletedEventHandler
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
           ICoreWebView2NavigationCompletedEventHandler> {
  private:
-  Core::State::AppState* m_state;
+  core::AppState* m_state;
 
  public:
-  explicit NavigationCompletedEventHandler(Core::State::AppState* state) : m_state(state) {}
+  explicit NavigationCompletedEventHandler(core::AppState* state) : m_state(state) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender,
                                    ICoreWebView2NavigationCompletedEventArgs* args) {
@@ -312,8 +313,8 @@ class NavigationCompletedEventHandler
   }
 };
 
-auto setup_navigation_events(Core::State::AppState* state, ICoreWebView2* webview,
-                             Core::WebView::State::CoreResources& resources) -> HRESULT {
+auto setup_navigation_events(core::AppState* state, ICoreWebView2* webview,
+                             core::webview::CoreResources& resources) -> HRESULT {
   if (!state || !webview) return E_FAIL;
 
   auto navigation_starting_handler = Microsoft::WRL::Make<NavigationStartingEventHandler>(state);
@@ -336,8 +337,8 @@ auto setup_navigation_events(Core::State::AppState* state, ICoreWebView2* webvie
   return S_OK;
 }
 
-auto setup_new_window_requested(Core::State::AppState* state, ICoreWebView2* webview,
-                                Core::WebView::State::CoreResources& resources) -> HRESULT {
+auto setup_new_window_requested(core::AppState* state, ICoreWebView2* webview,
+                                core::webview::CoreResources& resources) -> HRESULT {
   if (!state || !webview) return E_FAIL;
   (void)state;
 
@@ -363,21 +364,21 @@ auto setup_new_window_requested(Core::State::AppState* state, ICoreWebView2* web
 
         if (!is_http_or_https_uri(uri_raw.get())) {
           Logger().warn("NewWindowRequested ignored non-http(s) URI: {}",
-                        Utils::String::ToUtf8(uri_raw.get()));
+                        utils::string::ToUtf8(uri_raw.get()));
           args->put_Handled(TRUE);
           return S_OK;
         }
 
-        Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+        SHELLEXECUTEINFOW exec_info{
             .cbSize = sizeof(exec_info),
-            .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+            .fMask = SEE_MASK_NOASYNC,
             .lpVerb = L"open",
             .lpFile = uri_raw.get(),
-            .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+            .nShow = SW_SHOWNORMAL,
         };
-        if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+        if (!ShellExecuteExW(&exec_info)) {
           Logger().warn("ShellExecuteExW failed for NewWindowRequested URI: {}",
-                        Utils::String::ToUtf8(uri_raw.get()));
+                        utils::string::ToUtf8(uri_raw.get()));
         }
         args->put_Handled(TRUE);
         return S_OK;
@@ -394,11 +395,11 @@ auto setup_new_window_requested(Core::State::AppState* state, ICoreWebView2* web
   return S_OK;
 }
 
-auto setup_message_handler(Core::State::AppState* state, ICoreWebView2* webview,
-                           Core::WebView::State::CoreResources& resources) -> HRESULT {
+auto setup_message_handler(core::AppState* state, ICoreWebView2* webview,
+                           core::webview::CoreResources& resources) -> HRESULT {
   if (!state || !webview) return E_FAIL;
 
-  auto message_handler = Core::WebView::RpcBridge::create_message_handler(*state);
+  auto message_handler = core::webview::rpc_bridge::create_message_handler(*state);
 
   auto webview_message_handler =
       Microsoft::WRL::Callback<ICoreWebView2WebMessageReceivedEventHandler>(
@@ -410,8 +411,8 @@ auto setup_message_handler(Core::State::AppState* state, ICoreWebView2* webview,
               HRESULT hr = args->get_WebMessageAsJson(&message_raw);
 
               if (SUCCEEDED(hr) && message_raw) {
-                std::string message = Utils::String::ToUtf8(message_raw);
-                if (!Detail::try_handle_direct_window_bridge_message(*state, message)) {
+                std::string message = utils::string::ToUtf8(message_raw);
+                if (!detail::try_handle_direct_window_bridge_message(*state, message)) {
                   message_handler(message);
                 }
                 CoTaskMemFree(message_raw);
@@ -435,11 +436,11 @@ auto setup_message_handler(Core::State::AppState* state, ICoreWebView2* webview,
   return S_OK;
 }
 
-auto setup_virtual_host_mapping(ICoreWebView2* webview, Core::WebView::State::WebViewConfig& config)
+auto setup_virtual_host_mapping(ICoreWebView2* webview, core::webview::WebViewConfig& config)
     -> HRESULT {
   if (!webview) return E_FAIL;
 
-  auto dist_path_result = Utils::Path::GetEmbeddedWebRootDirectory();
+  auto dist_path_result = utils::path::GetEmbeddedWebRootDirectory();
   if (!dist_path_result) {
     Logger().error("Failed to resolve embedded web root: {}", dist_path_result.error());
     return E_FAIL;
@@ -468,12 +469,12 @@ auto setup_virtual_host_mapping(ICoreWebView2* webview, Core::WebView::State::We
   }
 
   Logger().info("Virtual host mapping established: {} -> {}",
-                Utils::String::ToUtf8(config.virtual_host_name), Utils::String::ToUtf8(dist_path));
+                utils::string::ToUtf8(config.virtual_host_name), utils::string::ToUtf8(dist_path));
   return S_OK;
 }
 
-auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
-                                                   ICoreWebView2* webview) -> HRESULT {
+auto apply_registered_virtual_host_folder_mappings(core::AppState& state, ICoreWebView2* webview)
+    -> HRESULT {
   // 把“WebView 创建前就登记好的 root host 映射”重新应用到真实 WebView 实例上。
   // 这样无论 root watch 先恢复还是 WebView 先创建，最终状态都能收敛一致。
   if (!webview) return E_FAIL;
@@ -489,7 +490,7 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
     return E_NOINTERFACE;
   }
 
-  std::vector<std::pair<std::wstring, Core::WebView::State::VirtualHostFolderMapping>> mappings;
+  std::vector<std::pair<std::wstring, core::webview::VirtualHostFolderMapping>> mappings;
   {
     std::lock_guard<std::mutex> lock(state.webview->resources.virtual_host_folder_mappings_mutex);
     for (const auto& [host_name, mapping] : state.webview->resources.virtual_host_folder_mappings) {
@@ -504,7 +505,7 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
         static_cast<COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND>(mapping.access_kind));
     if (FAILED(hr)) {
       Logger().warn("Failed to restore virtual host mapping {} -> {}: {}",
-                    Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path),
+                    utils::string::ToUtf8(host_name), utils::string::ToUtf8(mapping.folder_path),
                     hr);
       continue;
     }
@@ -514,20 +515,20 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
       state.webview->resources.applied_virtual_host_folder_mappings[host_name] = mapping;
     }
 
-    Logger().info("Restored virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),
-                  Utils::String::ToUtf8(mapping.folder_path));
+    Logger().info("Restored virtual host mapping: {} -> {}", utils::string::ToUtf8(host_name),
+                  utils::string::ToUtf8(mapping.folder_path));
   }
 
   return S_OK;
 }
 
-auto apply_registered_document_created_scripts(Core::State::AppState& state, ICoreWebView2* webview)
+auto apply_registered_document_created_scripts(core::AppState& state, ICoreWebView2* webview)
     -> HRESULT {
   if (!webview || !state.webview) {
     return E_FAIL;
   }
 
-  std::vector<Core::WebView::State::DocumentCreatedScript> scripts;
+  std::vector<core::webview::DocumentCreatedScript> scripts;
   {
     std::lock_guard<std::mutex> lock(state.webview->resources.document_created_scripts_mutex);
     scripts.reserve(state.webview->resources.document_created_scripts.size());
@@ -552,20 +553,20 @@ auto apply_registered_document_created_scripts(Core::State::AppState& state, ICo
   return S_OK;
 }
 
-auto select_initial_url(Core::WebView::State::WebViewState& webview_state) -> void {
+auto select_initial_url(core::webview::WebViewState& webview_state) -> void {
   auto& config = webview_state.config;
   if (!webview_state.pending_initial_url.empty()) {
     config.initial_url = std::move(webview_state.pending_initial_url);
     webview_state.pending_initial_url.clear();
     Logger().info("Using pending WebView initial URL: {}",
-                  Utils::String::ToUtf8(config.initial_url));
+                  utils::string::ToUtf8(config.initial_url));
     return;
   }
 
-  if (Vendor::BuildConfig::is_debug_build()) {
+  if (core::build_config::is_debug_build()) {
     config.initial_url = config.dev_server_url;
     Logger().info("Debug mode: Using Vite dev server at {}",
-                  Utils::String::ToUtf8(config.dev_server_url));
+                  utils::string::ToUtf8(config.dev_server_url));
   } else {
     config.initial_url = L"https://" + config.virtual_host_name + L"/index.html";
     Logger().info("Release mode: Using built frontend from resources/web");
@@ -601,7 +602,7 @@ auto enable_non_client_region_support(ICoreWebView2* webview) -> bool {
 
 auto setup_composition_non_client_support(
     ICoreWebView2CompositionController* composition_controller,
-    Core::WebView::State::CoreResources& resources) -> void {
+    core::webview::CoreResources& resources) -> void {
   if (!composition_controller) {
     resources.composition_controller4.reset();
     return;
@@ -625,11 +626,11 @@ auto initialize_navigation(ICoreWebView2* webview, const std::wstring& initial_u
     return hr;
   }
 
-  Logger().info("WebView2 ready, navigating to: {}", Utils::String::ToUtf8(initial_url));
+  Logger().info("WebView2 ready, navigating to: {}", utils::string::ToUtf8(initial_url));
   return S_OK;
 }
 
-auto consume_initial_navigation_reveal(Core::WebView::State::WebViewState& webview_state) -> void {
+auto consume_initial_navigation_reveal(core::webview::WebViewState& webview_state) -> void {
   auto reveal = std::exchange(webview_state.reveal_after_initial_navigation, {});
   if (!reveal) {
     return;
@@ -642,8 +643,7 @@ auto consume_initial_navigation_reveal(Core::WebView::State::WebViewState& webvi
   }
 }
 
-auto finalize_controller_initialization(Core::State::AppState* state,
-                                        ICoreWebView2Controller* controller,
+auto finalize_controller_initialization(core::AppState* state, ICoreWebView2Controller* controller,
                                         ICoreWebView2CompositionController* composition_controller)
     -> HRESULT {
   if (!state || !controller) return E_FAIL;
@@ -711,7 +711,7 @@ auto finalize_controller_initialization(Core::State::AppState* state,
 
   hr = setup_virtual_host_mapping(webview, webview_state.config);
   if (FAILED(hr)) {
-    if (Vendor::BuildConfig::is_debug_build()) {
+    if (core::build_config::is_debug_build()) {
       Logger().warn("Virtual host mapping failed in debug mode, continuing with dev server");
     } else {
       return hr;
@@ -719,12 +719,12 @@ auto finalize_controller_initialization(Core::State::AppState* state,
   }
 
   hr = apply_registered_virtual_host_folder_mappings(*state, webview);
-  if (FAILED(hr) && !Vendor::BuildConfig::is_debug_build()) {
+  if (FAILED(hr) && !core::build_config::is_debug_build()) {
     Logger().warn("Registered virtual host mapping restore failed: {}", hr);
   }
 
-  hr = Core::WebView::Static::setup_resource_interception(*state, webview, environment, resources,
-                                                          webview_state.config);
+  hr = core::webview::static_content::setup_resource_interception(*state, webview, environment,
+                                                                  resources, webview_state.config);
   if (FAILED(hr)) {
     Logger().warn("Resource interception setup failed, continuing without thumbnail support");
   }
@@ -747,7 +747,7 @@ auto finalize_controller_initialization(Core::State::AppState* state,
   if (FAILED(hr)) return hr;
 
   webview_state.is_ready = true;
-  Core::WebView::RpcBridge::initialize_rpc_bridge(*state);
+  core::webview::rpc_bridge::initialize_rpc_bridge(*state);
   consume_initial_navigation_reveal(webview_state);
 
   return S_OK;
@@ -758,10 +758,10 @@ class CompositionControllerCompletedHandler
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
           ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler> {
  private:
-  Core::State::AppState* m_state;
+  core::AppState* m_state;
 
  public:
-  explicit CompositionControllerCompletedHandler(Core::State::AppState* state) : m_state(state) {}
+  explicit CompositionControllerCompletedHandler(core::AppState* state) : m_state(state) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result,
                                    ICoreWebView2CompositionController* composition_controller) {
@@ -790,10 +790,10 @@ class HwndControllerCompletedHandler
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
           ICoreWebView2CreateCoreWebView2ControllerCompletedHandler> {
  private:
-  Core::State::AppState* m_state;
+  core::AppState* m_state;
 
  public:
-  explicit HwndControllerCompletedHandler(Core::State::AppState* state) : m_state(state) {}
+  explicit HwndControllerCompletedHandler(core::AppState* state) : m_state(state) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Controller* controller) {
     if (!m_state) return E_FAIL;
@@ -811,11 +811,11 @@ class EnvironmentCompletedHandler
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
           ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler> {
  private:
-  Core::State::AppState* m_state;
+  core::AppState* m_state;
   HWND m_webview_hwnd;
 
  public:
-  EnvironmentCompletedHandler(Core::State::AppState* state, HWND webview_hwnd)
+  EnvironmentCompletedHandler(core::AppState* state, HWND webview_hwnd)
       : m_state(state), m_webview_hwnd(webview_hwnd) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Environment* env) {
@@ -872,14 +872,14 @@ class EnvironmentCompletedHandler
   }
 };
 
-}  // namespace Core::WebView::Host::Detail
+}  // namespace core::webview::host::detail
 
-namespace Core::WebView::Host {
+namespace core::webview::host {
 
-auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
+auto start_environment_creation(core::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string> {
   try {
-    auto app_data_dir_result = Utils::Path::GetAppDataDirectory();
+    auto app_data_dir_result = utils::path::GetAppDataDirectory();
     if (!app_data_dir_result) {
       return std::unexpected("Failed to get app data directory: " + app_data_dir_result.error());
     }
@@ -891,7 +891,7 @@ auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
                                 ? configured_user_data_folder
                                 : app_data_dir_result.value() / configured_user_data_folder;
 
-    auto ensure_result = Utils::Path::EnsureDirectoryExists(user_data_folder);
+    auto ensure_result = utils::path::EnsureDirectoryExists(user_data_folder);
     if (!ensure_result) {
       return std::unexpected("Failed to create WebView2 user data directory: " +
                              ensure_result.error());
@@ -900,7 +900,7 @@ auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
     state.webview->resources.user_data_folder = user_data_folder.wstring();
 
     auto environment_handler =
-        Microsoft::WRL::Make<Detail::EnvironmentCompletedHandler>(&state, webview_hwnd);
+        Microsoft::WRL::Make<detail::EnvironmentCompletedHandler>(&state, webview_hwnd);
 
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr, state.webview->resources.user_data_folder.c_str(), nullptr,
@@ -922,28 +922,28 @@ auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
   }
 }
 
-auto reset_host_runtime(Core::State::AppState& state) -> void {
+auto reset_host_runtime(core::AppState& state) -> void {
   if (!state.webview) return;
-  Detail::clear_host_runtime(state.webview->resources.host_runtime);
+  detail::clear_host_runtime(state.webview->resources.host_runtime);
 }
 
-auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
+auto apply_background_mode_from_settings(core::AppState& state) -> void {
   auto* controller = state.webview->resources.controller.get();
   if (!controller) {
     Logger().debug("Skip applying WebView background mode: controller is not ready");
     return;
   }
 
-  auto [transparent_enabled, theme_mode] = Detail::read_background_mode(state);
-  Detail::apply_default_background(controller, transparent_enabled, theme_mode);
+  auto [transparent_enabled, theme_mode] = detail::read_background_mode(state);
+  detail::apply_default_background(controller, transparent_enabled, theme_mode);
 }
 
-auto get_loading_background_color(Core::State::AppState& state) -> COLORREF {
-  auto [transparent_enabled, theme_mode] = Detail::read_background_mode(state);
+auto get_loading_background_color(core::AppState& state) -> COLORREF {
+  auto [transparent_enabled, theme_mode] = detail::read_background_mode(state);
   (void)transparent_enabled;
 
-  auto color = Detail::resolve_opaque_background_color(theme_mode);
+  auto color = detail::resolve_opaque_background_color(theme_mode);
   return RGB(color.R, color.G, color.B);
 }
 
-}  // namespace Core::WebView::Host
+}  // namespace core::webview::host

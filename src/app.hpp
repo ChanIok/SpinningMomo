@@ -1,8 +1,11 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+
 #include "core/events/events.hpp"
 #include "core/state/app_state.hpp"
-#include "vendor/windows.hpp"
 
 // 主应用程序类
 class Application {
@@ -17,12 +20,12 @@ class Application {
   auto operator=(Application&&) -> Application& = delete;
 
   // 初始化
-  [[nodiscard]] auto Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool;
+  [[nodiscard]] auto Initialize(HINSTANCE hInstance) -> bool;
 
   // 运行应用程序
   [[nodiscard]] auto Run() -> int;
 
  private:
   // 应用状态
-  Core::State::AppState m_app_state{};
+  core::AppState m_app_state{};
 };

@@ -1,13 +1,15 @@
 #pragma once
 
-#include <d2d1.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1.hpp"
 
 #include "features/settings/menu.hpp"
 #include "features/settings/menu_types.hpp"
 #include "features/window_control/types.hpp"
 
-namespace UI::ContextMenu::Types {
+namespace ui::context_menu {
 
 enum class CursorZone { MainMenu, Submenu, Outside };
 
@@ -56,7 +58,7 @@ struct MenuAction {
   std::any data;  // 存储具体的业务对象
 
   // 便捷构造函数
-  static auto window_selection(const Features::WindowControl::WindowInfo& window) -> MenuAction {
+  static auto window_selection(const features::window_control::WindowInfo& window) -> MenuAction {
     return MenuAction{Type::WindowSelection, window};
   }
 
@@ -111,17 +113,17 @@ struct MenuItem {
   }
 
   // 便捷工厂方法
-  static auto window_item(const Features::WindowControl::WindowInfo& window) -> MenuItem {
+  static auto window_item(const features::window_control::WindowInfo& window) -> MenuItem {
     return MenuItem(window.title, MenuAction::window_selection(window));
   }
 
-  static auto ratio_item(const Features::Settings::Menu::RatioPreset& ratio, size_t index,
+  static auto ratio_item(const features::settings::menu::RatioPreset& ratio, size_t index,
                          bool selected = false) -> MenuItem {
     return MenuItem(ratio.name, MenuAction::ratio_selection(index, ratio.name, ratio.ratio),
                     selected);
   }
 
-  static auto resolution_item(const Features::Settings::Menu::ResolutionPreset& resolution,
+  static auto resolution_item(const features::settings::menu::ResolutionPreset& resolution,
                               size_t index, bool selected = false) -> MenuItem {
     std::wstring display_text;
     if (resolution.base_width == 0 && resolution.base_height == 0) {
@@ -199,4 +201,4 @@ struct InteractionState {
   static constexpr UINT HIDE_SUBMENU_DELAY = 200;
 };
 
-}  // namespace UI::ContextMenu::Types
+}  // namespace ui::context_menu

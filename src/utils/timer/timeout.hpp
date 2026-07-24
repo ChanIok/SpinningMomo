@@ -1,8 +1,10 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Timeout {
+#include "vendor/windows.hpp"
+
+namespace utils::timeout {
 
 // 超时错误类型：只保留当前可明确上报的错误。
 enum class timeout_error { invalid_callback, create_timer_failed };
@@ -37,4 +39,4 @@ class Timeout {
   auto create_timer_object() -> std::expected<void, timeout_error>;
 };
 
-}  // namespace Utils::Timeout
+}  // namespace utils::timeout

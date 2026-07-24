@@ -1,11 +1,44 @@
 #pragma once
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/windows/winhttp.hpp"
 
 #include "core/http_client/types.hpp"
-#include "vendor/winhttp.hpp"
 
-namespace Core::HttpClient::State {
+namespace core::http_client {
+
+struct UniqueHInternet {
+  HINTERNET handle = nullptr;
+
+  UniqueHInternet() = default;
+  explicit UniqueHInternet(HINTERNET value) : handle(value) {}
+  ~UniqueHInternet() {
+    if (handle) {
+      ::WinHttpCloseHandle(handle);
+    }
+  }
+
+  UniqueHInternet(const UniqueHInternet&) = delete;
+  auto operator=(const UniqueHInternet&) -> UniqueHInternet& = delete;
+
+  UniqueHInternet(UniqueHInternet&& other) noexcept
+      : handle(std::exchange(other.handle, nullptr)) {}
+
+  auto operator=(UniqueHInternet&& other) noexcept -> UniqueHInternet& {
+    if (this != &other) {
+      if (handle) {
+        ::WinHttpCloseHandle(handle);
+      }
+      handle = std::exchange(other.handle, nullptr);
+    }
+    return *this;
+  }
+
+  explicit operator bool() const { return handle != nullptr; }
+  [[nodiscard]] auto get() const -> HINTERNET { return handle; }
+};
 
 // 单次异步 HTTP 请求的完整运行时上下文。对象由协程侧创建，通过 keepalive 自引用延长生命周期，
 // 确保在 WinHTTP 后台回调结束前不被析构。
@@ -14,10 +47,10 @@ struct RequestOperation {
   std::shared_ptr<RequestOperation> keepalive;
   std::mutex keepalive_mutex;
 
-  Core::HttpClient::Types::Request request;
-  Core::HttpClient::Types::Response response;
+  core::http_client::Request request;
+  core::http_client::Response response;
   // 最终结果：初始为"未完成"错误态，由 complete_operation / complete_with_error 写入。
-  std::expected<Core::HttpClient::Types::Response, std::string> result =
+  std::expected<core::http_client::Response, std::string> result =
       std::unexpected("Request is not completed");
 
   // 协程执行器与完成通知定时器：timer 到期即唤醒挂起的协程。
@@ -41,14 +74,14 @@ struct RequestOperation {
     std::optional<std::ofstream> output_file;
     std::uint64_t downloaded_bytes = 0;
     std::optional<std::uint64_t> total_bytes;  // 来自 Content-Length，服务器不保证提供
-    Core::HttpClient::Types::DownloadProgressCallback progress_callback;
+    core::http_client::DownloadProgressCallback progress_callback;
   };
   std::optional<DownloadOptions> download;
 
-  Vendor::WinHttp::HINTERNET connect_handle = nullptr;
-  Vendor::WinHttp::HINTERNET request_handle = nullptr;
+  HINTERNET connect_handle = nullptr;
+  HINTERNET request_handle = nullptr;
 
-  Vendor::WinHttp::INTERNET_PORT port = 0;
+  INTERNET_PORT port = 0;
   bool secure = false;
   bool callback_registered = false;  // 已向 request_handle 注册状态回调
   bool receive_started = false;
@@ -59,7 +92,7 @@ struct RequestOperation {
 };
 
 struct HttpClientState {
-  Vendor::WinHttp::UniqueHInternet session;
+  core::http_client::UniqueHInternet session;
   std::wstring user_agent = L"SpinningMomo/1.0";
 
   int resolve_timeout_ms = 0;
@@ -70,4 +103,4 @@ struct HttpClientState {
   std::atomic<bool> is_initialized{false};
 };
 
-}  // namespace Core::HttpClient::State
+}  // namespace core::http_client

@@ -1,6 +1,8 @@
 #include "features/photography/long_exposure.hpp"
 
-namespace Features::Photography::LongExposure {
+#include "vendor/std.hpp"
+
+namespace features::photography::long_exposure {
 
 // 滑块档位：0=关闭，30/60/120/300/1000 帧
 constexpr std::array<int, 6> kLongExposureFrameStops = {0, 30, 60, 120, 300, 1000};
@@ -21,4 +23,4 @@ auto nearest_frame_stop(int frames) -> int {
   return nearest;
 }
 
-}  // namespace Features::Photography::LongExposure
+}  // namespace features::photography::long_exposure

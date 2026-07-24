@@ -1,8 +1,10 @@
-#include <doctest/doctest.h>
+#include "vendor/std.hpp"
+
+#include "vendor/doctest.hpp"
 
 #include "features/recording/time.hpp"
 
-using Features::Recording::Time::relative_timestamp_100ns;
+using features::recording::time::relative_timestamp_100ns;
 
 // 无效录制起点不能生成可供编码器使用的时间线
 TEST_CASE("relative timestamp returns zero for an invalid recording start") {

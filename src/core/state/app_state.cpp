@@ -1,5 +1,7 @@
 #include "core/state/app_state.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/async/state.hpp"
 #include "core/commands/state.hpp"
 #include "core/database/state.hpp"
@@ -30,41 +32,40 @@
 #include "ui/shared_render_resources/state.hpp"
 #include "ui/tray_icon/state.hpp"
 
-namespace Core::State {
+namespace core {
 
 AppState::AppState()
-    : rpc(std::make_unique<Core::RPC::State::RpcState>()),
-      async(std::make_unique<Core::Async::State::AsyncState>()),
-      dialog_service(std::make_unique<Core::DialogService::State::DialogServiceState>()),
-      events(std::make_unique<Core::Events::State::EventsState>()),
-      i18n(std::make_unique<Core::I18n::State::I18nState>()),
-      webview(std::make_unique<Core::WebView::State::WebViewState>()),
-      runtime_info(std::make_unique<Core::State::RuntimeInfo::RuntimeInfoState>()),
-      database(std::make_unique<Core::Database::State::DatabaseState>()),
-      http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
-      http_client(std::make_unique<Core::HttpClient::State::HttpClientState>()),
-      worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
-      commands(std::make_unique<Core::Commands::State::CommandState>()),
-      tasks(std::make_unique<Core::Tasks::State::TaskState>()),
-      settings(std::make_unique<Features::Settings::State::SettingsState>()),
-      update(std::make_unique<Features::Update::State::UpdateState>()),
+    : rpc(std::make_unique<core::rpc::RpcState>()),
+      async(std::make_unique<core::async::AsyncState>()),
+      dialog_service(std::make_unique<core::dialog_service::DialogServiceState>()),
+      events(std::make_unique<core::events::EventsState>()),
+      i18n(std::make_unique<core::i18n::I18nState>()),
+      webview(std::make_unique<core::webview::WebViewState>()),
+      runtime_info(std::make_unique<core::runtime_info::RuntimeInfoState>()),
+      database(std::make_unique<core::database::DatabaseState>()),
+      http_server(std::make_unique<core::http_server::HttpServerState>()),
+      http_client(std::make_unique<core::http_client::HttpClientState>()),
+      worker_pool(std::make_unique<core::worker_pool::WorkerPoolState>()),
+      commands(std::make_unique<core::commands::CommandState>()),
+      tasks(std::make_unique<core::tasks::TaskState>()),
+      settings(std::make_unique<features::settings::SettingsState>()),
+      update(std::make_unique<features::update::UpdateState>()),
       shared_render_resources(
-          std::make_unique<UI::SharedRenderResources::State::SharedRenderResourcesState>()),
-      floating_window(std::make_unique<UI::FloatingWindow::State::FloatingWindowState>()),
-      tray_icon(std::make_unique<UI::TrayIcon::State::TrayIconState>()),
-      context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
-      notification_window(
-          std::make_unique<UI::NotificationWindow::State::NotificationWindowState>()),
-      photography_panel(std::make_unique<UI::PhotographyPanel::State::PhotographyPanelState>()),
-      letterbox(std::make_unique<Features::Letterbox::State::LetterboxState>()),
-      gallery(std::make_unique<Features::Gallery::State::GalleryState>()),
-      overlay(std::make_unique<Features::Overlay::State::OverlayState>()),
-      preview(std::make_unique<Features::Preview::State::PreviewState>()),
-      window_control(std::make_unique<Features::WindowControl::State::WindowControlState>()),
-      screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
-      recording(std::make_unique<Features::Recording::State::RecordingState>()),
-      photography(std::make_unique<Features::Photography::State::PhotographyState>()) {}
+          std::make_unique<ui::shared_render_resources::SharedRenderResourcesState>()),
+      floating_window(std::make_unique<ui::floating_window::FloatingWindowState>()),
+      tray_icon(std::make_unique<ui::tray_icon::TrayIconState>()),
+      context_menu(std::make_unique<ui::context_menu::ContextMenuState>()),
+      notification_window(std::make_unique<ui::notification_window::NotificationWindowState>()),
+      photography_panel(std::make_unique<ui::photography_panel::PhotographyPanelState>()),
+      letterbox(std::make_unique<features::letterbox::LetterboxState>()),
+      gallery(std::make_unique<features::gallery::GalleryState>()),
+      overlay(std::make_unique<features::overlay::OverlayState>()),
+      preview(std::make_unique<features::preview::PreviewState>()),
+      window_control(std::make_unique<features::window_control::WindowControlState>()),
+      screenshot(std::make_unique<features::screenshot::ScreenshotState>()),
+      recording(std::make_unique<features::recording::RecordingState>()),
+      photography(std::make_unique<features::photography::PhotographyState>()) {}
 
 AppState::~AppState() = default;
 
-}  // namespace Core::State
+}  // namespace core

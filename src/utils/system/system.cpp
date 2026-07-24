@@ -1,12 +1,14 @@
 #include "utils/system/system.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/shellapi.hpp"
+#include "vendor/windows/shlobj_core.hpp"
 
 #include "utils/string/string.hpp"
-#include "vendor/shellapi.hpp"
-#include "vendor/windows.hpp"
 
-namespace Utils::System {
+namespace utils::system {
 
 // Windows 约定：Preferred DropEffect = 1 表示“复制”，
 // 这样其他程序在粘贴这些文件时会按“复制文件”来理解，而不是“移动文件”。
@@ -33,24 +35,23 @@ auto normalize_clipboard_alpha(ClipboardBitmap& bitmap) -> void {
 
 // 从 CF_HDROP 中复制全部路径，关闭剪贴板后不再依赖 Shell 持有的句柄。
 auto read_clipboard_file_paths() -> std::expected<std::vector<std::filesystem::path>, std::string> {
-  auto drop = static_cast<Vendor::ShellApi::HDROP>(GetClipboardData(Vendor::ShellApi::kCF_HDROP));
+  auto drop = static_cast<HDROP>(GetClipboardData(CF_HDROP));
   if (drop == nullptr) {
     return std::unexpected("Failed to get clipboard file list, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
-  const auto file_count = Vendor::ShellApi::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+  const auto file_count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
   std::vector<std::filesystem::path> paths;
   paths.reserve(file_count);
   for (UINT index = 0; index < file_count; ++index) {
-    const auto path_length = Vendor::ShellApi::DragQueryFileW(drop, index, nullptr, 0);
+    const auto path_length = DragQueryFileW(drop, index, nullptr, 0);
     if (path_length == 0) {
       continue;
     }
 
     std::wstring path(path_length + 1, L'\0');
-    const auto copied_length =
-        Vendor::ShellApi::DragQueryFileW(drop, index, path.data(), path_length + 1);
+    const auto copied_length = DragQueryFileW(drop, index, path.data(), path_length + 1);
     if (copied_length == 0) {
       continue;
     }
@@ -66,7 +67,7 @@ auto read_clipboard_encoded_png(UINT png_format)
   auto handle = GetClipboardData(png_format);
   if (handle == nullptr) {
     return std::unexpected("Failed to get clipboard PNG handle, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   const auto byte_count = GlobalSize(handle);
@@ -77,7 +78,7 @@ auto read_clipboard_encoded_png(UINT png_format)
   auto* bytes = static_cast<const std::uint8_t*>(GlobalLock(handle));
   if (bytes == nullptr) {
     return std::unexpected("Failed to lock clipboard PNG, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
   struct GlobalUnlockGuard {
     HGLOBAL handle;
@@ -97,7 +98,7 @@ auto read_clipboard_dib(UINT clipboard_format) -> std::expected<ClipboardBitmap,
   auto handle = GetClipboardData(clipboard_format);
   if (handle == nullptr) {
     return std::unexpected("Failed to get clipboard DIB handle, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   const auto total_bytes = GlobalSize(handle);
@@ -108,7 +109,7 @@ auto read_clipboard_dib(UINT clipboard_format) -> std::expected<ClipboardBitmap,
   auto* data = static_cast<const std::uint8_t*>(GlobalLock(handle));
   if (data == nullptr) {
     return std::unexpected("Failed to lock clipboard DIB, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
   struct GlobalUnlockGuard {
     HGLOBAL handle;
@@ -270,16 +271,16 @@ auto read_clipboard_dib(UINT clipboard_format) -> std::expected<ClipboardBitmap,
   }
 
   // 使用 ShellExecuteEx 请求提升权限
-  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+  SHELLEXECUTEINFOW exec_info{
       .cbSize = sizeof(exec_info),
-      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,  // 同步执行
-      .lpVerb = L"runas",                            // 请求提升权限
-      .lpFile = exe_path,                            // 要执行的文件
-      .lpParameters = arguments,                     // 命令行参数
-      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL      // 显示窗口
+      .fMask = SEE_MASK_NOASYNC,  // 同步执行
+      .lpVerb = L"runas",         // 请求提升权限
+      .lpFile = exe_path,         // 要执行的文件
+      .lpParameters = arguments,  // 命令行参数
+      .nShow = SW_SHOWNORMAL      // 显示窗口
   };
 
-  return Vendor::ShellApi::ShellExecuteExW(&exec_info) != FALSE;
+  return ShellExecuteExW(&exec_info) != FALSE;
 }
 
 auto open_directory(const std::filesystem::path& path) -> std::expected<void, std::string> {
@@ -300,17 +301,17 @@ auto open_directory(const std::filesystem::path& path) -> std::expected<void, st
   }
 
   std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
-  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+  SHELLEXECUTEINFOW exec_info{
       .cbSize = sizeof(exec_info),
-      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .fMask = SEE_MASK_NOASYNC,
       .lpVerb = L"open",
       .lpFile = wpath.c_str(),
-      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+      .nShow = SW_SHOWNORMAL,
   };
 
-  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+  if (!ShellExecuteExW(&exec_info)) {
     return std::unexpected("Failed to open directory, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   return {};
@@ -335,17 +336,17 @@ auto open_file_with_default_app(const std::filesystem::path& path)
   }
 
   std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
-  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+  SHELLEXECUTEINFOW exec_info{
       .cbSize = sizeof(exec_info),
-      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .fMask = SEE_MASK_NOASYNC,
       .lpVerb = L"open",
       .lpFile = wpath.c_str(),
-      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+      .nShow = SW_SHOWNORMAL,
   };
 
-  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+  if (!ShellExecuteExW(&exec_info)) {
     return std::unexpected("Failed to open file with default app, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   return {};
@@ -367,18 +368,18 @@ auto reveal_file_in_explorer(const std::filesystem::path& path)
 
   std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
   std::wstring params = std::format(LR"(/select,"{}")", wpath);
-  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+  SHELLEXECUTEINFOW exec_info{
       .cbSize = sizeof(exec_info),
-      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .fMask = SEE_MASK_NOASYNC,
       .lpVerb = L"open",
       .lpFile = L"explorer.exe",
       .lpParameters = params.c_str(),
-      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+      .nShow = SW_SHOWNORMAL,
   };
 
-  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+  if (!ShellExecuteExW(&exec_info)) {
     return std::unexpected("Failed to reveal file in explorer, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   return {};
@@ -421,27 +422,26 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
   };
 
   // CF_HDROP 需要一块连续内存：前面是 DROPFILES 头，后面是以 \0 分隔、\0\0 结尾的宽字符串路径列表。
-  const auto dropfiles_size =
-      sizeof(Vendor::ShellApi::DROPFILES) + ((total_chars + 1) * sizeof(wchar_t));
+  const auto dropfiles_size = sizeof(DROPFILES) + ((total_chars + 1) * sizeof(wchar_t));
   HGLOBAL dropfiles_handle = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dropfiles_size);
   if (dropfiles_handle == nullptr) {
     return std::unexpected("Failed to allocate clipboard file list, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
-  auto* dropfiles = static_cast<Vendor::ShellApi::DROPFILES*>(GlobalLock(dropfiles_handle));
+  auto* dropfiles = static_cast<DROPFILES*>(GlobalLock(dropfiles_handle));
   if (dropfiles == nullptr) {
     free_global(dropfiles_handle);
     return std::unexpected("Failed to lock clipboard file list, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
-  dropfiles->pFiles = sizeof(Vendor::ShellApi::DROPFILES);
+  dropfiles->pFiles = sizeof(DROPFILES);
   dropfiles->fWide = TRUE;
 
   // 把所有文件路径顺序写进 DROPFILES 后面的缓冲区。
-  auto* cursor = reinterpret_cast<wchar_t*>(reinterpret_cast<std::byte*>(dropfiles) +
-                                            sizeof(Vendor::ShellApi::DROPFILES));
+  auto* cursor =
+      reinterpret_cast<wchar_t*>(reinterpret_cast<std::byte*>(dropfiles) + sizeof(DROPFILES));
   for (const auto& normalized_path : normalized_paths) {
     const auto byte_count = (normalized_path.size() + 1) * sizeof(wchar_t);
     std::memcpy(cursor, normalized_path.c_str(), byte_count);
@@ -452,10 +452,10 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
   // GlobalUnlock 返回 0 不一定代表失败。
   // 所以先清空 last error，再根据是否仍然为 NO_ERROR 来判断。
   SetLastError(NO_ERROR);
-  if (!GlobalUnlock(dropfiles_handle) && Vendor::Windows::GetLastError() != NO_ERROR) {
+  if (!GlobalUnlock(dropfiles_handle) && GetLastError() != NO_ERROR) {
     free_global(dropfiles_handle);
     return std::unexpected("Failed to unlock clipboard file list, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   // Preferred DropEffect 是 Windows Shell 常用的附加格式，
@@ -464,14 +464,14 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
   if (preferred_drop_effect_format == 0) {
     free_global(dropfiles_handle);
     return std::unexpected("Failed to register clipboard drop effect format, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   HGLOBAL drop_effect_handle = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DWORD));
   if (drop_effect_handle == nullptr) {
     free_global(dropfiles_handle);
     return std::unexpected("Failed to allocate clipboard drop effect, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   auto* drop_effect = static_cast<DWORD*>(GlobalLock(drop_effect_handle));
@@ -479,25 +479,25 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
     free_global(dropfiles_handle);
     free_global(drop_effect_handle);
     return std::unexpected("Failed to lock clipboard drop effect, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   *drop_effect = kClipboardDropEffectCopy;
 
   // 同上：GlobalUnlock 返回 0 时，需要结合 last error 判断是否真失败。
   SetLastError(NO_ERROR);
-  if (!GlobalUnlock(drop_effect_handle) && Vendor::Windows::GetLastError() != NO_ERROR) {
+  if (!GlobalUnlock(drop_effect_handle) && GetLastError() != NO_ERROR) {
     free_global(dropfiles_handle);
     free_global(drop_effect_handle);
     return std::unexpected("Failed to unlock clipboard drop effect, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   if (!OpenClipboard(nullptr)) {
     free_global(dropfiles_handle);
     free_global(drop_effect_handle);
     return std::unexpected("Failed to open clipboard, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   struct ClipboardCloser {
@@ -510,14 +510,14 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
     free_global(dropfiles_handle);
     free_global(drop_effect_handle);
     return std::unexpected("Failed to empty clipboard, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
-  if (SetClipboardData(Vendor::ShellApi::kCF_HDROP, dropfiles_handle) == nullptr) {
+  if (SetClipboardData(CF_HDROP, dropfiles_handle) == nullptr) {
     free_global(dropfiles_handle);
     free_global(drop_effect_handle);
     return std::unexpected("Failed to set clipboard file list, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
   dropfiles_handle = nullptr;
 
@@ -525,7 +525,7 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
   if (SetClipboardData(preferred_drop_effect_format, drop_effect_handle) == nullptr) {
     free_global(drop_effect_handle);
     return std::unexpected("Failed to set clipboard drop effect, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
   drop_effect_handle = nullptr;
 
@@ -536,14 +536,14 @@ auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
 auto read_clipboard_media() -> std::expected<ClipboardMedia, std::string> {
   if (!OpenClipboard(nullptr)) {
     return std::unexpected("Failed to open clipboard, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
   struct ClipboardCloser {
     ~ClipboardCloser() { CloseClipboard(); }
   } clipboard_closer;
 
   // 文件列表保留原文件语义，优先于同一剪贴板对象附带的预览位图。
-  if (IsClipboardFormatAvailable(Vendor::ShellApi::kCF_HDROP)) {
+  if (IsClipboardFormatAvailable(CF_HDROP)) {
     auto paths_result = read_clipboard_file_paths();
     if (!paths_result) {
       return std::unexpected(paths_result.error());
@@ -594,7 +594,7 @@ auto read_clipboard_media() -> std::expected<ClipboardMedia, std::string> {
 auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string> {
   if (!OpenClipboard(nullptr)) {
     return std::unexpected("Failed to open clipboard, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   struct ClipboardCloser {
@@ -608,13 +608,13 @@ auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::str
   auto handle = GetClipboardData(CF_UNICODETEXT);
   if (!handle) {
     return std::unexpected("Failed to get clipboard text handle, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   auto* text_ptr = static_cast<const wchar_t*>(GlobalLock(handle));
   if (!text_ptr) {
     return std::unexpected("Failed to lock clipboard text, Win32 error: " +
-                           std::to_string(Vendor::Windows::GetLastError()));
+                           std::to_string(GetLastError()));
   }
 
   struct GlobalUnlockGuard {
@@ -627,7 +627,7 @@ auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::str
   } unlock_guard{handle};
 
   std::wstring wide_text(text_ptr);
-  return std::optional<std::string>{Utils::String::ToUtf8(wide_text)};
+  return std::optional<std::string>{utils::string::ToUtf8(wide_text)};
 }
 
 auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
@@ -653,13 +653,12 @@ auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
   // SHFileOperation 要求双 \0 结尾的路径列表
   from_buffer.push_back(L'\0');
 
-  Vendor::ShellApi::SHFILEOPSTRUCTW file_op{};
-  file_op.wFunc = Vendor::ShellApi::kFO_DELETE;
+  SHFILEOPSTRUCTW file_op{};
+  file_op.wFunc = FO_DELETE;
   file_op.pFrom = from_buffer.c_str();
-  file_op.fFlags = Vendor::ShellApi::kFOF_ALLOWUNDO | Vendor::ShellApi::kFOF_NOCONFIRMATION |
-                   Vendor::ShellApi::kFOF_NOERRORUI | Vendor::ShellApi::kFOF_SILENT;
+  file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
 
-  auto result = Vendor::ShellApi::SHFileOperationW(&file_op);
+  auto result = SHFileOperationW(&file_op);
   if (result != 0) {
     return std::unexpected("Failed to move files to recycle bin, shell error: " +
                            std::to_string(result));
@@ -730,4 +729,4 @@ auto activate_existing_instance() noexcept -> void {
   }
 }
 
-}  // namespace Utils::System
+}  // namespace utils::system

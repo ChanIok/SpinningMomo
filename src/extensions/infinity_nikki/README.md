@@ -1,8 +1,8 @@
-# Infinity Nikki 模块说明（AI 速读）
+# Infinity Nikki 扩展说明（AI 速读）
 
-本文件只补充 `AGENTS.md` 之外的 `infinity_nikki` 模块增量信息，重点是核心链路与改动注意点。
+本文件只补充 `AGENTS.md` 之外的 `infinity_nikki` 扩展信息，重点是核心链路与改动注意点。
 
-## 模块定位
+## 扩展定位
 
 - 提供《无限暖暖》领域能力：照片目录接入、硬链接同步、参数提取、地图扩展。
 - 通过通用 `gallery` 变化语义接收文件变化，不要求基础模块理解游戏规则。
@@ -12,15 +12,15 @@
 - `src/extensions/infinity_nikki/photo_service.cpp`：监听注册与扫描后回调接线入口。
 - `src/extensions/infinity_nikki/media_hardlinks.cpp`：Infinity Nikki 照片/录像受管硬链接同步核心。
 - `src/extensions/infinity_nikki/task_service.cpp`：扩展任务编排与进度上报。
-- `src/extensions/infinity_nikki/types.ixx`：扩展请求/结果结构。
+- `src/extensions/infinity_nikki/types.hpp`：扩展请求/结果结构。
 - `src/core/initializer/initializer.cpp`：扩展在启动流程中的接入时机。
 
 ## 核心链路
 
 - 设置驱动注册 watcher -> `PhotoService` 绑定 `post_scan_callback`。
-- callback 收到 `ScanResult.changes` -> `MediaHardlinks::apply_runtime_changes`（增量）。
-- 变更集不可用或初始化场景 -> `MediaHardlinks::sync/initialize`（全量）。
-- 重操作统一通过 `TaskService` 进入任务系统，便于前端观测进度。
+- callback 收到 `ScanResult.changes` -> `media_hardlinks::apply_runtime_changes`（增量）。
+- 变更集不可用或初始化场景 -> `media_hardlinks::sync/initialize`（全量）。
+- 重操作统一通过 `task_service` 进入任务系统，便于前端观测进度。
 
 ## 关键不变量
 

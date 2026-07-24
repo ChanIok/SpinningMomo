@@ -1,8 +1,10 @@
 #include "features/gallery/ignore/matcher.hpp"
 
+#include "vendor/std.hpp"
+
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Ignore::Matcher {
+namespace features::gallery::ignore::matcher {
 
 // ============= 路径处理辅助函数 =============
 
@@ -121,4 +123,4 @@ auto match_regex_pattern(const std::string& pattern, const std::string& path) ->
   }
 }
 
-}  // namespace Features::Gallery::Ignore::Matcher
+}  // namespace features::gallery::ignore::matcher

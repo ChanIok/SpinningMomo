@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Utils::Throttle {
+#include "vendor/std.hpp"
+
+namespace utils::throttle {
 
 // 节流状态（带参数版本）
 template <typename... Args>
@@ -134,4 +136,4 @@ inline auto flush(ThrottleState<void>& state, Func&& func) -> bool {
   return true;
 }
 
-}  // namespace Utils::Throttle
+}  // namespace utils::throttle

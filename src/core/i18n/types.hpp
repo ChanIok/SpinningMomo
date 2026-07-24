@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::I18n::Types {
+#include "vendor/std.hpp"
+
+namespace core::i18n {
 
 enum class Language { ZhCN, EnUS };
 
@@ -17,4 +19,4 @@ inline auto get_text(const TextData& texts, const std::string& key) -> std::stri
 // 辅助函数：创建默认文本数据（空map）
 inline auto create_default_text_data() -> TextData { return TextData{}; }
 
-}  // namespace Core::I18n::Types
+}  // namespace core::i18n

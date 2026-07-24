@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace UI::FloatingWindow::Events {
+namespace ui::floating_window::events {
 
 // 比例改变事件
 struct RatioChangeEvent {
@@ -69,9 +71,9 @@ struct ToggleVisibilityEvent {
 
 struct WindowSelectionEvent {
   std::wstring window_title;
-  Vendor::Windows::HWND window_handle;
+  HWND window_handle;
 
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-}  // namespace UI::FloatingWindow::Events
+}  // namespace ui::floating_window::events

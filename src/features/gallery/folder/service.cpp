@@ -1,7 +1,9 @@
 #include "features/gallery/folder/service.hpp"
 
-#include <wil/resource.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/database/database.hpp"
 #include "core/state/app_state.hpp"
@@ -19,36 +21,34 @@
 #include "utils/string/string.hpp"
 #include "utils/system/system.hpp"
 
-namespace Features::Gallery::Folder::Service {
+namespace features::gallery::folder::service {
 
 // 确保根文件夹的 WebView 原图 host mappings 就绪。
-auto ensure_root_folder_webview_mapping(Core::State::AppState& app_state,
-                                        const Types::Folder& folder) -> void {
+auto ensure_root_folder_webview_mapping(core::AppState& app_state, const Folder& folder) -> void {
   if (folder.parent_id.has_value()) {
     return;
   }
 
-  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state, folder.id)) {
+  if (features::gallery::root_availability::is_remote_unreachable(app_state, folder.id)) {
     Logger().warn("Skip WebView original host mapping for unreachable remote root: id={}, path={}",
                   folder.id, folder.path);
     return;
   }
 
-  auto host_name = Features::Gallery::OriginalLocator::make_root_host_name(folder.id);
-  Core::WebView::register_virtual_host_folder_mapping(
-      app_state, std::move(host_name), Utils::String::FromUtf8(folder.path),
-      Core::WebView::State::VirtualHostResourceAccessKind::deny_cors);
+  auto host_name = features::gallery::original_locator::make_root_host_name(folder.id);
+  core::webview::register_virtual_host_folder_mapping(
+      app_state, std::move(host_name), utils::string::FromUtf8(folder.path),
+      core::webview::VirtualHostResourceAccessKind::deny_cors);
 }
 
 // 移除根文件夹的 WebView 原图 host mappings。
-auto remove_root_folder_webview_mapping(Core::State::AppState& app_state,
-                                        const Types::Folder& folder) -> void {
+auto remove_root_folder_webview_mapping(core::AppState& app_state, const Folder& folder) -> void {
   if (folder.parent_id.has_value()) {
     return;
   }
 
-  auto host_name = Features::Gallery::OriginalLocator::make_root_host_name(folder.id);
-  Core::WebView::unregister_virtual_host_folder_mapping(app_state, host_name);
+  auto host_name = features::gallery::original_locator::make_root_host_name(folder.id);
+  core::webview::unregister_virtual_host_folder_mapping(app_state, host_name);
 }
 
 // ============= 路径处理辅助函数 =============
@@ -60,7 +60,7 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
   std::vector<std::filesystem::path> result;
 
   // 规范化扫描根目录
-  auto normalized_scan_root_result = Utils::Path::NormalizePath(scan_root);
+  auto normalized_scan_root_result = utils::path::NormalizePath(scan_root);
   if (!normalized_scan_root_result) {
     Logger().error("Failed to normalize scan root path '{}': {}", scan_root.string(),
                    normalized_scan_root_result.error());
@@ -72,7 +72,7 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
   for (const auto& file_path : file_paths) {
     // 调用方传入的 file_paths 已遵守 Gallery 内部路径不变量；
     // 这里初始化一次即可，后续 parent_path() 递推不再重复做 lexical 归一化。
-    auto current_path_result = Utils::Path::NormalizePath(file_path.parent_path());
+    auto current_path_result = utils::path::NormalizePath(file_path.parent_path());
     if (!current_path_result) {
       Logger().warn("Failed to normalize parent path '{}': {}", file_path.parent_path().string(),
                     current_path_result.error());
@@ -83,7 +83,7 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
     // 从文件的父目录开始，递归向上直到扫描根目录
     while (!current_path.empty()) {
       // 如果已经超出扫描根目录，停止
-      if (!Utils::Path::IsPathWithinBase(current_path, normalized_scan_root)) {
+      if (!utils::path::IsPathWithinBase(current_path, normalized_scan_root)) {
         break;
       }
 
@@ -113,12 +113,12 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
 }
 
 auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
-    -> std::vector<Types::FolderHierarchy> {
-  std::vector<Types::FolderHierarchy> result;
+    -> std::vector<FolderHierarchy> {
+  std::vector<FolderHierarchy> result;
   result.reserve(paths.size());
 
   for (const auto& path : paths) {
-    Types::FolderHierarchy hierarchy;
+    FolderHierarchy hierarchy;
     hierarchy.path = path.string();
     hierarchy.name = path.filename().string();
 
@@ -140,7 +140,7 @@ auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
 }
 
 // 按父先优先顺序严格物化一批目录路径，并返回完整路径映射。
-auto batch_create_folders_for_paths(Core::State::AppState& app_state,
+auto batch_create_folders_for_paths(core::AppState& app_state,
                                     const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string> {
   std::unordered_map<std::string, std::int64_t> path_to_id_map;
@@ -150,7 +150,7 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   std::unordered_set<std::string> normalized_path_keys;
 
   for (const auto& folder_path : folder_paths) {
-    auto normalized_result = Utils::Path::NormalizePath(folder_path);
+    auto normalized_result = utils::path::NormalizePath(folder_path);
     if (!normalized_result) {
       return std::unexpected("Failed to normalize folder path '" + folder_path.string() +
                              "': " + normalized_result.error());
@@ -184,7 +184,7 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     }
 
     // 首先检查数据库中是否已存在
-    auto existing_folder_result = Repository::get_folder_by_path(app_state, path_str);
+    auto existing_folder_result = repository::get_folder_by_path(app_state, path_str);
     if (!existing_folder_result) {
       return std::unexpected("Failed to query folder for path '" + path_str +
                              "': " + existing_folder_result.error());
@@ -221,9 +221,9 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 
     // 创建新文件夹
     std::string folder_name = folder_path.filename().string();
-    Types::Folder new_folder{.path = path_str, .parent_id = parent_id, .name = folder_name};
+    Folder new_folder{.path = path_str, .parent_id = parent_id, .name = folder_name};
 
-    auto create_result = Repository::create_folder(app_state, new_folder);
+    auto create_result = repository::create_folder(app_state, new_folder);
     if (!create_result) {
       return std::unexpected("Failed to create folder for path '" + path_str +
                              "': " + create_result.error());
@@ -233,8 +233,7 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     path_to_id_map[path_str] = folder_id;
     ensure_root_folder_webview_mapping(
         app_state,
-        Types::Folder{
-            .id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name});
+        Folder{.id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name});
     Logger().debug("Created folder '{}' with ID {} (parent_id: {})", path_str, folder_id,
                    parent_id.has_value() ? std::to_string(parent_id.value()) : "NULL");
   }
@@ -243,9 +242,9 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 }
 
 // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
-auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
+auto ensure_all_root_folder_webview_mappings(core::AppState& app_state)
     -> std::expected<void, std::string> {
-  auto folders_result = Repository::list_all_folders(app_state);
+  auto folders_result = repository::list_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected("Failed to list folders for WebView mapping sync: " +
                            folders_result.error());
@@ -261,7 +260,7 @@ auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
 // 校验用户输入是可以安全拼到父目录下的单个路径段。
 auto normalize_child_folder_name(const std::string& name)
     -> std::expected<std::string, std::string> {
-  auto normalized_name = Utils::String::TrimAscii(name);
+  auto normalized_name = utils::string::TrimAscii(name);
   if (normalized_name.empty()) {
     return std::unexpected("Folder name cannot be empty");
   }
@@ -281,7 +280,7 @@ auto normalize_child_folder_name(const std::string& name)
   }
 
   auto stem_end = normalized_name.find('.');
-  auto device_name = Utils::String::ToLowerAscii(normalized_name.substr(0, stem_end));
+  auto device_name = utils::string::ToLowerAscii(normalized_name.substr(0, stem_end));
   static const std::unordered_set<std::string> reserved_device_names = {
       "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
       "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
@@ -290,7 +289,7 @@ auto normalize_child_folder_name(const std::string& name)
     return std::unexpected("Folder name is reserved by Windows");
   }
 
-  auto name_path = std::filesystem::path(Utils::String::FromUtf8(normalized_name));
+  auto name_path = std::filesystem::path(utils::string::FromUtf8(normalized_name));
   // 只允许单个名称段，不让 RPC 输入跨越已选父目录。
   if (name_path.empty() || name_path.is_absolute() || name_path.has_root_path() ||
       name_path.filename() != name_path) {
@@ -300,9 +299,8 @@ auto normalize_child_folder_name(const std::string& name)
 }
 
 // 在已索引父目录下创建真实子目录，并立即物化对应文件夹记录。
-auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_folder_id,
-                         const std::string& name)
-    -> std::expected<Types::OperationResult, std::string> {
+auto create_child_folder(core::AppState& app_state, std::int64_t parent_folder_id,
+                         const std::string& name) -> std::expected<OperationResult, std::string> {
   auto normalized_name_result = normalize_child_folder_name(name);
   if (!normalized_name_result) {
     return std::unexpected(normalized_name_result.error());
@@ -310,7 +308,7 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
   auto normalized_name = normalized_name_result.value();
 
   // 路径始终由后端根据已索引父节点构造，前端不能指定任意位置。
-  auto parent_result = Repository::get_folder_by_id(app_state, parent_folder_id);
+  auto parent_result = repository::get_folder_by_id(app_state, parent_folder_id);
   if (!parent_result) {
     return std::unexpected("Failed to query parent folder: " + parent_result.error());
   }
@@ -319,9 +317,9 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
   }
   const auto& parent = parent_result->value();
 
-  auto parent_path = std::filesystem::path(Utils::String::FromUtf8(parent.path));
-  auto target_path_result = Utils::Path::NormalizePath(
-      parent_path / std::filesystem::path(Utils::String::FromUtf8(normalized_name)));
+  auto parent_path = std::filesystem::path(utils::string::FromUtf8(parent.path));
+  auto target_path_result = utils::path::NormalizePath(
+      parent_path / std::filesystem::path(utils::string::FromUtf8(normalized_name)));
   if (!target_path_result) {
     return std::unexpected("Failed to normalize target folder path: " + target_path_result.error());
   }
@@ -329,11 +327,11 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
 
   // 新目录若会被当前 root 规则排除，直接拒绝“创建成功但树中不可见”的状态。
   auto root_folder_id_result =
-      Features::Gallery::Ignore::Service::resolve_root_folder_id(app_state, parent_folder_id);
+      features::gallery::ignore::service::resolve_root_folder_id(app_state, parent_folder_id);
   if (!root_folder_id_result) {
     return std::unexpected("Failed to resolve parent watch root: " + root_folder_id_result.error());
   }
-  auto root_folder_result = Repository::get_folder_by_id(app_state, root_folder_id_result.value());
+  auto root_folder_result = repository::get_folder_by_id(app_state, root_folder_id_result.value());
   if (!root_folder_result) {
     return std::unexpected("Failed to load parent watch root: " + root_folder_result.error());
   }
@@ -341,13 +339,13 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
     return std::unexpected("Parent watch root not found");
   }
   auto ignore_rules_result =
-      Features::Gallery::Ignore::Service::load_ignore_rules(app_state, parent_folder_id);
+      features::gallery::ignore::service::load_ignore_rules(app_state, parent_folder_id);
   if (!ignore_rules_result) {
     return std::unexpected("Failed to load folder ignore rules: " + ignore_rules_result.error());
   }
-  if (Features::Gallery::Ignore::Service::apply_ignore_rules(
+  if (features::gallery::ignore::service::apply_ignore_rules(
           target_path,
-          std::filesystem::path(Utils::String::FromUtf8(root_folder_result->value().path)),
+          std::filesystem::path(utils::string::FromUtf8(root_folder_result->value().path)),
           ignore_rules_result.value(), true)) {
     return std::unexpected("Folder name is excluded by the current ignore rules");
   }
@@ -361,13 +359,13 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
   }
 
   // 在落盘前屏蔽这条已知变化，避免 watcher 与 RPC 同时建立同一索引。
-  auto ignore_result = Features::Gallery::Watcher::begin_manual_file_system_ignore(
+  auto ignore_result = features::gallery::watcher::begin_manual_file_system_ignore(
       app_state, target_path, target_path);
   if (!ignore_result) {
     return std::unexpected("Failed to register watcher ignore: " + ignore_result.error());
   }
   auto complete_ignore = wil::scope_exit([&app_state, &target_path]() {
-    auto result = Features::Gallery::Watcher::complete_manual_file_system_ignore(
+    auto result = features::gallery::watcher::complete_manual_file_system_ignore(
         app_state, target_path, target_path);
     if (!result) {
       Logger().warn("Failed to complete watcher ignore for created folder '{}': {}",
@@ -382,12 +380,12 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
     return std::unexpected("Failed to create folder on disk: " + message);
   }
 
-  Types::Folder new_folder{
+  Folder new_folder{
       .path = target_path.string(),
       .parent_id = parent_folder_id,
       .name = normalized_name,
   };
-  auto create_result = Repository::create_folder(app_state, new_folder);
+  auto create_result = repository::create_folder(app_state, new_folder);
   if (!create_result) {
     // 索引失败时只回滚本次创建且仍为空的目录，不删除并发写入的用户内容。
     std::error_code rollback_error;
@@ -401,7 +399,7 @@ auto create_child_folder(Core::State::AppState& app_state, std::int64_t parent_f
     return std::unexpected(message);
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Folder created",
       .affected_count = 1,
@@ -415,7 +413,7 @@ auto normalize_display_name(const std::optional<std::string>& display_name)
     return std::nullopt;
   }
 
-  auto trimmed = Utils::String::TrimAscii(display_name.value());
+  auto trimmed = utils::string::TrimAscii(display_name.value());
   if (trimmed.empty()) {
     return std::nullopt;
   }
@@ -424,14 +422,13 @@ auto normalize_display_name(const std::optional<std::string>& display_name)
 }
 
 // 清除指定根目录对应的数据索引（在数据库事务中级联删除其涵盖的所有资产与子文件夹记录）
-auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t root_folder_id,
+auto cleanup_root_folder_index(core::AppState& app_state, std::int64_t root_folder_id,
                                const std::string& root_path)
     -> std::expected<std::int64_t, std::string> {
-  return Core::Database::execute_transaction(
-      app_state,
-      [&](Core::State::AppState& txn_app_state) -> std::expected<std::int64_t, std::string> {
+  return core::database::execute_transaction(
+      app_state, [&](core::AppState& txn_app_state) -> std::expected<std::int64_t, std::string> {
         // 1. 基于路径匹配，删除该目录下及所有子目录内的资产记录
-        auto delete_assets_result = Core::Database::query<Core::Database::ReturningIdRow>(
+        auto delete_assets_result = core::database::query<core::database::ReturningIdRow>(
             txn_app_state, "DELETE FROM assets WHERE path = ? OR path LIKE ? RETURNING id",
             {root_path, root_path + "/%"});
         if (!delete_assets_result) {
@@ -455,7 +452,7 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
           RETURNING id
         )";
 
-        auto delete_folders_result = Core::Database::query<Core::Database::ReturningIdRow>(
+        auto delete_folders_result = core::database::query<core::database::ReturningIdRow>(
             txn_app_state, delete_folders_sql, {root_folder_id});
         if (!delete_folders_result) {
           return std::unexpected("Failed to delete folders under root: " +
@@ -468,10 +465,10 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
 }
 
 // 更新文件夹的自定义显示名称（允许清空为 nullopt）
-auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t folder_id,
+auto update_folder_display_name(core::AppState& app_state, std::int64_t folder_id,
                                 const std::optional<std::string>& display_name)
-    -> std::expected<Types::OperationResult, std::string> {
-  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+    -> std::expected<OperationResult, std::string> {
+  auto folder_result = repository::get_folder_by_id(app_state, folder_id);
   if (!folder_result) {
     return std::unexpected("Failed to query folder: " + folder_result.error());
   }
@@ -482,12 +479,12 @@ auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t f
   auto folder = folder_result->value();
   folder.display_name = normalize_display_name(display_name);
 
-  auto update_result = Repository::update_folder(app_state, folder);
+  auto update_result = repository::update_folder(app_state, folder);
   if (!update_result) {
     return std::unexpected("Failed to update folder: " + update_result.error());
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = folder.display_name.has_value() ? "Folder display name updated"
                                                  : "Folder display name reset",
@@ -496,9 +493,9 @@ auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t f
 }
 
 // 在系统资源管理器中打开指定 ID 的文件夹路径
-auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t folder_id)
-    -> std::expected<Types::OperationResult, std::string> {
-  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+auto open_folder_in_explorer(core::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<OperationResult, std::string> {
+  auto folder_result = repository::get_folder_by_id(app_state, folder_id);
   if (!folder_result) {
     return std::unexpected("Failed to query folder: " + folder_result.error());
   }
@@ -507,12 +504,12 @@ auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t fold
   }
 
   auto open_result =
-      Utils::System::open_directory(std::filesystem::path(folder_result->value().path));
+      utils::system::open_directory(std::filesystem::path(folder_result->value().path));
   if (!open_result) {
     return std::unexpected("Failed to open folder in explorer: " + open_result.error());
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Folder opened in explorer",
       .affected_count = 0,
@@ -520,9 +517,9 @@ auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t fold
 }
 
 // 取消对指定根文件夹的监控跟踪，清理相关的索引与孤立缩略图缓存
-auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t folder_id)
-    -> std::expected<Types::OperationResult, std::string> {
-  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+auto remove_root_folder_watch(core::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<OperationResult, std::string> {
+  auto folder_result = repository::get_folder_by_id(app_state, folder_id);
   if (!folder_result) {
     return std::unexpected("Failed to query folder: " + folder_result.error());
   }
@@ -537,7 +534,7 @@ auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t fol
   }
 
   // 1. 从系统的文件变动监控器中注销该目录
-  auto remove_watcher_result = Features::Gallery::Watcher::remove_watcher_for_directory(
+  auto remove_watcher_result = features::gallery::watcher::remove_watcher_for_directory(
       app_state, std::filesystem::path(folder.path));
   if (!remove_watcher_result) {
     return std::unexpected("Failed to remove watcher: " + remove_watcher_result.error());
@@ -553,17 +550,17 @@ auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t fol
 
   // 3. 触发清理因本次操作而处于孤立状态的缩略图缓存
   auto thumbnail_cleanup_result =
-      Features::Gallery::Asset::Thumbnail::cleanup_orphaned_thumbnails(app_state);
+      features::gallery::asset::thumbnail::cleanup_orphaned_thumbnails(app_state);
   if (!thumbnail_cleanup_result) {
     Logger().warn("Failed to cleanup orphaned thumbnails after removing watch: {}",
                   thumbnail_cleanup_result.error());
   }
 
-  return Types::OperationResult{
+  return OperationResult{
       .success = true,
       .message = "Folder removed from watch list and index cleaned",
       .affected_count = cleanup_result.value(),
   };
 }
 
-}  // namespace Features::Gallery::Folder::Service
+}  // namespace features::gallery::folder::service

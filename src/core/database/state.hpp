@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::Database::State {
+#include "vendor/std.hpp"
+
+namespace core::database {
 
 struct DatabaseState {
   // 存储数据库文件路径
@@ -15,4 +17,4 @@ struct DatabaseState {
   std::size_t thread_count = 0;
 };
 
-}  // namespace Core::Database::State
+}  // namespace core::database

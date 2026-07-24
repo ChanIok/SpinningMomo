@@ -1,9 +1,10 @@
 #pragma once
 
-// Auto-generated schema index
-// DO NOT EDIT - This file imports all generated schema modules
+#include "vendor/std.hpp"
 
-// Import all schema modules
+// Auto-generated schema index
+// DO NOT EDIT - This file includes all generated schema headers
+
 #include "core/migration/generated/schema_001.hpp"
 #include "core/migration/generated/schema_002.hpp"
 #include "core/migration/generated/schema_003.hpp"

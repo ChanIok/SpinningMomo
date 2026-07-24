@@ -1,9 +1,11 @@
 #pragma once
 
-#include <uwebsockets/App.h>
-#include <asio.hpp>
+#include "vendor/std.hpp"
 
-namespace Core::HttpServer::Types {
+#include "vendor/asio.hpp"
+#include "vendor/uwebsockets.hpp"
+
+namespace core::http_server {
 
 // ============= 流式传输配置 =============
 
@@ -72,4 +74,4 @@ struct SseConnection {
   bool is_closed = false;
 };
 
-}  // namespace Core::HttpServer::Types
+}  // namespace core::http_server

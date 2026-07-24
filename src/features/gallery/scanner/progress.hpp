@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Scanner::Progress {
+namespace features::gallery::scanner::progress {
 
 // 全量扫描进度百分比锚点：各阶段在自己的区间内插值，避免条来回跳。
 constexpr double kPreparingPercent = 2.0;
@@ -16,7 +18,7 @@ constexpr double kProcessingEndPercent = 92.0;
 constexpr double kCleanupPercent = 96.0;
 
 // 向 UI 汇报扫描进度；回调抛异常时只记日志，不中断扫描
-auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>& progress_callback,
+auto report_scan_progress(const std::function<void(const ScanProgress&)>& progress_callback,
                           std::string stage, std::int64_t current, std::int64_t total,
                           std::optional<double> percent = std::nullopt,
                           std::optional<std::string> message = std::nullopt) -> void;
@@ -25,7 +27,7 @@ auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>&
 struct ProcessingProgressTracker {
   static constexpr std::int64_t kMinReportIntervalMillis = 200;
 
-  const std::function<void(const Types::ScanProgress&)>& progress_callback;
+  const std::function<void(const ScanProgress&)>& progress_callback;
   const std::int64_t total_files;
   const std::int64_t total_thumbnails;
   const std::int64_t total_units;
@@ -41,7 +43,7 @@ struct ProcessingProgressTracker {
   int last_reported_percent = -1;
   std::int64_t last_report_millis = 0;
 
-  ProcessingProgressTracker(const std::function<void(const Types::ScanProgress&)>& callback,
+  ProcessingProgressTracker(const std::function<void(const ScanProgress&)>& callback,
                             std::int64_t files, std::int64_t thumbnails, std::int64_t units,
                             std::int64_t thumbnail_weight_value, double start_percent,
                             double end_percent);
@@ -55,7 +57,7 @@ struct ProcessingProgressTracker {
 struct HashProgressTracker {
   static constexpr std::int64_t kMinReportIntervalMillis = 200;
 
-  const std::function<void(const Types::ScanProgress&)>& progress_callback;
+  const std::function<void(const ScanProgress&)>& progress_callback;
   const std::int64_t total_candidates;
   const double percent_start;
   const double percent_end;
@@ -66,11 +68,11 @@ struct HashProgressTracker {
   int last_reported_percent = -1;
   std::int64_t last_report_millis = 0;
 
-  HashProgressTracker(const std::function<void(const Types::ScanProgress&)>& callback,
+  HashProgressTracker(const std::function<void(const ScanProgress&)>& callback,
                       std::int64_t candidates, double start_percent, double end_percent);
 
   auto report(bool force = false) -> void;
   auto mark_item_hashed() -> void;
 };
 
-}  // namespace Features::Gallery::Scanner::Progress
+}  // namespace features::gallery::scanner::progress

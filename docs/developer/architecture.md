@@ -9,8 +9,11 @@
 
 ## 架构与代码规范说明
 
-本项目核心采用 C++23 Modules 与 Vue 3 混合双端架构。
-关于详细的设计哲学、C++ 组件系统划分以及所有的模块依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
+本项目核心采用 C++23 原生后端与 Vue 3 Web 前端的混合双端架构。C++ 后端使用
+`.hpp + .cpp + PCH`，所有项目头保持自包含，PCH 只负责构建加速。
+项目代码通过 `src/vendor/` 下的精确门面引入外部头；Windows SDK 门面与物理头文件
+一一对应，避免领域聚合头把不相关调用点和 PCH 绑定在一起。
+关于详细的设计哲学、C++ 组件划分以及依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
 
 ## 环境要求
 

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Utils::Dialog {
+namespace utils::dialog {
 
 struct FileSelectorParams {
   std::string title;
@@ -24,10 +26,10 @@ struct FolderSelectorResult {
   std::string path;
 };
 
-auto select_folder(const FolderSelectorParams& params, Vendor::Windows::HWND hwnd = nullptr)
+auto select_folder(const FolderSelectorParams& params, HWND hwnd = nullptr)
     -> std::expected<FolderSelectorResult, std::string>;
 
-auto select_file(const FileSelectorParams& params, Vendor::Windows::HWND hwnd = nullptr)
+auto select_file(const FileSelectorParams& params, HWND hwnd = nullptr)
     -> std::expected<FileSelectorResult, std::string>;
 
-}  // namespace Utils::Dialog
+}  // namespace utils::dialog

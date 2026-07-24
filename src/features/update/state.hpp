@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "features/update/types.hpp"
 
-namespace Features::Update::State {
+namespace features::update {
 
 struct PendingUpdateContext {
   std::filesystem::path package_path;              // 待执行更新包路径
@@ -40,4 +42,4 @@ inline auto create_default_update_state() -> UpdateState {
   return state;
 }
 
-}  // namespace Features::Update::State
+}  // namespace features::update

@@ -1,18 +1,20 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 
-namespace Core::WebView::Host {
+namespace core::webview::host {
 
-auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
+auto start_environment_creation(core::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string>;
 
-auto reset_host_runtime(Core::State::AppState& state) -> void;
+auto reset_host_runtime(core::AppState& state) -> void;
 
-auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
+auto apply_background_mode_from_settings(core::AppState& state) -> void;
 
-auto get_loading_background_color(Core::State::AppState& state) -> COLORREF;
+auto get_loading_background_color(core::AppState& state) -> COLORREF;
 
-}  // namespace Core::WebView::Host
+}  // namespace core::webview::host

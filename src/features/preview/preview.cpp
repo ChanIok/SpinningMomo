@@ -1,8 +1,10 @@
 #include "features/preview/preview.hpp"
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/state/runtime_info.hpp"
@@ -19,7 +21,7 @@
 #include "utils/graphics/hdr.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Preview {
+namespace features::preview {
 
 auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
   if (!preview_hwnd || !IsWindow(preview_hwnd)) {
@@ -29,8 +31,7 @@ auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
   return SendMessageW(preview_hwnd, message, 0, 0) != 0;
 }
 
-auto start_preview(Core::State::AppState& state, HWND target_window)
-    -> std::expected<void, std::string> {
+auto start_preview(core::AppState& state, HWND target_window) -> std::expected<void, std::string> {
   auto& preview_state = *state.preview;
 
   // 检查是否支持捕获
@@ -42,7 +43,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   if (!preview_state.hwnd) {
     HINSTANCE instance = GetModuleHandle(nullptr);
 
-    if (auto result = Window::initialize_preview_window(state, instance); !result) {
+    if (auto result = window::initialize_preview_window(state, instance); !result) {
       return std::unexpected(result.error());
     }
   }
@@ -56,19 +57,19 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
-  auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target_window);
+  auto hdr_info = utils::graphics::hdr::query_monitor_hdr_info(target_window);
   if (!hdr_info) {
     return std::unexpected("Failed to query HDR monitor info: " + hdr_info.error());
   }
   const bool enable_hdr = hdr_info->hdr_active;
 
   const auto& fw = *state.floating_window;
-  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     return std::unexpected("Failed to resolve working monitor: " + monitor_info.error());
   }
 
-  if (!send_preview_control_message(preview_state.hwnd, Types::WM_CANCEL_PREVIEW_CLEANUP)) {
+  if (!send_preview_control_message(preview_state.hwnd, WM_CANCEL_PREVIEW_CLEANUP)) {
     Logger().warn("Failed to cancel pending preview cleanup");
   }
 
@@ -79,7 +80,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
 
   if (preview_state.rendering_resources.initialized.load(std::memory_order_acquire) &&
       preview_state.rendering_resources.d3d_context.enable_hdr != enable_hdr) {
-    Rendering::cleanup_rendering(state);
+    rendering::cleanup_rendering(state);
   }
   preview_state.enable_hdr = enable_hdr;
 
@@ -92,7 +93,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   // 初始化渲染系统（如果需要）
   if (!preview_state.rendering_resources.initialized.load(std::memory_order_acquire)) {
     auto rendering_result =
-        Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
+        rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
                                         preview_state.size.window_height);
 
     if (!rendering_result) {
@@ -102,19 +103,19 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 初始化捕获系统
-  auto capture_result = Capture::initialize_capture(state, target_window, width, height);
+  auto capture_result = capture::initialize_capture(state, target_window, width, height);
 
   if (!capture_result) {
     Logger().error("Failed to initialize capture system");
     return std::unexpected(capture_result.error());
   }
   // 计算窗口尺寸和宽高比
-  Window::set_preview_window_size(state, width, height);
+  window::set_preview_window_size(state, width, height);
 
-  Window::show_preview_window(state);
+  window::show_preview_window(state);
 
   // 启动捕获
-  auto start_result = Capture::start_capture(state);
+  auto start_result = capture::start_capture(state);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected(start_result.error());
@@ -126,7 +127,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   return {};
 }
 
-auto stop_preview(Core::State::AppState& state) -> void {
+auto stop_preview(core::AppState& state) -> void {
   auto& preview_state = *state.preview;
 
   if (!preview_state.running.load(std::memory_order_acquire)) {
@@ -137,32 +138,32 @@ auto stop_preview(Core::State::AppState& state) -> void {
   preview_state.create_new_srv.store(true, std::memory_order_release);
 
   // 停止捕获
-  Capture::stop_capture(state);
+  capture::stop_capture(state);
 
   // 隐藏窗口
-  Window::hide_preview_window(state);
+  window::hide_preview_window(state);
 
-  if (!send_preview_control_message(preview_state.hwnd, Types::WM_SCHEDULE_PREVIEW_CLEANUP)) {
+  if (!send_preview_control_message(preview_state.hwnd, WM_SCHEDULE_PREVIEW_CLEANUP)) {
     cleanup_preview(state);
   }
 
   Logger().info("Preview capture stopped");
 }
 
-auto update_preview_dpi(Core::State::AppState& state, UINT new_dpi) -> void {
+auto update_preview_dpi(core::AppState& state, UINT new_dpi) -> void {
   state.preview->dpi_sizes.update_dpi_scaling(new_dpi);
-  Window::update_preview_window_dpi(state, new_dpi);
+  window::update_preview_window_dpi(state, new_dpi);
 }
 
-auto cleanup_preview(Core::State::AppState& state) -> void {
-  if (send_preview_control_message(state.preview->hwnd, Types::WM_IMMEDIATE_PREVIEW_CLEANUP)) {
+auto cleanup_preview(core::AppState& state) -> void {
+  if (send_preview_control_message(state.preview->hwnd, WM_IMMEDIATE_PREVIEW_CLEANUP)) {
     return;
   }
 
-  Capture::cleanup_capture(state);
-  Rendering::cleanup_rendering(state);
+  capture::cleanup_capture(state);
+  rendering::cleanup_rendering(state);
 
   Logger().info("Preview resources cleaned up");
 }
 
-}  // namespace Features::Preview
+}  // namespace features::preview

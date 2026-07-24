@@ -1,7 +1,9 @@
 #include "extensions/infinity_nikki/world_area.hpp"
 
-#include <asio.hpp>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
 
 #include "core/http_client/http_client.hpp"
 #include "core/http_client/types.hpp"
@@ -9,7 +11,7 @@
 #include "extensions/infinity_nikki/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Extensions::InfinityNikki::WorldArea {
+namespace extensions::infinity_nikki::world_area {
 
 // 远端地图配置的来源地址和内存缓存有效期。
 // 配置包含所有世界的 polygon 区域、坐标变换参数和官方 world_id 映射，
@@ -234,17 +236,17 @@ auto parse_map_config_payload(const std::string& body)
 }
 
 // 从远端拉取地图配置 JSON 并解析、校验。
-auto fetch_and_parse_map_config(Core::State::AppState& app_state)
+auto fetch_and_parse_map_config(core::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {
-  Core::HttpClient::Types::Request request{
+  core::http_client::Request request{
       .method = "GET",
       .url = std::string(kMapConfigUrl),
-      .headers = {Core::HttpClient::Types::Header{.name = "Accept", .value = "application/json"}},
+      .headers = {core::http_client::Header{.name = "Accept", .value = "application/json"}},
       .connect_timeout_ms = kMapConfigConnectTimeoutMs,
       .receive_timeout_ms = kMapConfigReceiveTimeoutMs,
   };
 
-  auto response = co_await Core::HttpClient::fetch(app_state, request);
+  auto response = co_await core::http_client::fetch(app_state, request);
   if (!response) {
     co_return std::unexpected("Failed to fetch Infinity Nikki map config: " + response.error());
   }
@@ -261,7 +263,7 @@ auto fetch_and_parse_map_config(Core::State::AppState& app_state)
 // 缓存命中直接返回；未命中则拉取远端配置；
 // 拉取失败时标记 refresh_failed，抑制期内跳过后续 HTTP；
 // 若有旧缓存则回退使用（降级），否则返回错误。
-auto load_map_config(Core::State::AppState& app_state)
+auto load_map_config(core::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {
   auto& cache = map_config_cache();
 
@@ -396,4 +398,4 @@ auto transform_game_to_map_coordinates(const GamePoint& point, const InfinityNik
   };
 }
 
-}  // namespace Extensions::InfinityNikki::WorldArea
+}  // namespace extensions::infinity_nikki::world_area

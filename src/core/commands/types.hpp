@@ -1,14 +1,16 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Core::Commands {
+namespace core::commands {
 
 // 热键绑定
 struct HotkeyBinding {
-  Vendor::Windows::UINT modifiers = 0;  // MOD_CONTROL=1, MOD_ALT=2, MOD_SHIFT=4
-  Vendor::Windows::UINT key = 0;        // 虚拟键码 (VK_*)
-  std::string settings_path;            // 设置文件中的路径，如 "app.hotkey.floating_window"
+  UINT modifiers = 0;         // MOD_CONTROL=1, MOD_ALT=2, MOD_SHIFT=4
+  UINT key = 0;               // 虚拟键码 (VK_*)
+  std::string settings_path;  // 设置文件中的路径，如 "app.hotkey.floating_window"
 };
 
 // 命令描述符
@@ -56,4 +58,4 @@ struct InvokeCommandResult {
   std::string message;
 };
 
-}  // namespace Core::Commands
+}  // namespace core::commands

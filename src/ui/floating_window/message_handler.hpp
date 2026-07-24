@@ -1,9 +1,11 @@
 #pragma once
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace UI::FloatingWindow::MessageHandler {
+#include "vendor/windows.hpp"
+
+namespace ui::floating_window::message_handler {
 
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-}  // namespace UI::FloatingWindow::MessageHandler
+}  // namespace ui::floating_window::message_handler

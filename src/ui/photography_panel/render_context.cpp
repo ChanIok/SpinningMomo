@@ -1,12 +1,14 @@
 #include "ui/photography_panel/render_context.hpp"
 
-#include <d2d1_3.h>
-#include <d3d11.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/floating_window/render_context.hpp"
@@ -16,12 +18,12 @@
 #include "ui/shared_render_resources/state.hpp"
 #include "ui/shared_theme/shared_theme.hpp"
 
-namespace UI::PhotographyPanel::RenderContext {
+namespace ui::photography_panel::render_context {
 
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
-auto shared_resources(Core::State::AppState& state)
-    -> UI::SharedRenderResources::State::SharedRenderResourcesState& {
+auto shared_resources(core::AppState& state)
+    -> ui::shared_render_resources::SharedRenderResourcesState& {
   return *state.shared_render_resources;
 }
 
@@ -31,8 +33,7 @@ auto get_client_size(HWND hwnd) -> SIZE {
   return {rc.right - rc.left, rc.bottom - rc.top};
 }
 
-auto create_device_context(ID2D1Device* shared_device, State::RenderResources& render_resources)
-    -> bool {
+auto create_device_context(ID2D1Device* shared_device, RenderResources& render_resources) -> bool {
   if (!shared_device) {
     return false;
   }
@@ -54,7 +55,7 @@ auto create_device_context(ID2D1Device* shared_device, State::RenderResources& r
   return true;
 }
 
-auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderResources& render_resources,
+auto create_swap_chain(ID3D11Device* shared_d3d_device, RenderResources& render_resources,
                        const SIZE& size) -> bool {
   if (!shared_d3d_device) {
     return false;
@@ -83,8 +84,8 @@ auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderResources& 
 }
 
 // 建立 DirectComposition 树：hwnd → target → visual → swap chain，实现亚像素透明
-auto create_composition_tree(ID3D11Device* shared_d3d_device,
-                             State::RenderResources& render_resources, HWND hwnd) -> bool {
+auto create_composition_tree(ID3D11Device* shared_d3d_device, RenderResources& render_resources,
+                             HWND hwnd) -> bool {
   if (!shared_d3d_device || !render_resources.swap_chain) {
     return false;
   }
@@ -118,7 +119,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
          SUCCEEDED(composition_device->Commit());
 }
 
-auto release_target_bitmap(State::RenderResources& render_resources) -> void {
+auto release_target_bitmap(RenderResources& render_resources) -> void {
   if (render_resources.device_context) {
     render_resources.device_context->SetTarget(nullptr);
   }
@@ -126,7 +127,7 @@ auto release_target_bitmap(State::RenderResources& render_resources) -> void {
 }
 
 // 从 swap chain 获取 back buffer 并绑定为 D2D 绘制目标
-auto create_target_bitmap(State::RenderResources& render_resources, const SIZE& size) -> bool {
+auto create_target_bitmap(RenderResources& render_resources, const SIZE& size) -> bool {
   release_target_bitmap(render_resources);
 
   wil::com_ptr<IDXGISurface> dxgi_surface;
@@ -150,15 +151,14 @@ auto create_target_bitmap(State::RenderResources& render_resources, const SIZE& 
 }
 
 // 按浮窗 token 创建面板画刷，让摄影面板和主浮窗共用同一套配色语义
-auto create_brushes(Core::State::AppState& state, State::RenderResources& render_resources)
-    -> bool {
+auto create_brushes(core::AppState& state, RenderResources& render_resources) -> bool {
   auto* context = render_resources.device_context.get();
   if (!context) {
     return false;
   }
 
   // 这里只映射摄影面板真正需要的槽位，避免为了一致性强行引入无关样式
-  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
+  const auto colors = ui::shared_theme::resolve_floating_window_theme_colors(state);
   return SUCCEEDED(context->CreateSolidColorBrush(colors.background,
                                                   render_resources.background_brush.put())) &&
          SUCCEEDED(context->CreateSolidColorBrush(colors.title_bar,
@@ -172,7 +172,7 @@ auto create_brushes(Core::State::AppState& state, State::RenderResources& render
 }
 
 // 释放所有 D3D/D2D 资源并重置状态标记
-auto reset_render_context(State::RenderResources& render_resources) -> void {
+auto reset_render_context(RenderResources& render_resources) -> void {
   render_resources.text_format.reset();
   render_resources.background_brush.reset();
   render_resources.title_brush.reset();
@@ -190,13 +190,13 @@ auto reset_render_context(State::RenderResources& render_resources) -> void {
 }
 
 // 确保 D3D 渲染管线就绪：首次调用时完整初始化，后续仅在窗口大小变化时 resize
-auto ensure_render_context(Core::State::AppState& state) -> bool {
+auto ensure_render_context(core::AppState& state) -> bool {
   auto& panel = *state.photography_panel;
   auto& render_resources = panel.render_resources;
   if (!panel.hwnd) {
     return false;
   }
-  if (!UI::SharedRenderResources::ensure_initialized(state)) {
+  if (!ui::shared_render_resources::ensure_initialized(state)) {
     return false;
   }
 
@@ -234,7 +234,7 @@ auto ensure_render_context(Core::State::AppState& state) -> bool {
 }
 
 // 窗口大小变化时重建 back buffer，避免拉伸或裁剪
-auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -> bool {
+auto resize_render_context(core::AppState& state, const SIZE& new_size) -> bool {
   auto& render_resources = state.photography_panel->render_resources;
   if (!render_resources.is_ready || !render_resources.swap_chain ||
       !render_resources.device_context || new_size.cx <= 0 || new_size.cy <= 0) {
@@ -256,7 +256,7 @@ auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -
   return true;
 }
 
-auto cleanup_render_context(Core::State::AppState& state) -> void {
+auto cleanup_render_context(core::AppState& state) -> void {
   if (!state.photography_panel) {
     return;
   }
@@ -264,13 +264,13 @@ auto cleanup_render_context(Core::State::AppState& state) -> void {
 }
 
 // 设置变化时只改现有 brush 的颜色，避免为了换肤去重建整个渲染后端
-auto update_theme_brushes(Core::State::AppState& state) -> void {
+auto update_theme_brushes(core::AppState& state) -> void {
   auto& render_resources = state.photography_panel->render_resources;
   if (!render_resources.device_context) {
     return;
   }
 
-  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
+  const auto colors = ui::shared_theme::resolve_floating_window_theme_colors(state);
   if (render_resources.background_brush) {
     render_resources.background_brush->SetColor(colors.background);
   }
@@ -289,15 +289,15 @@ auto update_theme_brushes(Core::State::AppState& state) -> void {
 }
 
 // 面板直接沿用浮窗字号，保证标题和内容行的文字密度始终一致
-auto update_text_format(Core::State::AppState& state) -> bool {
+auto update_text_format(core::AppState& state) -> bool {
   auto& render_resources = state.photography_panel->render_resources;
-  if (!UI::SharedRenderResources::ensure_initialized(state)) {
+  if (!ui::shared_render_resources::ensure_initialized(state)) {
     return false;
   }
 
-  render_resources.text_format = UI::FloatingWindow::RenderContext::create_text_format_with_size(
+  render_resources.text_format = ui::floating_window::render_context::create_text_format_with_size(
       shared_resources(state).write_factory.get(), state.floating_window->layout.font_size);
   return static_cast<bool>(render_resources.text_format);
 }
 
-}  // namespace UI::PhotographyPanel::RenderContext
+}  // namespace ui::photography_panel::render_context

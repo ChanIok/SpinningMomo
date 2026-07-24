@@ -1,9 +1,11 @@
 #include "features/gallery/scanner/progress.hpp"
 
+#include "vendor/std.hpp"
+
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Gallery::Scanner::Progress {
+namespace features::gallery::scanner::progress {
 
 auto steady_clock_millis() -> std::int64_t {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -12,7 +14,7 @@ auto steady_clock_millis() -> std::int64_t {
 }
 
 // 向 UI 汇报扫描进度；回调抛异常时只记日志，不中断扫描
-auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>& progress_callback,
+auto report_scan_progress(const std::function<void(const ScanProgress&)>& progress_callback,
                           std::string stage, std::int64_t current, std::int64_t total,
                           std::optional<double> percent, std::optional<std::string> message)
     -> void {
@@ -21,18 +23,18 @@ auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>&
   }
 
   try {
-    progress_callback(Types::ScanProgress{.stage = std::move(stage),
-                                          .current = current,
-                                          .total = total,
-                                          .percent = percent,
-                                          .message = std::move(message)});
+    progress_callback(ScanProgress{.stage = std::move(stage),
+                                   .current = current,
+                                   .total = total,
+                                   .percent = percent,
+                                   .message = std::move(message)});
   } catch (const std::exception& e) {
     Logger().warn("Scan progress callback failed: {}", e.what());
   }
 }
 
 ProcessingProgressTracker::ProcessingProgressTracker(
-    const std::function<void(const Types::ScanProgress&)>& callback, std::int64_t files,
+    const std::function<void(const ScanProgress&)>& callback, std::int64_t files,
     std::int64_t thumbnails, std::int64_t units, std::int64_t thumbnail_weight_value,
     double start_percent, double end_percent)
     : progress_callback(callback),
@@ -121,9 +123,9 @@ auto ProcessingProgressTracker::mark_thumbnail_processed() -> void {
   report();
 }
 
-HashProgressTracker::HashProgressTracker(
-    const std::function<void(const Types::ScanProgress&)>& callback, std::int64_t candidates,
-    double start_percent, double end_percent)
+HashProgressTracker::HashProgressTracker(const std::function<void(const ScanProgress&)>& callback,
+                                         std::int64_t candidates, double start_percent,
+                                         double end_percent)
     : progress_callback(callback),
       total_candidates(candidates),
       percent_start(start_percent),
@@ -182,4 +184,4 @@ auto HashProgressTracker::mark_item_hashed() -> void {
   report();
 }
 
-}  // namespace Features::Gallery::Scanner::Progress
+}  // namespace features::gallery::scanner::progress

@@ -1,13 +1,15 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 
-namespace Features::Photography::UseCase {
+namespace features::photography {
 
-auto start(Core::State::AppState& state) -> std::expected<void, std::string>;
-auto stop(Core::State::AppState& state) -> void;
-auto toggle(Core::State::AppState& state) -> void;
-auto cleanup(Core::State::AppState& state) -> void;
-auto handle_panel_close(Core::State::AppState& state) -> void;
+auto start(core::AppState& state) -> std::expected<void, std::string>;
+auto stop(core::AppState& state) -> void;
+auto toggle(core::AppState& state) -> void;
+auto cleanup(core::AppState& state) -> void;
+auto handle_panel_close(core::AppState& state) -> void;
 
-}  // namespace Features::Photography::UseCase
+}  // namespace features::photography

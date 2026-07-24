@@ -7,7 +7,7 @@
 >
 > Pull requests are very welcome for issues with confirmed scope, clear bug fixes, documentation improvements, and technical challenges that have already been discussed. Unsolicited feature PRs may not be merged if they do not align with the project direction.
 
-This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. For the full design philosophy, module breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
+This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. The backend uses self-contained `.hpp + .cpp` sources with a PCH used only for build acceleration. Project code includes external headers through exact facades under `src/vendor/`; Windows SDK facades map one-to-one to physical headers so domain aggregates do not couple unrelated call sites to the PCH. For the full design philosophy, component breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
 
 ## Prerequisites
 

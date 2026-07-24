@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::WebView::Types {
+#include "vendor/std.hpp"
+
+namespace core::webview {
 
 struct WebResourceResolution {
   bool success;
@@ -26,4 +28,4 @@ struct WebResolverRegistry {
   std::shared_mutex mutex;
 };
 
-}  // namespace Core::WebView::Types
+}  // namespace core::webview

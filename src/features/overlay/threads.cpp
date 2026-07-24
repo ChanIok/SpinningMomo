@@ -1,6 +1,8 @@
 #include "features/overlay/threads.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/overlay/interaction.hpp"
@@ -9,9 +11,9 @@
 #include "features/overlay/window.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Features::Overlay::Threads {
+namespace features::overlay::threads {
 
-auto start_threads(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto start_threads(core::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
   try {
     // 启动钩子线程
@@ -30,7 +32,7 @@ auto start_threads(Core::State::AppState& state) -> std::expected<void, std::str
   }
 }
 
-auto stop_threads(Core::State::AppState& state) -> void {
+auto stop_threads(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   // 请求停止线程并发送 WM_QUIT 消息
   if (overlay_state.threads.hook_thread.joinable() && overlay_state.threads.hook_thread_id != 0) {
@@ -44,7 +46,7 @@ auto stop_threads(Core::State::AppState& state) -> void {
   }
 }
 
-auto wait_for_threads(Core::State::AppState& state) -> void {
+auto wait_for_threads(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.threads.hook_thread.joinable()) {
     Logger().debug("Waiting for hook thread to join");
@@ -56,14 +58,14 @@ auto wait_for_threads(Core::State::AppState& state) -> void {
   }
 }
 
-auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> void {
+auto hook_thread_proc(core::AppState& state, std::stop_token token) -> void {
   // 初始化交互系统
-  if (auto result = Interaction::initialize_interaction(state); !result) {
+  if (auto result = interaction::initialize_interaction(state); !result) {
     return;
   }
 
-  if (auto result = Interaction::install_window_event_hook(state); !result) {
-    Interaction::uninstall_hooks(state);
+  if (auto result = interaction::install_window_event_hook(state); !result) {
+    interaction::uninstall_hooks(state);
     return;
   }
 
@@ -80,10 +82,10 @@ auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> vo
   }
 
   // 清理钩子
-  Interaction::uninstall_hooks(state);
+  interaction::uninstall_hooks(state);
 }
 
-auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token token) -> void {
+auto window_manager_thread_proc(core::AppState& state, std::stop_token token) -> void {
   auto& overlay_state = *state.overlay;
 
   // 创建定时器窗口
@@ -121,10 +123,10 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
     switch (msg.message) {
       case WM_TIMER:
         // 更新游戏窗口位置
-        Interaction::update_game_window_position(state);
+        interaction::update_game_window_position(state);
         break;
 
-      case Types::WM_GAME_WINDOW_FOREGROUND:
+      case WM_GAME_WINDOW_FOREGROUND:
         // 确保叠加层窗口在游戏窗口上方
         if (overlay_state.window.overlay_hwnd && overlay_state.window.target_window) {
           SetWindowPos(overlay_state.window.overlay_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
@@ -138,11 +140,11 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
         }
         break;
 
-      case Types::WM_WINDOW_EVENT: {
+      case WM_WINDOW_EVENT: {
         // 处理窗口事件
         DWORD event = static_cast<DWORD>(msg.wParam);
         HWND hwnd = reinterpret_cast<HWND>(msg.lParam);
-        Interaction::handle_window_event(state, event, hwnd);
+        interaction::handle_window_event(state, event, hwnd);
         break;
       }
     }
@@ -158,4 +160,4 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
   overlay_state.window.timer_window = nullptr;
 }
 
-}  // namespace Features::Overlay::Threads
+}  // namespace features::overlay::threads

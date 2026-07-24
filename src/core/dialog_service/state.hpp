@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Core::DialogService::State {
+#include "vendor/std.hpp"
+
+namespace core::dialog_service {
 
 struct DialogServiceState {
   std::jthread worker_thread;
@@ -13,4 +15,4 @@ struct DialogServiceState {
   std::atomic<bool> shutdown_requested{false};
 };
 
-}  // namespace Core::DialogService::State
+}  // namespace core::dialog_service

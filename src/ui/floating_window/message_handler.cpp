@@ -1,8 +1,10 @@
 #include "ui/floating_window/message_handler.hpp"
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
 #include "core/commands/registry.hpp"
 #include "core/commands/types.hpp"
@@ -22,11 +24,11 @@
 #include "ui/tray_icon/types.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace UI::FloatingWindow::MessageHandler {
+namespace ui::floating_window::message_handler {
 
-auto apply_dpi_change(Core::State::AppState& state, HWND hwnd, UINT new_dpi,
-                      const RECT& suggested_rect) -> void {
-  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(state, new_dpi);
+auto apply_dpi_change(core::AppState& state, HWND hwnd, UINT new_dpi, const RECT& suggested_rect)
+    -> void {
+  const auto metrics = ui::floating_window::layout::calculate_window_metrics(state, new_dpi);
 
   state.floating_window->window.dpi = new_dpi;
   state.floating_window->layout = metrics.layout;
@@ -40,8 +42,8 @@ auto apply_dpi_change(Core::State::AppState& state, HWND hwnd, UINT new_dpi,
 
   SetWindowPos(hwnd, nullptr, suggested_rect.left, suggested_rect.top, metrics.size.cx,
                metrics.size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
-  UI::FloatingWindow::refresh_visible_frame_border_thickness(state);
-  UI::FloatingWindow::request_repaint(state);
+  ui::floating_window::refresh_visible_frame_border_thickness(state);
+  ui::floating_window::request_repaint(state);
 }
 
 // 确保窗口能接收到WM_MOUSELEAVE消息
@@ -54,7 +56,7 @@ auto ensure_mouse_tracking(HWND hwnd) -> void {
 }
 
 // 检查鼠标是否在关闭按钮上
-auto is_mouse_on_close_button(const Core::State::AppState& state, int x, int y) -> bool {
+auto is_mouse_on_close_button(const core::AppState& state, int x, int y) -> bool {
   const auto& render = state.floating_window->layout;
 
   // 计算按钮尺寸（正方形，与标题栏高度一致）
@@ -70,45 +72,45 @@ auto is_mouse_on_close_button(const Core::State::AppState& state, int x, int y) 
 }
 
 // 将菜单项点击转换为具体的高层应用事件
-auto dispatch_item_click_event(Core::State::AppState& state,
-                               const UI::FloatingWindow::MenuItem& item) -> void {
-  using namespace UI::FloatingWindow::Events;
+auto dispatch_item_click_event(core::AppState& state, const ui::floating_window::MenuItem& item)
+    -> void {
+  using namespace ui::floating_window::events;
 
   switch (item.category) {
-    case UI::FloatingWindow::MenuItemCategory::AspectRatio: {
-      const auto& ratios = Features::Settings::Menu::get_ratios(state);
+    case ui::floating_window::MenuItemCategory::AspectRatio: {
+      const auto& ratios = features::settings::menu::get_ratios(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
-        Core::Events::send(state, RatioChangeEvent{static_cast<size_t>(item.index),
+        core::events::send(state, RatioChangeEvent{static_cast<size_t>(item.index),
                                                    ratio_preset.name, ratio_preset.ratio});
       }
       break;
     }
-    case UI::FloatingWindow::MenuItemCategory::Resolution: {
-      const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
+    case ui::floating_window::MenuItemCategory::Resolution: {
+      const auto& resolutions = features::settings::menu::get_resolutions(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        Core::Events::send(state,
+        core::events::send(state,
                            ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name});
       }
       break;
     }
-    case UI::FloatingWindow::MenuItemCategory::Feature: {
+    case ui::floating_window::MenuItemCategory::Feature: {
       // 通过注册表调用命令
-      Core::Commands::invoke_command(state, item.action_id);
+      core::commands::invoke_command(state, item.action_id);
       break;
     }
   }
 }
 
 // 处理热键，通过命令系统统一分发
-auto handle_hotkey_message(Core::State::AppState& state, WPARAM hotkey_id) -> void {
+auto handle_hotkey_message(core::AppState& state, WPARAM hotkey_id) -> void {
   Logger().debug("WM_HOTKEY received, wParam={}", hotkey_id);
-  Core::Commands::handle_hotkey(state, static_cast<int>(hotkey_id));
+  core::commands::handle_hotkey(state, static_cast<int>(hotkey_id));
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
-auto handle_mouse_leave(Core::State::AppState& state) -> void {
+auto handle_mouse_leave(core::AppState& state) -> void {
   // 重置悬停索引
   state.floating_window->ui.hover_index = -1;
 
@@ -118,17 +120,17 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
   // 重置 hovered_column
   state.floating_window->ui.hovered_column = -1;
 
-  UI::FloatingWindow::request_repaint(state);
+  ui::floating_window::request_repaint(state);
 }
 
 // 处理鼠标移动，更新悬停状态并重绘
-auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
-  const int new_hover_index = UI::FloatingWindow::Layout::get_item_index_from_point(state, x, y);
+auto handle_mouse_move(core::AppState& state, int x, int y) -> void {
+  const int new_hover_index = ui::floating_window::layout::get_item_index_from_point(state, x, y);
   if (new_hover_index != state.floating_window->ui.hover_index) {
     // 更新悬停索引
     state.floating_window->ui.hover_index = new_hover_index;
 
-    UI::FloatingWindow::request_repaint(state);
+    ui::floating_window::request_repaint(state);
     ensure_mouse_tracking(state.floating_window->window.hwnd);
   }
 
@@ -136,13 +138,13 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
   const bool close_hovered = is_mouse_on_close_button(state, x, y);
   if (close_hovered != state.floating_window->ui.close_button_hovered) {
     state.floating_window->ui.close_button_hovered = close_hovered;
-    UI::FloatingWindow::request_repaint(state);
+    ui::floating_window::request_repaint(state);
     ensure_mouse_tracking(state.floating_window->window.hwnd);
   }
 
   // 更新 hovered_column 状态
   const auto& render = state.floating_window->layout;
-  const auto bounds = UI::FloatingWindow::Layout::get_column_bounds(state);
+  const auto bounds = ui::floating_window::layout::get_column_bounds(state);
 
   int new_hovered_column = -1;
   if (y >= render.title_height + render.separator_height) {
@@ -158,20 +160,20 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
 
   if (new_hovered_column != state.floating_window->ui.hovered_column) {
     state.floating_window->ui.hovered_column = new_hovered_column;
-    UI::FloatingWindow::request_repaint(state);
+    ui::floating_window::request_repaint(state);
   }
 }
 
 // 处理鼠标左键点击，分发项目点击事件
-auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
+auto handle_left_click(core::AppState& state, int x, int y) -> void {
   // 检查是否点击了关闭按钮
   if (is_mouse_on_close_button(state, x, y)) {
     // 发送隐藏事件而不是退出事件
-    Core::Events::send(state, UI::FloatingWindow::Events::HideEvent{});
+    core::events::send(state, ui::floating_window::events::HideEvent{});
     return;
   }
 
-  const int clicked_index = UI::FloatingWindow::Layout::get_item_index_from_point(state, x, y);
+  const int clicked_index = ui::floating_window::layout::get_item_index_from_point(state, x, y);
   if (clicked_index >= 0 &&
       clicked_index < static_cast<int>(state.floating_window->data.menu_items.size())) {
     const auto& item = state.floating_window->data.menu_items[clicked_index];
@@ -180,12 +182,12 @@ auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
 }
 
 // 主窗口过程函数，负责将Windows消息翻译成应用程序事件
-auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
-                      LPARAM lParam) -> LRESULT {
+auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    -> LRESULT {
   switch (msg) {
-    case UI::TrayIcon::Types::WM_TRAYICON:
+    case ui::tray_icon::WM_TRAYICON:
       if (lParam == WM_RBUTTONUP || lParam == WM_LBUTTONUP) {
-        UI::TrayIcon::show_context_menu(state);
+        ui::tray_icon::show_context_menu(state);
       }
       return 0;
 
@@ -210,7 +212,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       if (HDC hdc = BeginPaint(hwnd, &ps); hdc) {
         RECT rect{};
         GetClientRect(hwnd, &rect);
-        UI::FloatingWindow::Painter::paint(state, hwnd, rect);
+        ui::floating_window::painter::paint(state, hwnd, rect);
         EndPaint(hwnd, &ps);
       }
       return 0;
@@ -238,9 +240,9 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
       // 判断鼠标在哪一列（排除分隔线区域）
       const auto& render = state.floating_window->layout;
-      const auto bounds = UI::FloatingWindow::Layout::get_column_bounds(state);
+      const auto bounds = ui::floating_window::layout::get_column_bounds(state);
       const auto& items = state.floating_window->data.menu_items;
-      const auto counts = UI::FloatingWindow::Layout::count_items_per_column(items);
+      const auto counts = ui::floating_window::layout::count_items_per_column(items);
       auto& ui = state.floating_window->ui;
 
       size_t* target_offset = nullptr;
@@ -280,7 +282,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       const int clamped_page = std::clamp(new_page, 0, std::max(0, total_pages - 1));
       *target_offset = static_cast<size_t>(clamped_page * page_size);
 
-      UI::FloatingWindow::request_repaint(state);
+      ui::floating_window::request_repaint(state);
       return 0;
     }
 
@@ -301,19 +303,19 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_RBUTTONUP: {
       // 复用托盘菜单的逻辑来显示上下文菜单
-      UI::TrayIcon::show_context_menu(state);
+      ui::tray_icon::show_context_menu(state);
       return 0;
     }
 
     case WM_SIZE: {
       SIZE new_size = {LOWORD(lParam), HIWORD(lParam)};
       // 调整Direct2D渲染上下文以适应新的窗口大小
-      UI::FloatingWindow::RenderContext::resize_render_context(state, new_size);
+      ui::floating_window::render_context::resize_render_context(state, new_size);
       return 0;
     }
 
     case WM_CLOSE:
-      Core::Events::send(state, UI::FloatingWindow::Events::HideEvent{});
+      core::events::send(state, ui::floating_window::events::HideEvent{});
       return 0;
 
     case WM_DESTROY:
@@ -322,17 +324,17 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     // 自定义消息：另一个实例请求显示窗口
     case 0x8000 + 100:  // WM_SPINNINGMOMO_SHOW
-      UI::FloatingWindow::show_window(state);
+      ui::floating_window::show_window(state);
       SetForegroundWindow(hwnd);
       return 0;
 
     // 处理异步事件队列 (WM_APP + 1)
-    case Core::Events::kWM_APP_PROCESS_EVENTS:
-      Core::Events::process_events(state);
+    case core::events::kWM_APP_PROCESS_EVENTS:
+      core::events::process_events(state);
       return 0;
 
     // Windows 11 TopMost Z 序失效 workaround：重新应用置顶以恢复视觉层级
-    case UI::FloatingWindow::WM_REFRESH_TOPMOST:
+    case ui::floating_window::WM_REFRESH_TOPMOST:
       SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
       return 0;
   }
@@ -341,14 +343,14 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
 // 静态窗口过程函数，将窗口句柄与应用程序状态关联起来
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  core::AppState* state = nullptr;
 
   if (msg == WM_NCCREATE) {
     const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = reinterpret_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   if (state) {
@@ -358,4 +360,4 @@ LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
   return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-}  // namespace UI::FloatingWindow::MessageHandler
+}  // namespace ui::floating_window::message_handler

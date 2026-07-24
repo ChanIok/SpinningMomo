@@ -1,12 +1,14 @@
 #include "core/worker_pool/worker_pool.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "core/worker_pool/state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::WorkerPool {
+namespace core::worker_pool {
 
-auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
+auto start(core::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
   if (!state.worker_pool) {
     return std::unexpected("WorkerPoolState is not initialized");
   }
@@ -86,7 +88,7 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
   }
 }
 
-auto stop(Core::State::AppState& state) -> void {
+auto stop(core::AppState& state) -> void {
   if (!state.worker_pool) {
     return;
   }
@@ -128,7 +130,7 @@ auto stop(Core::State::AppState& state) -> void {
   }
 }
 
-auto is_running(const Core::State::AppState& state) -> bool {
+auto is_running(const core::AppState& state) -> bool {
   if (!state.worker_pool) {
     return false;
   }
@@ -136,7 +138,7 @@ auto is_running(const Core::State::AppState& state) -> bool {
   return pool.is_running.load();
 }
 
-auto submit_task(Core::State::AppState& state, std::move_only_function<void()> task) -> bool {
+auto submit_task(core::AppState& state, std::move_only_function<void()> task) -> bool {
   if (!state.worker_pool) {
     return false;
   }
@@ -162,7 +164,7 @@ auto submit_task(Core::State::AppState& state, std::move_only_function<void()> t
   }
 }
 
-auto get_thread_count(const Core::State::AppState& state) -> size_t {
+auto get_thread_count(const core::AppState& state) -> size_t {
   if (!state.worker_pool) {
     return 0;
   }
@@ -170,7 +172,7 @@ auto get_thread_count(const Core::State::AppState& state) -> size_t {
   return pool.worker_threads.size();
 }
 
-auto get_pending_tasks(Core::State::AppState& state) -> size_t {
+auto get_pending_tasks(core::AppState& state) -> size_t {
   if (!state.worker_pool) {
     return 0;
   }
@@ -180,4 +182,4 @@ auto get_pending_tasks(Core::State::AppState& state) -> size_t {
   return pool.task_queue.size();
 }
 
-}  // namespace Core::WorkerPool
+}  // namespace core::worker_pool

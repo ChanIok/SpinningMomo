@@ -1,8 +1,10 @@
 #include "ui/notification_window/painter.hpp"
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dwrite_3.hpp"
 
 #include "core/notifications/types.hpp"
 #include "core/state/app_state.hpp"
@@ -15,7 +17,7 @@
 #include "utils/logger/logger.hpp"
 #include "utils/system/system.hpp"
 
-namespace UI::NotificationWindow::Painter {
+namespace ui::notification_window::painter {
 
 struct NotificationVisualStyle {
   bool use_system_chrome = false;
@@ -29,9 +31,9 @@ auto scale_for_dpi(int value, int dpi) -> int { return MulDiv(value, dpi, 96); }
 
 auto stroke_width_for_dpi(int dpi) -> float { return static_cast<float>(scale_for_dpi(1, dpi)); }
 
-auto is_exiting(NotificationWindow::NotificationAnimState state) -> bool {
-  return state == NotificationWindow::NotificationAnimState::FadingOut ||
-         state == NotificationWindow::NotificationAnimState::Done;
+auto is_exiting(notification_window::NotificationAnimState state) -> bool {
+  return state == notification_window::NotificationAnimState::FadingOut ||
+         state == notification_window::NotificationAnimState::Done;
 }
 
 auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
@@ -46,7 +48,7 @@ auto color_with_opacity(D2D1_COLOR_F color, float opacity) -> D2D1_COLOR_F {
 
 auto is_windows_11_or_newer() -> bool {
   static const bool result = []() -> bool {
-    const auto version = Utils::System::get_windows_version();
+    const auto version = utils::system::get_windows_version();
     if (!version) {
       return false;
     }
@@ -60,30 +62,30 @@ auto resolve_visual_style(int dpi) -> NotificationVisualStyle {
     return {};
   }
 
-  const float border_gray = static_cast<float>(NotificationWindow::BASE_BORDER_GRAY) / 255.0f;
+  const float border_gray = static_cast<float>(notification_window::BASE_BORDER_GRAY) / 255.0f;
   return NotificationVisualStyle{
       .use_system_chrome = true,
       .corner_radius =
-          static_cast<float>(scale_for_dpi(NotificationWindow::BASE_CORNER_RADIUS, dpi)),
+          static_cast<float>(scale_for_dpi(notification_window::BASE_CORNER_RADIUS, dpi)),
       .border_width = stroke_width_for_dpi(dpi),
       .shadow_margin = scale_for_dpi(10, dpi),
       .border_color = D2D1::ColorF(border_gray, border_gray, border_gray,
-                                   NotificationWindow::BASE_BORDER_ALPHA),
+                                   notification_window::BASE_BORDER_ALPHA),
   };
 }
 
 // 通知只复用浮窗的基础配色，不复用布局和边框策略，避免把两种窗口结构绑死
-auto resolve_notification_theme_colors(const Core::State::AppState& state)
-    -> NotificationWindow::NotificationThemeColors {
-  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
-  return NotificationWindow::NotificationThemeColors{
+auto resolve_notification_theme_colors(const core::AppState& state)
+    -> notification_window::NotificationThemeColors {
+  const auto colors = ui::shared_theme::resolve_floating_window_theme_colors(state);
+  return notification_window::NotificationThemeColors{
       .background = colors.background,
       .text = colors.text,
       .hover = colors.hover,
   };
 }
 
-auto get_current_dpi(const Core::State::AppState& state) -> int {
+auto get_current_dpi(const core::AppState& state) -> int {
   if (state.notification_window->host_hwnd) {
     return static_cast<int>(GetDpiForWindow(state.notification_window->host_hwnd));
   }
@@ -99,25 +101,25 @@ auto get_current_dpi(const Core::State::AppState& state) -> int {
 }
 
 auto get_window_width(int dpi) -> int {
-  return scale_for_dpi(NotificationWindow::BASE_WINDOW_WIDTH, dpi);
+  return scale_for_dpi(notification_window::BASE_WINDOW_WIDTH, dpi);
 }
 
 auto get_layout_margin(int dpi) -> int {
   const auto style = resolve_visual_style(dpi);
-  return scale_for_dpi(NotificationWindow::BASE_PADDING, dpi) + style.shadow_margin;
+  return scale_for_dpi(notification_window::BASE_PADDING, dpi) + style.shadow_margin;
 }
 
 auto get_host_size(int dpi) -> SIZE {
   const int margin = get_layout_margin(dpi);
-  const int spacing = scale_for_dpi(NotificationWindow::BASE_SPACING, dpi);
+  const int spacing = scale_for_dpi(notification_window::BASE_SPACING, dpi);
   const int width = get_window_width(dpi) + margin * 2;
-  const int height = scale_for_dpi(NotificationWindow::BASE_MAX_HEIGHT, dpi) *
-                         NotificationWindow::MAX_VISIBLE_NOTIFICATIONS +
-                     spacing * (NotificationWindow::MAX_VISIBLE_NOTIFICATIONS - 1) + margin * 2;
+  const int height = scale_for_dpi(notification_window::BASE_MAX_HEIGHT, dpi) *
+                         notification_window::MAX_VISIBLE_NOTIFICATIONS +
+                     spacing * (notification_window::MAX_VISIBLE_NOTIFICATIONS - 1) + margin * 2;
   return {width, height};
 }
 
-auto measure_text_height(NotificationWindow::RenderResources& render_resources,
+auto measure_text_height(notification_window::RenderResources& render_resources,
                          IDWriteFactory7* write_factory, const std::wstring& text, float width)
     -> float {
   if (!write_factory || !render_resources.message_text_format || width <= 0.0f) {
@@ -137,7 +139,7 @@ auto measure_text_height(NotificationWindow::RenderResources& render_resources,
   return metrics.height;
 }
 
-auto measure_text_width(NotificationWindow::RenderResources& render_resources,
+auto measure_text_width(notification_window::RenderResources& render_resources,
                         IDWriteFactory7* write_factory, const std::wstring& text,
                         IDWriteTextFormat* format) -> float {
   if (!write_factory || !format || text.empty()) {
@@ -156,11 +158,11 @@ auto measure_text_width(NotificationWindow::RenderResources& render_resources,
   return metrics.width;
 }
 
-auto calculate_button_width(Core::State::AppState& state, const std::wstring& label, int max_width)
+auto calculate_button_width(core::AppState& state, const std::wstring& label, int max_width)
     -> int {
   const int dpi = get_current_dpi(state);
-  const int min_width = scale_for_dpi(NotificationWindow::BASE_BUTTON_WIDTH, dpi);
-  const int text_padding = scale_for_dpi(NotificationWindow::BASE_BUTTON_TEXT_PADDING, dpi);
+  const int min_width = scale_for_dpi(notification_window::BASE_BUTTON_WIDTH, dpi);
+  const int text_padding = scale_for_dpi(notification_window::BASE_BUTTON_TEXT_PADDING, dpi);
   int width = min_width;
 
   const auto& render_resources = state.notification_window->render_resources;
@@ -175,14 +177,14 @@ auto calculate_button_width(Core::State::AppState& state, const std::wstring& la
   return std::min(width, std::max(min_width, max_width));
 }
 
-auto measure_message_block(Core::State::AppState& state, const std::wstring& message,
+auto measure_message_block(core::AppState& state, const std::wstring& message,
                            float message_text_width) -> float {
-  const int font_size = scale_for_dpi(NotificationWindow::BASE_FONT_SIZE, get_current_dpi(state));
+  const int font_size = scale_for_dpi(notification_window::BASE_FONT_SIZE, get_current_dpi(state));
   float message_height = static_cast<float>(font_size);
   if (message_text_width <= 0.0f) {
     return message_height;
   }
-  if (UI::NotificationWindow::RenderContext::ensure_render_context(state)) {
+  if (ui::notification_window::render_context::ensure_render_context(state)) {
     auto* write_factory = state.shared_render_resources->write_factory.get();
     message_height =
         std::max(message_height, measure_text_height(state.notification_window->render_resources,
@@ -191,8 +193,8 @@ auto measure_message_block(Core::State::AppState& state, const std::wstring& mes
   return message_height;
 }
 
-auto normalize_action(std::optional<Core::Notifications::Types::NotificationAction> action)
-    -> std::optional<Core::Notifications::Types::NotificationAction> {
+auto normalize_action(std::optional<core::notifications::NotificationAction> action)
+    -> std::optional<core::notifications::NotificationAction> {
   if (!action || action->label.empty()) {
     return std::nullopt;
   }
@@ -200,17 +202,17 @@ auto normalize_action(std::optional<Core::Notifications::Types::NotificationActi
 }
 
 auto compute_notification_layout(
-    Core::State::AppState& state, const std::wstring& message,
-    const std::optional<Core::Notifications::Types::NotificationAction>& action, int card_width)
-    -> NotificationWindow::NotificationLayoutMetrics {
+    core::AppState& state, const std::wstring& message,
+    const std::optional<core::notifications::NotificationAction>& action, int card_width)
+    -> notification_window::NotificationLayoutMetrics {
   const int dpi = get_current_dpi(state);
-  NotificationWindow::NotificationLayoutMetrics metrics{
-      .padding = scale_for_dpi(NotificationWindow::BASE_PADDING, dpi),
-      .content_padding = scale_for_dpi(NotificationWindow::BASE_CONTENT_PADDING, dpi),
-      .column_gap = scale_for_dpi(NotificationWindow::BASE_ACTION_COLUMN_GAP, dpi),
-      .title_height = scale_for_dpi(NotificationWindow::BASE_TITLE_HEIGHT, dpi),
-      .title_message_gap = scale_for_dpi(NotificationWindow::BASE_TITLE_MESSAGE_GAP, dpi),
-      .button_height = scale_for_dpi(NotificationWindow::BASE_BUTTON_HEIGHT, dpi),
+  notification_window::NotificationLayoutMetrics metrics{
+      .padding = scale_for_dpi(notification_window::BASE_PADDING, dpi),
+      .content_padding = scale_for_dpi(notification_window::BASE_CONTENT_PADDING, dpi),
+      .column_gap = scale_for_dpi(notification_window::BASE_ACTION_COLUMN_GAP, dpi),
+      .title_height = scale_for_dpi(notification_window::BASE_TITLE_HEIGHT, dpi),
+      .title_message_gap = scale_for_dpi(notification_window::BASE_TITLE_MESSAGE_GAP, dpi),
+      .button_height = scale_for_dpi(notification_window::BASE_BUTTON_HEIGHT, dpi),
   };
 
   if (action) {
@@ -228,11 +230,11 @@ auto compute_notification_layout(
   return metrics;
 }
 
-auto measure_card_height(const NotificationWindow::NotificationLayoutMetrics& layout, int dpi)
+auto measure_card_height(const notification_window::NotificationLayoutMetrics& layout, int dpi)
     -> int {
   const int total_height = layout.padding * 2 + layout.content_height;
-  const int min_height = scale_for_dpi(NotificationWindow::BASE_MIN_HEIGHT, dpi);
-  const int max_height = scale_for_dpi(NotificationWindow::BASE_MAX_HEIGHT, dpi);
+  const int min_height = scale_for_dpi(notification_window::BASE_MIN_HEIGHT, dpi);
+  const int max_height = scale_for_dpi(notification_window::BASE_MAX_HEIGHT, dpi);
   return std::clamp(total_height, min_height, max_height);
 }
 
@@ -244,7 +246,7 @@ auto set_brush_color(ID2D1SolidColorBrush* brush, D2D1_COLOR_F color) -> bool {
   return true;
 }
 
-auto fill_rounded_rect(NotificationWindow::RenderResources& render_resources,
+auto fill_rounded_rect(notification_window::RenderResources& render_resources,
                        const D2D1_ROUNDED_RECT& rect, D2D1_COLOR_F color) -> void {
   if (!render_resources.device_context ||
       !set_brush_color(render_resources.fill_brush.get(), color)) {
@@ -261,7 +263,7 @@ auto inset_rounded_rect(const D2D1_ROUNDED_RECT& rect, float inset) -> D2D1_ROUN
                            radius, radius);
 }
 
-auto draw_stroked_rounded_rect(NotificationWindow::RenderResources& render_resources,
+auto draw_stroked_rounded_rect(notification_window::RenderResources& render_resources,
                                const D2D1_ROUNDED_RECT& rect, D2D1_COLOR_F color,
                                float stroke_width) -> void {
   if (!render_resources.device_context || stroke_width <= 0.0f ||
@@ -285,7 +287,7 @@ auto expanded_rounded_rect(const D2D1_RECT_F& rect, float spread, float y_offset
   return D2D1::RoundedRect(expanded, radius + spread, radius + spread);
 }
 
-auto draw_card_shadow(NotificationWindow::RenderResources& render_resources,
+auto draw_card_shadow(notification_window::RenderResources& render_resources,
                       const D2D1_RECT_F& rect, const NotificationVisualStyle& style, float opacity)
     -> void {
   if (!style.use_system_chrome || style.shadow_margin <= 0 || opacity <= 0.0f) {
@@ -313,7 +315,7 @@ auto draw_card_shadow(NotificationWindow::RenderResources& render_resources,
   }
 }
 
-auto draw_text(NotificationWindow::RenderResources& render_resources, std::wstring_view text,
+auto draw_text(notification_window::RenderResources& render_resources, std::wstring_view text,
                IDWriteTextFormat* format, const D2D1_RECT_F& rect, D2D1_COLOR_F color) -> void {
   if (!render_resources.device_context || !format || text.empty() ||
       !set_brush_color(render_resources.text_brush.get(), color)) {
@@ -325,7 +327,7 @@ auto draw_text(NotificationWindow::RenderResources& render_resources, std::wstri
                                             D2D1_DRAW_TEXT_OPTIONS_CLIP);
 }
 
-auto update_notification_rects(NotificationWindow::Notification& notification) -> void {
+auto update_notification_rects(notification_window::Notification& notification) -> void {
   const auto& layout = notification.layout;
   const bool has_action = notification.action.has_value();
 
@@ -360,14 +362,14 @@ auto update_notification_rects(NotificationWindow::Notification& notification) -
   }
 }
 
-auto update_all_notification_rects(Core::State::AppState& state) -> void {
+auto update_all_notification_rects(core::AppState& state) -> void {
   for (auto& notification : state.notification_window->active_notifications) {
     update_notification_rects(notification);
   }
 }
 
-auto draw_action_button(Core::State::AppState& state,
-                        const NotificationWindow::Notification& notification) -> void {
+auto draw_action_button(core::AppState& state,
+                        const notification_window::Notification& notification) -> void {
   if (!notification.action) {
     return;
   }
@@ -393,11 +395,11 @@ auto draw_action_button(Core::State::AppState& state,
             rect, color_with_opacity(notification.colors.text, notification.opacity));
 }
 
-auto draw_notification(Core::State::AppState& state,
-                       const NotificationWindow::Notification& notification) -> void {
+auto draw_notification(core::AppState& state, const notification_window::Notification& notification)
+    -> void {
   auto& render_resources = state.notification_window->render_resources;
   if (notification.opacity <= 0.0f ||
-      notification.state == NotificationWindow::NotificationAnimState::Done) {
+      notification.state == notification_window::NotificationAnimState::Done) {
     return;
   }
 
@@ -424,7 +426,7 @@ auto draw_notification(Core::State::AppState& state,
   draw_action_button(state, notification);
 }
 
-auto present_render_context(Core::State::AppState& state) -> void {
+auto present_render_context(core::AppState& state) -> void {
   auto& render_resources = state.notification_window->render_resources;
   if (!render_resources.swap_chain) {
     return;
@@ -436,10 +438,10 @@ auto present_render_context(Core::State::AppState& state) -> void {
   }
 }
 
-auto paint_notifications(Core::State::AppState& state) -> void {
+auto paint_notifications(core::AppState& state) -> void {
   auto& render_resources = state.notification_window->render_resources;
   if (state.notification_window->active_notifications.empty() ||
-      !UI::NotificationWindow::RenderContext::ensure_render_context(state) ||
+      !ui::notification_window::render_context::ensure_render_context(state) ||
       render_resources.is_rendering) {
     return;
   }
@@ -457,7 +459,7 @@ auto paint_notifications(Core::State::AppState& state) -> void {
   render_resources.is_rendering = false;
 
   if (hr == D2DERR_RECREATE_TARGET) {
-    UI::NotificationWindow::RenderContext::cleanup_render_context(state);
+    ui::notification_window::render_context::cleanup_render_context(state);
     Logger().warn("Notification render target needs recreation");
     return;
   }
@@ -469,11 +471,11 @@ auto paint_notifications(Core::State::AppState& state) -> void {
   present_render_context(state);
 }
 
-auto request_repaint(Core::State::AppState& state) -> void {
+auto request_repaint(core::AppState& state) -> void {
   if (state.notification_window->host_hwnd &&
       IsWindowVisible(state.notification_window->host_hwnd)) {
     InvalidateRect(state.notification_window->host_hwnd, nullptr, FALSE);
   }
 }
 
-}  // namespace UI::NotificationWindow::Painter
+}  // namespace ui::notification_window::painter

@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Features::Settings::Registry {
+#include "vendor/std.hpp"
+
+namespace features::settings::registry {
 
 // === 比例预设注册表 ===
 // 内置的比例预设映射（用于快速查找，但用户可以添加任意 W:H 格式）
@@ -69,4 +71,4 @@ inline auto parse_resolution(std::string_view id) -> std::optional<std::pair<int
   return std::nullopt;
 }
 
-}  // namespace Features::Settings::Registry
+}  // namespace features::settings::registry

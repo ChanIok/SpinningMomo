@@ -1,11 +1,13 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/rpc/types.hpp"
 
-namespace Core::RPC::State {
+namespace core::rpc {
 
 struct RpcState {
   std::unordered_map<std::string, MethodInfo> registry;
 };
 
-}  // namespace Core::RPC::State
+}  // namespace core::rpc

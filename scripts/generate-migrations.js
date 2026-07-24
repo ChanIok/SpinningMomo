@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // SQL 迁移脚本生成器
-// 将 src/migrations 目录下的 SQL 文件转换为 C++ 模块文件
+// 将 src/migrations 目录下的 SQL 文件转换为 C++ 头文件
 //
 // 用法:
 //     node scripts/generate-migrations.js
@@ -10,7 +10,7 @@
 //     - 读取 src/migrations/*.sql 文件
 //     - 解析 SQL 文件中的版本号和描述（从注释中读取）
 //     - 按分号分割 SQL 语句
-//     - 生成 C++ 模块文件到 src/core/upgrade/generated/
+//     - 生成 C++ 头文件到 src/core/migration/generated/
 
 const fs = require("fs");
 const path = require("path");
@@ -134,17 +134,15 @@ function splitSqlStatements(sqlContent) {
 // ============================================================================
 
 /**
- * 生成 C++ 模块文件内容
+ * 生成 C++ 头文件内容
  *
  * @param {string} migrationFile - 迁移文件名
  * @param {number} version - 版本号
  * @param {string[]} sqlStatements - SQL 语句数组
- * @returns {string} C++ 模块文件内容
+ * @returns {string} C++ 头文件内容
  */
-function generateCppModule(migrationFile, version, sqlStatements) {
-  // 模块名称格式: V001, V002, ...
+function generateCppHeader(migrationFile, version, sqlStatements) {
   const moduleSuffix = `V${String(version).padStart(3, "0")}`;
-  const moduleName = `Core.Migration.Schema.${moduleSuffix}`;
   const structName = moduleSuffix; // 结构体名称，如 V001
 
   // 生成语句数组
@@ -163,24 +161,22 @@ ${stmt}
 
   const statementsArray = statementsCode.join(",\n");
 
-  return `// Auto-generated SQL schema module
-// DO NOT EDIT - This file is generated from src/migrations/${migrationFile}
+  return `#pragma once
 
-module;
+#include "vendor/std.hpp"
 
-export module ${moduleName};
+// Auto-generated SQL schema header
+// DO NOT EDIT - This file is generated from
+// src/migrations/${migrationFile}
 
-import std;
+namespace core::migration::schema {
 
-namespace Core::Migration::Schema {
-
-export struct ${structName} {
+struct ${structName} {
   static constexpr std::array<std::string_view, ${sqlStatements.length}> statements = {
-${statementsArray}
-  };
+${statementsArray}};
 };
 
-}  // namespace Core::Migration::Schema
+}  // namespace core::migration::schema
 `;
 }
 
@@ -224,12 +220,12 @@ function processMigrationFile(sqlFile) {
     console.log(`  Statements: ${statements.length}`);
 
     // 生成 C++ 代码
-    const cppContent = generateCppModule(fileName, version, statements);
+    const cppContent = generateCppHeader(fileName, version, statements);
 
     // 输出文件路径
     const outputFile = path.join(
       generatedDir,
-      `schema_${String(version).padStart(3, "0")}.ixx`
+      `schema_${String(version).padStart(3, "0")}.hpp`
     );
     fs.writeFileSync(outputFile, cppContent, "utf8");
 
@@ -246,39 +242,37 @@ function processMigrationFile(sqlFile) {
 }
 
 /**
- * 生成索引模块，导出所有 Schema
+ * 生成索引头文件，包含所有 Schema
  *
  * @param {number[]} processedVersions - 已处理的版本号数组
  */
-function generateIndexModule(processedVersions) {
+function generateIndexHeader(processedVersions) {
   if (processedVersions.length === 0) {
     return;
   }
 
   processedVersions.sort((a, b) => a - b);
 
-  // 生成 import 语句
-  const imports = processedVersions.map((ver) => {
-    return `export import Core.Migration.Schema.V${String(ver).padStart(
+  const includes = processedVersions.map((ver) => {
+    return `#include "core/migration/generated/schema_${String(ver).padStart(
       3,
       "0"
-    )};`;
+    )}.hpp"`;
   });
 
-  const importsCode = imports.join("\n");
+  const includesCode = includes.join("\n");
 
-  const indexContent = `// Auto-generated schema index
-// DO NOT EDIT - This file imports all generated schema modules
+  const indexContent = `#pragma once
 
-module;
+#include "vendor/std.hpp"
 
-export module Core.Migration.Schema;
+// Auto-generated schema index
+// DO NOT EDIT - This file includes all generated schema headers
 
-// Import all schema modules
-${importsCode}
+${includesCode}
 `;
 
-  const indexFile = path.join(generatedDir, "schema.ixx");
+  const indexFile = path.join(generatedDir, "schema.hpp");
   fs.writeFileSync(indexFile, indexContent, "utf8");
 
   const relativePath = path
@@ -351,13 +345,13 @@ function main() {
 
   // 生成索引模块
   if (processedVersions.length > 0) {
-    generateIndexModule(processedVersions);
+    generateIndexHeader(processedVersions);
   }
 
   // 输出总结
   console.log("=".repeat(70));
   console.log(
-    `✓ Successfully generated ${successCount}/${sqlFiles.length} schema module(s)`
+    `✓ Successfully generated ${successCount}/${sqlFiles.length} schema header(s)`
   );
   console.log("=".repeat(70));
 

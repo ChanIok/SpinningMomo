@@ -1,8 +1,10 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Logging {
+#include "vendor/spdlog.hpp"
+
+namespace utils::logging {
 
 // 日志管理函数
 auto initialize(const std::optional<std::string>& configured_level = std::nullopt)
@@ -11,7 +13,7 @@ auto shutdown() -> void;
 auto flush() -> void;
 auto set_level(std::string_view level) -> std::expected<void, std::string>;
 
-}  // namespace Utils::Logging
+}  // namespace utils::logging
 
 // Logger类 - 使用构造函数捕获source_location
 class Logger {

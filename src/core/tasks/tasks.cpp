@@ -1,13 +1,15 @@
 #include "core/tasks/tasks.hpp"
 
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/rfl.hpp"
 
 #include "core/rpc/notification_hub.hpp"
 #include "core/state/app_state.hpp"
 #include "core/tasks/state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::Tasks {
+namespace core::tasks {
 
 auto now_millis() -> std::int64_t {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -19,12 +21,12 @@ auto is_task_active(const std::string& status) -> bool {
   return status == "queued" || status == "running";
 }
 
-auto emit_task_updated(Core::State::AppState& state, const TaskSnapshot& snapshot) -> void {
+auto emit_task_updated(core::AppState& state, const TaskSnapshot& snapshot) -> void {
   auto params_json = rfl::json::write<rfl::SnakeCaseToCamelCase>(snapshot);
-  Core::RPC::NotificationHub::send_notification(state, "task.updated", params_json);
+  core::rpc::notification_hub::send_notification(state, "task.updated", params_json);
 }
 
-auto prune_history_unlocked(State::TaskState& task_state) -> void {
+auto prune_history_unlocked(TaskState& task_state) -> void {
   while (task_state.order.size() > task_state.history_limit) {
     const auto& oldest_id = task_state.order.front();
     auto it = task_state.tasks.find(oldest_id);
@@ -43,7 +45,7 @@ auto prune_history_unlocked(State::TaskState& task_state) -> void {
   }
 }
 
-auto create_task(Core::State::AppState& state, const std::string& type,
+auto create_task(core::AppState& state, const std::string& type,
                  const std::optional<std::string>& context) -> std::string {
   if (!state.tasks) {
     Logger().error("TaskState is not initialized");
@@ -70,11 +72,11 @@ auto create_task(Core::State::AppState& state, const std::string& type,
   return snapshot.task_id;
 }
 
-auto has_active_task_of_type(Core::State::AppState& state, const std::string& type) -> bool {
+auto has_active_task_of_type(core::AppState& state, const std::string& type) -> bool {
   return find_active_task_of_type(state, type).has_value();
 }
 
-auto find_active_task_of_type(Core::State::AppState& state, const std::string& type)
+auto find_active_task_of_type(core::AppState& state, const std::string& type)
     -> std::optional<TaskSnapshot> {
   if (!state.tasks) {
     return std::nullopt;
@@ -97,7 +99,7 @@ auto find_active_task_of_type(Core::State::AppState& state, const std::string& t
   return std::nullopt;
 }
 
-auto mark_task_running(Core::State::AppState& state, const std::string& task_id) -> bool {
+auto mark_task_running(core::AppState& state, const std::string& task_id) -> bool {
   if (!state.tasks) {
     return false;
   }
@@ -122,7 +124,7 @@ auto mark_task_running(Core::State::AppState& state, const std::string& task_id)
   return true;
 }
 
-auto update_task_progress(Core::State::AppState& state, const std::string& task_id,
+auto update_task_progress(core::AppState& state, const std::string& task_id,
                           const TaskProgress& progress) -> bool {
   if (!state.tasks) {
     return false;
@@ -154,7 +156,7 @@ auto update_task_progress(Core::State::AppState& state, const std::string& task_
   return true;
 }
 
-auto complete_task_success(Core::State::AppState& state, const std::string& task_id) -> bool {
+auto complete_task_success(core::AppState& state, const std::string& task_id) -> bool {
   if (!state.tasks) {
     return false;
   }
@@ -185,7 +187,7 @@ auto complete_task_success(Core::State::AppState& state, const std::string& task
   return true;
 }
 
-auto complete_task_failed(Core::State::AppState& state, const std::string& task_id,
+auto complete_task_failed(core::AppState& state, const std::string& task_id,
                           const std::string& error_message) -> bool {
   if (!state.tasks) {
     return false;
@@ -214,7 +216,7 @@ auto complete_task_failed(Core::State::AppState& state, const std::string& task_
   return true;
 }
 
-auto list_tasks(Core::State::AppState& state) -> std::vector<TaskSnapshot> {
+auto list_tasks(core::AppState& state) -> std::vector<TaskSnapshot> {
   if (!state.tasks) {
     return {};
   }
@@ -232,7 +234,7 @@ auto list_tasks(Core::State::AppState& state) -> std::vector<TaskSnapshot> {
   return result;
 }
 
-auto clear_finished_tasks(Core::State::AppState& state) -> std::size_t {
+auto clear_finished_tasks(core::AppState& state) -> std::size_t {
   if (!state.tasks) {
     return 0;
   }
@@ -260,4 +262,4 @@ auto clear_finished_tasks(Core::State::AppState& state) -> std::size_t {
   return cleared_count;
 }
 
-}  // namespace Core::Tasks
+}  // namespace core::tasks

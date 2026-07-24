@@ -1,8 +1,10 @@
 #pragma once
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
 
-namespace Core::Async::State {
+#include "vendor/asio.hpp"
+
+namespace core::async {
 
 struct AsyncState {
   // 核心asio状态
@@ -17,4 +19,4 @@ struct AsyncState {
   size_t thread_count = 0;  // 0表示使用硬件并发数
 };
 
-}  // namespace Core::Async::State
+}  // namespace core::async

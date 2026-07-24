@@ -1,14 +1,16 @@
 #include "core/events/events.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 #include "core/events/state.hpp"
 #include "core/state/app_state.hpp"
 
-namespace Core::Events {
+namespace core::events {
 
 // 同步分发一个事件：按类型查找订阅者并依次调用
-auto send_event(Core::State::AppState& state, std::type_index key, const std::any& data) -> void {
+auto send_event(core::AppState& state, std::type_index key, const std::any& data) -> void {
   if (!state.events) {
     return;
   }
@@ -26,7 +28,7 @@ auto send_event(Core::State::AppState& state, std::type_index key, const std::an
 }
 
 // 异步投递一个事件：入队后唤醒 UI 消息循环
-auto post_event(Core::State::AppState& state, std::type_index key, std::any data) -> void {
+auto post_event(core::AppState& state, std::type_index key, std::any data) -> void {
   if (!state.events) {
     return;
   }
@@ -43,7 +45,7 @@ auto post_event(Core::State::AppState& state, std::type_index key, std::any data
 }
 
 // 注册类型擦除后的事件处理器，由总线独占并重复调用
-auto subscribe_event(Core::State::AppState& state, std::type_index key,
+auto subscribe_event(core::AppState& state, std::type_index key,
                      std::move_only_function<void(const std::any&) const> handler) -> void {
   if (!state.events || !handler) {
     return;
@@ -55,7 +57,7 @@ auto subscribe_event(Core::State::AppState& state, std::type_index key,
 }
 
 // 批量处理异步事件：先缩短持锁时间，再在 UI 线程完成分发
-auto process_events_executor(State::EventsState& bus) -> void {
+auto process_events_executor(EventsState& bus) -> void {
   std::queue<std::pair<std::type_index, std::any>> events_to_process;
 
   // 快速获取事件队列的副本，减少锁的持有时间
@@ -87,7 +89,7 @@ auto process_events_executor(State::EventsState& bus) -> void {
 }
 
 // 处理当前待分发的异步事件
-auto process_events(Core::State::AppState& state) -> void {
+auto process_events(core::AppState& state) -> void {
   if (!state.events) {
     return;
   }
@@ -96,4 +98,4 @@ auto process_events(Core::State::AppState& state) -> void {
   process_events_executor(bus);
 }
 
-}  // namespace Core::Events
+}  // namespace core::events

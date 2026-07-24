@@ -1,9 +1,12 @@
 #pragma once
 
-// Auto-generated SQL schema module
-// DO NOT EDIT - This file is generated from src/migrations/002_watch_root_recovery_state.sql
+#include "vendor/std.hpp"
 
-namespace Core::Migration::Schema {
+// Auto-generated SQL schema header
+// DO NOT EDIT - This file is generated from
+// src/migrations/002_watch_root_recovery_state.sql
+
+namespace core::migration::schema {
 
 struct V002 {
   static constexpr std::array<std::string_view, 1> statements = {
@@ -19,4 +22,4 @@ CREATE TABLE watch_root_recovery_state (
         )SQL"};
 };
 
-}  // namespace Core::Migration::Schema
+}  // namespace core::migration::schema

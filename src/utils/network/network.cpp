@@ -1,10 +1,12 @@
 #include "utils/network/network.hpp"
 
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
 
 #include "utils/string/string.hpp"
 
-namespace Utils::Network::Detail {
+namespace utils::network::detail {
 
 auto reason_from_error(const asio::error_code& error) -> std::string {
   if (!error) {
@@ -40,7 +42,7 @@ auto make_timeout_result() -> TcpProbeResult {
 }
 
 auto parse_port(const std::wstring& port) -> std::expected<unsigned short, std::string> {
-  auto port_utf8 = Utils::String::ToUtf8(port);
+  auto port_utf8 = utils::string::ToUtf8(port);
   if (port_utf8.empty()) {
     return std::unexpected("Port is empty");
   }
@@ -172,9 +174,9 @@ auto connect_resolved(asio::ip::tcp::resolver::results_type endpoints,
   co_return TcpProbeResult{.reachable = true};
 }
 
-}  // namespace Utils::Network::Detail
+}  // namespace utils::network::detail
 
-namespace Utils::Network {
+namespace utils::network {
 
 auto probe_tcp_port(const std::wstring& server, const std::wstring& port,
                     std::chrono::milliseconds timeout) -> asio::awaitable<TcpProbeResult> {
@@ -182,13 +184,13 @@ auto probe_tcp_port(const std::wstring& server, const std::wstring& port,
     co_return TcpProbeResult{.reachable = false, .reason = "Server name is empty"};
   }
 
-  auto port_result = Detail::parse_port(port);
+  auto port_result = detail::parse_port(port);
   if (!port_result) {
     co_return TcpProbeResult{.reachable = false, .reason = port_result.error()};
   }
 
-  auto server_utf8 = Utils::String::ToUtf8(server);
-  auto port_utf8 = Utils::String::ToUtf8(port);
+  auto server_utf8 = utils::string::ToUtf8(server);
+  auto port_utf8 = utils::string::ToUtf8(port);
   if (server_utf8.empty()) {
     co_return TcpProbeResult{.reachable = false, .reason = "Server name is empty"};
   }
@@ -197,16 +199,16 @@ auto probe_tcp_port(const std::wstring& server, const std::wstring& port,
   auto address = asio::ip::make_address(server_utf8, address_error);
   if (!address_error) {
     // IP literal 不走 resolver，避免名称解析把短超时探测放大。
-    co_return co_await Detail::connect_endpoint(
+    co_return co_await detail::connect_endpoint(
         asio::ip::tcp::endpoint(address, port_result.value()), timeout);
   }
 
-  auto resolve_result = co_await Detail::resolve_host(server_utf8, port_utf8, timeout);
+  auto resolve_result = co_await detail::resolve_host(server_utf8, port_utf8, timeout);
   if (!resolve_result) {
     co_return resolve_result.error();
   }
 
-  co_return co_await Detail::connect_resolved(resolve_result.value(), timeout);
+  co_return co_await detail::connect_resolved(resolve_result.value(), timeout);
 }
 
-}  // namespace Utils::Network
+}  // namespace utils::network

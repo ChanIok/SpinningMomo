@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Utils::LRUCache {
+#include "vendor/std.hpp"
+
+namespace utils::lru_cache {
 
 // 缓存节点
 template <typename Key, typename Value>
@@ -112,4 +114,4 @@ inline auto get_stats(const LRUCacheState<Key, Value>& cache)
   return {cache.list.size(), cache.capacity};
 }
 
-}  // namespace Utils::LRUCache
+}  // namespace utils::lru_cache

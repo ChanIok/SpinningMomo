@@ -1,6 +1,9 @@
 #include "features/settings/settings.hpp"
 
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/rfl.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/events/events.hpp"
 #include "core/state/app_state.hpp"
@@ -12,11 +15,10 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 #include "utils/system/system.hpp"
-#include "vendor/windows.hpp"
 
-namespace Features::Settings {
+namespace features::settings {
 
-namespace Detail {
+namespace detail {
 
 // 启动期只关心 app 下的极少数字段；
 // 单独声明一个最小映射结构，避免在完整初始化前引入更多不必要的耦合。
@@ -33,14 +35,14 @@ struct StartupSettingsFile {
   StartupAppSettings app;
 };
 
-}  // namespace Detail
+}  // namespace detail
 
 auto detect_default_locale() -> std::string {
-  constexpr Vendor::Windows::LANGID kPrimaryLanguageMask = 0x03ff;
-  constexpr Vendor::Windows::LANGID kChinesePrimaryLanguage = 0x0004;
+  constexpr LANGID kPrimaryLanguageMask = 0x03ff;
+  constexpr LANGID kChinesePrimaryLanguage = 0x0004;
 
-  auto language_id = Vendor::Windows::GetUserDefaultUILanguage();
-  auto primary_language = static_cast<Vendor::Windows::LANGID>(language_id & kPrimaryLanguageMask);
+  auto language_id = GetUserDefaultUILanguage();
+  auto primary_language = static_cast<LANGID>(language_id & kPrimaryLanguageMask);
 
   if (primary_language == kChinesePrimaryLanguage) {
     return "zh-CN";
@@ -50,18 +52,18 @@ auto detect_default_locale() -> std::string {
 }
 
 auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
-  return Utils::Path::GetAppDataFilePath("settings.json");
+  return utils::path::GetAppDataFilePath("settings.json");
 }
 
-auto should_show_onboarding(const Types::AppSettings& settings) -> bool {
+auto should_show_onboarding(const AppSettings& settings) -> bool {
   if (!settings.app.onboarding.completed) {
     return true;
   }
 
-  return settings.app.onboarding.flow_version < Types::CURRENT_ONBOARDING_FLOW_VERSION;
+  return settings.app.onboarding.flow_version < CURRENT_ONBOARDING_FLOW_VERSION;
 }
 
-auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& app_state) -> std::expected<void, std::string> {
   try {
     auto settings_path = get_settings_path();
     if (!settings_path) {
@@ -72,15 +74,15 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     if (!std::filesystem::exists(settings_path.value())) {
       Logger().info("Settings file not found, creating default configuration");
 
-      Types::AppSettings config;
+      AppSettings config;
       config.app.language.current = detect_default_locale();
       // 新安装用户首次启动应进入欢迎流程
       config.app.onboarding.completed = false;
-      config.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
+      config.app.onboarding.flow_version = CURRENT_ONBOARDING_FLOW_VERSION;
       config.extensions.infinity_nikki.enable = false;
 
       // 根据操作系统版本设定圆角默认值（Win10 默认直角，Win11 默认圆角）
-      if (const auto win_ver = Utils::System::get_windows_version();
+      if (const auto win_ver = utils::system::get_windows_version();
           win_ver && (win_ver->major_version < 10 ||
                       (win_ver->major_version == 10 && win_ver->build_number < 22000))) {
         config.ui.web_theme.enable_rounded_corners = false;
@@ -97,9 +99,9 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
       // 计算预设并初始化内存状态
       app_state.settings->raw = std::move(config);
-      Compute::trigger_compute(app_state);
+      compute::trigger_compute(app_state);
       app_state.settings->is_initialized = true;
-      Background::register_static_resolvers(app_state);
+      background::register_static_resolvers(app_state);
 
       Logger().info("Default settings created successfully");
       return {};
@@ -113,15 +115,15 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-    auto config_result = rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing>(json_str);
+    auto config_result = rfl::json::read<AppSettings, rfl::DefaultIfMissing>(json_str);
     if (!config_result) {
       return std::unexpected("Failed to parse settings: " + config_result.error().what());
     }
 
     app_state.settings->raw = std::move(config_result.value());
-    Compute::trigger_compute(app_state);
+    compute::trigger_compute(app_state);
     app_state.settings->is_initialized = true;
-    Background::register_static_resolvers(app_state);
+    background::register_static_resolvers(app_state);
 
     Logger().info("Settings loaded successfully (version {})", app_state.settings->raw.version);
     return {};
@@ -130,20 +132,19 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 }
 
-auto get_settings(Core::State::AppState& app_state) -> Types::GetSettingsResult {
+auto get_settings(core::AppState& app_state) -> GetSettingsResult {
   std::scoped_lock lock(app_state.settings->mutation_mutex);
   return app_state.settings->raw;
 }
 
-auto notify_settings_changed(Core::State::AppState& app_state,
-                             const Types::AppSettings& old_settings,
+auto notify_settings_changed(core::AppState& app_state, const AppSettings& old_settings,
                              std::string_view change_description) -> void {
-  Types::SettingsChangeData change_data{
+  SettingsChangeData change_data{
       .old_settings = old_settings,
       .new_settings = app_state.settings->raw,
       .change_description = std::string(change_description),
   };
-  Core::Events::post(app_state, Features::Settings::Events::SettingsChangeEvent{change_data});
+  core::events::post(app_state, features::settings::events::SettingsChangeEvent{change_data});
 }
 
 auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object& patch) -> void {
@@ -167,36 +168,35 @@ auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object
   }
 }
 
-auto apply_settings_and_persist_locked(Core::State::AppState& app_state,
-                                       const Types::AppSettings& next_settings,
+auto apply_settings_and_persist_locked(core::AppState& app_state, const AppSettings& next_settings,
                                        std::string_view change_description)
-    -> std::expected<Types::UpdateSettingsResult, std::string> {
+    -> std::expected<UpdateSettingsResult, std::string> {
   auto settings_path = get_settings_path();
   if (!settings_path) {
     return std::unexpected(settings_path.error());
   }
 
-  Types::AppSettings old_settings = app_state.settings->raw;
+  AppSettings old_settings = app_state.settings->raw;
   app_state.settings->raw = next_settings;
-  Compute::trigger_compute(app_state);
+  compute::trigger_compute(app_state);
 
   auto save_result = save_settings_to_file(settings_path.value(), app_state.settings->raw);
   if (!save_result) {
     app_state.settings->raw = old_settings;
-    Compute::trigger_compute(app_state);
+    compute::trigger_compute(app_state);
     return std::unexpected(save_result.error());
   }
 
   notify_settings_changed(app_state, old_settings, change_description);
 
-  return Types::UpdateSettingsResult{
+  return UpdateSettingsResult{
       .success = true,
       .message = "Settings updated successfully",
   };
 }
 
-auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
-    -> std::expected<Types::UpdateSettingsResult, std::string> {
+auto update_settings(core::AppState& app_state, const UpdateSettingsParams& params)
+    -> std::expected<UpdateSettingsResult, std::string> {
   try {
     std::scoped_lock lock(app_state.settings->mutation_mutex);
     return apply_settings_and_persist_locked(app_state, params, "Settings updated via RPC");
@@ -205,11 +205,11 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
   }
 }
 
-auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettingsParams& params)
-    -> std::expected<Types::PatchSettingsResult, std::string> {
+auto patch_settings(core::AppState& app_state, const PatchSettingsParams& params)
+    -> std::expected<PatchSettingsResult, std::string> {
   try {
     if (params.patch.empty()) {
-      return Types::PatchSettingsResult{
+      return PatchSettingsResult{
           .success = true,
           .message = "No settings changes",
       };
@@ -225,8 +225,7 @@ auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettings
     // 不接受整数（如 100% → 1）导致的解析失败
     auto merged_json = rfl::json::write(merged_object);
     auto merged_settings_result =
-        rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing, rfl::SnakeCaseToCamelCase>(
-            merged_json);
+        rfl::json::read<AppSettings, rfl::DefaultIfMissing, rfl::SnakeCaseToCamelCase>(merged_json);
     if (!merged_settings_result) {
       return std::unexpected("Invalid settings patch: " + merged_settings_result.error().what());
     }
@@ -238,8 +237,8 @@ auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettings
   }
 }
 
-auto save_settings_to_file(const std::filesystem::path& settings_path,
-                           const Types::AppSettings& config) -> std::expected<void, std::string> {
+auto save_settings_to_file(const std::filesystem::path& settings_path, const AppSettings& config)
+    -> std::expected<void, std::string> {
   try {
     // 序列化配置到格式化的 JSON
     auto json_str = rfl::json::write(config, rfl::json::pretty);
@@ -279,7 +278,7 @@ auto load_startup_settings() noexcept -> StartupSettings {
     // - app.logger.level
     // 任何解析失败都应静默回退到默认值，不能阻塞应用启动。
     auto startup_result =
-        rfl::json::read<Detail::StartupSettingsFile, rfl::DefaultIfMissing>(json_str);
+        rfl::json::read<detail::StartupSettingsFile, rfl::DefaultIfMissing>(json_str);
     if (!startup_result) {
       return startup_settings;
     }
@@ -297,4 +296,4 @@ auto load_startup_settings() noexcept -> StartupSettings {
   }
 }
 
-}  // namespace Features::Settings
+}  // namespace features::settings

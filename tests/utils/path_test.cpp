@@ -1,12 +1,14 @@
-#include <doctest/doctest.h>
+#include "vendor/std.hpp"
+
+#include "vendor/doctest.hpp"
 
 #include "utils/path/path.hpp"
 
-using Utils::Path::ClassifyPathStorageKind;
-using Utils::Path::IsPathWithinBase;
-using Utils::Path::NormalizeForComparison;
-using Utils::Path::PathStorageKind;
-using Utils::Path::TryParseUncServer;
+using utils::path::ClassifyPathStorageKind;
+using utils::path::IsPathWithinBase;
+using utils::path::NormalizeForComparison;
+using utils::path::PathStorageKind;
+using utils::path::TryParseUncServer;
 
 // 标准 UNC 与扩展 UNC 路径都应解析出同一个服务器段
 TEST_CASE("UNC parser accepts supported Windows network path forms") {
@@ -35,8 +37,7 @@ TEST_CASE("UNC parser rejects local and incomplete paths") {
 
 // 存储分类只把具备服务器与共享段的 UNC 路径视为远程位置
 TEST_CASE("storage kind distinguishes UNC paths from local paths") {
-  CHECK(ClassifyPathStorageKind(LR"(\\server\share\photo.jpg)") ==
-        PathStorageKind::RemoteUnc);
+  CHECK(ClassifyPathStorageKind(LR"(\\server\share\photo.jpg)") == PathStorageKind::RemoteUnc);
   CHECK(ClassifyPathStorageKind(LR"(\\?\UNC\server\share\photo.jpg)") ==
         PathStorageKind::RemoteUnc);
   CHECK(ClassifyPathStorageKind(LR"(C:\Photos\photo.jpg)") == PathStorageKind::Local);
@@ -46,8 +47,7 @@ TEST_CASE("storage kind distinguishes UNC paths from local paths") {
 
 // 比较键统一 Windows 大小写、分隔符和 lexical 冗余段
 TEST_CASE("comparison normalization produces a stable Windows path key") {
-  CHECK(NormalizeForComparison(LR"(C:\Photos\.\Album\..\A.JPG)") ==
-        LR"(c:/photos/a.jpg)");
+  CHECK(NormalizeForComparison(LR"(C:\Photos\.\Album\..\A.JPG)") == LR"(c:/photos/a.jpg)");
 }
 
 // 相同路径与任意深度的子路径都属于扫描根

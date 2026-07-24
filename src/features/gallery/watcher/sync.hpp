@@ -1,67 +1,63 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/state.hpp"
 #include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Watcher::Sync {
+namespace features::gallery::watcher::sync {
 
 // 更新监听器的扫描配置
-auto update_watcher_scan_options(State::FolderWatcherState& watcher,
-                                 const std::optional<Types::ScanOptions>& scan_options) -> void;
+auto update_watcher_scan_options(FolderWatcherState& watcher,
+                                 const std::optional<ScanOptions>& scan_options) -> void;
 
 // 更新扫描完成后的回调
-auto update_post_scan_callback(State::FolderWatcherState& watcher,
-                               std::function<void(const Types::ScanResult&)> post_scan_callback)
-    -> void;
+auto update_post_scan_callback(FolderWatcherState& watcher,
+                               std::function<void(const ScanResult&)> post_scan_callback) -> void;
 
-auto get_post_scan_callback(State::FolderWatcherState& watcher)
-    -> std::function<void(const Types::ScanResult&)>;
+auto get_post_scan_callback(FolderWatcherState& watcher) -> std::function<void(const ScanResult&)>;
 
-auto get_watcher_scan_options(State::FolderWatcherState& watcher) -> Types::ScanOptions;
+auto get_watcher_scan_options(FolderWatcherState& watcher) -> ScanOptions;
 
 // 全量同步失败后，通知层只保留 dirty 状态，不再自动调度扫描。
-auto is_sync_faulted(State::FolderWatcherState& watcher) -> bool;
+auto is_sync_faulted(FolderWatcherState& watcher) -> bool;
 
 // 暂停实时队列消费，让启动恢复先建立一致的索引基线。
-auto begin_startup_recovery(State::FolderWatcherState& watcher) -> void;
+auto begin_startup_recovery(FolderWatcherState& watcher) -> void;
 
 // 结束启动恢复并唤醒全局编排线程处理期间积累的实时通知。
-auto finish_startup_recovery(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void;
+auto finish_startup_recovery(core::AppState& app_state, FolderWatcherState& watcher) -> void;
 
 // 将文件变更加入最终队列（REMOVE 等立即生效的动作）
-auto enqueue_file_change(State::FolderWatcherState& watcher, const std::string& normalized_path,
-                         State::PendingFileChangeAction action) -> void;
+auto enqueue_file_change(FolderWatcherState& watcher, const std::string& normalized_path,
+                         PendingFileChangeAction action) -> void;
 
 // UPSERT 先进入稳定队列，静默后再提升
-auto enqueue_file_upsert_for_stability(State::FolderWatcherState& watcher,
+auto enqueue_file_upsert_for_stability(FolderWatcherState& watcher,
                                        const std::string& normalized_path) -> void;
 
 // 标记需要全量并调度同步
-auto request_full_rescan(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void;
+auto request_full_rescan(core::AppState& app_state, FolderWatcherState& watcher) -> void;
 
 // 更新该 root 的防抖期限，并唤醒 Gallery 全局编排线程。
-auto schedule_sync_task(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
-    -> void;
+auto schedule_sync_task(core::AppState& app_state, FolderWatcherState& watcher) -> void;
 
 // Gallery 全局同步编排循环：选择到期 root，串行执行防抖、稳定检测与扫描。
-auto run_sync_coordinator(Core::State::AppState& app_state, std::stop_token stop_token) -> void;
+auto run_sync_coordinator(core::AppState& app_state, std::stop_token stop_token) -> void;
 
 // 启动阶段在调用方持有该 root 执行锁时，当场跑完一次全量。
-auto run_startup_full_rescan(Core::State::AppState& app_state, State::FolderWatcherState& watcher)
+auto run_startup_full_rescan(core::AppState& app_state, FolderWatcherState& watcher)
     -> std::expected<void, std::string>;
 
 // 将 USN 等离线 ScanChange 走增量应用
-auto apply_offline_scan_changes(Core::State::AppState& app_state,
-                                State::FolderWatcherState& watcher,
-                                const std::vector<Types::ScanChange>& changes)
-    -> std::expected<Types::ScanResult, std::string>;
+auto apply_offline_scan_changes(core::AppState& app_state, FolderWatcherState& watcher,
+                                const std::vector<ScanChange>& changes)
+    -> std::expected<ScanResult, std::string>;
 
 // 统一收口：日志、gallery.changed、post_scan_callback
-auto dispatch_scan_result(Core::State::AppState& app_state, State::FolderWatcherState& watcher,
-                          const Types::ScanResult& result, std::string_view mode,
+auto dispatch_scan_result(core::AppState& app_state, FolderWatcherState& watcher,
+                          const ScanResult& result, std::string_view mode,
                           bool force_gallery_changed = false) -> void;
 
-}  // namespace Features::Gallery::Watcher::Sync
+}  // namespace features::gallery::watcher::sync

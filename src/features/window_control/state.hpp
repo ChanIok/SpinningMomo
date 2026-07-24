@@ -1,8 +1,10 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Features::WindowControl::State {
+namespace features::window_control {
 
 struct WindowControlState {
   std::jthread center_lock_monitor_thread;
@@ -12,15 +14,15 @@ struct WindowControlState {
   // 仅在当前 clip 区域仍然是本模块上次写入的小矩形时才负责释放，
   // 避免误清掉游戏后续自己重新设置的 ClipCursor 状态。
   bool center_lock_owned{false};
-  Vendor::Windows::RECT last_center_lock_rect{};
+  RECT last_center_lock_rect{};
 
   // 仅在本模块为捕获稳定性 workaround 临时添加了 WS_EX_LAYERED 时负责恢复。
   bool layered_capture_workaround_owned{false};
-  Vendor::Windows::HWND layered_capture_workaround_hwnd{nullptr};
+  HWND layered_capture_workaround_hwnd{nullptr};
 };
 
 constexpr auto kCenterLockPollInterval = std::chrono::milliseconds{50};
 constexpr int kCenterLockSize = 1;
 constexpr int kClipTolerance = 10;
 
-}  // namespace Features::WindowControl::State
+}  // namespace features::window_control

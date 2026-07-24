@@ -1,13 +1,15 @@
 #pragma once
 
-// Auto-generated embedded Chinese locale module
+#include "vendor/std.hpp"
+
+// Auto-generated embedded Chinese locale header
 // DO NOT EDIT - This file contains embedded locale data
 //
 // Source: src/locales/zh-CN.json
-// Module: Core.I18n.Embedded.ZhCN
 // Variable: zh_cn_json
 
-namespace EmbeddedLocales {
+namespace embedded_locales {
+
 // Embedded Chinese JSON content as string_view
 // Size: 4033 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
@@ -90,4 +92,5 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "label.language_en_us": "English"
 }
 )EmbeddedJson";
-}  // namespace EmbeddedLocales
+
+}  // namespace embedded_locales

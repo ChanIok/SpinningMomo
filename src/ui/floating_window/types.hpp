@@ -1,15 +1,17 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "features/settings/menu.hpp"
 
-namespace UI::FloatingWindow {
+namespace ui::floating_window {
 
 // 用于 Windows 11 TopMost Z 序失效 workaround 的自定义消息
 constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
@@ -95,7 +97,7 @@ struct TextMeasureCacheEntry {
 };
 
 struct RenderResources {
-  // 设备级资源已上收至 UI.SharedRenderResources。
+  // 设备级资源已上收至 ui::shared_render_resources。
   // 这里仅保留浮窗自己的 composition surface 和绘制缓存。
   wil::com_ptr<IDXGISwapChain1> swap_chain;
   wil::com_ptr<IDCompositionTarget> composition_target;
@@ -140,4 +142,4 @@ inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D
   return D2D1::RectF(left, top, right, bottom);
 }
 
-}  // namespace UI::FloatingWindow
+}  // namespace ui::floating_window

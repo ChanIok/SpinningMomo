@@ -1,8 +1,10 @@
 #pragma once
 
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
 
-namespace Features::Settings::Types {
+#include "vendor/rfl.hpp"
+
+namespace features::settings {
 
 // 当前设置版本
 constexpr int CURRENT_SETTINGS_VERSION = 1;
@@ -277,4 +279,4 @@ struct PatchSettingsParams {
 
 using PatchSettingsResult = UpdateSettingsResult;
 
-}  // namespace Features::Settings::Types
+}  // namespace features::settings

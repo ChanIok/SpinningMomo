@@ -1,11 +1,13 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "core/notifications/types.hpp"
 
-namespace Core::Notifications::Events {
+namespace core::notifications::events {
 
 struct NotificationRequestEvent {
-  Core::Notifications::Types::NotificationOptions options;
+  core::notifications::NotificationOptions options;
 };
 
-}  // namespace Core::Notifications::Events
+}  // namespace core::notifications::events

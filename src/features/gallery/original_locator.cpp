@@ -1,14 +1,16 @@
 #include "features/gallery/original_locator.hpp"
 
+#include "vendor/std.hpp"
+
 #include "core/state/app_state.hpp"
 #include "features/gallery/folder/repository.hpp"
 #include "features/gallery/types.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
-namespace Features::Gallery::OriginalLocator {
+namespace features::gallery::original_locator {
 
-namespace Detail {
+namespace detail {
 
 // populate 一批 asset 时共用的 folder→root 查找表（不落库，仅内存）。
 struct LocatorContext {
@@ -21,7 +23,7 @@ struct LocatorContext {
 auto compute_relative_path_string(const std::filesystem::path& asset_path,
                                   const std::filesystem::path& root_path)
     -> std::optional<std::string> {
-  if (!Utils::Path::IsPathWithinBase(asset_path, root_path)) {
+  if (!utils::path::IsPathWithinBase(asset_path, root_path)) {
     return std::nullopt;
   }
 
@@ -36,13 +38,13 @@ auto compute_relative_path_string(const std::filesystem::path& asset_path,
   return relative_path_string;
 }
 
-auto build_locator_context(const std::vector<Types::Folder>& folders)
+auto build_locator_context(const std::vector<Folder>& folders)
     -> std::expected<LocatorContext, std::string> {
   LocatorContext context;
 
   // 路径短的先处理，保证子 folder 处理时父 folder 已写入 folder_to_root_id
-  std::vector<Types::Folder> sorted_folders = folders;
-  std::ranges::sort(sorted_folders, [](const Types::Folder& lhs, const Types::Folder& rhs) {
+  std::vector<Folder> sorted_folders = folders;
+  std::ranges::sort(sorted_folders, [](const Folder& lhs, const Folder& rhs) {
     if (lhs.path.size() != rhs.path.size()) {
       return lhs.path.size() < rhs.path.size();
     }
@@ -52,7 +54,7 @@ auto build_locator_context(const std::vector<Types::Folder>& folders)
   for (const auto& folder : sorted_folders) {
     if (!folder.parent_id.has_value()) {
       // 监视根：自己就是 root_id，并记下规范化根路径
-      auto normalized_root_result = Utils::Path::NormalizePath(std::filesystem::path(folder.path));
+      auto normalized_root_result = utils::path::NormalizePath(std::filesystem::path(folder.path));
       if (!normalized_root_result) {
         Logger().error("Failed to lexically normalize watch root folder path '{}': {}", folder.path,
                        normalized_root_result.error());
@@ -79,9 +81,9 @@ auto build_locator_context(const std::vector<Types::Folder>& folders)
   return context;
 }
 
-auto load_all_folders(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::Folder>, std::string> {
-  auto folders_result = Features::Gallery::Folder::Repository::list_all_folders(app_state);
+auto load_all_folders(core::AppState& app_state)
+    -> std::expected<std::vector<Folder>, std::string> {
+  auto folders_result = features::gallery::folder::repository::list_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected("Failed to load folders for original locator: " +
                            folders_result.error());
@@ -91,8 +93,8 @@ auto load_all_folders(Core::State::AppState& app_state)
 }
 
 // 给单个 asset 填 root_id、relative_path（仅改内存，不写库）；失败则字段留空并打日志。
-auto try_assign_locator(Core::State::AppState& app_state, const LocatorContext& context,
-                        Types::Asset& asset) -> std::expected<void, std::string> {
+auto try_assign_locator(core::AppState& app_state, const LocatorContext& context, Asset& asset)
+    -> std::expected<void, std::string> {
   asset.root_id.reset();
   asset.relative_path.reset();
 
@@ -122,7 +124,7 @@ auto try_assign_locator(Core::State::AppState& app_state, const LocatorContext& 
     return {};
   }
 
-  auto normalized_asset_result = Utils::Path::NormalizePath(std::filesystem::path(asset.path));
+  auto normalized_asset_result = utils::path::NormalizePath(std::filesystem::path(asset.path));
   if (!normalized_asset_result) {
     Logger().error(
         "Failed to lexically normalize asset path for original locator id={} path='{}': {}",
@@ -144,7 +146,7 @@ auto try_assign_locator(Core::State::AppState& app_state, const LocatorContext& 
   return {};
 }
 
-}  // namespace Detail
+}  // namespace detail
 
 // WebView 虚拟主机名，与 folder 注册映射一致（如 r-3.test）。
 auto make_root_host_name(std::int64_t root_id) -> std::wstring {
@@ -152,26 +154,26 @@ auto make_root_host_name(std::int64_t root_id) -> std::wstring {
 }
 
 // 列表 RPC 返回前：为每条 asset 补上 root_id、relative_path（整批只查一次 folders）。
-auto populate_asset_locators(Core::State::AppState& app_state, std::vector<Types::Asset>& assets)
+auto populate_asset_locators(core::AppState& app_state, std::vector<Asset>& assets)
     -> std::expected<void, std::string> {
   if (assets.empty()) {
     return {};
   }
 
   // 读 folders 表，建 folder→root 查找表
-  auto folders_result = Detail::load_all_folders(app_state);
+  auto folders_result = detail::load_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected(folders_result.error());
   }
 
-  auto context_result = Detail::build_locator_context(folders_result.value());
+  auto context_result = detail::build_locator_context(folders_result.value());
   if (!context_result) {
     return std::unexpected(context_result.error());
   }
 
   // 按 folder_id 为每条 asset 算 root_id、relative_path
   for (auto& asset : assets) {
-    auto assign_result = Detail::try_assign_locator(app_state, context_result.value(), asset);
+    auto assign_result = detail::try_assign_locator(app_state, context_result.value(), asset);
     if (!assign_result) {
       return std::unexpected(assign_result.error());
     }
@@ -182,7 +184,7 @@ auto populate_asset_locators(Core::State::AppState& app_state, std::vector<Types
 
 // 把 URL 里的 root_id + relative_path 拼回磁盘路径（dev 下 /static/assets/originals/by-root/...
 // 用）。
-auto resolve_original_file_path(Core::State::AppState& app_state, std::int64_t root_id,
+auto resolve_original_file_path(core::AppState& app_state, std::int64_t root_id,
                                 std::string_view relative_path)
     -> std::expected<std::filesystem::path, std::string> {
   if (root_id <= 0) {
@@ -194,7 +196,7 @@ auto resolve_original_file_path(Core::State::AppState& app_state, std::int64_t r
   }
 
   // 按 root_id 取监视根 folder 记录
-  auto folder_result = Features::Gallery::Folder::Repository::get_folder_by_id(app_state, root_id);
+  auto folder_result = features::gallery::folder::repository::get_folder_by_id(app_state, root_id);
   if (!folder_result) {
     return std::unexpected("Failed to query original root folder: " + folder_result.error());
   }
@@ -213,7 +215,7 @@ auto resolve_original_file_path(Core::State::AppState& app_state, std::int64_t r
     return std::unexpected("Original relative path must not be absolute");
   }
 
-  auto normalized_root_result = Utils::Path::NormalizePath(std::filesystem::path(folder.path));
+  auto normalized_root_result = utils::path::NormalizePath(std::filesystem::path(folder.path));
   if (!normalized_root_result) {
     return std::unexpected("Failed to lexically normalize original root folder path: " +
                            normalized_root_result.error());
@@ -224,11 +226,11 @@ auto resolve_original_file_path(Core::State::AppState& app_state, std::int64_t r
   auto candidate_path = std::filesystem::path(
       (normalized_root_path / relative_path_value).lexically_normal().generic_string());
   // 拒绝 .. 等逃出监视根的路径
-  if (!Utils::Path::IsPathWithinBase(candidate_path, normalized_root_path)) {
+  if (!utils::path::IsPathWithinBase(candidate_path, normalized_root_path)) {
     return std::unexpected("Original relative path escapes root folder");
   }
 
   return candidate_path;
 }
 
-}  // namespace Features::Gallery::OriginalLocator
+}  // namespace features::gallery::original_locator

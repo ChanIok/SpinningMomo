@@ -1,14 +1,16 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/throttle/throttle.hpp"
 
-namespace Features::Preview::Types {
+namespace features::preview {
 
 // 窗口类名
 constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
@@ -55,7 +57,7 @@ struct InteractionState {
   bool is_dragging = false;
   bool viewport_dragging = false;
   POINT drag_start{};
-  std::unique_ptr<Utils::Throttle::ThrottleState<float, float>> move_throttle;
+  std::unique_ptr<utils::throttle::ThrottleState<float, float>> move_throttle;
 
   // 上次设置的游戏窗口位置（用于跳过重复的 SetWindowPos 调用）
   std::optional<POINT> last_game_window_pos;
@@ -101,9 +103,9 @@ struct WindowSizeState {
 struct RenderingResources {
   std::atomic<bool> initialized = false;
   std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
-  Utils::Graphics::D3D::D3DContext d3d_context;
-  Utils::Graphics::D3D::ShaderResources basic_shaders;
-  Utils::Graphics::D3D::ShaderResources viewport_shaders;
+  utils::graphics::d3d::D3DContext d3d_context;
+  utils::graphics::d3d::ShaderResources basic_shaders;
+  utils::graphics::d3d::ShaderResources viewport_shaders;
   wil::com_ptr<ID3D11Buffer> basic_vertex_buffer;
   wil::com_ptr<ID3D11Buffer> viewport_vertex_buffer;
   wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
@@ -111,9 +113,9 @@ struct RenderingResources {
 
 // 捕获会话（业务层封装）
 struct CaptureState {
-  Utils::Graphics::Capture::CaptureSession session;
+  utils::graphics::capture::CaptureSession session;
   std::atomic<int> last_frame_width = 0;
   std::atomic<int> last_frame_height = 0;
 };
 
-}  // namespace Features::Preview::Types
+}  // namespace features::preview

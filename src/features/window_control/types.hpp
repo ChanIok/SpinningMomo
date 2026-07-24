@@ -1,11 +1,13 @@
 #pragma once
 
+#include "vendor/std.hpp"
+
 #include "vendor/windows.hpp"
 
-namespace Features::WindowControl {
+namespace features::window_control {
 
 struct WindowInfo {
-  Vendor::Windows::HWND handle = nullptr;
+  HWND handle = nullptr;
   std::wstring title;
 
   auto operator==(const WindowInfo& other) const noexcept -> bool {
@@ -24,7 +26,7 @@ struct Resolution {
 
 struct TransformOptions {
   bool activate_window = true;
-  std::optional<Vendor::Windows::HWND> letterbox_window = std::nullopt;
+  std::optional<HWND> letterbox_window = std::nullopt;
 };
 
 struct ResolutionPresetInput {
@@ -39,4 +41,4 @@ struct ResolutionCalculationOptions {
   int screen_height = 0;
 };
 
-}  // namespace Features::WindowControl
+}  // namespace features::window_control

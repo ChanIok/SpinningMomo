@@ -1,7 +1,9 @@
 #include "core/http_server/static.hpp"
 
-#include <uwebsockets/App.h>
-#include <asio.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/uwebsockets.hpp"
 
 #include "core/async/async.hpp"
 #include "core/http_server/types.hpp"
@@ -12,11 +14,11 @@
 #include "utils/path/path.hpp"
 #include "utils/time.hpp"
 
-namespace Core::HttpServer::Static {
+namespace core::http_server::static_content {
 
 // 注册 HTTP 路径解析器：独占修改注册表并转移 resolver 所有权
-auto register_path_resolver(Core::State::AppState& state, std::string prefix,
-                            Types::PathResolver resolver) -> void {
+auto register_path_resolver(core::AppState& state, std::string prefix, PathResolver resolver)
+    -> void {
   if (!state.http_server) {
     Logger().error("HttpServer state not initialized, cannot register path resolver");
     return;
@@ -31,7 +33,7 @@ auto register_path_resolver(Core::State::AppState& state, std::string prefix,
 }
 
 // 注销指定前缀的 HTTP 路径解析器，并等待正在执行的读取离开共享区
-auto unregister_path_resolver(Core::State::AppState& state, std::string_view prefix) -> void {
+auto unregister_path_resolver(core::AppState& state, std::string_view prefix) -> void {
   if (!state.http_server) {
     return;
   }
@@ -45,8 +47,8 @@ auto unregister_path_resolver(Core::State::AppState& state, std::string_view pre
 }
 
 // 按注册顺序查找并调用首个能够解析当前 URL 的 HTTP resolver
-auto try_custom_resolve(Core::State::AppState& state, std::string_view url_path)
-    -> std::optional<Types::PathResolution> {
+auto try_custom_resolve(core::AppState& state, std::string_view url_path)
+    -> std::optional<PathResolution> {
   if (!state.http_server) {
     return std::nullopt;
   }
@@ -103,7 +105,7 @@ auto get_cache_duration(const std::string& extension) -> std::chrono::seconds {
 
 // 路径解析
 auto resolve_file_path(const std::string& url_path) -> std::filesystem::path {
-  auto web_root = Utils::Path::GetEmbeddedWebRootDirectory().value_or(".");
+  auto web_root = utils::path::GetEmbeddedWebRootDirectory().value_or(".");
 
   auto clean_path = url_path == "/" ? "/index.html" : url_path;
   if (clean_path.ends_with("/")) clean_path += "index.html";
@@ -113,7 +115,7 @@ auto resolve_file_path(const std::string& url_path) -> std::filesystem::path {
 
 // 获取web根目录
 auto get_web_root() -> std::filesystem::path {
-  return Utils::Path::GetEmbeddedWebRootDirectory().value_or(".");
+  return utils::path::GetEmbeddedWebRootDirectory().value_or(".");
 }
 
 // ---- Range 请求：<video> 拖动进度、分片加载依赖 Accept-Ranges + 206 + Content-Range ----
@@ -224,8 +226,8 @@ auto build_cache_validators(const std::filesystem::path& file_path, size_t file_
   }
 
   auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
-      Utils::Time::file_time_to_system_clock(last_write_time));
-  auto modified_seconds = Utils::Time::file_time_to_seconds(last_write_time);
+      utils::time::file_time_to_system_clock(last_write_time));
+  auto modified_seconds = utils::time::file_time_to_seconds(last_write_time);
 
   return CacheValidators{
       .etag = std::format("\"{:x}-{:x}\"", file_size, modified_seconds),
@@ -307,8 +309,8 @@ auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
 }
 
 // 在 uWS 线程中发送数据块
-auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
-                       std::shared_ptr<std::string> chunk_data) -> void {
+auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::string> chunk_data)
+    -> void {
   if (ctx->is_aborted) {
     Logger().debug("Stream aborted, stopping");
     return;
@@ -376,7 +378,7 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
 }
 
 // 读取并发送下一个数据块
-auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void {
+auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
   // 检查是否完成
   if (ctx->file_offset >= ctx->file_end_offset || ctx->is_aborted) {
     if (!ctx->is_aborted) {
@@ -387,7 +389,7 @@ auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void
   }
 
   // 计算本次读取大小
-  size_t to_read = std::min(Types::STREAM_CHUNK_SIZE, ctx->file_end_offset - ctx->file_offset);
+  size_t to_read = std::min(STREAM_CHUNK_SIZE, ctx->file_end_offset - ctx->file_offset);
 
   // 异步读取文件块
   ctx->file.async_read_some_at(
@@ -412,12 +414,12 @@ auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void
 }
 
 // 流式传输文件
-auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file_path,
+auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                         std::string mime_type, std::string cache_control,
                         CacheValidators validators, size_t file_size,
                         std::optional<ByteRange> range, auto* res) -> void {
   auto* loop = uWS::Loop::get();
-  auto io_context = Core::Async::get_io_context(state);
+  auto io_context = core::async::get_io_context(state);
 
   size_t range_start = range.has_value() ? range->start : 0;
   size_t range_end = range.has_value() ? range->end : (file_size - 1);
@@ -435,7 +437,7 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
       Logger().debug("Starting stream for file: {}, size: {} bytes", file_path.string(), file_size);
 
       // 创建流上下文
-      auto ctx = std::make_shared<Types::StreamContext>(Types::StreamContext{
+      auto ctx = std::make_shared<StreamContext>(StreamContext{
           .file = std::move(file),
           .file_path = file_path,
           .source_file_size = file_size,
@@ -454,7 +456,7 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
                                       : std::nullopt,
           .loop = loop,
           .res = res,
-          .buffer = std::vector<char>(Types::STREAM_CHUNK_SIZE),
+          .buffer = std::vector<char>(STREAM_CHUNK_SIZE),
           .is_aborted = false,
       });
 
@@ -491,8 +493,7 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
 }
 
 // 图库 /static 原文件与磁盘 web 根路径共用：统一处理 Range、HEAD/GET，并择流式或整读。
-auto serve_resolved_file_request(Core::State::AppState& state,
-                                 const std::filesystem::path& file_path,
+auto serve_resolved_file_request(core::AppState& state, const std::filesystem::path& file_path,
                                  std::optional<std::chrono::seconds> cache_duration_override,
                                  std::optional<std::string> cache_control_override, auto* res,
                                  auto* req, bool is_head) -> void {
@@ -508,7 +509,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
   size_t file_size = std::filesystem::file_size(file_path);
 
   // 决定mime类型和缓存时间
-  std::string mime_type = Utils::File::Mime::get_mime_type(file_path);
+  std::string mime_type = utils::file::mime::get_mime_type(file_path);
   std::chrono::seconds cache_duration;
   if (cache_duration_override) {
     cache_duration = *cache_duration_override;
@@ -554,7 +555,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
 
   // 视频任意 Range 都应流式发送，避免小 Range 却整文件读入内存（content_length 可能很小但 file
   // 很大）。
-  if (content_length > Types::STREAM_THRESHOLD || file_size > Types::STREAM_THRESHOLD) {
+  if (content_length > STREAM_THRESHOLD || file_size > STREAM_THRESHOLD) {
     Logger().debug("Using stream for resolved file: {} bytes", file_size);
     handle_file_stream(state, file_path, mime_type, cache_control, validators, file_size,
                        range_parse.range, res);
@@ -568,13 +569,13 @@ auto serve_resolved_file_request(Core::State::AppState& state,
 
   // 在异步运行时中处理文件读取
   asio::co_spawn(
-      *Core::Async::get_io_context(state),
+      *core::async::get_io_context(state),
       [res, file_path, mime_type, cache_control = std::move(cache_control),
        validators = std::move(validators), loop, file_size,
        range = range_parse.range]() -> asio::awaitable<void> {
         try {
           // 异步读取文件
-          auto file_result = co_await Utils::File::read_file(file_path);
+          auto file_result = co_await utils::file::read_file(file_path);
           if (!file_result) {
             Logger().error("Failed to read custom file: {}", file_result.error());
             loop->defer([res]() {
@@ -615,8 +616,8 @@ auto serve_resolved_file_request(Core::State::AppState& state,
 }
 
 // 处理静态文件请求
-auto handle_static_request(Core::State::AppState& state, const std::string& url_path, auto* res,
-                           auto* req, bool is_head = false) -> void {
+auto handle_static_request(core::AppState& state, const std::string& url_path, auto* res, auto* req,
+                           bool is_head = false) -> void {
   // 1. 先尝试自定义解析器
   if (auto custom_result = try_custom_resolve(state, url_path)) {
     if (custom_result->has_value()) {
@@ -653,7 +654,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
 }
 
 // 注册静态文件路由
-auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
+auto register_routes(core::AppState& state, uWS::App& app) -> void {
   Logger().info("Registering static file routes");
 
   // 注册通用的GET路由处理所有静态文件请求
@@ -680,4 +681,4 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
   });
 }
 
-}  // namespace Core::HttpServer::Static
+}  // namespace core::http_server::static_content

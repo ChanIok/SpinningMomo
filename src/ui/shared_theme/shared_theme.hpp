@@ -1,11 +1,13 @@
 #pragma once
 
-#include <d2d1_3.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
 
 #include "core/state/app_state.hpp"
 
-namespace UI::SharedTheme {
+namespace ui::shared_theme {
 
 struct FloatingWindowThemeColors {
   D2D1_COLOR_F background{};
@@ -17,7 +19,6 @@ struct FloatingWindowThemeColors {
   D2D1_COLOR_F scroll_indicator{};
 };
 
-auto resolve_floating_window_theme_colors(const Core::State::AppState& state)
-    -> FloatingWindowThemeColors;
+auto resolve_floating_window_theme_colors(const core::AppState& state) -> FloatingWindowThemeColors;
 
-}  // namespace UI::SharedTheme
+}  // namespace ui::shared_theme

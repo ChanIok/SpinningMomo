@@ -1,12 +1,14 @@
 #include "ui/notification_window/render_context.hpp"
 
-#include <d2d1_3.h>
-#include <d3d11.h>
-#include <dcomp.h>
-#include <dwrite_3.h>
-#include <dxgi1_2.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
 #include "ui/notification_window/state.hpp"
@@ -14,12 +16,12 @@
 #include "ui/shared_render_resources/shared_render_resources.hpp"
 #include "ui/shared_render_resources/state.hpp"
 
-namespace UI::NotificationWindow::RenderContext {
+namespace ui::notification_window::render_context {
 
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
-auto shared_resources(Core::State::AppState& state)
-    -> UI::SharedRenderResources::State::SharedRenderResourcesState& {
+auto shared_resources(core::AppState& state)
+    -> ui::shared_render_resources::SharedRenderResourcesState& {
   return *state.shared_render_resources;
 }
 
@@ -51,19 +53,19 @@ auto create_text_format(IDWriteFactory7* write_factory, float font_size,
   return format;
 }
 
-auto release_text_formats(NotificationWindow::RenderResources& render_resources) -> void {
+auto release_text_formats(notification_window::RenderResources& render_resources) -> void {
   render_resources.title_text_format.reset();
   render_resources.message_text_format.reset();
   render_resources.button_text_format.reset();
 }
 
-auto release_brushes(NotificationWindow::RenderResources& render_resources) -> void {
+auto release_brushes(notification_window::RenderResources& render_resources) -> void {
   render_resources.fill_brush.reset();
   render_resources.stroke_brush.reset();
   render_resources.text_brush.reset();
 }
 
-auto release_target_bitmap(NotificationWindow::RenderResources& render_resources) -> void {
+auto release_target_bitmap(notification_window::RenderResources& render_resources) -> void {
   if (render_resources.device_context) {
     render_resources.device_context->SetTarget(nullptr);
   }
@@ -71,7 +73,7 @@ auto release_target_bitmap(NotificationWindow::RenderResources& render_resources
 }
 
 auto create_device_context(ID2D1Device* shared_device,
-                           NotificationWindow::RenderResources& render_resources) -> bool {
+                           notification_window::RenderResources& render_resources) -> bool {
   if (!shared_device) {
     return false;
   }
@@ -94,7 +96,7 @@ auto create_device_context(ID2D1Device* shared_device,
 }
 
 auto create_swap_chain(ID3D11Device* shared_d3d_device,
-                       NotificationWindow::RenderResources& render_resources, const SIZE& size)
+                       notification_window::RenderResources& render_resources, const SIZE& size)
     -> bool {
   if (!shared_d3d_device) {
     return false;
@@ -123,7 +125,7 @@ auto create_swap_chain(ID3D11Device* shared_d3d_device,
 }
 
 auto create_composition_tree(ID3D11Device* shared_d3d_device,
-                             NotificationWindow::RenderResources& render_resources, HWND hwnd)
+                             notification_window::RenderResources& render_resources, HWND hwnd)
     -> bool {
   if (!shared_d3d_device || !render_resources.swap_chain) {
     return false;
@@ -158,7 +160,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
          SUCCEEDED(composition_device->Commit());
 }
 
-auto create_target_bitmap(NotificationWindow::RenderResources& render_resources, const SIZE& size)
+auto create_target_bitmap(notification_window::RenderResources& render_resources, const SIZE& size)
     -> bool {
   release_target_bitmap(render_resources);
 
@@ -182,7 +184,7 @@ auto create_target_bitmap(NotificationWindow::RenderResources& render_resources,
   return true;
 }
 
-auto create_brushes(NotificationWindow::RenderResources& render_resources) -> bool {
+auto create_brushes(notification_window::RenderResources& render_resources) -> bool {
   if (!render_resources.device_context) {
     return false;
   }
@@ -195,8 +197,8 @@ auto create_brushes(NotificationWindow::RenderResources& render_resources) -> bo
              D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f), render_resources.text_brush.put()));
 }
 
-auto ensure_text_formats(Core::State::AppState& state,
-                         NotificationWindow::RenderResources& render_resources, int dpi) -> bool {
+auto ensure_text_formats(core::AppState& state,
+                         notification_window::RenderResources& render_resources, int dpi) -> bool {
   if (render_resources.title_text_format && render_resources.message_text_format &&
       render_resources.button_text_format && render_resources.dpi == dpi) {
     return true;
@@ -210,14 +212,14 @@ auto ensure_text_formats(Core::State::AppState& state,
   };
 
   render_resources.title_text_format = create_text_format(
-      write_factory, scale_for_dpi(NotificationWindow::BASE_TITLE_FONT_SIZE),
+      write_factory, scale_for_dpi(notification_window::BASE_TITLE_FONT_SIZE),
       DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_NEAR, DWRITE_WORD_WRAPPING_NO_WRAP);
   render_resources.message_text_format =
-      create_text_format(write_factory, scale_for_dpi(NotificationWindow::BASE_FONT_SIZE),
+      create_text_format(write_factory, scale_for_dpi(notification_window::BASE_FONT_SIZE),
                          DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_NEAR,
                          DWRITE_WORD_WRAPPING_CHARACTER);
   render_resources.button_text_format =
-      create_text_format(write_factory, scale_for_dpi(NotificationWindow::BASE_FONT_SIZE),
+      create_text_format(write_factory, scale_for_dpi(notification_window::BASE_FONT_SIZE),
                          DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
                          DWRITE_WORD_WRAPPING_NO_WRAP);
 
@@ -226,7 +228,7 @@ auto ensure_text_formats(Core::State::AppState& state,
          render_resources.button_text_format;
 }
 
-auto reset_render_context(NotificationWindow::RenderResources& render_resources) -> void {
+auto reset_render_context(notification_window::RenderResources& render_resources) -> void {
   release_text_formats(render_resources);
   release_brushes(render_resources);
   release_target_bitmap(render_resources);
@@ -240,13 +242,13 @@ auto reset_render_context(NotificationWindow::RenderResources& render_resources)
   render_resources.dpi = 96;
 }
 
-auto ensure_render_context(Core::State::AppState& state) -> bool {
+auto ensure_render_context(core::AppState& state) -> bool {
   auto& window_state = *state.notification_window;
   auto& render_resources = window_state.render_resources;
   if (!window_state.host_hwnd) {
     return false;
   }
-  if (!UI::SharedRenderResources::ensure_initialized(state)) {
+  if (!ui::shared_render_resources::ensure_initialized(state)) {
     return false;
   }
 
@@ -284,11 +286,11 @@ auto ensure_render_context(Core::State::AppState& state) -> bool {
   return true;
 }
 
-auto cleanup_render_context(Core::State::AppState& state) -> void {
+auto cleanup_render_context(core::AppState& state) -> void {
   reset_render_context(state.notification_window->render_resources);
 }
 
-auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -> bool {
+auto resize_render_context(core::AppState& state, const SIZE& new_size) -> bool {
   auto& render_resources = state.notification_window->render_resources;
   if (!render_resources.is_ready || !render_resources.swap_chain ||
       !render_resources.device_context || new_size.cx <= 0 || new_size.cy <= 0) {
@@ -310,4 +312,4 @@ auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -
   return true;
 }
 
-}  // namespace UI::NotificationWindow::RenderContext
+}  // namespace ui::notification_window::render_context

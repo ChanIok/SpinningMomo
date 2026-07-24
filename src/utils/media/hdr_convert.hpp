@@ -1,11 +1,13 @@
 #pragma once
 
-#include <d3d11.h>
-#include <d3d11_4.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Media::HdrConvert {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/d3d11_4.hpp"
+
+namespace utils::media::hdr_convert {
 
 // HDR 录制转换器：把 WGC 的 scRGB FP16 帧渲染成单张 P010 纹理的 Y/UV 两个 plane。
 struct ConverterContext {
@@ -28,4 +30,4 @@ auto create_converter(ID3D11Device* device, std::uint32_t width, std::uint32_t h
 auto convert_frame(ConverterContext& converter, ID3D11DeviceContext* context,
                    ID3D11Texture2D* source_texture) -> std::expected<ID3D11Texture2D*, std::string>;
 
-}  // namespace Utils::Media::HdrConvert
+}  // namespace utils::media::hdr_convert

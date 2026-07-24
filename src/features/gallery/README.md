@@ -1,10 +1,10 @@
-# Gallery 模块
+# Gallery 功能
 
 Gallery 负责把文件系统中的照片和视频维护为可查询的图库索引，并提供文件夹、标签、
 缩略图、筛选、文件操作及变化通知。它不托管或备份原件：数据库保存图库元数据，
 文件系统决定原件当前是否可用。
 
-## 模块边界
+## 功能边界
 
 - Gallery 向前端提供 `gallery.*` RPC，并在可见索引变化后发送 `gallery.changed`。
 - Gallery 通过 `ScanChange` 向扩展报告文件路径变化，但不包含 Infinity Nikki 等扩展业务。
@@ -24,7 +24,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 - `asset/`、`folder/`、`tag/`、`color/`：索引查询与各自的数据操作。
 - `asset/thumbnail.cpp`：缩略图生成、修复和缓存对账。
 - `static_resolver.cpp`：缩略图与原图的静态访问入口。
-- `types.ixx`：跨扫描器、watcher、RPC 和扩展共享的稳定语义。
+- `types.hpp`：跨扫描器、watcher、RPC 和扩展共享的稳定语义。
 
 ## 资产身份
 
@@ -96,7 +96,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 ## 必须保持的不变量
 
 - Scanner 只能更新文件系统或媒体派生字段，不能覆盖资产用户数据。
-- 全量扫描与 watcher 必须复用 `Scanner.AssetPipeline` 的路径处理语义。
+- 全量扫描与 watcher 必须复用 `features::gallery::scanner::asset_pipeline` 的路径处理语义。
 - 目录库存变化可以刷新 Gallery UI，但不能伪造文件级 `ScanChange`。
 - 应用主动文件操作若忽略了对应 watcher 事件，必须显式补发真实的 `REMOVE/UPSERT`。
 - 启动恢复先接收实时通知，再应用 USN 或全量基线；checkpoint 只能推进到成功应用的边界。

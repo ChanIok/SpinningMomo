@@ -1,7 +1,9 @@
 #include "features/gallery/watcher/watcher.hpp"
 
-#include <wil/resource.h>
-#include <windows.h>
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
@@ -16,26 +18,26 @@
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
-namespace Features::Gallery::Watcher {
+namespace features::gallery::watcher {
 
 // 应用主动文件系统操作结束后额外缓冲一段时间，吸收“晚到”的通知。
 constexpr std::chrono::milliseconds kManualFileSystemIgnoreGracePeriod{3000};
 
-auto is_shutdown_requested(const Core::State::AppState& app_state) -> bool {
+auto is_shutdown_requested(const core::AppState& app_state) -> bool {
   return app_state.gallery && app_state.gallery->shutdown_requested.load(std::memory_order_acquire);
 }
 
 auto build_ignore_key(const std::filesystem::path& path)
     -> std::expected<std::wstring, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(path);
+  auto normalized_result = utils::path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
   }
-  return Utils::Path::NormalizeForComparison(normalized_result.value());
+  return utils::path::NormalizeForComparison(normalized_result.value());
 }
 
 // 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
-auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state) -> void {
+auto cleanup_expired_manual_file_system_ignores(core::AppState& app_state) -> void {
   auto now = std::chrono::steady_clock::now();
   std::erase_if(app_state.gallery->manual_file_system_ignore_paths, [now](const auto& pair) {
     const auto& entry = pair.second;
@@ -44,16 +46,16 @@ auto cleanup_expired_manual_file_system_ignores(Core::State::AppState& app_state
 }
 
 // 保存已经成功应用的启动恢复边界，作为下次启动重放 USN 的保守起点。
-auto persist_startup_recovery_plan(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Recovery::Types::StartupRecoveryPlan& plan) -> void {
+auto persist_startup_recovery_plan(core::AppState& app_state,
+                                   const features::gallery::recovery::StartupRecoveryPlan& plan)
+    -> void {
   // 非 NTFS/无 Journal 的计划没有可恢复边界，继续依赖下次全量扫描。
   if (plan.root_path.empty() || plan.volume_identity.empty() || plan.rule_fingerprint.empty() ||
       !plan.journal_id.has_value() || !plan.checkpoint_usn.has_value()) {
     return;
   }
 
-  Features::Gallery::Recovery::Types::WatchRootRecoveryState recovery_state{
+  features::gallery::recovery::WatchRootRecoveryState recovery_state{
       .root_path = plan.root_path,
       .volume_identity = plan.volume_identity,
       .journal_id = plan.journal_id,
@@ -61,7 +63,7 @@ auto persist_startup_recovery_plan(
       .rule_fingerprint = plan.rule_fingerprint,
   };
   auto persist_result =
-      Features::Gallery::Recovery::Service::persist_recovery_state(app_state, recovery_state);
+      features::gallery::recovery::service::persist_recovery_state(app_state, recovery_state);
   if (!persist_result) {
     Logger().warn("Failed to persist startup recovery checkpoint for '{}': {}", plan.root_path,
                   persist_result.error());
@@ -69,7 +71,7 @@ auto persist_startup_recovery_plan(
 }
 
 // 启动 Gallery 唯一的同步编排线程。
-auto start_sync_coordinator_if_needed(Core::State::AppState& app_state)
+auto start_sync_coordinator_if_needed(core::AppState& app_state)
     -> std::expected<bool, std::string> {
   if (is_shutdown_requested(app_state)) {
     return std::unexpected("Gallery is shutting down");
@@ -87,7 +89,7 @@ auto start_sync_coordinator_if_needed(Core::State::AppState& app_state)
   try {
     // 编排线程不占用 WorkerPool，扫描内部的叶子任务仍由 WorkerPool 处理。
     app_state.gallery->watcher_sync_thread = std::jthread([&app_state](std::stop_token stop_token) {
-      Sync::run_sync_coordinator(app_state, stop_token);
+      sync::run_sync_coordinator(app_state, stop_token);
     });
   } catch (const std::exception& e) {
     return std::unexpected("Failed to start gallery sync coordinator: " + std::string(e.what()));
@@ -96,7 +98,7 @@ auto start_sync_coordinator_if_needed(Core::State::AppState& app_state)
 }
 
 // 停止 Gallery 全局同步编排线程，并打断无任务时的条件等待。
-auto stop_sync_coordinator(Core::State::AppState& app_state) -> void {
+auto stop_sync_coordinator(core::AppState& app_state) -> void {
   std::jthread coordinator_thread;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->watcher_sync_mutex);
@@ -113,7 +115,7 @@ auto stop_sync_coordinator(Core::State::AppState& app_state) -> void {
 }
 
 // 在已独占监听生命周期锁时停止该 root 的目录读取线程。
-auto stop_watch_thread(State::FolderWatcherState& watcher) -> void {
+auto stop_watch_thread(FolderWatcherState& watcher) -> void {
   // 先关闭该 root 的事件接收与同步入口。
   watcher.stop_requested.store(true, std::memory_order_release);
 
@@ -133,7 +135,7 @@ auto stop_watch_thread(State::FolderWatcherState& watcher) -> void {
 }
 
 // 停止指定 watcher：关闭监听后等待该 root 当前同步退出。
-auto stop_watcher(State::FolderWatcherState& watcher) -> void {
+auto stop_watcher(FolderWatcherState& watcher) -> void {
   {
     std::unique_lock<std::mutex> lifecycle_lock(watcher.watch_lifecycle_mutex);
     stop_watch_thread(watcher);
@@ -143,8 +145,8 @@ auto stop_watcher(State::FolderWatcherState& watcher) -> void {
 }
 
 // 在调用方持有监听生命周期锁时启动该 root 的目录读取线程。
-auto start_watch_thread_if_needed(Core::State::AppState& app_state, const std::string& watcher_key,
-                                  State::FolderWatcherState& watcher, bool bootstrap_full_scan)
+auto start_watch_thread_if_needed(core::AppState& app_state, const std::string& watcher_key,
+                                  FolderWatcherState& watcher, bool bootstrap_full_scan)
     -> std::expected<bool, std::string> {
   if (watcher.removal_in_progress.load(std::memory_order_acquire)) {
     return std::unexpected("Watcher is stopping for root directory: " + watcher_key);
@@ -159,7 +161,7 @@ auto start_watch_thread_if_needed(Core::State::AppState& app_state, const std::s
   try {
     // 全局编排器已由上层先行启动，此处只产生目录事件。
     watcher.watch_thread = std::jthread([&app_state, watcher_key](std::stop_token stop_token) {
-      Notify::run_watch_loop(app_state, watcher_key, stop_token);
+      notify::run_watch_loop(app_state, watcher_key, stop_token);
     });
   } catch (const std::exception& e) {
     stop_watch_thread(watcher);
@@ -168,7 +170,7 @@ auto start_watch_thread_if_needed(Core::State::AppState& app_state, const std::s
 
   if (bootstrap_full_scan) {
     // 首次启动通过同一调度入口请求全量对账，不额外创建扫描任务。
-    Sync::request_full_rescan(app_state, watcher);
+    sync::request_full_rescan(app_state, watcher);
   }
 
   return true;
@@ -177,7 +179,7 @@ auto start_watch_thread_if_needed(Core::State::AppState& app_state, const std::s
 // Gallery root 的运行时 key 只做 lexical 规范化，不解析 symlink/网络路径。
 auto normalize_root_directory(const std::filesystem::path& root_directory)
     -> std::expected<std::filesystem::path, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(root_directory);
+  auto normalized_result = utils::path::NormalizePath(root_directory);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
   }
@@ -198,9 +200,9 @@ auto validate_root_directory_accessible(const std::filesystem::path& root_direct
 }
 
 // 注册一个根目录 watcher；若已存在则更新扫描参数。
-auto register_watcher_for_directory(Core::State::AppState& app_state,
+auto register_watcher_for_directory(core::AppState& app_state,
                                     const std::filesystem::path& root_directory,
-                                    const std::optional<Types::ScanOptions>& scan_options)
+                                    const std::optional<ScanOptions>& scan_options)
     -> std::expected<void, std::string> {
   // shutdown 开始后不再接受新 watcher，避免清空 watcher 表后又被并发写回。
   if (is_shutdown_requested(app_state)) {
@@ -232,7 +234,7 @@ auto register_watcher_for_directory(Core::State::AppState& app_state,
     }
 
     if (watcher_created || scan_options.has_value()) {
-      Sync::update_watcher_scan_options(watcher, scan_options);
+      sync::update_watcher_scan_options(watcher, scan_options);
     }
   }
 
@@ -240,9 +242,9 @@ auto register_watcher_for_directory(Core::State::AppState& app_state,
 }
 
 // 为已注册的根目录 watcher 设置扫描完成回调。
-auto set_post_scan_callback_for_directory(
-    Core::State::AppState& app_state, const std::filesystem::path& root_directory,
-    std::function<void(const Types::ScanResult&)> post_scan_callback)
+auto set_post_scan_callback_for_directory(core::AppState& app_state,
+                                          const std::filesystem::path& root_directory,
+                                          std::function<void(const ScanResult&)> post_scan_callback)
     -> std::expected<void, std::string> {
   auto normalized_result = normalize_root_directory(root_directory);
   if (!normalized_result) {
@@ -260,13 +262,13 @@ auto set_post_scan_callback_for_directory(
       return std::unexpected("Watcher is stopping for root directory: " +
                              normalized_result->string());
     }
-    Sync::update_post_scan_callback(it->second, std::move(post_scan_callback));
+    sync::update_post_scan_callback(it->second, std::move(post_scan_callback));
   }
   return {};
 }
 
 // 启动一个已注册的根目录 watcher。
-auto start_watcher_for_directory(Core::State::AppState& app_state,
+auto start_watcher_for_directory(core::AppState& app_state,
                                  const std::filesystem::path& root_directory,
                                  bool bootstrap_full_scan) -> std::expected<void, std::string> {
   auto normalized_result = normalize_root_directory(root_directory);
@@ -274,12 +276,12 @@ auto start_watcher_for_directory(Core::State::AppState& app_state,
     return std::unexpected(normalized_result.error());
   }
 
-  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
-                                                                 normalized_result.value())) {
+  if (features::gallery::root_availability::is_remote_unreachable(app_state,
+                                                                  normalized_result.value())) {
     return std::unexpected("Remote root is unavailable: " + normalized_result->string());
   }
 
-  State::FolderWatcherState* watcher = nullptr;
+  FolderWatcherState* watcher = nullptr;
   std::unique_lock<std::mutex> lifecycle_lock;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
@@ -313,7 +315,7 @@ auto start_watcher_for_directory(Core::State::AppState& app_state,
 }
 
 // 从程序缓存中移除对应目录的监听器并停止后台线程
-auto remove_watcher_for_directory(Core::State::AppState& app_state,
+auto remove_watcher_for_directory(core::AppState& app_state,
                                   const std::filesystem::path& root_directory)
     -> std::expected<bool, std::string> {
   auto normalized_result = normalize_root_directory(root_directory);
@@ -322,7 +324,7 @@ auto remove_watcher_for_directory(Core::State::AppState& app_state,
   }
 
   auto key = normalized_result->string();
-  State::FolderWatcherState* watcher = nullptr;
+  FolderWatcherState* watcher = nullptr;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
     auto it = app_state.gallery->folder_watchers.find(key);
@@ -350,9 +352,8 @@ auto remove_watcher_for_directory(Core::State::AppState& app_state,
 }
 
 // 在应用启动时，从数据库的文件夹列表中恢复所有的监听器配置
-auto restore_watchers_from_db(Core::State::AppState& app_state)
-    -> std::expected<void, std::string> {
-  auto folders_result = Features::Gallery::Folder::Repository::list_all_folders(app_state);
+auto restore_watchers_from_db(core::AppState& app_state) -> std::expected<void, std::string> {
+  auto folders_result = features::gallery::folder::repository::list_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected("Failed to query folders for watcher restore: " +
                            folders_result.error());
@@ -380,8 +381,7 @@ auto restore_watchers_from_db(Core::State::AppState& app_state)
 }
 
 // 启动所有已经纳入管理的（注册过的）监听器任务
-auto start_registered_watchers(Core::State::AppState& app_state)
-    -> std::expected<void, std::string> {
+auto start_registered_watchers(core::AppState& app_state) -> std::expected<void, std::string> {
   if (is_shutdown_requested(app_state)) {
     Logger().info("Skip gallery watcher startup recovery: shutdown has been requested");
     return {};
@@ -408,7 +408,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
   std::optional<std::string> first_error;
 
   // 公共 helper：启动 watcher 线程并统一处理计数和错误记录。
-  auto try_start_watcher = [&](const std::string& key, State::FolderWatcherState& watcher) -> bool {
+  auto try_start_watcher = [&](const std::string& key, FolderWatcherState& watcher) -> bool {
     if (is_shutdown_requested(app_state)) {
       Logger().info("Skip watcher start for '{}': shutdown has been requested",
                     watcher.root_path.string());
@@ -445,7 +445,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       break;
     }
 
-    State::FolderWatcherState* watcher_ptr = nullptr;
+    FolderWatcherState* watcher_ptr = nullptr;
     std::unique_lock<std::mutex> lifecycle_lock;
     {
       std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
@@ -460,7 +460,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     }
     auto& watcher = *watcher_ptr;
 
-    if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state, watcher.root_path)) {
+    if (features::gallery::root_availability::is_remote_unreachable(app_state, watcher.root_path)) {
       Logger().warn("Skip gallery startup recovery for unavailable remote root '{}'",
                     watcher.root_path.string());
       continue;
@@ -470,21 +470,21 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     std::unique_lock<std::mutex> execution_lock(watcher.sync_execution_mutex);
 
     // 先暂停实时队列消费并启动监听，让恢复期间的新事件只入队、不抢跑数据库同步。
-    Sync::begin_startup_recovery(watcher);
+    sync::begin_startup_recovery(watcher);
     [[maybe_unused]] auto recovery_gate = wil::scope_exit(
-        [&app_state, &watcher] { Sync::finish_startup_recovery(app_state, watcher); });
+        [&app_state, &watcher] { sync::finish_startup_recovery(app_state, watcher); });
     if (!try_start_watcher(watcher_key, watcher)) {
       continue;
     }
     lifecycle_lock.unlock();
 
     // 实时监听建立后再划定 USN 边界：离线计划负责边界之前，pending 队列负责边界之后。
-    auto recovery_plan_result = Features::Gallery::Recovery::Service::prepare_startup_recovery(
-        app_state, watcher.root_path, Sync::get_watcher_scan_options(watcher));
+    auto recovery_plan_result = features::gallery::recovery::service::prepare_startup_recovery(
+        app_state, watcher.root_path, sync::get_watcher_scan_options(watcher));
     if (!recovery_plan_result) {
       Logger().warn("Startup recovery decision failed for '{}': {}. Falling back to full scan.",
                     watcher.root_path.string(), recovery_plan_result.error());
-      auto startup_full_scan_result = Sync::run_startup_full_rescan(app_state, watcher);
+      auto startup_full_scan_result = sync::run_startup_full_rescan(app_state, watcher);
       if (!startup_full_scan_result) {
         Logger().warn("Startup full scan failed for '{}': {}", watcher.root_path.string(),
                       startup_full_scan_result.error());
@@ -494,17 +494,17 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
     const auto& plan = recovery_plan_result.value();
 
-    if (plan.mode == Features::Gallery::Recovery::Types::StartupRecoveryMode::UsnJournal) {
+    if (plan.mode == features::gallery::recovery::StartupRecoveryMode::UsnJournal) {
       Logger().info("Gallery startup recovery for '{}': mode=usn, reason={}, changes={}",
                     watcher.root_path.string(), plan.reason, plan.changes.size());
 
       if (!plan.changes.empty()) {
         auto recovery_apply_result =
-            Sync::apply_offline_scan_changes(app_state, watcher, plan.changes);
+            sync::apply_offline_scan_changes(app_state, watcher, plan.changes);
         if (!recovery_apply_result) {
           Logger().warn("USN recovery apply failed for '{}': {}. Falling back to full scan.",
                         watcher.root_path.string(), recovery_apply_result.error());
-          auto startup_full_scan_result = Sync::run_startup_full_rescan(app_state, watcher);
+          auto startup_full_scan_result = sync::run_startup_full_rescan(app_state, watcher);
           if (!startup_full_scan_result) {
             Logger().warn("Startup full scan failed for '{}': {}", watcher.root_path.string(),
                           startup_full_scan_result.error());
@@ -514,7 +514,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
           }
           continue;
         }
-        Sync::dispatch_scan_result(app_state, watcher, recovery_apply_result.value(),
+        sync::dispatch_scan_result(app_state, watcher, recovery_apply_result.value(),
                                    "startup_usn");
       }
 
@@ -526,7 +526,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     Logger().info("Gallery startup recovery for '{}': mode=full_scan, reason={}",
                   watcher.root_path.string(), plan.reason);
 
-    auto startup_full_scan_result = Sync::run_startup_full_rescan(app_state, watcher);
+    auto startup_full_scan_result = sync::run_startup_full_rescan(app_state, watcher);
     if (!startup_full_scan_result) {
       Logger().warn("Startup full scan failed for '{}': {}", watcher.root_path.string(),
                     startup_full_scan_result.error());
@@ -549,7 +549,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
           std::chrono::system_clock::now().time_since_epoch() - kMissingRetention)
           .count();
   auto purge_result =
-      Features::Gallery::Asset::Repository::purge_expired_missing_assets(app_state, cutoff_millis);
+      features::gallery::asset::repository::purge_expired_missing_assets(app_state, cutoff_millis);
   if (!purge_result) {
     Logger().warn("Gallery startup missing asset purge failed: {}", purge_result.error());
   } else if (purge_result.value() > 0) {
@@ -558,8 +558,8 @@ auto start_registered_watchers(Core::State::AppState& app_state)
   }
 
   // 回收之后统一做一次全局缩略图缓存对账：补 present 资产、删已无引用的 orphan。
-  auto thumbnail_reconcile_result = Features::Gallery::Asset::Thumbnail::reconcile_thumbnail_cache(
-      app_state, Types::kDefaultThumbnailShortEdge);
+  auto thumbnail_reconcile_result = features::gallery::asset::thumbnail::reconcile_thumbnail_cache(
+      app_state, kDefaultThumbnailShortEdge);
   if (!thumbnail_reconcile_result) {
     Logger().warn("Gallery startup thumbnail cache reconcile failed: {}",
                   thumbnail_reconcile_result.error());
@@ -582,7 +582,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 }
 
 // 在真实磁盘操作前登记源/目标路径，防止 watcher 重复应用同一事实。
-auto begin_manual_file_system_ignore(Core::State::AppState& app_state,
+auto begin_manual_file_system_ignore(core::AppState& app_state,
                                      const std::filesystem::path& source_path,
                                      const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
@@ -614,7 +614,7 @@ auto begin_manual_file_system_ignore(Core::State::AppState& app_state,
 }
 
 // 在磁盘与索引操作结束后退出 in-flight，但保留短缓冲过滤延迟通知。
-auto complete_manual_file_system_ignore(Core::State::AppState& app_state,
+auto complete_manual_file_system_ignore(core::AppState& app_state,
                                         const std::filesystem::path& source_path,
                                         const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
@@ -648,8 +648,7 @@ auto complete_manual_file_system_ignore(Core::State::AppState& app_state,
   return {};
 }
 
-auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
-                                  const std::vector<Types::ScanChange>& changes)
+auto dispatch_manual_scan_changes(core::AppState& app_state, const std::vector<ScanChange>& changes)
     -> std::expected<void, std::string> {
   if (changes.empty()) {
     return {};
@@ -657,7 +656,7 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 
   struct ManualDispatchTarget {
     std::filesystem::path root_path;
-    std::function<void(const Types::ScanResult&)> post_scan_callback;
+    std::function<void(const ScanResult&)> post_scan_callback;
   };
   std::vector<ManualDispatchTarget> targets;
   {
@@ -683,11 +682,11 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
   Logger().info("Gallery manual scan change dispatch: incoming changes={}, watchers={}",
                 changes.size(), targets.size());
 
-  std::unordered_map<std::string, std::vector<Types::ScanChange>> changes_by_watcher_root;
+  std::unordered_map<std::string, std::vector<ScanChange>> changes_by_watcher_root;
   changes_by_watcher_root.reserve(targets.size());
 
   for (const auto& change : changes) {
-    auto changed_path_result = Utils::Path::NormalizePath(std::filesystem::path(change.path));
+    auto changed_path_result = utils::path::NormalizePath(std::filesystem::path(change.path));
     if (!changed_path_result) {
       return std::unexpected("Failed to normalize manual scan change path '" + change.path +
                              "': " + changed_path_result.error());
@@ -695,12 +694,12 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 
     bool matched = false;
     for (const auto& target : targets) {
-      if (!Utils::Path::IsPathWithinBase(changed_path_result.value(), target.root_path)) {
+      if (!utils::path::IsPathWithinBase(changed_path_result.value(), target.root_path)) {
         continue;
       }
 
       auto& bucket = changes_by_watcher_root[target.root_path.string()];
-      bucket.push_back(Types::ScanChange{
+      bucket.push_back(ScanChange{
           .path = changed_path_result->string(),
           .action = change.action,
       });
@@ -719,13 +718,13 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
       continue;
     }
 
-    Types::ScanResult result;
+    ScanResult result;
     result.total_files = static_cast<int>(bucket_it->second.size());
     result.scan_duration = "manual_dispatch";
     result.changes = std::move(bucket_it->second);
 
     for (const auto& change : result.changes) {
-      if (change.action == Types::ScanChangeAction::REMOVE) {
+      if (change.action == ScanChangeAction::REMOVE) {
         result.missing_items++;
       } else {
         // 手动上报场景中，UPSERT 语义是“确保目标状态存在”，统一计入 updated。
@@ -746,8 +745,8 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 }
 
 // 在应用关闭时，优雅关闭所有的监听器线程和句柄资源
-auto shutdown_watchers(Core::State::AppState& app_state) -> void {
-  std::vector<State::FolderWatcherState*> watchers;
+auto shutdown_watchers(core::AppState& app_state) -> void {
+  std::vector<FolderWatcherState*> watchers;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
     for (auto& [_, watcher] : app_state.gallery->folder_watchers) {
@@ -773,4 +772,4 @@ auto shutdown_watchers(Core::State::AppState& app_state) -> void {
   Logger().info("Gallery watchers stopped: {}", watchers.size());
 }
 
-}  // namespace Features::Gallery::Watcher
+}  // namespace features::gallery::watcher

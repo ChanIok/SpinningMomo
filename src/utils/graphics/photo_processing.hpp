@@ -1,10 +1,12 @@
 #pragma once
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+#include "vendor/std.hpp"
 
-namespace Utils::Graphics::PhotoProcessing {
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+
+namespace utils::graphics::photo_processing {
 
 // GPU 端长曝光累积器：双缓冲 ping-pong + 逐帧加权混合
 struct AverageAccumulator {
@@ -31,4 +33,4 @@ auto initialize_average_accumulator(ID3D11Texture2D* first_frame)
 auto accumulate_average_frame(AverageAccumulator& accumulator, ID3D11Texture2D* frame)
     -> std::expected<void, std::string>;
 
-}  // namespace Utils::Graphics::PhotoProcessing
+}  // namespace utils::graphics::photo_processing

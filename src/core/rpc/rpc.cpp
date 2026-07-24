@@ -1,14 +1,16 @@
 #include "core/rpc/rpc.hpp"
 
-#include <asio.hpp>
-#include <rfl/json.hpp>
+#include "vendor/std.hpp"
+
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
 
 #include "core/rpc/state.hpp"
 #include "core/rpc/types.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/logger/logger.hpp"
 
-namespace Core::RPC {
+namespace core::rpc {
 
 // 创建标准错误响应
 auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
@@ -20,7 +22,7 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
 }
 
 // 获取所有已注册方法的列表
-auto get_method_list(const Core::State::AppState& app_state) -> std::vector<MethodListItem> {
+auto get_method_list(const core::AppState& app_state) -> std::vector<MethodListItem> {
   std::vector<MethodListItem> methods;
   const auto& registry = app_state.rpc->registry;
 
@@ -32,7 +34,7 @@ auto get_method_list(const Core::State::AppState& app_state) -> std::vector<Meth
 }
 
 // 处理系统内置方法
-auto handle_system_method(Core::State::AppState& app_state, const JsonRpcRequest& request,
+auto handle_system_method(core::AppState& app_state, const JsonRpcRequest& request,
                           rfl::Generic request_id) -> std::optional<std::string> {
   if (request.method == "system.listMethods") {
     JsonRpcSuccessResponse success_response;
@@ -95,7 +97,7 @@ auto execute_registered_method(const MethodInfo& method_info, rfl::Generic param
 }
 
 // 处理JSON-RPC 2.0协议请求 - 优化版本
-auto process_request(Core::State::AppState& app_state, const std::string& request_json)
+auto process_request(core::AppState& app_state, const std::string& request_json)
     -> RpcJsonAwaitable {
   try {
     // 解析JSON-RPC请求
@@ -144,4 +146,4 @@ auto process_request(Core::State::AppState& app_state, const std::string& reques
   }
 }
 
-}  // namespace Core::RPC
+}  // namespace core::rpc
