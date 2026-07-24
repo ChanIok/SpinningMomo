@@ -17,12 +17,15 @@
 
 ## 环境要求
 
+C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）工具链。MSVC 同样可用，
+只需将 `xmake.lua` 中的工具链改为 `msvc`，但项目对其验证较少。
+
 | 工具 | 要求 | 说明 |
 |------|------|------|
-| **Visual Studio 2026 / LLVM** | 含「使用 C++ 的桌面开发」及 C++ Clang 工具 | **默认/推荐使用 `clang-cl` 工具链** |
+| **Visual Studio 2026 / Build Tools** | 安装「使用 C++ 的桌面开发」及 C++ Clang 工具 | Visual Studio IDE 可选 |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
-| **xmake** | 最新版 | C++ 构建系统 |
+| **xmake** | 3.0.9+ | C++ 构建系统 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
 
 ### 安装 xmake
@@ -64,15 +67,18 @@ npm install
 npm ci --prefix web
 ```
 
-### 3. 初始化 xmake 依赖
+### 3. 初始化 xmake 依赖并应用补丁
 
 ```bash
-xmake f -m debug -y
+node scripts/patch-xmake-7554.js
+node scripts/patch-xmake-clang-cl-cxx23.js
+xmake f -m release -y && xmake f -m debug -y
+node scripts/patch-vcpkg.js
 ```
 
 ---
 
-## 使用 Visual Studio 开发（可选）
+## 使用 Visual Studio IDE 开发（可选）
 
 如需使用 Visual Studio 浏览、编辑和调试 C++ 代码，可生成由 Xmake 管理的解决方案：
 

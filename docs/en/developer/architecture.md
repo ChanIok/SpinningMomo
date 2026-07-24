@@ -58,10 +58,13 @@ npm install
 npm ci --prefix web
 ```
 
-### 3. Initialize xmake deps
+### 3. Initialize xmake dependencies and apply patches
 
 ```bash
-xmake f -m debug -y
+node scripts/patch-xmake-7554.js
+node scripts/patch-xmake-clang-cl-cxx23.js
+xmake f -m release -y && xmake f -m debug -y
+node scripts/patch-vcpkg.js
 ```
 
 ---

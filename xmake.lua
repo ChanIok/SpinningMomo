@@ -8,8 +8,8 @@ includes("tests")
 -- 设置C++23标准
 set_languages("c++23")
 
--- 固定使用 clang-cl 工具链
-set_toolchains("clang-cl")
+-- 固定使用 LLVM 工具链
+set_toolchains("clang-cl[llvm]")
 
 -- 统一源文件编码
 add_cxflags("/utf-8", "/bigobj")
@@ -33,7 +33,7 @@ target("SpinningMomo")
     set_arch("x64")
     -- 设置预编译头文件
     set_pcxxheader("src/pch.hpp")
-    add_cxflags("-Wno-microsoft-include")
+    add_cxflags("clang_cl::-Wno-microsoft-include")
 
     -- Release 也保留调试符号，便于分析生产崩溃 dump
     if is_mode("release") then
