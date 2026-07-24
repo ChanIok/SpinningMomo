@@ -19,7 +19,7 @@
 
 | 工具 | 要求 | 说明 |
 |------|------|------|
-| **Visual Studio 2026** | 含「使用 C++ 的桌面开发」工作负载 | |
+| **Visual Studio 2026 / LLVM** | 含「使用 C++ 的桌面开发」及 C++ Clang 工具 | **默认/推荐使用 `clang-cl` 工具链** |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
 | **xmake** | 最新版 | C++ 构建系统 |
@@ -64,18 +64,34 @@ npm install
 npm ci --prefix web
 ```
 
-### 3. 初始化 xmake 依赖并应用补丁
+### 3. 初始化 xmake 依赖
 
 ```bash
-node scripts/patch-xmake-7554.js
-node scripts/patch-xmake-clang-cl-cxx23.js
-xmake f -m release -y && xmake f -m debug -y
-npm run patch:vcpkg
+xmake f -m debug -y
+```
+
+---
+
+## 使用 Visual Studio 开发（可选）
+
+如需使用 Visual Studio 浏览、编辑和调试 C++ 代码，可生成由 Xmake 管理的解决方案：
+
+```powershell
+xmake vs
+```
+
+生成后打开：
+
+```text
+vsxmake2026\SpinningMomo.sln
 ```
 
 ---
 
 ## 构建
+
+> [!TIP]
+> 如果在本地搭建或构建过程中遇到工具链、依赖或环境问题，建议参考 GitHub CI 的 [Build Release 工作流](https://github.com/ChanIok/SpinningMomo/blob/main/.github/workflows/build-release.yml)，它记录了当前最新且自动化跑通的标准环境配置与构建顺序。
 
 ### 完整构建（推荐）
 
@@ -97,7 +113,7 @@ xmake build
 xmake release    # 构建 release 后自动恢复 debug 配置
 
 # Web 前端
-cd web && npm run build
+npm run build --prefix web
 
 # 打包 dist/（汇总 exe + web 资源）
 npm run build:prepare

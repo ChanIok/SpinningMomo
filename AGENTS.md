@@ -95,7 +95,7 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 - `docs/` — VitePress documentation site for user and developer docs
 - `playground/` — standalone Node/TypeScript scripts for backend HTTP/RPC debugging and experiments
 - `installer/` — WiX source files for MSI and bundle installer generation
-- `tasks/` — custom xmake tasks such as `build-all`, `release`, and `vs`
+- `tasks/` — custom xmake tasks such as `release` and `vs`
 
 ## Subsystem Documentation
 

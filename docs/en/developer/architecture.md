@@ -13,10 +13,10 @@ This project uses a hybrid architecture with a **C++23 native backend** and a **
 
 | Tool | Requirement | Notes |
 |------|-------------|-------|
-| **Visual Studio 2026** | "Desktop development with C++" workload | |
+| **Visual Studio 2026 / LLVM** | Includes Clang compiler (`clang-cl`) | **Default / recommended compiler (`clang-cl`)** |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
-| **xmake** | Latest | C++ build system |
+| **xmake** | Latest | C++ build system (configured with `clang-cl`) |
 | **Node.js** | v20+ | Web frontend build and npm scripts |
 
 ### Install xmake
@@ -58,18 +58,35 @@ npm install
 npm ci --prefix web
 ```
 
-### 3. Initialize xmake deps and apply patches
+### 3. Initialize xmake deps
 
 ```bash
-node scripts/patch-xmake-7554.js
-node scripts/patch-xmake-clang-cl-cxx23.js
-xmake f -m release -y && xmake f -m debug -y
-npm run patch:vcpkg
+xmake f -m debug -y
+```
+
+---
+
+## Visual Studio Development (Optional)
+
+To browse, edit, and debug the C++ code in Visual Studio, generate an
+Xmake-managed solution:
+
+```powershell
+xmake vs
+```
+
+Then open:
+
+```text
+vsxmake2026\SpinningMomo.sln
 ```
 
 ---
 
 ## Build
+
+> [!TIP]
+> If you encounter environment, dependency, or toolchain issues during local setup, you can refer to the [Build Release Workflow](https://github.com/ChanIok/SpinningMomo/blob/main/.github/workflows/build-release.yml) for an up-to-date, automated reference build procedure.
 
 ### Full Build (Recommended)
 
@@ -91,7 +108,7 @@ xmake build
 xmake release    # automatically restores debug config after release build
 
 # Web frontend
-cd web && npm run build
+npm run build --prefix web
 
 # Assemble dist/ (exe + web resources)
 npm run build:prepare

@@ -62,7 +62,7 @@ jobs:
             .xmake
             .xmake-global
             build/.packages/v
-          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock', 'scripts/patch-vcpkg.js') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-
 
@@ -163,9 +163,6 @@ jobs:
 
       - name: Prepare xmake release dependencies
         run: xmake f -m release -y
-
-      - name: Patch vcpkg private cache
-        run: npm run patch:vcpkg
 
       - name: Build C++ backend (Release)
         run: xmake build -y

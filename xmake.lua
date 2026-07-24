@@ -1,13 +1,15 @@
 add_rules("mode.debug", "mode.release")
 
 -- 引入自定义任务
-includes("tasks/build-all.lua")
 includes("tasks/release.lua")
 includes("tasks/vs.lua")
 includes("tests")
 
 -- 设置C++23标准
 set_languages("c++23")
+
+-- 固定使用 clang-cl 工具链
+set_toolchains("clang-cl")
 
 -- 统一源文件编码
 add_cxflags("/utf-8", "/bigobj")

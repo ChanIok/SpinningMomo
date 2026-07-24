@@ -6,18 +6,17 @@
     "prepare": "husky",
     "build": "npm run build:cpp && npm run build:web && npm run build:dist",
     "build:cpp": "xmake config -m release && xmake build && xmake config -m debug",
-    "build:web": "cd web && npm run build",
+    "build:web": "npm run build --prefix web",
     "build:dist": "node scripts/prepare-dist.js",
     "build:portable": "node scripts/build-portable.js",
     "fetch:third-party": "node scripts/fetch-third-party.js",
     "build:installer": "node scripts/build-installer.js",
     "build:checksums": "node scripts/generate-checksums.js",
-    "patch:vcpkg": "node scripts/patch-vcpkg.js",
     "dev:web": "npm run dev --prefix web",
     "release": "npm run build && npm run build:portable && npm run build:installer && npm run build:checksums",
     "release:version": "node scripts/release-version.js",
     "format:cpp": "node scripts/format-cpp.js",
-    "format:web": "cd web && prettier --write ."
+    "format:web": "npm run format --prefix web"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
@@ -26,7 +25,7 @@
     "lint-staged": "^16.2.4"
   },
   "lint-staged": {
-    "src/**/*.{cpp,ixx,h,hpp}": [
+    "src/**/*.{cpp,h,hpp}": [
       "node scripts/format-cpp.js --files"
     ],
     "web/**/*.{js,ts,vue,json,css,md}": [
