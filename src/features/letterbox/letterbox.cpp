@@ -1,15 +1,13 @@
-module;
+#include "features/letterbox/letterbox.hpp"
 
-module Features.Letterbox;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Letterbox.State;
-import UI.FloatingWindow.State;
-import Utils.Display;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/letterbox/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Letterbox {
 

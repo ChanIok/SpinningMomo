@@ -1,23 +1,20 @@
-module;
+#include "features/gallery/recovery/service.hpp"
 
 #include <windows.h>
 #include <winioctl.h>
 
-module Features.Gallery.Recovery.Service;
-
-import std;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Recovery.Types;
-import Features.Gallery.Recovery.Repository;
-import Features.Gallery.Ignore.Repository;
-import Features.Gallery.RootAvailability;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Asset.Repository;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/ignore/repository.hpp"
+#include "features/gallery/recovery/repository.hpp"
+#include "features/gallery/recovery/types.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Gallery::Recovery::Service::Detail {
 

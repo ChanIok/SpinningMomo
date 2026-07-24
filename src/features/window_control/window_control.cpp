@@ -1,16 +1,14 @@
-module;
+#include "features/window_control/window_control.hpp"
 
-module Features.WindowControl;
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Settings.State;
-import Features.WindowControl.State;
-import UI.FloatingWindow.State;
-import Utils.Display;
-import Utils.Logger;
-import Utils.String;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::WindowControl {
 

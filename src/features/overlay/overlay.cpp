@@ -1,24 +1,22 @@
-module;
+#include "features/overlay/overlay.hpp"
 
-module Features.Overlay;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Window;
-import Features.Overlay.Rendering;
-import Features.Overlay.Capture;
-import Features.Overlay.Interaction;
-import Features.Overlay.Threads;
-import Features.Overlay.Geometry;
-import UI.FloatingWindow.State;
-import Utils.Display;
-import Utils.Graphics.HDR;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/overlay/capture.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/interaction.hpp"
+#include "features/overlay/rendering.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/threads.hpp"
+#include "features/overlay/types.hpp"
+#include "features/overlay/window.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/graphics/hdr.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Overlay {
 auto send_overlay_control_message(HWND overlay_hwnd, UINT message) -> bool {

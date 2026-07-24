@@ -1,16 +1,14 @@
-module;
+#include "ui/context_menu/layout.hpp"
 
-module UI.ContextMenu.Layout;
+#include <dwrite_3.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import UI.SharedRenderResources.State;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
-import Vendor.Windows;
-import <dwrite_3.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
+#include "ui/shared_render_resources/state.hpp"
+#include "vendor/windows.hpp"
 
 namespace UI::ContextMenu::Layout {
 

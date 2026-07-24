@@ -1,17 +1,15 @@
-module;
+#include "core/rpc/endpoints/gallery/folder.hpp"
 
-module Core.RPC.Endpoints.Gallery.Folder;
+#include <asio.hpp>
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Features.Gallery.Types;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Folder.Service;
-import <asio.hpp>;
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/folder/service.hpp"
+#include "features/gallery/types.hpp"
 
 namespace Core::RPC::Endpoints::Gallery::Folder {
 

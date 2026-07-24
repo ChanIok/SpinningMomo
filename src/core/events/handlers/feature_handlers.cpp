@@ -1,16 +1,13 @@
-module;
+#include "core/events/handlers/feature_handlers.hpp"
 
-module Core.Events.Handlers.Feature;
-
-import std;
-import Core.Events;
-import Core.Notifications;
-import Core.Notifications.Events;
-import Core.State;
-import UI.FloatingWindow;
-import UI.FloatingWindow.Events;
-import Features.Screenshot.UseCase;
-import Features.WindowControl.UseCase;
+#include "core/events/events.hpp"
+#include "core/notifications/events.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/state/app_state.hpp"
+#include "features/screenshot/usecase.hpp"
+#include "features/window_control/usecase.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/floating_window.hpp"
 
 namespace Core::Events::Handlers {
 

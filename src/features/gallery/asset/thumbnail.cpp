@@ -1,17 +1,14 @@
-module;
+#include "features/gallery/asset/thumbnail.hpp"
 
-module Features.Gallery.Asset.Thumbnail;
-
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.State;
-import Features.Gallery.Asset.Service;
-import Core.Database;
-import Utils.Image;
-import Utils.Media.VideoAsset;
-import Utils.Path;
-import Utils.Logger;
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/service.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/video_asset.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery::Asset::Thumbnail {
 

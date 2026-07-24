@@ -1,11 +1,11 @@
-import std;
-import App;
-import Utils.CrashDump;
-import Utils.Logger;
-import Utils.System;
-import Features.Settings;
-import Vendor.Windows;
-import <wil/com.h>;
+#include <wil/com.h>
+#include <windows.h>
+#include "app.hpp"
+#include "features/settings/settings.hpp"
+#include "utils/crash_dump/crash_dump.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/system/system.hpp"
+#include "vendor/windows.hpp"
 
 // Win32 入口
 auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,

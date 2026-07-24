@@ -1,22 +1,19 @@
-module;
+#include "features/screenshot/usecase.hpp"
 
-module Features.Screenshot.UseCase;
-
-import std;
-import Core.State;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
-import UI.FloatingWindow.Events;
-import Features.Screenshot;
-import Features.Photography.State;
-import Features.Settings.State;
-import Features.WindowControl;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.System;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/photography/state.hpp"
+#include "features/screenshot/screenshot.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/floating_window/events.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
 namespace Features::Screenshot::UseCase {
 

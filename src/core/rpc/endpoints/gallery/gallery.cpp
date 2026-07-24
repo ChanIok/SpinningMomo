@@ -1,20 +1,20 @@
-module Core.RPC.Endpoints.Gallery;
+#include "core/rpc/endpoints/gallery/gallery.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Core.Async;
-import Core.Tasks;
-import Features.Gallery;
-import Features.Gallery.Types;
-import Core.RPC.Endpoints.Gallery.Asset;
-import Core.RPC.Endpoints.Gallery.Tag;
-import Core.RPC.Endpoints.Gallery.Folder;
-import Utils.Logger;
-import <asio.hpp>;
+#include <asio.hpp>
+
+#include "core/async/async.hpp"
+#include "core/rpc/endpoints/gallery/asset.hpp"
+#include "core/rpc/endpoints/gallery/folder.hpp"
+#include "core/rpc/endpoints/gallery/tag.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/tasks.hpp"
+#include "features/gallery/gallery.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::RPC::Endpoints::Gallery {
 

@@ -1,8 +1,7 @@
-module Features.Screenshot.HdrEncoder;
+#include "features/screenshot/hdr_encoder.hpp"
 
-import std;
-import Utils.Logger;
-import Utils.String;
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Screenshot::HdrEncoder {
 

@@ -1,19 +1,16 @@
-module;
+#include "core/http_server/static.hpp"
 
 #include <uwebsockets/App.h>
+#include <asio.hpp>
 
-module Core.HttpServer.Static;
-
-import std;
-import Core.State;
-import Core.HttpServer.Types;
-import Core.Async;
-import Utils.File;
-import Utils.File.Mime;
-import Utils.Path;
-import Utils.Logger;
-import Utils.Time;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/http_server/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/file/file.hpp"
+#include "utils/file/mime.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/time.hpp"
 
 namespace Core::HttpServer::Static {
 

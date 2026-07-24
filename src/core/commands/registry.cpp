@@ -1,14 +1,12 @@
-module;
+#include "core/commands/registry.hpp"
 
-module Core.Commands;
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.Commands.State;
-import Core.Commands.Types;
-import Features.Settings.State;
-import Utils.Logger;
-import <windows.h>;
+#include "core/commands/state.hpp"
+#include "core/commands/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Commands {
 

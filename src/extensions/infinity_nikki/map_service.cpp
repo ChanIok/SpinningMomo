@@ -1,12 +1,9 @@
-module;
+#include "extensions/infinity_nikki/map_service.hpp"
 
-module Extensions.InfinityNikki.MapService;
-
-import std;
-import Core.State;
-import Core.WebView;
-import Extensions.InfinityNikki.Generated.MapInjectionScript;
-import Utils.Logger;
+#include "core/state/app_state.hpp"
+#include "core/webview/webview.hpp"
+#include "extensions/infinity_nikki/generated/map_injection_script.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Extensions::InfinityNikki::MapService {
 

@@ -1,16 +1,14 @@
-module;
+#include "features/overlay/window.hpp"
 
-module Features.Overlay.Window;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Features.Overlay.State;
-import Utils.Logger;
-import Core.State;
-import Features.Overlay.Types;
-import Features.Overlay.Geometry;
-import Features.Overlay.Interaction;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/interaction.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Overlay::Window {
 

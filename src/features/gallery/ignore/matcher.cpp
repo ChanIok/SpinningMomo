@@ -1,9 +1,6 @@
-module;
+#include "features/gallery/ignore/matcher.hpp"
 
-module Features.Gallery.Ignore.Matcher;
-
-import std;
-import Utils.Logger;
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Ignore::Matcher {
 

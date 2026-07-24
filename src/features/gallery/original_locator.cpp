@@ -1,13 +1,10 @@
-module;
+#include "features/gallery/original_locator.hpp"
 
-module Features.Gallery.OriginalLocator;
-
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Folder.Repository;
-import Utils.Logger;
-import Utils.Path;
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery::OriginalLocator {
 

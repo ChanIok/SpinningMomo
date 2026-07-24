@@ -1,25 +1,23 @@
-module;
+#include "ui/webview_window/webview_window.hpp"
 
-module UI.WebViewWindow;
+#include <dwmapi.h>
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Core.State;
-import Core.WebView;
-import Core.WebView.State;
-import Features.Settings;
-import Features.Settings.State;
-import Features.Settings.Types;
-import UI.FloatingWindow.State;
-import UI.TrayIcon.Types;
-import Utils.Logger;
-import Vendor.BuildConfig;
-import Vendor.Windows;
-import Vendor.ShellApi;
-import Core.State.RuntimeInfo;
-import Core.HttpServer.State;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/http_server/state.hpp"
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/webview.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/state.hpp"
+#include "features/settings/types.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/tray_icon/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "vendor/build_config.hpp"
+#include "vendor/shellapi.hpp"
+#include "vendor/windows.hpp"
 
 namespace UI::WebViewWindow {
 

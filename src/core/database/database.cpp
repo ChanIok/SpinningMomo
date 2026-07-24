@@ -1,13 +1,11 @@
-module;
+#include "core/database/database.hpp"
 
-module Core.Database;
+#include <SQLiteCpp/SQLiteCpp.h>
 
-import std;
-import Core.State;
-import Core.Database.State;
-import Core.Database.Types;
-import Utils.Logger;
-import <SQLiteCpp/SQLiteCpp.h>;
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Database {
 

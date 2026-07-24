@@ -1,18 +1,16 @@
-module;
+#include "features/overlay/rendering.hpp"
 
-module Features.Overlay.Rendering;
+#include <d3d11.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Geometry;
-import Features.Overlay.Shaders;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/shaders.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Overlay::Rendering {
 

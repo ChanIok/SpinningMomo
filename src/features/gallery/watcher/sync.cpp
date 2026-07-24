@@ -1,25 +1,22 @@
-module;
+#include "features/gallery/watcher/sync.hpp"
 
-module Features.Gallery.Watcher.Sync;
-
-import std;
-import Core.State;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
-import Core.RPC.NotificationHub;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.AssetPipeline;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Folder.Service;
-import Features.Gallery.Ignore.Service;
-import Features.Gallery.Asset.Thumbnail;
-import Utils.Logger;
-import Utils.String;
-import Utils.Time;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/folder/service.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/asset_pipeline.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/scanner.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "utils/time.hpp"
 
 namespace Features::Gallery::Watcher::Sync {
 

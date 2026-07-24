@@ -1,14 +1,13 @@
-module;
+#include "extensions/infinity_nikki/game_directory.hpp"
 
-module Extensions.InfinityNikki.GameDirectory;
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import Utils.String;
-import Vendor.ShellApi;
-import Vendor.Windows;
-import <wil/com.h>;
+#include "extensions/infinity_nikki/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/shellapi.hpp"
+#include "vendor/windows.hpp"
 
 namespace Extensions::InfinityNikki::GameDirectory {
 

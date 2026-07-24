@@ -1,28 +1,26 @@
-module;
+#include "ui/floating_window/floating_window.hpp"
 
-module UI.FloatingWindow;
+#include <dwmapi.h>
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Features.Settings.Menu;
-import Features.Settings.Types;
-import Features.Settings.State;
-import Core.Commands;
-import Core.Commands.Types;
-import Core.Events;
-import Core.State;
-import Core.I18n.Types;
-import Core.I18n.State;
-import UI.FloatingWindow.MessageHandler;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.RenderContext;
-import UI.FloatingWindow.Painter;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import Utils.Logger;
-import Utils.String;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "features/settings/state.hpp"
+#include "features/settings/types.hpp"
+#include "ui/floating_window/layout.hpp"
+#include "ui/floating_window/message_handler.hpp"
+#include "ui/floating_window/painter.hpp"
+#include "ui/floating_window/render_context.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace UI::FloatingWindow {
 

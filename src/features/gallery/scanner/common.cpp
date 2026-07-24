@@ -1,12 +1,9 @@
-module;
+#include "features/gallery/scanner/common.hpp"
 
-module Features.Gallery.Scanner.Common;
-
-import std;
-import Vendor.BuildConfig;
-import Vendor.XXHash;
-import Utils.Media.VideoAsset;
-import Utils.String;
+#include "utils/media/video_asset.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/build_config.hpp"
+#include "vendor/xxhash.hpp"
 
 namespace Features::Gallery::Scanner::Common {
 

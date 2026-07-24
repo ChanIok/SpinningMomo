@@ -1,19 +1,17 @@
-module;
+#include "features/preview/rendering.hpp"
 
-module Features.Preview.Rendering;
+#include <d3d11.h>
+#include <wil/com.h>
+#include <windows.h>
+#include <winerror.h>
 
-import std;
-import Core.State;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Shaders;
-import Features.Preview.Viewport;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
-import <winerror.h>;
+#include "core/state/app_state.hpp"
+#include "features/preview/shaders.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "features/preview/viewport.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Preview::Rendering {
 

@@ -1,36 +1,34 @@
-module;
+#include "core/state/app_state.hpp"
 
-module Core.State;
-
-import Core.Async.State;
-import Core.Commands.State;
-import Core.Database.State;
-import Core.DialogService.State;
-import Core.Events.State;
-import Core.HttpServer.State;
-import Core.HttpClient.State;
-import Core.I18n.State;
-import Core.RPC.State;
-import Core.State.RuntimeInfo;
-import Core.WebView.State;
-import Core.WorkerPool.State;
-import Core.Tasks.State;
-import Features.Letterbox.State;
-import Features.Gallery.State;
-import Features.Overlay.State;
-import Features.Preview.State;
-import Features.WindowControl.State;
-import Features.Screenshot.State;
-import Features.Recording.State;
-import Features.Photography.State;
-import Features.Settings.State;
-import Features.Update.State;
-import UI.SharedRenderResources.State;
-import UI.FloatingWindow.State;
-import UI.ContextMenu.State;
-import UI.NotificationWindow.State;
-import UI.PhotographyPanel.State;
-import UI.TrayIcon.State;
+#include "core/async/state.hpp"
+#include "core/commands/state.hpp"
+#include "core/database/state.hpp"
+#include "core/dialog_service/state.hpp"
+#include "core/events/state.hpp"
+#include "core/http_client/state.hpp"
+#include "core/http_server/state.hpp"
+#include "core/i18n/state.hpp"
+#include "core/rpc/state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "core/tasks/state.hpp"
+#include "core/webview/state.hpp"
+#include "core/worker_pool/state.hpp"
+#include "features/gallery/state.hpp"
+#include "features/letterbox/state.hpp"
+#include "features/overlay/state.hpp"
+#include "features/photography/state.hpp"
+#include "features/preview/state.hpp"
+#include "features/recording/state.hpp"
+#include "features/screenshot/state.hpp"
+#include "features/settings/state.hpp"
+#include "features/update/state.hpp"
+#include "features/window_control/state.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/notification_window/state.hpp"
+#include "ui/photography_panel/state.hpp"
+#include "ui/shared_render_resources/state.hpp"
+#include "ui/tray_icon/state.hpp"
 
 namespace Core::State {
 

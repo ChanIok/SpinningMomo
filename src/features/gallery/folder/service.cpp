@@ -1,24 +1,23 @@
-module;
+#include "features/gallery/folder/service.hpp"
 
-module Features.Gallery.Folder.Service;
+#include <wil/resource.h>
+#include <windows.h>
 
-import std;
-import Core.WebView;
-import Core.WebView.State;
-import Core.State;
-import Core.Database;
-import Features.Gallery.Types;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Ignore.Service;
-import Features.Gallery.OriginalLocator;
-import Features.Gallery.RootAvailability;
-import Features.Gallery.Watcher;
-import Features.Gallery.Asset.Thumbnail;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.System;
-import <wil/resource.h>;
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/webview.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/original_locator.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
 namespace Features::Gallery::Folder::Service {
 

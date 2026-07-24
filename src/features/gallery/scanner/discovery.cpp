@@ -1,17 +1,14 @@
-module;
+#include "features/gallery/scanner/discovery.hpp"
 
-module Features.Gallery.Scanner.Discovery;
-
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Ignore.Service;
-import Utils.Logger;
-import Utils.Path;
-import Utils.Time;
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/progress.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/time.hpp"
 
 namespace Features::Gallery::Scanner::Discovery {
 

@@ -1,0 +1,167 @@
+#pragma once
+
+#include <windows.h>
+
+#include "utils/graphics/capture_region.hpp"
+#include "utils/media/audio_capture.hpp"
+
+namespace Features::Recording::Types {
+
+// 码率控制模式
+enum class RateControlMode {
+  CBR,      // 固定码率 - 使用 bitrate
+  VBR,      // 质量优先 VBR - 使用 quality (0-100)
+  ManualQP  // 手动 QP 模式 - 使用 qp (0-51)
+};
+
+// 从字符串转换为 RateControlMode
+constexpr RateControlMode rate_control_mode_from_string(std::string_view str) {
+  if (str == "vbr") return RateControlMode::VBR;
+  if (str == "manual_qp") return RateControlMode::ManualQP;
+  return RateControlMode::CBR;  // 默认
+}
+
+// RateControlMode 转换为字符串
+constexpr std::string_view rate_control_mode_to_string(RateControlMode mode) {
+  switch (mode) {
+    case RateControlMode::VBR:
+      return "vbr";
+    case RateControlMode::ManualQP:
+      return "manual_qp";
+    default:
+      return "cbr";
+  }
+}
+
+// 编码器模式
+enum class EncoderMode {
+  Auto,  // 自动检测，优先 GPU
+  GPU,   // 强制 GPU（不可用则失败）
+  CPU    // 强制 CPU
+};
+
+// 从字符串转换为 EncoderMode
+constexpr EncoderMode encoder_mode_from_string(std::string_view str) {
+  if (str == "gpu") return EncoderMode::GPU;
+  if (str == "cpu") return EncoderMode::CPU;
+  return EncoderMode::Auto;  // 默认或 "auto"
+}
+
+// EncoderMode 转换为字符串
+constexpr std::string_view encoder_mode_to_string(EncoderMode mode) {
+  switch (mode) {
+    case EncoderMode::GPU:
+      return "gpu";
+    case EncoderMode::CPU:
+      return "cpu";
+    default:
+      return "auto";
+  }
+}
+
+// 视频编码格式
+enum class VideoCodec {
+  H264,  // H.264/AVC
+  H265   // H.265/HEVC
+};
+
+// 从字符串转换为 VideoCodec
+constexpr VideoCodec video_codec_from_string(std::string_view str) {
+  if (str == "h265" || str == "hevc") return VideoCodec::H265;
+  return VideoCodec::H264;  // 默认
+}
+
+// VideoCodec 转换为字符串
+constexpr std::string_view video_codec_to_string(VideoCodec codec) {
+  switch (codec) {
+    case VideoCodec::H265:
+      return "h265";
+    default:
+      return "h264";
+  }
+}
+
+// 录制配置
+struct RecordingConfig {
+  std::filesystem::path output_path;                    // 输出文件路径
+  std::uint32_t width = 0;                              // 视频宽度
+  std::uint32_t height = 0;                             // 视频高度
+  std::uint32_t fps = 30;                               // 帧率
+  std::uint32_t bitrate = 80'000'000;                   // 视频比特率 (默认 80Mbps, CBR 模式使用)
+  std::uint32_t quality = 70;                           // 质量值 (0-100, VBR 模式使用)
+  std::uint32_t qp = 23;                                // 量化参数 (0-51, ManualQP 模式使用)
+  RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
+  EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
+  VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
+  bool enable_hdr = false;                              // HDR10 录制，仅支持 GPU + H.265 Main10
+  std::uint32_t hdr_target_peak_nits = 1000;            // HDR 静态元数据峰值亮度
+  bool capture_client_area = true;                      // 是否只捕获客户区（无边框）
+  bool capture_cursor = false;                          // 是否捕获鼠标指针
+  bool auto_restart_on_resize = true;                   // 尺寸变化时是否自动切段重启录制
+
+  // 音频配置
+  Utils::Media::AudioCapture::AudioSource audio_source =
+      Utils::Media::AudioCapture::AudioSource::System;  // 音频源类型 (默认系统音频)
+  std::uint32_t audio_bitrate = 192'000;                // 音频码率 (默认 192kbps)
+};
+
+// 录制状态枚举
+enum class RecordingStatus {
+  Idle,       // 空闲
+  Starting,   // 正在启动
+  Recording,  // 正在录制
+  Stopping,   // 正在停止
+};
+
+// 录制几何计划：
+// source_* 表示 WGC 实际给到的源帧尺寸；
+// output_* 表示最终送给编码器的尺寸；
+// should_crop/region 描述是否需要先从源帧裁出一块再编码。
+struct CapturePlan {
+  int source_width = 0;
+  int source_height = 0;
+  std::uint32_t output_width = 0;
+  std::uint32_t output_height = 0;
+  bool should_crop = false;
+  Utils::Graphics::CaptureRegion::CropRegion region{};
+};
+
+struct StartRequest {
+  HWND target_window = nullptr;
+  RecordingConfig config;
+};
+
+enum class RecordingControlAction {
+  None,
+  UserStart,
+  UserStop,
+  AbortWithError,
+  RestartAfterResize,
+  CleanupD3D,
+  ShutdownStop,
+};
+
+enum class StopResultKind {
+  NotRecording,
+  Saved,
+  Discarded,
+  PublishFailed,
+};
+
+struct StopResult {
+  StopResultKind kind = StopResultKind::NotRecording;
+  std::filesystem::path output_path;
+  std::string error;
+};
+
+struct QueuedAudioPacket {
+  std::vector<std::uint8_t> data;
+  std::uint32_t num_frames = 0;
+  std::uint32_t bytes_per_frame = 0;
+  std::uint32_t sample_rate = 0;
+  std::int64_t timestamp_100ns = 0;
+};
+
+constexpr std::size_t k_max_audio_queue_size = 120;
+
+}  // namespace Features::Recording::Types

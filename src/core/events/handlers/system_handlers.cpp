@@ -1,17 +1,14 @@
-module;
+#include "core/events/handlers/system_handlers.hpp"
 
-module Core.Events.Handlers.System;
-
-import std;
-import Core.Events;
-import Core.State;
-import Core.WebView;
-import Core.WebView.Events;
-import UI.FloatingWindow;
-import UI.FloatingWindow.Events;
-import UI.WebViewWindow;
-import Utils.Logger;
-import Vendor.Windows;
+#include "core/events/events.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/events.hpp"
+#include "core/webview/webview.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "ui/webview_window/webview_window.hpp"
+#include "utils/logger/logger.hpp"
+#include "vendor/windows.hpp"
 
 namespace Core::Events::Handlers {
 

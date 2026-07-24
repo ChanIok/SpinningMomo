@@ -1,11 +1,8 @@
-module;
+#include "core/worker_pool/worker_pool.hpp"
 
-module Core.WorkerPool;
-
-import std;
-import Core.WorkerPool.State;
-import Core.State;
-import Utils.Logger;
+#include "core/state/app_state.hpp"
+#include "core/worker_pool/state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::WorkerPool {
 

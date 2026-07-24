@@ -1,0 +1,92 @@
+#pragma once
+
+#include <d3d11.h>
+#include <wil/com.h>
+#include <windows.h>
+#include <winrt/Windows.Graphics.Capture.h>
+
+namespace Utils::Graphics::Capture {
+
+// 捕获会话
+struct CaptureSession {
+  winrt::Windows::Graphics::Capture::GraphicsCaptureItem capture_item{nullptr};
+  winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool frame_pool{nullptr};
+  winrt::Windows::Graphics::Capture::GraphicsCaptureSession session{nullptr};
+  winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
+  winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format =
+      winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
+  winrt::event_token frame_token;
+  int frame_pool_size = 1;
+  bool need_hide_cursor = false;
+};
+
+// 捕获会话配置
+struct CaptureSessionOptions {
+  bool capture_cursor = false;
+  bool border_required = false;
+  // 仅在需要突破 WGC 默认 60Hz 节流时显式设置；未设置时保持系统默认行为。
+  std::optional<std::chrono::milliseconds> min_update_interval;
+  winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format =
+      winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
+};
+
+using Direct3D11CaptureFrame = winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame;
+
+// 帧回调函数类型
+using FrameCallback = std::function<void(Direct3D11CaptureFrame)>;
+using FrameArrivedCallback = std::function<void()>;
+
+// 创建WinRT设备
+auto create_winrt_device(ID3D11Device* d3d_device)
+    -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string>;
+
+// 检测 WGC 会话属性支持能力
+auto is_cursor_capture_control_supported() -> bool;
+auto is_border_control_supported() -> bool;
+auto is_min_update_interval_supported() -> bool;
+
+// 获取目标窗口对应的 WGC 实际捕获尺寸。
+// 录制模块用它作为“源帧真相”，避免只靠窗口矩形推算导致差 1px 的错配。
+auto get_capture_item_size(HWND target_window) -> std::expected<std::pair<int, int>, std::string>;
+
+// 创建捕获会话
+auto create_capture_session(
+    HWND target_window,
+    const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
+    int height, FrameCallback frame_callback, int frame_pool_size = 1,
+    const CaptureSessionOptions& options = {}) -> std::expected<CaptureSession, std::string>;
+
+// 创建捕获会话，但 FrameArrived 回调只负责通知，调用方稍后主动 try_get_next_frame。
+// 适合录制这类需要把 WGC frame pool 消费权交给专用线程的场景。
+// 注意：frame_arrived_callback 里不要取帧；消费者应在自己的线程里按需主动取帧。
+auto create_capture_session_with_frame_notification(
+    HWND target_window,
+    const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
+    int height, FrameArrivedCallback frame_arrived_callback, int frame_pool_size = 1,
+    const CaptureSessionOptions& options = {}) -> std::expected<CaptureSession, std::string>;
+
+// 主动从帧池取下一帧；如果帧池为空或已关闭，返回 null frame。
+auto try_get_next_frame(CaptureSession& session) -> Direct3D11CaptureFrame;
+
+// 开始捕获
+auto start_capture(CaptureSession& session) -> std::expected<void, std::string>;
+
+// 只关闭捕获会话，不关闭帧池；用于先停止产帧，再让消费者排空帧池。
+auto stop_capture_session(CaptureSession& session) -> void;
+
+// 停止捕获
+auto stop_capture(CaptureSession& session) -> void;
+
+// 清理捕获资源
+auto cleanup_capture_session(CaptureSession& session) -> void;
+
+// 重建帧池
+auto recreate_frame_pool(CaptureSession& session, int width, int height)
+    -> std::expected<void, std::string>;
+
+// 从WinRT对象获取DXGI接口的辅助函数
+template <typename T>
+auto get_dxgi_interface_from_object(const winrt::Windows::Foundation::IInspectable& object)
+    -> wil::com_ptr<T>;
+
+}  // namespace Utils::Graphics::Capture

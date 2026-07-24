@@ -1,28 +1,25 @@
-module;
+#include "features/screenshot/screenshot.hpp"
 
+#include <d3d11.h>
+#include <wil/com.h>
+#include <wincodec.h>
+#include <windows.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
-module Features.Screenshot;
-
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Screenshot.State;
-import Features.Settings.State;
-import Features.Screenshot.HdrEncoder;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.Graphics.Capture;
-import Utils.Graphics.D3D;
-import Utils.Graphics.HDR;
-import Utils.Graphics.PhotoProcessing;
-import Utils.Graphics.CaptureRegion;
-import Utils.Image;
-import <d3d11.h>;
-import <wil/com.h>;
-import <wincodec.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/screenshot/hdr_encoder.hpp"
+#include "features/screenshot/state.hpp"
+#include "features/settings/state.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/capture_region.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/graphics/hdr.hpp"
+#include "utils/graphics/photo_processing.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Screenshot {
 

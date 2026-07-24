@@ -1,11 +1,9 @@
-module;
+#include "core/events/events.hpp"
 
-module Core.Events;
+#include <windows.h>
 
-import std;
-import Core.Events.State;
-import Core.State;
-import <windows.h>;
+#include "core/events/state.hpp"
+#include "core/state/app_state.hpp"
 
 namespace Core::Events {
 

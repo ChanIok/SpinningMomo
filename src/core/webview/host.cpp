@@ -1,28 +1,25 @@
-module;
+#include "core/webview/host.hpp"
 
 #include <wil/com.h>
+#include <windows.h>
 
 #include <WebView2.h>  // 必须放最后面
+#include <d3d11.h>
+#include <dcomp.h>
+#include <dxgi.h>
+#include <wrl.h>
+#include <rfl/json.hpp>
 
-module Core.WebView.Host;
-
-import std;
-import Core.State;
-import Core.WebView.RpcBridge;
-import Core.WebView.State;
-import Core.WebView.Static;
-import Features.Settings.State;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Vendor.BuildConfig;
-import Vendor.ShellApi;
-import <d3d11.h>;
-import <dcomp.h>;
-import <dxgi.h>;
-import <rfl/json.hpp>;
-import <windows.h>;
-import <wrl.h>;
+#include "core/state/app_state.hpp"
+#include "core/webview/rpc_bridge.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/static.hpp"
+#include "features/settings/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/build_config.hpp"
+#include "vendor/shellapi.hpp"
 
 namespace Core::WebView::Host::Detail {
 

@@ -1,16 +1,14 @@
-module;
+#include "ui/context_menu/painter.hpp"
 
-module UI.ContextMenu.Painter;
+#include <d2d1_3.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
-import UI.ContextMenu.Interaction;
-import UI.ContextMenu.RenderContext;
-import Utils.Logger;
-import <d2d1_3.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "ui/context_menu/interaction.hpp"
+#include "ui/context_menu/render_context.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace UI::ContextMenu::Painter {
 

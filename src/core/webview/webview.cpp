@@ -1,19 +1,16 @@
-module;
+#include "core/webview/webview.hpp"
 
 #include <wil/com.h>
+#include <windows.h>
 
 #include <WebView2.h>  // 必须放最后面
+#include <windowsx.h>
 
-module Core.WebView;
-
-import std;
-import Core.State;
-import Core.WebView.Host;
-import Core.WebView.State;
-import Utils.Logger;
-import Utils.String;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/state/app_state.hpp"
+#include "core/webview/host.hpp"
+#include "core/webview/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace Core::WebView::Detail {
 

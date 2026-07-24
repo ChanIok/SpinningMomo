@@ -1,18 +1,15 @@
-module;
+#include "features/gallery/asset/service.hpp"
 
-module Features.Gallery.Asset.Service;
-
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.Types;
-import Features.Gallery.OriginalLocator;
-import Features.Gallery.Types;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Asset.QuerySupport;
-import Features.Gallery.Color.Repository;
-import Utils.Logger;
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/query_support.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/color/repository.hpp"
+#include "features/gallery/original_locator.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Asset::Service {
 

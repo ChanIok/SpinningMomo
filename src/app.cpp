@@ -1,15 +1,12 @@
-module;
+#include "app.hpp"
 
-module App;
-
-import std;
-import Core.Initializer;
-import Core.RuntimeInfo;
-import Core.Shutdown;
-import Core.State;
-import UI.FloatingWindow.State;
-import Utils.Logger;
-import Vendor.Windows;
+#include "core/initializer/initializer.hpp"
+#include "core/runtime_info/runtime_info.hpp"
+#include "core/shutdown/shutdown.hpp"
+#include "core/state/app_state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "vendor/windows.hpp"
 
 Application::Application() = default;
 

@@ -1,0 +1,17 @@
+#pragma once
+
+#include "core/state/app_state.hpp"
+#include "features/settings/menu_types.hpp"
+
+namespace Features::Settings::Menu {
+
+// === Getters Interface ===
+
+// 获取当前的比例预设数据
+auto get_ratios(const Core::State::AppState& app_state) -> const std::vector<RatioPreset>&;
+
+// 获取当前的分辨率预设数据
+auto get_resolutions(const Core::State::AppState& app_state)
+    -> const std::vector<ResolutionPreset>&;
+
+}  // namespace Features::Settings::Menu

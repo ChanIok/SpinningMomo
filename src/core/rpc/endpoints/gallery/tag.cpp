@@ -1,16 +1,14 @@
-module;
+#include "core/rpc/endpoints/gallery/tag.hpp"
 
-module Core.RPC.Endpoints.Gallery.Tag;
+#include <asio.hpp>
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Features.Gallery.Types;
-import Features.Gallery.Tag.Repository;
-import <asio.hpp>;
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/tag/repository.hpp"
+#include "features/gallery/types.hpp"
 
 namespace Core::RPC::Endpoints::Gallery::Tag {
 

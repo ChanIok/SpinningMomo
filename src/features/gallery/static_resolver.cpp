@@ -1,19 +1,16 @@
-module;
+#include "features/gallery/static_resolver.hpp"
 
-module Features.Gallery.StaticResolver;
-
-import std;
-import Core.State;
-import Core.HttpServer.Static;
-import Core.HttpServer.Types;
-import Core.WebView;
-import Core.WebView.State;
-import Features.Gallery.State;
-import Features.Gallery.OriginalLocator;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Vendor.BuildConfig;
+#include "core/http_server/static.hpp"
+#include "core/http_server/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/webview.hpp"
+#include "features/gallery/original_locator.hpp"
+#include "features/gallery/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/build_config.hpp"
 
 namespace Features::Gallery::StaticResolver {
 

@@ -1,18 +1,15 @@
-module;
+#include "features/settings/background.hpp"
 
-module Features.Settings.Background;
-
-import std;
-import Core.State;
-import Core.HttpServer.Static;
-import Core.HttpServer.Types;
-import Core.WebView.State;
-import Core.WebView.Static;
-import Core.WebView.Types;
-import Features.Settings.Types;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
+#include "core/http_server/static.hpp"
+#include "core/http_server/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/static.hpp"
+#include "core/webview/types.hpp"
+#include "features/settings/types.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Settings::Background {
 

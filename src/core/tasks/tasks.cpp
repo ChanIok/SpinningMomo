@@ -1,13 +1,11 @@
-module;
+#include "core/tasks/tasks.hpp"
 
-module Core.Tasks;
+#include <rfl/json.hpp>
 
-import std;
-import Core.State;
-import Core.Tasks.State;
-import Core.RPC.NotificationHub;
-import Utils.Logger;
-import <rfl/json.hpp>;
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Tasks {
 

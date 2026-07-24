@@ -1,17 +1,14 @@
-module;
+#include "ui/notification_window/message_handler.hpp"
 
 #include <windows.h>
 #include <windowsx.h>
 
-module UI.NotificationWindow.MessageHandler;
-
-import std;
-import Core.State;
-import UI.NotificationWindow;
-import UI.NotificationWindow.Painter;
-import UI.NotificationWindow.RenderContext;
-import UI.NotificationWindow.State;
-import UI.NotificationWindow.Types;
+#include "core/state/app_state.hpp"
+#include "ui/notification_window/notification_window.hpp"
+#include "ui/notification_window/painter.hpp"
+#include "ui/notification_window/render_context.hpp"
+#include "ui/notification_window/state.hpp"
+#include "ui/notification_window/types.hpp"
 
 auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM w_param,
                       LPARAM l_param) -> LRESULT {

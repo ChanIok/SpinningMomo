@@ -1,13 +1,10 @@
-module;
+#include "ui/context_menu/interaction.hpp"
 
 #include <windows.h>
 
-module UI.ContextMenu.Interaction;
-
-import std;
-import Core.State;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
+#include "core/state/app_state.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
 
 namespace {
 

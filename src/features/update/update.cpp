@@ -1,31 +1,29 @@
-module;
+#include "features/update/update.hpp"
 
-module Features.Update;
+#include <asio.hpp>
 
-import std;
-import Core.Events;
-import Core.Async;
-import Core.Notifications;
-import Core.Notifications.Types;
-import Core.Tasks;
-import UI.FloatingWindow.Events;
-import UI.WebViewWindow;
-import Core.State;
-import Core.I18n.State;
-import Core.HttpClient;
-import Core.HttpClient.Types;
-import Features.Update.State;
-import Features.Update.Types;
-import Features.Settings.State;
-import Utils.Crypto;
-import Utils.Logger;
-import Utils.Path;
-import Utils.PowerShell;
-import Utils.String;
-import Utils.Throttle;
-import Vendor.Version;
-import Vendor.Windows;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/events/events.hpp"
+#include "core/http_client/http_client.hpp"
+#include "core/http_client/types.hpp"
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/tasks.hpp"
+#include "features/settings/state.hpp"
+#include "features/update/state.hpp"
+#include "features/update/types.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/webview_window/webview_window.hpp"
+#include "utils/crypto/crypto.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/powershell/powershell.hpp"
+#include "utils/string/string.hpp"
+#include "utils/throttle/throttle.hpp"
+#include "vendor/version.hpp"
+#include "vendor/windows.hpp"
 
 namespace Features::Update {
 

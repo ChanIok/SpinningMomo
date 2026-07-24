@@ -1,23 +1,20 @@
-module;
+#include "core/webview/static.hpp"
 
 #include <wil/com.h>
+#include <windows.h>
 
+#include <Shlwapi.h>
 #include <WebView2.h>  // 必须放最后面
+#include <wrl.h>
 
-module Core.WebView.Static;
-
-import std;
-import Core.State;
-import Core.WebView.State;
-import Core.WebView.Types;
-import Utils.File.Mime;
-import Utils.Logger;
-import Utils.String;
-import Utils.Time;
-import Vendor.BuildConfig;
-import <Shlwapi.h>;
-import <windows.h>;
-import <wrl.h>;
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/types.hpp"
+#include "utils/file/mime.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "utils/time.hpp"
+#include "vendor/build_config.hpp"
 
 namespace Core::WebView::Static {
 

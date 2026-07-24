@@ -1,14 +1,11 @@
-module;
+#include "features/gallery/tag/repository.hpp"
 
-module Features.Gallery.Tag.Repository;
-
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.Types;
-import Utils.Logger;
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Tag::Repository {
 

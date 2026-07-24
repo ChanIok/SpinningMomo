@@ -1,24 +1,21 @@
-module;
+#include "core/events/handlers/settings_handlers.hpp"
 
-module Core.Events.Handlers.Settings;
-
-import std;
-import Core.Events;
-import Core.RPC.NotificationHub;
-import Core.State;
-import Core.Commands;
-import Core.I18n;
-import Core.WebView;
-import Features.Gallery;
-import Features.Settings.Events;
-import Features.Settings.Types;
-import Extensions.InfinityNikki.PhotoService;
-import Extensions.InfinityNikki.TaskService;
-import UI.FloatingWindow;
-import UI.FloatingWindow.State;
-import UI.PhotographyPanel;
-import UI.WebViewWindow;
-import Utils.Logger;
+#include "core/commands/registry.hpp"
+#include "core/events/events.hpp"
+#include "core/i18n/i18n.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/webview.hpp"
+#include "extensions/infinity_nikki/photo_service.hpp"
+#include "extensions/infinity_nikki/task_service.hpp"
+#include "features/gallery/gallery.hpp"
+#include "features/settings/events.hpp"
+#include "features/settings/types.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/photography_panel/photography_panel.hpp"
+#include "ui/webview_window/webview_window.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Events::Handlers {
 

@@ -1,15 +1,12 @@
-module;
+#include "core/http_server/http_server.hpp"
 
 #include <uwebsockets/App.h>
 
-module Core.HttpServer;
-
-import std;
-import Core.State;
-import Core.HttpServer.State;
-import Core.HttpServer.Routes;
-import Core.HttpServer.SseManager;
-import Utils.Logger;
+#include "core/http_server/routes.hpp"
+#include "core/http_server/sse_manager.hpp"
+#include "core/http_server/state.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::HttpServer {
 

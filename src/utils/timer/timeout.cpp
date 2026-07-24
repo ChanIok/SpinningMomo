@@ -1,11 +1,8 @@
-module;
+#include "utils/timer/timeout.hpp"
 
 #include <windows.h>
 
-module Utils.Timeout;
-
-import std;
-import Utils.Logger;
+#include "utils/logger/logger.hpp"
 
 namespace Utils::Timeout {
 

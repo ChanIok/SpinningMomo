@@ -1,24 +1,22 @@
-module;
+#include "features/gallery/gallery.hpp"
 
-module Features.Gallery;
+#include <mfapi.h>
+#include <asio.hpp>
 
-import std;
-import Core.Async;
-import Core.RPC.NotificationHub;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Folder.Service;
-import Features.Gallery.RootAvailability;
-import Features.Gallery.StaticResolver;
-import Features.Gallery.Watcher;
-import Utils.Logger;
-import Utils.Path;
-import <asio.hpp>;
-import <mfapi.h>;
+#include "core/async/async.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/folder/service.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/scanner.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/static_resolver.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery {
 

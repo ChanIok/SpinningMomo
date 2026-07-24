@@ -1,11 +1,8 @@
-module;
+#include "utils/graphics/capture_region.hpp"
 
-module Utils.Graphics.CaptureRegion;
-
-import std;
-import <d3d11.h>;
-import <dwmapi.h>;
-import <windows.h>;
+#include <d3d11.h>
+#include <dwmapi.h>
+#include <windows.h>
 
 namespace Utils::Graphics::CaptureRegion {
 

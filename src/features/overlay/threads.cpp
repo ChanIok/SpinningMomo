@@ -1,15 +1,13 @@
-module;
+#include "features/overlay/threads.hpp"
 
-module Features.Overlay.Threads;
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Interaction;
-import Features.Overlay.Window;
-import Utils.Logger;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/overlay/interaction.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "features/overlay/window.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Overlay::Threads {
 

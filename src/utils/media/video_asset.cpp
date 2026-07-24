@@ -1,19 +1,17 @@
-module;
+#include "utils/media/video_asset.hpp"
 
+#include <mfapi.h>
+#include <mferror.h>
 #include <mfidl.h>
 #include <mfobjects.h>
 #include <mfreadwrite.h>
 #include <propvarutil.h>
+#include <wil/com.h>
+#include <windows.h>
 
-module Utils.Media.VideoAsset;
-
-import std;
-import Utils.File.Mime;
-import Utils.Image;
-import Utils.Logger;
-import <mfapi.h>;
-import <mferror.h>;
-import <wil/com.h>;
+#include "utils/file/mime.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Utils::Media::VideoAsset {
 

@@ -1,18 +1,15 @@
-module;
+#include "features/gallery/file_operations/file_operations.hpp"
 
-module Features.Gallery.FileOperations;
-
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Watcher;
-import Utils.File;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.System;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "utils/file/file.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
 namespace Features::Gallery::FileOperations {
 

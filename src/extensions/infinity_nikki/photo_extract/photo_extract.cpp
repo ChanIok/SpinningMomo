@@ -1,13 +1,13 @@
-module Extensions.InfinityNikki.PhotoExtract;
+#include "extensions/infinity_nikki/photo_extract/photo_extract.hpp"
 
-import std;
-import Core.State;
-import Core.WorkerPool;
-import Extensions.InfinityNikki.PhotoExtract.Infra;
-import Extensions.InfinityNikki.PhotoExtract.Scan;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import <asio.hpp>;
+#include <asio.hpp>
+
+#include "core/state/app_state.hpp"
+#include "core/worker_pool/worker_pool.hpp"
+#include "extensions/infinity_nikki/photo_extract/infra.hpp"
+#include "extensions/infinity_nikki/photo_extract/scan.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Extensions::InfinityNikki::PhotoExtract {
 

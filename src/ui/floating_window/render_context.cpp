@@ -1,21 +1,20 @@
-module;
+#include "ui/floating_window/render_context.hpp"
 
-module UI.FloatingWindow.RenderContext;
+#include <d2d1_3.h>
+#include <d3d11.h>
+#include <dcomp.h>
+#include <dwrite_3.h>
+#include <dxgi1_2.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import Core.State;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import UI.SharedRenderResources;
-import UI.SharedRenderResources.State;
-import UI.SharedTheme;
-import Features.Settings.State;
-import <d2d1_3.h>;
-import <d3d11.h>;
-import <dcomp.h>;
-import <dwrite_3.h>;
-import <dxgi1_2.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "ui/shared_render_resources/shared_render_resources.hpp"
+#include "ui/shared_render_resources/state.hpp"
+#include "ui/shared_theme/shared_theme.hpp"
 
 namespace UI::FloatingWindow::RenderContext {
 

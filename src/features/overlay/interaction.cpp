@@ -1,20 +1,18 @@
-module;
+#include "features/overlay/interaction.hpp"
 
-module Features.Overlay.Interaction;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Overlay;
-import Features.Overlay.Capture;
-import Features.Overlay.Rendering;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Geometry;
-import Features.Overlay.Window;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/overlay/capture.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/overlay.hpp"
+#include "features/overlay/rendering.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "features/overlay/window.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Overlay::Interaction {
 

@@ -1,10 +1,7 @@
-module;
+#include "features/gallery/color/extractor.hpp"
 
-module Features.Gallery.Color.Extractor;
-
-import std;
-import Utils.Image;
-import Features.Gallery.Color.Types;
+#include "features/gallery/color/types.hpp"
+#include "utils/image/image.hpp"
 
 namespace Features::Gallery::Color::Extractor {
 

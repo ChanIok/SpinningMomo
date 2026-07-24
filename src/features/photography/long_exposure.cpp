@@ -1,8 +1,4 @@
-module;
-
-module Features.Photography.LongExposure;
-
-import std;
+#include "features/photography/long_exposure.hpp"
 
 namespace Features::Photography::LongExposure {
 

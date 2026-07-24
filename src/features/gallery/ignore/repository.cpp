@@ -1,16 +1,14 @@
-module;
+#include "features/gallery/ignore/repository.hpp"
 
-module Features.Gallery.Ignore.Repository;
+#include <rfl/json.hpp>
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Utils.Logger;
-import <rfl/json.hpp>;
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Ignore::Repository {
 

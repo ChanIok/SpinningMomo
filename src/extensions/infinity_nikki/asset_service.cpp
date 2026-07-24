@@ -1,19 +1,17 @@
-module;
+#include "extensions/infinity_nikki/asset_service.hpp"
 
-module Extensions.InfinityNikki.AssetService;
+#include <asio.hpp>
 
-import std;
-import Core.Database;
-import Core.Database.Types;
-import Core.State;
-import Extensions.InfinityNikki.MetadataDict;
-import Extensions.InfinityNikki.Types;
-import Extensions.InfinityNikki.WorldArea;
-import Features.Gallery.Asset.QuerySupport;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Types;
-import Utils.Logger;
-import <asio.hpp>;
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/metadata_dict.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "extensions/infinity_nikki/world_area.hpp"
+#include "features/gallery/asset/query_support.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Extensions::InfinityNikki::AssetService {
 

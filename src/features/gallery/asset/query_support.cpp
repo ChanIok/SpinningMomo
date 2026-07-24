@@ -1,13 +1,10 @@
-module;
+#include "features/gallery/asset/query_support.hpp"
 
-module Features.Gallery.Asset.QuerySupport;
-
-import std;
-import Core.Database;
-import Core.Database.Types;
-import Core.State;
-import Features.Gallery.Color.Filter;
-import Features.Gallery.Types;
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/color/filter.hpp"
+#include "features/gallery/types.hpp"
 
 namespace Features::Gallery::Asset::QuerySupport {
 

@@ -1,11 +1,10 @@
-module;
+#include "ui/shared_theme/shared_theme.hpp"
 
-module UI.SharedTheme;
+#include <d2d1_3.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Settings.State;
-import <d2d1_3.h>;
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
 
 namespace UI::SharedTheme {
 

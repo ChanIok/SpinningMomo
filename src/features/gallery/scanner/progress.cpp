@@ -1,10 +1,7 @@
-module;
+#include "features/gallery/scanner/progress.hpp"
 
-module Features.Gallery.Scanner.Progress;
-
-import std;
-import Features.Gallery.Types;
-import Utils.Logger;
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Scanner::Progress {
 

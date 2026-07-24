@@ -1,10 +1,7 @@
-module;
+#include "features/settings/menu.hpp"
 
-module Features.Settings.Menu;
-
-import std;
-import Core.State;
-import Features.Settings.State;
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
 
 namespace Features::Settings::Menu {
 

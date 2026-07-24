@@ -1,19 +1,17 @@
-module;
+#include "ui/photography_panel/painter.hpp"
 
-module UI.PhotographyPanel.Painter;
+#include <d2d1_3.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.I18n.State;
-import Features.Photography.LongExposure;
-import Features.Photography.State;
-import UI.FloatingWindow.State;
-import UI.PhotographyPanel.RenderContext;
-import UI.PhotographyPanel.State;
-import Utils.Logger;
-import Utils.String;
-import <d2d1_3.h>;
-import <windows.h>;
+#include "core/i18n/state.hpp"
+#include "core/state/app_state.hpp"
+#include "features/photography/long_exposure.hpp"
+#include "features/photography/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/photography_panel/render_context.hpp"
+#include "ui/photography_panel/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace UI::PhotographyPanel::Painter {
 

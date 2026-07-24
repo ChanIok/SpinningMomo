@@ -1,12 +1,9 @@
-module;
+#include "features/gallery/tag/service.hpp"
 
-module Features.Gallery.Tag.Service;
-
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Tag.Repository;
-import Utils.Logger;
+#include "core/state/app_state.hpp"
+#include "features/gallery/tag/repository.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Tag::Service {
 

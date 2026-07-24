@@ -1,10 +1,10 @@
-module Core.Async;
+#include "core/async/async.hpp"
 
-import std;
-import Core.State;
-import Core.Async.State;
-import Utils.Logger;
-import <asio.hpp>;
+#include <asio.hpp>
+
+#include "core/async/state.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Async {
 

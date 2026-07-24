@@ -1,12 +1,10 @@
-module;
+#include "utils/graphics/hdr.hpp"
 
-module Utils.Graphics.HDR;
+#include <dxgi1_6.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Utils.Logger;
-import <dxgi1_6.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "utils/logger/logger.hpp"
 
 namespace Utils::Graphics::HDR {
 

@@ -1,15 +1,13 @@
-module;
+#include "extensions/infinity_nikki/metadata_dict.hpp"
 
-module Extensions.InfinityNikki.MetadataDict;
+#include <asio.hpp>
+#include <rfl/json.hpp>
 
-import std;
-import Core.HttpClient;
-import Core.HttpClient.Types;
-import Core.State;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import <asio.hpp>;
-import <rfl/json.hpp>;
+#include "core/http_client/http_client.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Extensions::InfinityNikki::MetadataDict {
 

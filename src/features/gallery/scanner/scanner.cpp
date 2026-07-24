@@ -1,26 +1,23 @@
-module;
+#include "features/gallery/scanner/scanner.hpp"
 
-module Features.Gallery.Scanner;
-
-import std;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Scanner.Discovery;
-import Features.Gallery.Scanner.Analysis;
-import Features.Gallery.Scanner.Process;
-import Features.Gallery.Scanner.Cleanup;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.AssetPipeline;
-import Features.Gallery.Asset.Service;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Folder.Service;
-import Features.Gallery.Ignore.Repository;
-import Features.Gallery.Ignore.Service;
-import Utils.Logger;
-import Utils.Path;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/service.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/folder/service.hpp"
+#include "features/gallery/ignore/repository.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/analysis.hpp"
+#include "features/gallery/scanner/asset_pipeline.hpp"
+#include "features/gallery/scanner/cleanup.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/discovery.hpp"
+#include "features/gallery/scanner/process.hpp"
+#include "features/gallery/scanner/progress.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery::Scanner {
 

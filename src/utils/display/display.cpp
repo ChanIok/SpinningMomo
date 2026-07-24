@@ -1,10 +1,6 @@
-module;
+#include "utils/display/display.hpp"
 
 #include <windows.h>
-
-module Utils.Display;
-
-import std;
 
 namespace Utils::Display {
 

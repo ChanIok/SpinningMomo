@@ -1,12 +1,9 @@
-module;
+#include "features/gallery/recovery/repository.hpp"
 
-module Features.Gallery.Recovery.Repository;
-
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.Types;
-import Features.Gallery.Recovery.Types;
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/recovery/types.hpp"
 
 namespace Features::Gallery::Recovery::Repository {
 

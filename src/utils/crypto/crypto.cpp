@@ -1,12 +1,8 @@
-module;
+#include "utils/crypto/crypto.hpp"
 
 #include <windows.h>
 
 #include <bcrypt.h>
-
-module Utils.Crypto;
-
-import std;
 
 namespace Utils::Crypto {
 

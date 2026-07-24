@@ -1,19 +1,17 @@
-module;
+#include "ui/notification_window/notification_window.hpp"
 
-module UI.NotificationWindow;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.Notifications.Types;
-import UI.NotificationWindow.Painter;
-import UI.NotificationWindow.RenderContext;
-import UI.NotificationWindow.State;
-import UI.NotificationWindow.Types;
-import UI.FloatingWindow.State;
-import Utils.Display;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/notification_window/painter.hpp"
+#include "ui/notification_window/render_context.hpp"
+#include "ui/notification_window/state.hpp"
+#include "ui/notification_window/types.hpp"
+#include "utils/display/display.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace UI::NotificationWindow::MessageHandler {
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);

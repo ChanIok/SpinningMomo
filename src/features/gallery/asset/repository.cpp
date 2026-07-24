@@ -1,18 +1,16 @@
-module;
+#include "features/gallery/asset/repository.hpp"
 
-module Features.Gallery.Asset.Repository;
+#include <rfl/json.hpp>
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.Types;
-import Features.Gallery.State;
-import Utils.Logger;
-import Utils.Time;
-import Utils.LRUCache;
-import <rfl/json.hpp>;
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/lru_cache.hpp"
+#include "utils/time.hpp"
 
 namespace Features::Gallery::Asset::Repository::Detail {
 

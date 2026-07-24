@@ -1,14 +1,11 @@
-module;
+#include "features/gallery/color/repository.hpp"
 
-module Features.Gallery.Color.Repository;
-
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.Color.Types;
-import Features.Gallery.Types;
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/color/types.hpp"
+#include "features/gallery/types.hpp"
 
 namespace Features::Gallery::Color::Repository {
 

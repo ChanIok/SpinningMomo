@@ -1,14 +1,11 @@
-module;
+#include "utils/logger/logger.hpp"
 
 #include <spdlog/sinks/msvc_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
-module Utils.Logger;
-
-import std;
-import Utils.Path;
-import Vendor.BuildConfig;
+#include "utils/path/path.hpp"
+#include "vendor/build_config.hpp"
 
 namespace Utils::Logging::Detail {
 

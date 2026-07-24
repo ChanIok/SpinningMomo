@@ -1,20 +1,17 @@
-module;
+#include "features/letterbox/usecase.hpp"
 
-module Features.Letterbox.UseCase;
-
-import std;
-import Core.State;
-import Core.I18n.State;
-import Core.Notifications;
-import Features.Letterbox;
-import Features.Letterbox.State;
-import Features.Overlay;
-import Features.Overlay.State;
-import Features.Settings;
-import Features.Settings.State;
-import Features.WindowControl;
-import Utils.Logger;
-import Utils.String;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/state/app_state.hpp"
+#include "features/letterbox/letterbox.hpp"
+#include "features/letterbox/state.hpp"
+#include "features/overlay/overlay.hpp"
+#include "features/overlay/state.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/window_control.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Letterbox::UseCase {
 

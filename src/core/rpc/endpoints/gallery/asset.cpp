@@ -1,21 +1,19 @@
-module;
+#include "core/rpc/endpoints/gallery/asset.hpp"
 
-module Core.RPC.Endpoints.Gallery.Asset;
+#include <asio.hpp>
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Features.Gallery.Types;
-import Features.Gallery.Clipboard;
-import Features.Gallery.FileOperations;
-import Features.Gallery.Asset.Service;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.OriginalLocator;
-import Features.Gallery.RootAvailability;
-import <asio.hpp>;
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/service.hpp"
+#include "features/gallery/clipboard/clipboard.hpp"
+#include "features/gallery/file_operations/file_operations.hpp"
+#include "features/gallery/original_locator.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/types.hpp"
 
 namespace Core::RPC::Endpoints::Gallery::Asset {
 

@@ -1,14 +1,12 @@
-module;
+#include "utils/file/file.hpp"
 
-module Utils.File;
+#include <windows.h>
+#include <asio.hpp>
 
-import std;
-import Utils.Logger;
-import Utils.File.Mime;
-import Utils.String;
-import Utils.Time;
-import <asio.hpp>;
-import <windows.h>;
+#include "utils/file/mime.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "utils/time.hpp"
 
 namespace Utils::File {
 

@@ -1,30 +1,28 @@
-module;
+#include "features/recording/recording.hpp"
 
-module Features.Recording;
+#include <audioclient.h>
+#include <mfapi.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Core.Events;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
-import Core.State;
-import Features.Recording.EncoderLoop;
-import Features.Recording.Session;
-import Features.Recording.State;
-import Features.Settings.State;
-import Features.Recording.Time;
-import Features.Recording.Types;
-import UI.FloatingWindow;
-import UI.FloatingWindow.Events;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import Utils.Media.AudioCapture;
-import Utils.String;
-import Utils.System;
-import <audioclient.h>;
-import <mfapi.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/recording/encoder_loop.hpp"
+#include "features/recording/session.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/time.hpp"
+#include "features/recording/types.hpp"
+#include "features/settings/state.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/audio_capture.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
 namespace Features::Recording {
 

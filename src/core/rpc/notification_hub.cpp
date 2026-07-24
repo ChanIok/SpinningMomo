@@ -1,13 +1,10 @@
-module;
+#include "core/rpc/notification_hub.hpp"
 
-module Core.RPC.NotificationHub;
-
-import std;
-import Core.State;
-import Core.Events;
-import Core.WebView.Events;
-import Core.HttpServer.SseManager;
-import Utils.Logger;
+#include "core/events/events.hpp"
+#include "core/http_server/sse_manager.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/events.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::RPC::NotificationHub {
 

@@ -1,18 +1,16 @@
-module;
+#include "ui/photography_panel/message_handler.hpp"
 
-module UI.PhotographyPanel.MessageHandler;
+#include <dwmapi.h>
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Core.State;
-import Features.Photography.LongExposure;
-import Features.Photography.State;
-import Features.Photography.UseCase;
-import UI.PhotographyPanel.Painter;
-import UI.PhotographyPanel.RenderContext;
-import UI.PhotographyPanel.State;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/state/app_state.hpp"
+#include "features/photography/long_exposure.hpp"
+#include "features/photography/state.hpp"
+#include "features/photography/usecase.hpp"
+#include "ui/photography_panel/painter.hpp"
+#include "ui/photography_panel/render_context.hpp"
+#include "ui/photography_panel/state.hpp"
 
 namespace UI::PhotographyPanel::MessageHandler {
 

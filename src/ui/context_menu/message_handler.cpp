@@ -1,19 +1,17 @@
-module;
+#include "ui/context_menu/message_handler.hpp"
 
-module UI.ContextMenu.MessageHandler;
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Core.State;
-import UI.ContextMenu;
-import UI.ContextMenu.Layout;
-import UI.ContextMenu.Painter;
-import UI.ContextMenu.RenderContext;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
-import UI.ContextMenu.Interaction;
-import Utils.Logger;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/state/app_state.hpp"
+#include "ui/context_menu/context_menu.hpp"
+#include "ui/context_menu/interaction.hpp"
+#include "ui/context_menu/layout.hpp"
+#include "ui/context_menu/painter.hpp"
+#include "ui/context_menu/render_context.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace UI::ContextMenu::MessageHandler {
 

@@ -1,16 +1,16 @@
-module Extensions.InfinityNikki.PhotoExtract.Infra;
+#include "extensions/infinity_nikki/photo_extract/infra.hpp"
 
-import std;
-import Core.Database;
-import Core.Database.Types;
-import Core.State;
-import Core.HttpClient;
-import Core.HttpClient.Types;
-import Features.Gallery.Folder.Repository;
-import Extensions.InfinityNikki.PhotoExtract.Scan;
-import Extensions.InfinityNikki.Types;
-import <asio.hpp>;
-import <rfl/json.hpp>;
+#include <asio.hpp>
+#include <rfl/json.hpp>
+
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/http_client/http_client.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/photo_extract/scan.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "features/gallery/folder/repository.hpp"
 
 namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 

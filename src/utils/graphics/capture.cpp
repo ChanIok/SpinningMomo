@@ -1,20 +1,17 @@
-module;
+#include "utils/graphics/capture.hpp"
 
+#include <d3d11.h>
+#include <wil/com.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
+#include <windows.h>
 #include <winrt/Windows.Foundation.Metadata.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
 #include <winrt/Windows.Graphics.DirectX.h>
 
-module Utils.Graphics.Capture;
-
-import std;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "utils/logger/logger.hpp"
 
 namespace Utils::Graphics::Capture {
 

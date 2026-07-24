@@ -1,22 +1,20 @@
-module;
+#include "features/gallery/watcher/watcher.hpp"
 
-module Features.Gallery.Watcher;
+#include <wil/resource.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Recovery.Service;
-import Features.Gallery.Watcher.Sync;
-import Features.Gallery.Watcher.Notify;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.RootAvailability;
-import Utils.Logger;
-import Utils.Path;
-import <windows.h>;
-import <wil/resource.h>;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/recovery/service.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/notify.hpp"
+#include "features/gallery/watcher/sync.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery::Watcher {
 

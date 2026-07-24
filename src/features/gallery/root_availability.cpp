@@ -1,18 +1,16 @@
-module;
+#include "features/gallery/root_availability.hpp"
 
-module Features.Gallery.RootAvailability;
+#include <asio.hpp>
 
-import std;
-import Core.Async;
-import Core.State;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Utils.Logger;
-import Utils.Network;
-import Utils.Path;
-import Utils.String;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/network/network.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Gallery::RootAvailability::Detail {
 

@@ -1,11 +1,9 @@
-module;
+#include "core/events/registrar.hpp"
 
-module Core.Events.Registrar;
-
-import Core.State;
-import Core.Events.Handlers.Feature;
-import Core.Events.Handlers.Settings;
-import Core.Events.Handlers.System;
+#include "core/events/handlers/feature_handlers.hpp"
+#include "core/events/handlers/settings_handlers.hpp"
+#include "core/events/handlers/system_handlers.hpp"
+#include "core/state/app_state.hpp"
 
 namespace Core::Events {
 

@@ -1,16 +1,15 @@
-module;
+#include "features/gallery/scanner/analysis.hpp"
 
-module Features.Gallery.Scanner.Analysis;
+#include <wil/resource.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.WorkerPool;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Asset.Repository;
-import Utils.Logger;
-import <wil/resource.h>;
+#include "core/state/app_state.hpp"
+#include "core/worker_pool/worker_pool.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/progress.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Scanner::Analysis {
 

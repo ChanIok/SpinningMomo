@@ -1,13 +1,12 @@
-module;
+#include "core/rpc/endpoints/clipboard/clipboard.hpp"
 
-module Core.RPC.Endpoints.Clipboard;
+#include <asio.hpp>
 
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Utils.System;
-import <asio.hpp>;
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/system/system.hpp"
 
 namespace Core::RPC::Endpoints::Clipboard {
 

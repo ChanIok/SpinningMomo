@@ -1,18 +1,15 @@
-module;
+#include "core/runtime_info/runtime_info.hpp"
 
-module Core.RuntimeInfo;
-
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Core.WebView;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import Utils.Media.AudioCapture;
-import Utils.System;
-import Utils.Path;
-import Vendor.BuildConfig;
-import Vendor.Version;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "core/webview/webview.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/audio_capture.hpp"
+#include "utils/path/path.hpp"
+#include "utils/system/system.hpp"
+#include "vendor/build_config.hpp"
+#include "vendor/version.hpp"
 
 namespace Core::RuntimeInfo::Detail {
 

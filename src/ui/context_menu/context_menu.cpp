@@ -1,34 +1,32 @@
-module;
+#include "ui/context_menu/context_menu.hpp"
 
-module UI.ContextMenu;
+#include <d2d1.h>
+#include <dwmapi.h>
+#include <dwrite.h>
+#include <windows.h>
+#include <wrl/client.h>
 
-import std;
-import Core.State;
-import Core.I18n.State;
-import Core.I18n.Types;
-import Core.Events;
-import Features.Settings.Menu;
-import Core.Commands;
-import Core.Commands.Types;
-import UI.FloatingWindow.Types;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Events;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
-import UI.ContextMenu.Layout;
-import UI.ContextMenu.MessageHandler;
-import UI.ContextMenu.Interaction;
-import UI.ContextMenu.Painter;
-import UI.ContextMenu.RenderContext;
-import Utils.Logger;
-import Utils.String;
-import Vendor.Windows;
-import Features.WindowControl;
-import <d2d1.h>;
-import <dwmapi.h>;
-import <dwrite.h>;
-import <windows.h>;
-import <wrl/client.h>;
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/context_menu/interaction.hpp"
+#include "ui/context_menu/layout.hpp"
+#include "ui/context_menu/message_handler.hpp"
+#include "ui/context_menu/painter.hpp"
+#include "ui/context_menu/render_context.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/windows.hpp"
 
 namespace UI::ContextMenu {
 

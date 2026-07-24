@@ -1,17 +1,15 @@
-module;
+#include "ui/photography_panel/photography_panel.hpp"
 
-module UI.PhotographyPanel;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.I18n.State;
-import UI.PhotographyPanel.MessageHandler;
-import UI.PhotographyPanel.Painter;
-import UI.PhotographyPanel.RenderContext;
-import UI.PhotographyPanel.State;
-import Utils.String;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/i18n/state.hpp"
+#include "core/state/app_state.hpp"
+#include "ui/photography_panel/message_handler.hpp"
+#include "ui/photography_panel/painter.hpp"
+#include "ui/photography_panel/render_context.hpp"
+#include "ui/photography_panel/state.hpp"
+#include "utils/string/string.hpp"
 
 namespace UI::PhotographyPanel {
 

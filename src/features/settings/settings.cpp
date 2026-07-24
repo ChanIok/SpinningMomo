@@ -1,20 +1,18 @@
-module;
+#include "features/settings/settings.hpp"
 
-module Features.Settings;
+#include <rfl/json.hpp>
 
-import std;
-import Core.State;
-import Core.Events;
-import Features.Settings.Events;
-import Features.Settings.Types;
-import Features.Settings.State;
-import Features.Settings.Compute;
-import Features.Settings.Background;
-import Utils.Path;
-import Utils.System;
-import Utils.Logger;
-import Vendor.Windows;
-import <rfl/json.hpp>;
+#include "core/events/events.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/background.hpp"
+#include "features/settings/compute.hpp"
+#include "features/settings/events.hpp"
+#include "features/settings/state.hpp"
+#include "features/settings/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/system/system.hpp"
+#include "vendor/windows.hpp"
 
 namespace Features::Settings {
 

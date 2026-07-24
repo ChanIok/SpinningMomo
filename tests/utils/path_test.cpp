@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-import Utils.Path;
+#include "utils/path/path.hpp"
 
 using Utils::Path::ClassifyPathStorageKind;
 using Utils::Path::IsPathWithinBase;

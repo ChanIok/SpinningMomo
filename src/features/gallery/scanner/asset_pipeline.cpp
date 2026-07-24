@@ -1,24 +1,21 @@
-module;
+#include "features/gallery/scanner/asset_pipeline.hpp"
 
-module Features.Gallery.Scanner.AssetPipeline;
-
-import std;
-import Core.Database;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Color.Types;
-import Features.Gallery.Color.Extractor;
-import Features.Gallery.Color.Repository;
-import Features.Gallery.Ignore.Service;
-import Utils.Media.VideoAsset;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.Time;
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/color/extractor.hpp"
+#include "features/gallery/color/repository.hpp"
+#include "features/gallery/color/types.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/video_asset.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/time.hpp"
 
 namespace Features::Gallery::Scanner::AssetPipeline {
 

@@ -1,20 +1,17 @@
-module;
+#include "utils/media/encoder.hpp"
 
+#include <codecapi.h>
+#include <d3d11.h>
+#include <mfapi.h>
+#include <mferror.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
+#include <strmif.h>
+#include <wil/com.h>
+#include <windows.h>
 
-module Utils.Media.Encoder;
-
-import std;
-import Utils.Logger;
-import Utils.Media.HdrConvert;
-import <d3d11.h>;
-import <mfapi.h>;
-import <mferror.h>;
-import <wil/com.h>;
-import <windows.h>;
-import <codecapi.h>;
-import <strmif.h>;
+#include "utils/logger/logger.hpp"
+#include "utils/media/hdr_convert.hpp"
 
 namespace Utils::Media::Encoder {
 

@@ -1,14 +1,11 @@
-module;
+#include "core/http_server/sse_manager.hpp"
 
 #include <uwebsockets/App.h>
 
-module Core.HttpServer.SseManager;
-
-import std;
-import Core.State;
-import Core.HttpServer.State;
-import Core.HttpServer.Types;
-import Utils.Logger;
+#include "core/http_server/state.hpp"
+#include "core/http_server/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::HttpServer::SseManager {
 

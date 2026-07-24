@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-import Features.Recording.Time;
+#include "features/recording/time.hpp"
 
 using Features::Recording::Time::relative_timestamp_100ns;
 

@@ -1,12 +1,12 @@
-module Core.RPC.Endpoints.Tasks;
+#include "core/rpc/endpoints/tasks/tasks.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.Tasks;
-import <asio.hpp>;
+#include <asio.hpp>
+
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/tasks.hpp"
 
 namespace Core::RPC::Endpoints::Tasks {
 

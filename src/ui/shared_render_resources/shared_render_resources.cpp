@@ -1,15 +1,14 @@
-module;
+#include "ui/shared_render_resources/shared_render_resources.hpp"
 
-module UI.SharedRenderResources;
+#include <d2d1_3.h>
+#include <d3d11.h>
+#include <dwrite_3.h>
+#include <dxgi1_2.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import Core.State;
-import UI.SharedRenderResources.State;
-import <d2d1_3.h>;
-import <d3d11.h>;
-import <dwrite_3.h>;
-import <dxgi1_2.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "ui/shared_render_resources/state.hpp"
 
 namespace UI::SharedRenderResources {
 

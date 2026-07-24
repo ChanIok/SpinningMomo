@@ -1,24 +1,22 @@
-module;
+#include "features/recording/usecase.hpp"
 
-module Features.Recording.UseCase;
+#include <windows.h>
 
-import std;
-import Core.Events;
-import Core.State;
-import Core.I18n.State;
-import Features.Recording;
-import Features.Recording.Session;
-import Features.Recording.Types;
-import Features.Recording.State;
-import Features.Settings.State;
-import Features.WindowControl;
-import UI.FloatingWindow.Events;
-import Utils.Graphics.HDR;
-import Utils.Logger;
-import Utils.Media.AudioCapture;
-import Utils.Path;
-import Utils.String;
-import <windows.h>;
+#include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
+#include "core/state/app_state.hpp"
+#include "features/recording/recording.hpp"
+#include "features/recording/session.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/types.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/floating_window/events.hpp"
+#include "utils/graphics/hdr.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/audio_capture.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Recording::UseCase {
 

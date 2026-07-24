@@ -1,23 +1,20 @@
-module;
+#include "core/rpc/registry.hpp"
 
-module Core.RPC.Registry;
-
-import std;
-import Core.State;
-import Core.RPC.Endpoints.Clipboard;
-import Core.RPC.Endpoints.Backup;
-import Core.RPC.Endpoints.Dialog;
-import Core.RPC.Endpoints.File;
-import Core.RPC.Endpoints.RuntimeInfo;
-import Core.RPC.Endpoints.Settings;
-import Core.RPC.Endpoints.Tasks;
-import Core.RPC.Endpoints.Registry;
-import Core.RPC.Endpoints.Update;
-import Core.RPC.Endpoints.WebView;
-import Core.RPC.Endpoints.Gallery;
-import Core.RPC.Endpoints.Extensions;
-import Core.RPC.Endpoints.WindowControl;
-import Utils.Logger;
+#include "core/rpc/endpoints/backup/backup.hpp"
+#include "core/rpc/endpoints/clipboard/clipboard.hpp"
+#include "core/rpc/endpoints/dialog/dialog.hpp"
+#include "core/rpc/endpoints/extensions/extensions.hpp"
+#include "core/rpc/endpoints/file/file.hpp"
+#include "core/rpc/endpoints/gallery/gallery.hpp"
+#include "core/rpc/endpoints/registry/registry.hpp"
+#include "core/rpc/endpoints/runtime_info/runtime_info.hpp"
+#include "core/rpc/endpoints/settings/settings.hpp"
+#include "core/rpc/endpoints/tasks/tasks.hpp"
+#include "core/rpc/endpoints/update/update.hpp"
+#include "core/rpc/endpoints/webview/webview.hpp"
+#include "core/rpc/endpoints/window_control/window_control.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::RPC::Registry {
 

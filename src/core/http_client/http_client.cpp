@@ -1,14 +1,14 @@
-module Core.HttpClient;
+#include "core/http_client/http_client.hpp"
 
-import std;
-import Core.State;
-import Core.HttpClient.State;
-import Core.HttpClient.Types;
-import Utils.Logger;
-import Utils.String;
-import Vendor.WinHttp;
-import <asio.hpp>;
-import <windows.h>;
+#include <windows.h>
+#include <asio.hpp>
+
+#include "core/http_client/state.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/winhttp.hpp"
 
 namespace Core::HttpClient::Detail {
 

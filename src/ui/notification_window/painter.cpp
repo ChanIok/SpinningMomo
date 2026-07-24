@@ -1,21 +1,19 @@
-module;
+#include "ui/notification_window/painter.hpp"
 
-module UI.NotificationWindow.Painter;
+#include <d2d1_3.h>
+#include <dwrite_3.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.Notifications.Types;
-import UI.NotificationWindow.RenderContext;
-import UI.NotificationWindow.State;
-import UI.NotificationWindow.Types;
-import UI.SharedRenderResources.State;
-import UI.SharedTheme;
-import UI.FloatingWindow.State;
-import Utils.Logger;
-import Utils.System;
-import <d2d1_3.h>;
-import <dwrite_3.h>;
-import <windows.h>;
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/notification_window/render_context.hpp"
+#include "ui/notification_window/state.hpp"
+#include "ui/notification_window/types.hpp"
+#include "ui/shared_render_resources/state.hpp"
+#include "ui/shared_theme/shared_theme.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/system/system.hpp"
 
 namespace UI::NotificationWindow::Painter {
 

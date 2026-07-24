@@ -1,19 +1,16 @@
-module;
+#include "utils/media/audio_capture.hpp"
 
+#include <audioclient.h>
 #include <audioclientactivationparams.h>
+#include <mmdeviceapi.h>
 #include <mmreg.h>
+#include <wil/com.h>
+#include <wil/resource.h>
+#include <windows.h>
+#include <wrl/implements.h>
 #include "AudioSessionTypes.h"
 
-module Utils.Media.AudioCapture;
-
-import std;
-import Utils.Logger;
-import <audioclient.h>;
-import <mmdeviceapi.h>;
-import <wil/com.h>;
-import <wil/resource.h>;
-import <windows.h>;
-import <wrl/implements.h>;
+#include "utils/logger/logger.hpp"
 
 namespace {
 

@@ -1,16 +1,13 @@
-module;
+#include "features/backup/backup.hpp"
 
-module Features.Backup;
-
-import std;
-import Core.Database;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Backup.Types;
-import Utils.Path;
-import Utils.PowerShell;
-import Utils.String;
-import Vendor.Windows;
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/backup/types.hpp"
+#include "utils/path/path.hpp"
+#include "utils/powershell/powershell.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/windows.hpp"
 
 namespace Features::Backup::Detail {
 

@@ -1,19 +1,17 @@
-module;
+#include "features/recording/session.hpp"
 
-module Features.Recording.Session;
+#include <d3d11_4.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Recording.State;
-import Features.Recording.Types;
-import Utils.Graphics.Capture;
-import Utils.Graphics.CaptureRegion;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import Utils.String;
-import <d3d11_4.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/types.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/capture_region.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Recording::Session {
 

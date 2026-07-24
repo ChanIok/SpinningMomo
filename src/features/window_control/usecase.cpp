@@ -1,32 +1,29 @@
-module;
+#include "features/window_control/usecase.hpp"
 
-module Features.WindowControl.UseCase;
-
-import std;
-import Features.Settings.Menu;
-import Core.Async.UiAwaitable;
-import Core.Notifications;
-import Core.State;
-import Core.I18n.State;
-import UI.FloatingWindow;
-import UI.FloatingWindow.Events;
-import UI.FloatingWindow.State;
-import Features.Settings;
-import Features.Settings.State;
-import Features.Letterbox;
-import Features.Letterbox.State;
-import Features.WindowControl;
-import Features.WindowControl.Types;
-import Features.Overlay;
-import Features.Overlay.State;
-import Features.Preview;
-import Features.Preview.State;
-import Features.Overlay.Geometry;
-import Features.Overlay.Interaction;
-import Utils.Display;
-import Utils.Logger;
-import Utils.String;
-import Vendor.Windows;
+#include "core/async/ui_awaitable.hpp"
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/state/app_state.hpp"
+#include "features/letterbox/letterbox.hpp"
+#include "features/letterbox/state.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/interaction.hpp"
+#include "features/overlay/overlay.hpp"
+#include "features/overlay/state.hpp"
+#include "features/preview/preview.hpp"
+#include "features/preview/state.hpp"
+#include "features/settings/menu.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/types.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/windows.hpp"
 
 namespace Features::WindowControl::UseCase {
 

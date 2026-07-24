@@ -1,12 +1,10 @@
-module;
+#include "utils/system/system.hpp"
 
-module Utils.System;
+#include <windows.h>
 
-import std;
-import <windows.h>;
-import Vendor.ShellApi;
-import Vendor.Windows;
-import Utils.String;
+#include "utils/string/string.hpp"
+#include "vendor/shellapi.hpp"
+#include "vendor/windows.hpp"
 
 namespace Utils::System {
 

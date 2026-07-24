@@ -1,17 +1,15 @@
-module;
+#include "features/preview/viewport.hpp"
 
-module Features.Preview.Viewport;
+#include <d3d11.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Utils.Graphics.D3D;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Rendering;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Preview::Viewport {
 

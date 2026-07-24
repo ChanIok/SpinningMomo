@@ -1,0 +1,42 @@
+#pragma once
+
+#include <d3d11.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
+#include <wil/com.h>
+#include <windows.h>
+
+#include "utils/media/hdr_convert.hpp"
+
+namespace Utils::Media::Encoder::State {
+
+// 编码器上下文
+struct EncoderContext {
+  wil::com_ptr<IMFSinkWriter> sink_writer;
+  DWORD video_stream_index = 0;
+
+  // 缓存的尺寸信息
+  uint32_t frame_width = 0;
+  uint32_t frame_height = 0;
+  DWORD buffer_size = 0;  // width * height * 4
+
+  // CPU 编码模式
+  wil::com_ptr<ID3D11Texture2D> staging_texture;  // CPU 可读的暂存纹理
+  wil::com_ptr<IMFSample> reusable_sample;        // 复用的 Sample
+  wil::com_ptr<IMFMediaBuffer> reusable_buffer;   // 复用的 Buffer
+
+  // GPU 编码模式
+  wil::com_ptr<IMFDXGIDeviceManager> dxgi_manager;
+  UINT reset_token = 0;
+  bool gpu_encoding = false;
+  bool hdr_encoding = false;
+  Utils::Media::HdrConvert::ConverterContext hdr_converter;
+
+  // 音频流
+  DWORD audio_stream_index = 0;  // 音频流索引
+  bool has_audio = false;        // 是否有音频流
+
+  // 注：线程同步由调用方管理，因为 std::mutex 不可移动，无法放在 std::expected 返回值中
+};
+
+}  // namespace Utils::Media::Encoder::State

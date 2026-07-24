@@ -1,19 +1,16 @@
-module;
+#include "core/http_server/routes.hpp"
 
 #include <uwebsockets/App.h>
+#include <asio.hpp>
 
-module Core.HttpServer.Routes;
-
-import std;
-import Core.State;
-import Core.HttpServer.State;
-import Core.HttpServer.SseManager;
-import Core.HttpServer.Static;
-import Core.Async;
-import Core.RPC;
-import Utils.Logger;
-import Vendor.BuildConfig;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/http_server/sse_manager.hpp"
+#include "core/http_server/state.hpp"
+#include "core/http_server/static.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
+#include "vendor/build_config.hpp"
 
 namespace Core::HttpServer::Routes {
 

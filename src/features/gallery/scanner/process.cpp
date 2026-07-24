@@ -1,19 +1,18 @@
-module;
+#include "features/gallery/scanner/process.hpp"
 
-module Features.Gallery.Scanner.Process;
+#include <wil/resource.h>
+#include <windows.h>
 
-import std;
-import Core.Database;
-import Core.State;
-import Core.WorkerPool;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Scanner.AssetPipeline;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Color.Repository;
-import Utils.Logger;
-import <wil/resource.h>;
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "core/worker_pool/worker_pool.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/color/repository.hpp"
+#include "features/gallery/scanner/asset_pipeline.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/progress.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Gallery::Scanner::Process {
 

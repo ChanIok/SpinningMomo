@@ -1,13 +1,10 @@
-module;
+#include "utils/crash_dump/crash_dump.hpp"
 
 #include <windows.h>
 
 #include <DbgHelp.h>
 
-module Utils.CrashDump;
-
-import std;
-import Utils.Path;
+#include "utils/path/path.hpp"
 
 namespace Utils::CrashDump::Detail {
 

@@ -1,13 +1,11 @@
-module;
+#include "features/overlay/geometry.hpp"
 
-module Features.Overlay.Geometry;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
 
 namespace Features::Overlay::Geometry {
 

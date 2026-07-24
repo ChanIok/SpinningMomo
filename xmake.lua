@@ -31,7 +31,7 @@ target("SpinningMomo")
     set_arch("x64")
     
     -- 启用C++模块支持
-    set_policy("build.c++.modules", true)
+    set_pcxxheader("src/pch.hpp")
     -- set_policy("build.c++.modules.non_cascading_changes", true)
 
     -- Release 也保留调试符号，便于分析生产崩溃 dump
@@ -51,7 +51,7 @@ target("SpinningMomo")
     
     -- 添加源文件
     add_files("src/main.cpp")
-    add_files("src/**.cpp", "src/**.ixx")
+    add_files("src/**.cpp")
     add_files("resources/*.rc", "resources/*.manifest")
     
     -- 链接vcpkg包

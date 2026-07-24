@@ -1,30 +1,28 @@
-module;
 
-module Core.Commands;
 
-import std;
-import Core.State;
-import Core.Commands.State;
-import Core.Commands.Types;
-import Features.Settings.State;
-import Features.Screenshot.UseCase;
-import Features.Recording.UseCase;
-import Features.Letterbox.UseCase;
-import Features.Overlay.UseCase;
-import Features.Photography.UseCase;
-import Features.Photography.State;
-import Features.Preview.UseCase;
-import Features.Letterbox.State;
-import Features.Recording.State;
-import Features.Overlay.State;
-import Features.Preview.State;
-import Features.WindowControl.UseCase;
-import UI.FloatingWindow;
-import UI.WebViewWindow;
-import Utils.Logger;
-import Utils.Path;
-import Utils.System;
-import Vendor.Windows;
+#include "core/commands/registry.hpp"
+#include "core/commands/state.hpp"
+#include "core/commands/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/letterbox/state.hpp"
+#include "features/letterbox/usecase.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/usecase.hpp"
+#include "features/photography/state.hpp"
+#include "features/photography/usecase.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/usecase.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/usecase.hpp"
+#include "features/screenshot/usecase.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/usecase.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "ui/webview_window/webview_window.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/system/system.hpp"
+#include "vendor/windows.hpp"
 
 namespace Core::Commands {
 

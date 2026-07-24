@@ -1,9 +1,6 @@
-module;
+#include "utils/display/display_geometry.hpp"
 
-module Utils.DisplayGeometry;
-
-import std;
-import <windows.h>;
+#include <windows.h>
 
 namespace Utils::DisplayGeometry {
 

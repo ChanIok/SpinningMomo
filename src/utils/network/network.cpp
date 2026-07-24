@@ -1,10 +1,8 @@
-module;
+#include "utils/network/network.hpp"
 
-module Utils.Network;
+#include <asio.hpp>
 
-import std;
-import Utils.String;
-import <asio.hpp>;
+#include "utils/string/string.hpp"
 
 namespace Utils::Network::Detail {
 

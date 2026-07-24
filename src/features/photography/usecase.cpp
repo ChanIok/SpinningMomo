@@ -1,14 +1,11 @@
-module;
+#include "features/photography/usecase.hpp"
 
-module Features.Photography.UseCase;
-
-import std;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.State;
-import Features.Photography.State;
-import UI.PhotographyPanel;
-import Utils.Logger;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/state/app_state.hpp"
+#include "features/photography/state.hpp"
+#include "ui/photography_panel/photography_panel.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Photography::UseCase {
 

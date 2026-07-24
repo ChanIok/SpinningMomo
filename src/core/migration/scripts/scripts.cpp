@@ -1,15 +1,13 @@
-module;
+#include "core/migration/scripts/scripts.hpp"
 
-module Core.Migration.Scripts;
+#include <rfl/json.hpp>
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Migration.Schema;
-import Features.Settings;
-import Features.Settings.Types;
-import Utils.Logger;
-import <rfl/json.hpp>;
+#include "core/database/database.hpp"
+#include "core/migration/generated/schema.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::Migration::Scripts {
 

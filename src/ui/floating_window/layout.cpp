@@ -1,13 +1,11 @@
-module;
+#include "ui/floating_window/layout.hpp"
 
-module UI.FloatingWindow.Layout;
+#include <dwmapi.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import UI.FloatingWindow.State;
-import Features.Settings.State;
-import <dwmapi.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/settings/state.hpp"
+#include "ui/floating_window/state.hpp"
 
 namespace UI::FloatingWindow::Layout {
 

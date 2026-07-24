@@ -1,24 +1,22 @@
-module;
+#include "ui/tray_icon/tray_icon.hpp"
 
-module UI.TrayIcon;
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.Commands;
-import Core.Commands.Types;
-import Core.I18n.Types;
-import Core.I18n.State;
-import Features.Settings.Menu;
-import Features.WindowControl;
-import UI.ContextMenu;
-import UI.ContextMenu.Types;
-import UI.FloatingWindow.State;
-import UI.TrayIcon.State;
-import UI.TrayIcon.Types;
-import Utils.String;
-import Vendor.Windows;
-import Vendor.ShellApi;
-import <windows.h>;
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/context_menu/context_menu.hpp"
+#include "ui/context_menu/types.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/tray_icon/state.hpp"
+#include "ui/tray_icon/types.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/shellapi.hpp"
+#include "vendor/windows.hpp"
 
 namespace {
 

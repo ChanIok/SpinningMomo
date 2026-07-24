@@ -1,28 +1,26 @@
-module;
+#include "ui/floating_window/message_handler.hpp"
 
-module UI.FloatingWindow.MessageHandler;
+#include <dwmapi.h>
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Features.Settings.Menu;
-import Core.Commands;
-import Core.Commands.Types;
-import Core.Events;
-import Core.State;
-import UI.FloatingWindow;
-import UI.FloatingWindow.Events;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.Painter;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import UI.TrayIcon;
-import UI.TrayIcon.Types;
-import UI.ContextMenu;
-import UI.ContextMenu.Types;
-import UI.FloatingWindow.RenderContext;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/events/events.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "ui/context_menu/context_menu.hpp"
+#include "ui/context_menu/types.hpp"
+#include "ui/floating_window/events.hpp"
+#include "ui/floating_window/floating_window.hpp"
+#include "ui/floating_window/layout.hpp"
+#include "ui/floating_window/painter.hpp"
+#include "ui/floating_window/render_context.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "ui/tray_icon/tray_icon.hpp"
+#include "ui/tray_icon/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace UI::FloatingWindow::MessageHandler {
 

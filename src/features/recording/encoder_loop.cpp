@@ -1,29 +1,26 @@
-module;
+#include "features/recording/encoder_loop.hpp"
 
+#include <d3d11_4.h>
+#include <mfapi.h>
+#include <wil/com.h>
+#include <windows.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
-module Features.Recording.EncoderLoop;
-
-import std;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
-import Core.State;
-import Features.Recording;
-import Features.Recording.Session;
-import Features.Recording.State;
-import Features.Recording.Time;
-import Features.Recording.Types;
-import Utils.Graphics.Capture;
-import Utils.Graphics.CaptureRegion;
-import Utils.Media.Encoder;
-import Utils.Media.Encoder.Types;
-import Utils.Logger;
-import Utils.String;
-import <d3d11_4.h>;
-import <mfapi.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/recording/recording.hpp"
+#include "features/recording/session.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/time.hpp"
+#include "features/recording/types.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/capture_region.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/media/encoder.hpp"
+#include "utils/media/types.hpp"
+#include "utils/string/string.hpp"
 
 namespace Features::Recording::EncoderLoop {
 

@@ -1,20 +1,18 @@
-module;
+#include "ui/floating_window/painter.hpp"
 
-module UI.FloatingWindow.Painter;
+#include <d2d1_3.h>
+#include <dwrite_3.h>
+#include <windows.h>
 
-import std;
-import Core.State;
-import Core.Commands;
-import Core.Commands.Types;
-import UI.SharedRenderResources.State;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import UI.FloatingWindow.RenderContext;
-import Features.Settings.Menu;
-import <d2d1_3.h>;
-import <dwrite_3.h>;
-import <windows.h>;
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "ui/floating_window/layout.hpp"
+#include "ui/floating_window/render_context.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "ui/shared_render_resources/state.hpp"
 
 namespace UI::FloatingWindow::Painter {
 

@@ -1,15 +1,13 @@
-module;
 
-module Features.Screenshot.HdrEncoder;
+#include <d3d11.h>
+#include <wil/com.h>
+#include <wil/resource.h>
+#include <wil/result.h>
+#include <windows.h>
 
-import std;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <wil/result.h>;
-import <wil/resource.h>;
-import <windows.h>;
+#include "features/screenshot/hdr_encoder.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Screenshot::HdrEncoder {
 

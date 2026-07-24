@@ -1,9 +1,6 @@
-module;
+#include "utils/powershell/powershell.hpp"
 
-module Utils.PowerShell;
-
-import std;
-import <windows.h>;
+#include <windows.h>
 
 namespace Utils::PowerShell::Detail {
 

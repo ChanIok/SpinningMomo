@@ -1,25 +1,23 @@
-module;
+#include "features/preview/preview.hpp"
 
-module Features.Preview;
+#include <dwmapi.h>
+#include <windows.h>
+#include <windowsx.h>
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Window;
-import Features.Preview.Interaction;
-import Features.Preview.Rendering;
-import Features.Preview.Capture;
-import UI.FloatingWindow.State;
-import Utils.Graphics.D3D;
-import Utils.Graphics.Capture;
-import Utils.Graphics.HDR;
-import Utils.Display;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/preview/capture.hpp"
+#include "features/preview/interaction.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "features/preview/window.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/graphics/hdr.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Features::Preview {
 

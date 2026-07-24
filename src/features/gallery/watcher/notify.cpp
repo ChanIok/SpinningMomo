@@ -1,19 +1,17 @@
-module;
+#include "features/gallery/watcher/notify.hpp"
 
-module Features.Gallery.Watcher.Notify;
+#include <windows.h>
 
-import std;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Watcher.Sync;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Ignore.Service;
-import Features.Gallery.Asset.Repository;
-import Utils.Logger;
-import Utils.Path;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/sync.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
 namespace Features::Gallery::Watcher::Notify {
 

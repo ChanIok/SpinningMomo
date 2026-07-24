@@ -1,0 +1,106 @@
+#pragma once
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+// Win32 APIs
+#include <d2d1.h>
+#include <d3d11.h>
+#include <dcomp.h>
+#include <dwmapi.h>
+#include <dwrite.h>
+#include <dxgi.h>
+#include <psapi.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <tlhelp32.h>
+#include <windows.h>
+
+// C++ Standard Libraries
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <barrier>
+#include <bit>
+#include <cassert>
+#include <cctype>
+#include <charconv>
+#include <chrono>
+#include <cmath>
+#include <compare>
+#include <concepts>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cwctype>
+#include <exception>
+#include <expected>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <functional>
+#include <future>
+#include <initializer_list>
+#include <iomanip>
+#include <iostream>
+#include <latch>
+#include <limits>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <numbers>
+#include <numeric>
+#include <optional>
+#include <queue>
+#include <random>
+#include <ranges>
+#include <regex>
+#include <semaphore>
+#include <set>
+#include <shared_mutex>
+#include <source_location>
+#include <span>
+#include <sstream>
+#include <stack>
+#include <stdexcept>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <thread>
+#include <tuple>
+#include <type_traits>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
+
+// External / Third-Party Libraries
+#include <SQLiteCpp/SQLiteCpp.h>
+#include <WebView2.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+#include <uWebSockets/App.h>
+#include <webp/decode.h>
+#include <webp/encode.h>
+#include <wil/com.h>
+#include <wil/resource.h>
+#include <wil/result.h>
+#include <xxhash.h>
+#include <zlib.h>
+#include <asio.hpp>
+#include <dkm.hpp>
+#include <rfl.hpp>
+#include <rfl/json.hpp>

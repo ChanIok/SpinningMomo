@@ -1,25 +1,23 @@
-module;
+#include "extensions/infinity_nikki/task_service.hpp"
 
 // TaskService 实现：把无限暖暖相关的重活挂到 Asio 协程上，并对接 Core::Tasks（前端「后台任务」）。
 // 约定：对外只暴露 start_* / schedule_silent_*；launch_* 为内部 co_spawn
 // 入口，不校验「是否已有同类任务」 （重复校验在各自的 start_* 里通过 has_active_task_of_type +
 // create_task 完成）。
-module Extensions.InfinityNikki.TaskService;
+#include <asio.hpp>
 
-import std;
-import Core.Async;
-import Core.RPC.NotificationHub;
-import Core.State;
-import Core.Tasks;
-import Features.Gallery;
-import Features.Gallery.Types;
-import Features.Settings;
-import Features.Settings.State;
-import Extensions.InfinityNikki.PhotoExtract;
-import Extensions.InfinityNikki.MediaHardlinks;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/tasks.hpp"
+#include "extensions/infinity_nikki/media_hardlinks.hpp"
+#include "extensions/infinity_nikki/photo_extract/photo_extract.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "features/gallery/gallery.hpp"
+#include "features/gallery/types.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Extensions::InfinityNikki::TaskService {
 

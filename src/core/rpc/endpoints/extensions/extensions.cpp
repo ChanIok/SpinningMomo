@@ -1,19 +1,19 @@
-module Core.RPC.Endpoints.Extensions;
+#include "core/rpc/endpoints/extensions/extensions.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Extensions.InfinityNikki.AssetService;
-import Extensions.InfinityNikki.TaskService;
-import Extensions.InfinityNikki.Types;
-import Extensions.InfinityNikki.GameDirectory;
-import Features.Gallery.Types;
-import Utils.Logger;
-import <asio.hpp>;
-import <rfl/json.hpp>;
+#include <asio.hpp>
+#include <rfl/json.hpp>
+
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/asset_service.hpp"
+#include "extensions/infinity_nikki/game_directory.hpp"
+#include "extensions/infinity_nikki/task_service.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace Core::RPC::Endpoints::Extensions {
 

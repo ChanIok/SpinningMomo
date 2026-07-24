@@ -1,18 +1,15 @@
-module;
+#include "core/i18n/i18n.hpp"
 
-module Core.I18n;
+#include <rfl/json.hpp>
 
-import std;
-import Core.I18n.Types;
-import Core.I18n.State;
-import Core.State;
-import Utils.Logger;
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 // 导入生成的嵌入模块
-import Core.I18n.Embedded.ZhCN;
-import Core.I18n.Embedded.EnUS;
-
-import <rfl/json.hpp>;
+#include "core/i18n/embedded/en_us.hpp"
+#include "core/i18n/embedded/zh_cn.hpp"
 
 namespace Core::I18n {
 

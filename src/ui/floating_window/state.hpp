@@ -1,0 +1,16 @@
+#pragma once
+
+#include "ui/floating_window/types.hpp"
+
+namespace UI::FloatingWindow::State {
+
+// 主窗口聚合状态
+struct FloatingWindowState {
+  FloatingWindow::WindowInfo window;
+  FloatingWindow::InteractionState ui;
+  FloatingWindow::DataState data;
+  FloatingWindow::LayoutConfig layout;
+  FloatingWindow::RenderResources render_resources;  // 浮窗私有的窗口级渲染上下文
+};
+
+}  // namespace UI::FloatingWindow::State

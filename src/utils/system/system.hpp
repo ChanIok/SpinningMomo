@@ -1,0 +1,88 @@
+#pragma once
+
+namespace Utils::System {
+
+// Windows 系统版本信息结构体
+struct WindowsVersionInfo {
+  unsigned long major_version = 0;
+  unsigned long minor_version = 0;
+  unsigned long build_number = 0;
+  unsigned long platform_id = 0;
+};
+
+// 获取当前 Windows 系统版本信息
+[[nodiscard]] auto get_windows_version() noexcept -> std::expected<WindowsVersionInfo, std::string>;
+
+// 根据 WindowsVersionInfo 获取系统名称
+[[nodiscard]] auto get_windows_name(const WindowsVersionInfo& version) noexcept -> std::string;
+
+// 检测当前进程是否以管理员权限运行
+[[nodiscard]] auto is_process_elevated() noexcept -> bool;
+
+// 以管理员权限重启当前应用程序
+// 返回 true 表示成功启动新进程（当前进程应退出）
+// 返回 false 表示用户取消或启动失败
+[[nodiscard]] auto restart_as_elevated(const wchar_t* arguments = nullptr) noexcept -> bool;
+
+// 在资源管理器中打开目录
+auto open_directory(const std::filesystem::path& path) -> std::expected<void, std::string>;
+
+// 使用系统默认应用打开文件
+auto open_file_with_default_app(const std::filesystem::path& path)
+    -> std::expected<void, std::string>;
+
+// 在资源管理器中显示并选中文件
+auto reveal_file_in_explorer(const std::filesystem::path& path) -> std::expected<void, std::string>;
+
+auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
+    -> std::expected<void, std::string>;
+
+enum class ClipboardMediaKind {
+  Empty,
+  Files,
+  EncodedPng,
+  Bitmap,
+};
+
+struct ClipboardBitmap {
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  std::uint32_t stride = 0;
+  std::vector<std::uint8_t> bgra_pixels;
+};
+
+struct ClipboardMedia {
+  ClipboardMediaKind kind = ClipboardMediaKind::Empty;
+  std::vector<std::filesystem::path> file_paths;
+  std::vector<std::uint8_t> encoded_png;
+  std::optional<ClipboardBitmap> bitmap;
+};
+
+// 一次性复制系统剪贴板中的文件列表或位图数据，让调用方在剪贴板关闭后安全使用。
+auto read_clipboard_media() -> std::expected<ClipboardMedia, std::string>;
+
+// 读取系统剪贴板中的纯文本内容（UTF-8）
+auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string>;
+
+// 将文件移动到系统回收站
+auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
+    -> std::expected<void, std::string>;
+
+// 永久删除单个文件，不经过系统回收站。
+auto delete_file_permanently(const std::filesystem::path& path) -> std::expected<void, std::string>;
+
+// 单实例检测：尝试获取单实例锁
+// 返回 true 表示成功获取锁（当前是第一个实例）
+// 返回 false 表示已有实例在运行
+[[nodiscard]] auto acquire_single_instance_lock() noexcept -> bool;
+
+// 释放单实例锁（若当前进程持有）
+auto release_single_instance_lock() noexcept -> void;
+
+// 激活已运行的实例窗口
+auto activate_existing_instance() noexcept -> void;
+
+// 自定义消息：通知已运行实例显示窗口
+constexpr unsigned int WM_SPINNINGMOMO_SHOW = 0x8000 + 100;  // 跨进程消息范围
+
+}  // namespace Utils::System

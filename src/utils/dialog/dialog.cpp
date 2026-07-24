@@ -1,14 +1,13 @@
-module;
+#include "utils/dialog/dialog.hpp"
 
-module Utils.Dialog;
+#include <shobjidl.h>
+#include <wil/com.h>
+#include <wil/result.h>
+#include <windows.h>
 
-import std;
-import Utils.Logger;
-import Utils.String;
-import Vendor.Windows;
-import <shobjidl.h>;
-import <wil/com.h>;
-import <wil/result.h>;
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "vendor/windows.hpp"
 
 namespace Utils::Dialog {
 

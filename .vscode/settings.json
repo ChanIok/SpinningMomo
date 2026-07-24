@@ -124,6 +124,7 @@
     "resumable": "cpp",
     "*.ipp": "cpp",
     "*.rh": "cpp",
-    "generator": "cpp"
+    "generator": "cpp",
+    "string_view": "cpp"
   }
 }

@@ -1,10 +1,8 @@
-module;
+#include "utils/path/path.hpp"
 
-module Utils.Path;
+#include <windows.h>
 
-import std;
-import Vendor.ShellApi;
-import <windows.h>;
+#include "vendor/shellapi.hpp"
 
 namespace Utils::Path::Detail {
 

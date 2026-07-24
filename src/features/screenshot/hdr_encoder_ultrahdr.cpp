@@ -1,10 +1,8 @@
-module;
 
-module Features.Screenshot.HdrEncoder;
+#include <windows.h>
 
-import std;
-import Utils.Image;
-import <windows.h>;
+#include "features/screenshot/hdr_encoder.hpp"
+#include "utils/image/image.hpp"
 
 namespace Features::Screenshot::HdrEncoder {
 

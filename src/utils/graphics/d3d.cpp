@@ -1,15 +1,13 @@
-module;
+#include "utils/graphics/d3d.hpp"
 
-module Utils.Graphics.D3D;
+#include <d3d11.h>
+#include <d3dcompiler.h>
+#include <dxgi.h>
+#include <dxgi1_4.h>
+#include <wil/com.h>
+#include <windows.h>
 
-import std;
-import Utils.Logger;
-import <d3d11.h>;
-import <d3dcompiler.h>;
-import <dxgi.h>;
-import <dxgi1_4.h>;
-import <windows.h>;
-import <wil/com.h>;
+#include "utils/logger/logger.hpp"
 
 namespace Utils::Graphics::D3D {
 

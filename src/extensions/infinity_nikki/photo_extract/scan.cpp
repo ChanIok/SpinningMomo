@@ -1,13 +1,10 @@
-module;
+#include "extensions/infinity_nikki/photo_extract/scan.hpp"
 
 #include <windows.h>
 
 #include <bcrypt.h>
 
-module Extensions.InfinityNikki.PhotoExtract.Scan;
-
-import std;
-import Utils.String;
+#include "utils/string/string.hpp"
 
 namespace Extensions::InfinityNikki::PhotoExtract::Scan {
 
