@@ -62,6 +62,7 @@ npm ci --prefix web
 
 ```bash
 node scripts/patch-xmake-7554.js
+node scripts/patch-xmake-clang-cl-cxx23.js
 xmake f -m release -y && xmake f -m debug -y
 npm run patch:vcpkg
 ```
