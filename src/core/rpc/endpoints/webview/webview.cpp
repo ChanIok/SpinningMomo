@@ -11,6 +11,7 @@
 #include "core/state/app_state.hpp"
 #include "core/webview/state.hpp"
 #include "ui/webview_window/webview_window.hpp"
+#include "utils/string/string.hpp"
 
 namespace core::rpc::endpoints::webview {
 
@@ -20,6 +21,10 @@ struct WindowControlResult {
 
 struct SetFullscreenParams {
   bool fullscreen;
+};
+
+struct ActivateWindowParams {
+  std::string route;
 };
 
 struct FullscreenControlResult {
@@ -91,6 +96,12 @@ auto handle_get_window_state(core::AppState& app_state, [[maybe_unused]] const r
   };
 }
 
+auto handle_activate_window(core::AppState& app_state, const ActivateWindowParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<WindowControlResult>> {
+  ui::webview_window::activate_window(app_state, utils::string::FromUtf8(params.route));
+  co_return WindowControlResult{.success = true};
+}
+
 auto register_all(core::AppState& app_state) -> void {
   core::rpc::register_method<rfl::Generic, WindowStateResult>(
       app_state, app_state.rpc->registry, "webview.getWindowState", handle_get_window_state,
@@ -111,6 +122,10 @@ auto register_all(core::AppState& app_state) -> void {
   core::rpc::register_method<rfl::Generic, WindowControlResult>(
       app_state, app_state.rpc->registry, "webview.close", handle_close_window,
       "Close the webview window");
+
+  core::rpc::register_method<ActivateWindowParams, WindowControlResult>(
+      app_state, app_state.rpc->registry, "webview.activate", handle_activate_window,
+      "Activate the webview window and navigate to a route");
 }
 
 }  // namespace core::rpc::endpoints::webview

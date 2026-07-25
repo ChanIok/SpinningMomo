@@ -174,7 +174,7 @@ auto initialize_application(core::AppState& state) -> std::expected<void, std::s
         features::settings::should_show_onboarding(state.settings->raw);
     if (should_open_onboarding) {
       Logger().info("Onboarding required, attempting to open main UI window");
-      ui::webview_window::activate_window(state);
+      ui::webview_window::activate_window(state, L"/welcome", SIZE{900, 600});
     } else {
       // 默认显示悬浮窗
       ui::floating_window::show_window(state);

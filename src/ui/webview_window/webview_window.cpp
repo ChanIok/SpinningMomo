@@ -177,12 +177,126 @@ auto open_in_browser(core::AppState& state, std::wstring_view route) -> void {
   ShellExecuteExW(&exec_info);
 }
 
+struct WindowBounds {
+  int x;
+  int y;
+  int width;
+  int height;
+};
+
+// 将默认客户区尺寸或已保存的窗口外框尺寸解析为当前显示器上的可见窗口矩形。
+auto resolve_window_bounds(HWND hwnd, DWORD style, DWORD ex_style, int width, int height, int x,
+                           int y) -> WindowBounds {
+  bool use_center = x == -1 || y == -1;
+  if (use_center) {
+    // 未保存过的位置使用逻辑客户区尺寸，并根据当前 DPI 换算为窗口外框尺寸。
+    UINT dpi = hwnd ? GetDpiForWindow(hwnd) : GetDpiForSystem();
+    RECT desired_client_rect = {0, 0, MulDiv(width, dpi, 96), MulDiv(height, dpi, 96)};
+    if (AdjustWindowRectExForDpi(&desired_client_rect, style, FALSE, ex_style, dpi)) {
+      width = desired_client_rect.right - desired_client_rect.left;
+      height = desired_client_rect.bottom - desired_client_rect.top;
+    } else {
+      width = desired_client_rect.right;
+      height = desired_client_rect.bottom;
+    }
+  }
+
+  constexpr int kMinWidth = 320;
+  constexpr int kMinHeight = 240;
+  width = std::max(kMinWidth, width);
+  height = std::max(kMinHeight, height);
+
+  HMONITOR monitor = nullptr;
+  if (!use_center) {
+    RECT saved_rect{x, y, x + width, y + height};
+    monitor = MonitorFromRect(&saved_rect, MONITOR_DEFAULTTONULL);
+    use_center = monitor == nullptr;
+  }
+  if (!monitor) {
+    monitor = hwnd ? MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+                   : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+  }
+
+  MONITORINFO monitor_info = {sizeof(monitor_info)};
+  if (GetMonitorInfoW(monitor, &monitor_info)) {
+    const auto& work = monitor_info.rcWork;
+    int work_width = work.right - work.left;
+    int work_height = work.bottom - work.top;
+    width = std::min(width, work_width);
+    height = std::min(height, work_height);
+
+    if (!use_center) {
+      bool visible =
+          x + width > work.left && x < work.right && y + height > work.top && y < work.bottom;
+      use_center = !visible;
+    }
+
+    if (use_center) {
+      x = work.left + (work_width - width) / 2;
+      y = work.top + (work_height - height) / 2;
+    }
+  }
+
+  return WindowBounds{.x = x, .y = y, .width = width, .height = height};
+}
+
+auto apply_window_bounds(core::AppState& state, int width, int height, int x, int y)
+    -> std::expected<void, std::string> {
+  auto hwnd = state.webview->window.webview_hwnd;
+  if (!hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  if (state.webview->window.is_fullscreen) {
+    if (auto result = set_fullscreen_window(state, false); !result) {
+      return result;
+    }
+  }
+  if (IsZoomed(hwnd) == TRUE) {
+    ShowWindow(hwnd, SW_RESTORE);
+  }
+
+  auto style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+  auto ex_style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+  auto bounds = resolve_window_bounds(hwnd, style, ex_style, width, height, x, y);
+  if (!SetWindowPos(hwnd, nullptr, bounds.x, bounds.y, bounds.width, bounds.height,
+                    SWP_NOZORDER | SWP_NOACTIVATE)) {
+    return std::unexpected("Failed to apply WebView window bounds");
+  }
+
+  return {};
+}
+
 // 激活主界面：冷启动延迟到导航开始后显示，热启动直接拉起窗口。
-auto activate_window(core::AppState& state, std::wstring_view route) -> void {
+auto activate_window(core::AppState& state, std::wstring_view route,
+                     std::optional<SIZE> temporary_size) -> void {
   if (state.runtime_info && !state.runtime_info->is_webview2_available) {
     Logger().warn("WebView2 runtime is unavailable. Opening in browser.");
     open_in_browser(state, route);
     return;
+  }
+
+  auto& window = state.webview->window;
+  if (!temporary_size && window.temporary_size &&
+      features::settings::should_show_onboarding(state.settings->raw)) {
+    temporary_size = window.temporary_size;
+  }
+  bool was_temporary = window.temporary_size.has_value();
+  bool temporary_size_changed =
+      temporary_size &&
+      (!window.temporary_size || window.temporary_size->cx != temporary_size->cx ||
+       window.temporary_size->cy != temporary_size->cy);
+  window.temporary_size = temporary_size;
+
+  if (window.webview_hwnd &&
+      (was_temporary != temporary_size.has_value() || temporary_size_changed)) {
+    int width = temporary_size ? temporary_size->cx : state.settings->raw.ui.webview_window.width;
+    int height = temporary_size ? temporary_size->cy : state.settings->raw.ui.webview_window.height;
+    int x = temporary_size ? -1 : state.settings->raw.ui.webview_window.x;
+    int y = temporary_size ? -1 : state.settings->raw.ui.webview_window.y;
+    if (auto result = apply_window_bounds(state, width, height, x, y); !result) {
+      Logger().warn("Failed to apply WebView activation bounds: {}", result.error());
+    }
   }
 
   // 初始化尚未完成时先保存目标路由，后续初始导航会消费它。
@@ -618,66 +732,25 @@ auto create(core::AppState& state) -> std::expected<void, std::string> {
   int height = state.settings->raw.ui.webview_window.height;
   int x = state.settings->raw.ui.webview_window.x;
   int y = state.settings->raw.ui.webview_window.y;
-
-  if (x < 0 || y < 0) {
-    // 首次启动按系统 DPI 放大默认客户区，避免高缩放下初始窗口过小。
-    UINT dpi = GetDpiForSystem();
-    RECT desired_client_rect = {0, 0, MulDiv(width, dpi, 96), MulDiv(height, dpi, 96)};
-    if (AdjustWindowRectExForDpi(&desired_client_rect, style, FALSE, ex_style, dpi)) {
-      width = desired_client_rect.right - desired_client_rect.left;
-      height = desired_client_rect.bottom - desired_client_rect.top;
-    } else {
-      width = desired_client_rect.right;
-      height = desired_client_rect.bottom;
-    }
+  if (state.webview->window.temporary_size) {
+    width = state.webview->window.temporary_size->cx;
+    height = state.webview->window.temporary_size->cy;
+    x = -1;
+    y = -1;
   }
-
-  // 限制在合理范围内（最小 320×240，最大为工作区）
-  constexpr int kMinWidth = 320;
-  constexpr int kMinHeight = 240;
-  width = std::max(kMinWidth, width);
-  height = std::max(kMinHeight, height);
-
-  HMONITOR monitor = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
-  MONITORINFO mi = {sizeof(mi)};
-  if (GetMonitorInfoW(monitor, &mi)) {
-    // 保存尺寸不能超过当前主显示器工作区，否则窗口可能无法拖回。
-    int work_width = mi.rcWork.right - mi.rcWork.left;
-    int work_height = mi.rcWork.bottom - mi.rcWork.top;
-    width = std::min(width, work_width);
-    height = std::min(height, work_height);
-  }
-
-  // 位置：x/y < 0 表示未保存过，居中；否则使用保存的位置
-  // 若保存的位置完全不在当前显示器上，则回退到居中
-  bool use_center = (x < 0 || y < 0);
-  if (!use_center && GetMonitorInfoW(monitor, &mi)) {
-    RECT work = mi.rcWork;
-
-    // 显示器配置变化后，离屏的历史位置回退到居中。
-    bool visible =
-        (x + width > work.left && x < work.right && y + height > work.top && y < work.bottom);
-    if (!visible) {
-      use_center = true;
-    }
-  }
-  if (use_center && GetMonitorInfoW(monitor, &mi)) {
-    int work_width = mi.rcWork.right - mi.rcWork.left;
-    int work_height = mi.rcWork.bottom - mi.rcWork.top;
-    x = mi.rcWork.left + (work_width - width) / 2;
-    y = mi.rcWork.top + (work_height - height) / 2;
-  }
+  auto bounds = resolve_window_bounds(nullptr, style, ex_style, width, height, x, y);
 
   // 创建独立窗口
   // 窗口样式：
   // - WS_POPUP: 无边框窗口
   // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
-  HWND hwnd = CreateWindowExW(ex_style,                                // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",       // 窗口类名
-                              L"SpinningMomo WebView",                 // 窗口标题
-                              style,                                   // 窗口样式
-                              x, y, width, height,                     // 位置和大小
+  HWND hwnd = CreateWindowExW(ex_style,                           // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",  // 窗口类名
+                              L"SpinningMomo WebView",            // 窗口标题
+                              style,                              // 窗口样式
+                              bounds.x, bounds.y, bounds.width,   // 位置和大小
+                              bounds.height,
                               nullptr,                                 // 父窗口
                               nullptr,                                 // 菜单
                               state.floating_window->window.instance,  // 实例句柄
@@ -697,7 +770,7 @@ auto create(core::AppState& state) -> std::expected<void, std::string> {
 
   RECT client_rect{};
   GetClientRect(hwnd, &client_rect);
-  RECT window_rect{x, y, x + width, y + height};
+  RECT window_rect{bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height};
   GetWindowRect(hwnd, &window_rect);
   state.webview->window.width = client_rect.right - client_rect.left;
   state.webview->window.height = client_rect.bottom - client_rect.top;
@@ -743,57 +816,62 @@ auto cleanup(core::AppState& state) -> void {
   if (state.webview->window.webview_hwnd) {
     HWND hwnd = state.webview->window.webview_hwnd;
 
-    int width_to_save = state.webview->window.width;
-    int height_to_save = state.webview->window.height;
-    int x_to_save = state.webview->window.x;
-    int y_to_save = state.webview->window.y;
-    if (state.webview->window.is_fullscreen && state.webview->window.has_fullscreen_restore_state) {
-      // 全屏下保存进入全屏前的位置，而不是整屏尺寸。
-      const auto& restore = state.webview->window.fullscreen_restore_placement;
-      width_to_save = restore.rcNormalPosition.right - restore.rcNormalPosition.left;
-      height_to_save = restore.rcNormalPosition.bottom - restore.rcNormalPosition.top;
-      x_to_save = restore.rcNormalPosition.left;
-      y_to_save = restore.rcNormalPosition.top;
-    } else if (IsZoomed(hwnd) || IsIconic(hwnd)) {
-      // 最大化/最小化时保存还原位置，避免下次以异常状态尺寸启动。
-      WINDOWPLACEMENT wp = {sizeof(wp)};
-      if (GetWindowPlacement(hwnd, &wp)) {
-        width_to_save = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
-        height_to_save = wp.rcNormalPosition.bottom - wp.rcNormalPosition.top;
-        x_to_save = wp.rcNormalPosition.left;
-        y_to_save = wp.rcNormalPosition.top;
+    if (!state.webview->window.temporary_size) {
+      int width_to_save = state.webview->window.width;
+      int height_to_save = state.webview->window.height;
+      int x_to_save = state.webview->window.x;
+      int y_to_save = state.webview->window.y;
+      if (state.webview->window.is_fullscreen &&
+          state.webview->window.has_fullscreen_restore_state) {
+        // 全屏下保存进入全屏前的位置，而不是整屏尺寸。
+        const auto& restore = state.webview->window.fullscreen_restore_placement;
+        width_to_save = restore.rcNormalPosition.right - restore.rcNormalPosition.left;
+        height_to_save = restore.rcNormalPosition.bottom - restore.rcNormalPosition.top;
+        x_to_save = restore.rcNormalPosition.left;
+        y_to_save = restore.rcNormalPosition.top;
+      } else if (IsZoomed(hwnd) || IsIconic(hwnd)) {
+        // 最大化/最小化时保存还原位置，避免下次以异常状态尺寸启动。
+        WINDOWPLACEMENT wp = {sizeof(wp)};
+        if (GetWindowPlacement(hwnd, &wp)) {
+          width_to_save = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
+          height_to_save = wp.rcNormalPosition.bottom - wp.rcNormalPosition.top;
+          x_to_save = wp.rcNormalPosition.left;
+          y_to_save = wp.rcNormalPosition.top;
+        }
+      } else {
+        RECT rect{x_to_save, y_to_save, x_to_save + width_to_save, y_to_save + height_to_save};
+        GetWindowRect(hwnd, &rect);
+        width_to_save = rect.right - rect.left;
+        height_to_save = rect.bottom - rect.top;
+        x_to_save = rect.left;
+        y_to_save = rect.top;
+      }
+
+      constexpr int kMinWidth = 320;
+      constexpr int kMinHeight = 240;
+      width_to_save = std::max(kMinWidth, width_to_save);
+      height_to_save = std::max(kMinHeight, height_to_save);
+
+      auto old_settings = state.settings->raw;
+      state.settings->raw.ui.webview_window.width = width_to_save;
+      state.settings->raw.ui.webview_window.height = height_to_save;
+      state.settings->raw.ui.webview_window.x = x_to_save;
+      state.settings->raw.ui.webview_window.y = y_to_save;
+
+      auto settings_path = features::settings::get_settings_path();
+      if (settings_path) {
+        // 通过 settings 通知同步前端状态，避免关闭窗口后设置页仍拿旧尺寸。
+        if (auto save_result = features::settings::save_settings_to_file(settings_path.value(),
+                                                                         state.settings->raw);
+            !save_result) {
+          Logger().warn("Failed to persist WebView window bounds: {}", save_result.error());
+        } else {
+          features::settings::notify_settings_changed(state, old_settings,
+                                                      "Settings updated via WebView window bounds");
+        }
       }
     } else {
-      RECT rect{x_to_save, y_to_save, x_to_save + width_to_save, y_to_save + height_to_save};
-      GetWindowRect(hwnd, &rect);
-      width_to_save = rect.right - rect.left;
-      height_to_save = rect.bottom - rect.top;
-      x_to_save = rect.left;
-      y_to_save = rect.top;
-    }
-
-    constexpr int kMinWidth = 320;
-    constexpr int kMinHeight = 240;
-    width_to_save = std::max(kMinWidth, width_to_save);
-    height_to_save = std::max(kMinHeight, height_to_save);
-
-    auto old_settings = state.settings->raw;
-    state.settings->raw.ui.webview_window.width = width_to_save;
-    state.settings->raw.ui.webview_window.height = height_to_save;
-    state.settings->raw.ui.webview_window.x = x_to_save;
-    state.settings->raw.ui.webview_window.y = y_to_save;
-
-    auto settings_path = features::settings::get_settings_path();
-    if (settings_path) {
-      // 通过 settings 通知同步前端状态，避免关闭窗口后设置页仍拿旧尺寸。
-      if (auto save_result =
-              features::settings::save_settings_to_file(settings_path.value(), state.settings->raw);
-          !save_result) {
-        Logger().warn("Failed to persist WebView window bounds: {}", save_result.error());
-      } else {
-        features::settings::notify_settings_changed(state, old_settings,
-                                                    "Settings updated via WebView window bounds");
-      }
+      Logger().debug("Skipped persisting temporary WebView window bounds");
     }
 
     DestroyWindow(hwnd);

@@ -28,10 +28,11 @@ struct HostRuntime {
 // WebView窗口状态
 struct WindowState {
   HWND webview_hwnd = nullptr;
-  int width = 900;
-  int height = 600;
+  int width = 1200;
+  int height = 800;
   int x = 0;
   int y = 0;
+  std::optional<SIZE> temporary_size;
   bool is_visible = false;
   bool is_maximized = false;
   bool is_fullscreen = false;
