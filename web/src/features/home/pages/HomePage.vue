@@ -125,10 +125,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full overflow-x-hidden">
+  <div class="relative h-full w-full overflow-hidden">
     <div
       v-if="showMomoOutline"
-      class="pointer-events-none absolute top-10 right-10 bottom-6 z-10 w-[min(46vw,580px)] max-w-full text-white select-none dark:text-white/50"
+      class="pointer-events-none absolute top-10 right-10 bottom-6 z-0 w-auto max-w-full text-white select-none dark:text-white/50"
       aria-hidden="true"
     >
       <div
@@ -141,9 +141,7 @@ onUnmounted(() => {
       v-if="hasLoadedHomeStats"
       class="pointer-events-none absolute bottom-8 left-8 z-20 animate-in duration-600 fade-in-0"
     >
-      <div
-        class="relative overflow-hidden rounded-md border border-border shadow-sm backdrop-blur-md dark:border-border/30"
-      >
+      <div class="relative overflow-hidden rounded-md backdrop-blur-md">
         <!-- Base Backgrounds -->
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
@@ -210,7 +208,7 @@ onUnmounted(() => {
     <div class="group absolute right-8 bottom-8 z-20 flex flex-col items-end gap-3">
       <!-- Tooltip Label -->
       <div
-        class="pointer-events-none rounded-md border border-border px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100 dark:border-border/30"
+        class="pointer-events-none rounded-md px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100"
       >
         <div
           class="app-background-overlay pointer-events-none absolute inset-0 z-0 rounded-md"
@@ -227,7 +225,7 @@ onUnmounted(() => {
 
       <!-- Square Shutter Button -->
       <button
-        class="relative flex h-[52px] w-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-md border border-border shadow-sm backdrop-blur-md transition-all duration-300 hover:shadow-md focus:outline-none dark:border-border/30"
+        class="relative flex h-[52px] w-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-md backdrop-blur-md transition-all duration-300 focus:outline-none"
         :disabled="isOpening"
         @click="handleOpenOutputDirectory"
       >

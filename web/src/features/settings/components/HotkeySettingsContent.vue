@@ -88,7 +88,7 @@ const handleReset = async () => {
               <HotkeyRecorder
                 :value="getHotkey('floatingWindow')"
                 @change="(v) => updateFloatingWindowHotkey(v.modifiers, v.key)"
-                class="w-48"
+                class="w-36"
               />
             </ItemActions>
           </Item>
@@ -106,7 +106,7 @@ const handleReset = async () => {
               <HotkeyRecorder
                 :value="getHotkey('screenshot')"
                 @change="(v) => updateScreenshotHotkey(v.modifiers, v.key)"
-                class="w-48"
+                class="w-36"
               />
             </ItemActions>
           </Item>
@@ -124,7 +124,7 @@ const handleReset = async () => {
               <HotkeyRecorder
                 :value="getHotkey('recording')"
                 @change="(v) => updateRecordingHotkey(v.modifiers, v.key)"
-                class="w-48"
+                class="w-36"
               />
             </ItemActions>
           </Item>

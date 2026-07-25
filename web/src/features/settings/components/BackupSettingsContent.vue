@@ -89,6 +89,15 @@ const handleConfirmRestore = async () => {
 <template>
   <div class="w-full">
     <div class="space-y-8">
+      <div>
+        <h3 class="text-lg font-semibold text-foreground">
+          {{ t('settings.backup.title') }}
+        </h3>
+        <p class="mt-1 text-sm text-muted-foreground">
+          {{ t('settings.backup.description') }}
+        </p>
+      </div>
+
       <div class="space-y-4">
         <ItemGroup>
           <Item variant="surface" size="sm">

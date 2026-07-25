@@ -56,6 +56,7 @@ const isRejected = computed(() => props.reviewFlag === 'rejected')
     <!-- filmstrip：右下小方角标，仅 X -->
     <div
       v-if="isRejected && compact"
+      :title="t('gallery.review.flag.rejected')"
       class="absolute right-1 bottom-1 flex h-4 w-4 items-center justify-center rounded-sm border border-white/20 bg-black/50 text-current shadow-sm backdrop-blur-sm"
     >
       <X class="h-3 w-3 stroke-[3] text-rose-400" />
@@ -64,10 +65,11 @@ const isRejected = computed(() => props.reviewFlag === 'rejected')
     <!-- 主卡片：胶囊 + X + 文案 -->
     <div
       v-if="isRejected && !compact"
+      :title="t('gallery.review.flag.rejected')"
       class="absolute right-2 bottom-2 flex items-center gap-1 rounded-md border border-white/15 bg-black/50 px-2 py-1 text-[11px] text-white transition-opacity duration-150"
     >
       <X class="h-3.5 w-3.5 shrink-0 text-rose-400" />
-      <span class="font-medium">弃置</span>
+      <span class="font-medium">{{ t('gallery.review.flag.rejected') }}</span>
     </div>
   </div>
 </template>

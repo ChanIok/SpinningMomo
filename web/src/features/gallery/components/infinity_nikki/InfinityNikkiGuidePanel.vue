@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { ScanText, FolderSymlink, Sparkles } from 'lucide-vue-next'
+import { ScanText, FolderSymlink, Sparkles, ChevronRight } from 'lucide-vue-next'
+import zongziMomoSvg from '@/assets/zongzi-momo.svg?raw'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useSettingsStore } from '@/features/settings/store'
@@ -100,17 +101,30 @@ function handlePrevious() {
 </script>
 
 <template>
-  <div class="flex h-full w-full items-center justify-center overflow-y-auto p-6">
-    <!-- 卡片主体 -->
-    <div class="surface-top flex w-full max-w-2xl flex-col rounded-md border">
+  <div class="relative flex h-full w-full items-center justify-center overflow-hidden p-6">
+    <!-- Background Watermark: Zongzi Momo (Outer Canvas Accent) -->
+    <div
+      class="pointer-events-none absolute top-4 right-20 bottom-6 z-0 w-auto max-w-full text-foreground/5 opacity-20 select-none dark:text-white/4 [&_path]:fill-current"
+      aria-hidden="true"
+    >
+      <div
+        class="flex h-full w-full items-center justify-end [&_svg]:h-full [&_svg]:w-auto [&_svg]:max-w-none [&_svg]:shrink-0"
+        v-html="zongziMomoSvg"
+      ></div>
+    </div>
+
+    <!-- 卡片主体 (叠在水印上方) -->
+    <div
+      class="relative z-10 flex w-full max-w-2xl flex-col rounded-md bg-background/80 dark:bg-background/85"
+    >
       <!-- Header：说明来源 + 步骤进度 -->
-      <div class="flex shrink-0 items-center justify-between px-6 py-4">
+      <div class="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
         <div class="flex items-center">
           <div>
-            <p class="text-sm leading-tight font-semibold text-foreground">
-              {{ t('gallery.guide.infinityNikki.header.title') }}
-            </p>
-            <p class="text-xs text-muted-foreground">
+            <span class="text-[0.65rem] font-medium tracking-[0.2em] text-primary uppercase">
+              INFINITY NIKKI • GALLERY SETUP
+            </span>
+            <p class="mt-0.5 text-xs text-muted-foreground">
               {{ t('gallery.guide.infinityNikki.header.subtitle') }}
             </p>
           </div>
@@ -120,31 +134,31 @@ function handlePrevious() {
         <div class="flex items-center gap-1.5">
           <div
             class="h-1.5 rounded-full transition-all duration-300"
-            :class="step === 1 ? 'w-6 bg-primary' : 'w-2.5 bg-primary/30'"
+            :class="step === 1 ? 'w-6 bg-primary' : 'w-2 bg-primary/30'"
           />
           <div
             class="h-1.5 rounded-full transition-all duration-300"
-            :class="step === 2 ? 'w-6 bg-primary' : 'w-2.5 bg-muted-foreground/20'"
+            :class="step === 2 ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/20'"
           />
           <div
             class="h-1.5 rounded-full transition-all duration-300"
-            :class="step === 3 ? 'w-6 bg-primary' : 'w-2.5 bg-muted-foreground/20'"
+            :class="step === 3 ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/20'"
           />
         </div>
       </div>
 
-      <!-- Body：横向双栏 —— 左侧大图标，右侧文字内容 -->
-      <div class="flex min-h-[248px] flex-1 items-center gap-8 px-6 py-6">
-        <!-- 左栏：大图标，随步骤切换淡入淡出 -->
-        <div class="flex w-24 shrink-0 items-center justify-center">
+      <!-- Body：横向双栏 —— 左侧图标，右侧文字内容 -->
+      <div class="flex min-h-[220px] flex-1 items-center gap-6 px-6 py-4">
+        <!-- 左栏：精简图标 -->
+        <div class="flex w-16 shrink-0 items-center justify-center">
           <Transition name="guide-icon" mode="out-in">
             <div
               :key="step"
-              class="flex size-20 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+              class="surface-top flex size-14 items-center justify-center rounded-md border border-primary/20 text-primary"
             >
-              <ScanText v-if="step === 1" class="size-10" />
-              <FolderSymlink v-else-if="step === 2" class="size-10" />
-              <Sparkles v-else class="size-10" />
+              <ScanText v-if="step === 1" class="size-7" :stroke-width="1.5" />
+              <FolderSymlink v-else-if="step === 2" class="size-7" :stroke-width="1.5" />
+              <Sparkles v-else class="size-7" :stroke-width="1.5" />
             </div>
           </Transition>
         </div>
@@ -153,43 +167,44 @@ function handlePrevious() {
         <div class="flex-1 overflow-hidden">
           <Transition name="guide-step" mode="out-in">
             <!-- 步骤 1：照片元数据解析 -->
-            <div v-if="step === 1" key="step-1" class="space-y-2">
-              <h2 class="text-base font-semibold text-foreground">
+            <div v-if="step === 1" key="step-1" class="space-y-3">
+              <h2 class="text-2xl font-bold tracking-tight text-foreground">
                 {{ t('gallery.guide.infinityNikki.step1.title') }}
               </h2>
               <p class="text-sm leading-relaxed text-muted-foreground">
                 {{ t('gallery.guide.infinityNikki.metadataDescription') }}
               </p>
-              <p class="text-xs leading-relaxed text-muted-foreground">
-                <span>
-                  {{ t('gallery.guide.infinityNikki.credit') }}
-                  <a
-                    href="https://NUAN5.PRO"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-green-500 transition-colors hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
-                  >
-                    {{ t('gallery.guide.infinityNikki.creditLink') }}
-                  </a>
-                  {{ t('gallery.guide.infinityNikki.creditPowered') }}
-                </span>
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground/70">
-                {{ t('gallery.guide.infinityNikki.step1.mapHint') }}
-              </p>
+              <div class="space-y-1 pt-1">
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                  <span>
+                    {{ t('gallery.guide.infinityNikki.credit') }}
+                    <a
+                      href="https://NUAN5.PRO"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="font-medium text-green-500 transition-colors hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                    >
+                      {{ t('gallery.guide.infinityNikki.creditLink') }}
+                    </a>
+                    {{ t('gallery.guide.infinityNikki.creditPowered') }}
+                  </span>
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground/60">
+                  {{ t('gallery.guide.infinityNikki.step1.mapHint') }}
+                </p>
+              </div>
             </div>
 
             <!-- 步骤 2：硬链接优化 -->
             <div v-else-if="step === 2" key="step-2" class="space-y-3">
-              <h2 class="text-base font-semibold text-foreground">
+              <h2 class="text-2xl font-bold tracking-tight text-foreground">
                 {{ t('gallery.guide.infinityNikki.step2.title') }}
               </h2>
               <p class="text-sm leading-relaxed text-muted-foreground">
                 {{ t('gallery.guide.infinityNikki.hardlinksDescription') }}
               </p>
-              <!-- 细节说明直接展示，不再折叠 -->
               <p
-                class="rounded-lg bg-muted/50 px-3 py-2.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground"
+                class="rounded-md border border-border/40 bg-background/50 px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground"
               >
                 {{ t('gallery.guide.infinityNikki.hardlinksDetailsContent') }}
               </p>
@@ -197,14 +212,14 @@ function handlePrevious() {
 
             <!-- 步骤 3：执行前提醒 -->
             <div v-else key="step-3" class="space-y-3">
-              <h2 class="text-base font-semibold text-foreground">
+              <h2 class="text-2xl font-bold tracking-tight text-foreground">
                 {{ t('gallery.guide.infinityNikki.step3.title') }}
               </h2>
               <p class="text-sm leading-relaxed text-muted-foreground">
                 {{ t('gallery.guide.infinityNikki.step3.description') }}
               </p>
               <p
-                class="rounded-lg bg-muted/50 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
+                class="rounded-md border border-border/40 bg-background/50 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground"
               >
                 {{ t('gallery.guide.infinityNikki.step3.timeCostNotice') }}
               </p>
@@ -214,7 +229,7 @@ function handlePrevious() {
       </div>
 
       <!-- Footer：操作按钮 -->
-      <div class="flex shrink-0 items-center justify-between gap-3 border-t px-6 py-4">
+      <div class="flex shrink-0 items-center justify-between gap-3 px-6 py-4">
         <div>
           <Button
             v-if="step !== 1"
@@ -230,13 +245,15 @@ function handlePrevious() {
           <Button variant="ghost" :disabled="isSubmitting" @click="handleSkip">
             {{ t('gallery.guide.infinityNikki.actions.skip') }}
           </Button>
-          <Button :disabled="isSubmitting" @click="handleEnable">
+          <Button class="gap-1.5" :disabled="isSubmitting" @click="handleEnable">
             {{ t('gallery.guide.infinityNikki.actions.enable') }}
+            <ChevronRight class="size-4" />
           </Button>
         </div>
         <div v-else class="flex items-center gap-3">
-          <Button :disabled="isSubmitting" @click="handleEnable">
+          <Button class="gap-1.5" :disabled="isSubmitting" @click="handleEnable">
             {{ t('gallery.guide.infinityNikki.actions.confirmAndApply') }}
+            <ChevronRight class="size-4" />
           </Button>
         </div>
       </div>

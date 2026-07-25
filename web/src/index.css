@@ -210,6 +210,16 @@
   backdrop-filter: blur(var(--popover-glass-blur));
 }
 
+.menu-blur-overlay {
+  background-color: rgb(0 0 0 / 0.8);
+}
+
+:root[data-menu-blur] .menu-blur-overlay {
+  background-color: rgb(0 0 0 / 0.6);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
 .app-background-image {
   background-image: var(--app-background-image, none);
   background-size: cover;

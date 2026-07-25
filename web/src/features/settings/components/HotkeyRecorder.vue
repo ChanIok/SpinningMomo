@@ -193,20 +193,26 @@ useEventListener(document, 'auxclick', handleSideButtonNavigationGuard, { captur
     <div
       :class="
         cn(
-          'rounded-md border border-input bg-background px-3 py-2 text-sm',
-          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          'cursor-pointer transition-colors',
+          'flex h-9 w-full items-center justify-center rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors outline-none select-none dark:bg-input/30',
           isRecording
-            ? 'border-primary ring-2 ring-primary ring-offset-2'
-            : 'hover:border-accent-foreground'
+            ? 'border-primary font-medium text-primary'
+            : 'text-foreground hover:border-primary/50 dark:hover:border-primary/80'
         )
       "
       @click="startRecording"
       tabindex="0"
     >
-      {{
-        isRecording ? displayText || t('settings.general.hotkey.recorder.pressKey') : displayText
-      }}
+      <span
+        :class="
+          isRecording || !props.value.key
+            ? 'text-muted-foreground'
+            : 'font-mono text-xs text-foreground'
+        "
+      >
+        {{
+          isRecording ? displayText || t('settings.general.hotkey.recorder.pressKey') : displayText
+        }}
+      </span>
     </div>
   </div>
 </template>

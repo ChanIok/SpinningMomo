@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  Clipboard,
-  Folder,
-  Trash2,
-} from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Clipboard, Folder, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -29,10 +22,12 @@ import type { MissingAssetItem, MissingAssetsResponse } from '../../types'
 const { t } = useI18n()
 const { toast } = useToast()
 
+// --- 状态定义 ---
 const data = ref<MissingAssetsResponse | null>(null)
 const confirmAllOpen = ref(false)
 const expandedFolders = ref<Set<string>>(new Set())
 
+// --- 计算属性：按文件夹目录对失效文件进行分组 ---
 const groups = computed(() => {
   const grouped = new Map<string, MissingAssetItem[]>()
   for (const item of data.value?.items ?? []) {
@@ -44,6 +39,7 @@ const groups = computed(() => {
   return [...grouped.entries()].map(([path, items]) => ({ path, items }))
 })
 
+// --- 工具函数 ---
 function getParentPath(path: string): string {
   const slashIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return slashIndex >= 0 ? path.slice(0, slashIndex + 1) : path
@@ -70,6 +66,9 @@ function toggleFolder(path: string) {
   expandedFolders.value = next
 }
 
+// --- API 交互逻辑 ---
+
+// 加载失效文件数据
 async function load() {
   try {
     data.value = await galleryApi.getMissingAssets()
@@ -80,6 +79,7 @@ async function load() {
   }
 }
 
+// 复制文件路径
 async function copyPath(path: string) {
   const copied = await copyToClipboard(path)
   if (copied) {
@@ -89,6 +89,7 @@ async function copyPath(path: string) {
   }
 }
 
+// 清除单个失效资产记录
 async function purgeOne(assetId: number) {
   try {
     const result = await galleryApi.purgeMissingAssets({ ids: [assetId] })
@@ -104,6 +105,7 @@ async function purgeOne(assetId: number) {
   }
 }
 
+// 批量清除全部失效资产记录
 async function purgeAll() {
   try {
     const result = await galleryApi.purgeMissingAssets()
@@ -126,6 +128,7 @@ onMounted(load)
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-5">
+    <!-- 1. 顶部标题与说明 -->
     <div>
       <h3 class="text-base font-semibold text-foreground">
         {{ t('gallery.preferences.maintenance.title') }}
@@ -135,32 +138,25 @@ onMounted(load)
       </p>
     </div>
 
-    <div class="rounded-lg border border-border/60 bg-muted/30 p-3.5">
+    <!-- 2. 数据维护概览卡片（包含统计摘要、预计释放缓存与全部清理按钮） -->
+    <div class="space-y-3 rounded-md border border-border/60 bg-muted/30 p-3.5">
       <div class="flex items-start justify-between gap-4">
-        <div class="flex min-w-0 gap-3">
-          <div class="mt-0.5 rounded-md bg-muted p-1.5 text-muted-foreground">
-            <AlertTriangle class="h-4 w-4 shrink-0 text-foreground" />
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-foreground">
-              {{
-                t('gallery.preferences.maintenance.summary', {
-                  count: data?.totalCount ?? 0,
-                })
-              }}
-            </p>
-            <p class="mt-0.5 text-xs text-muted-foreground">
-              {{
-                t('gallery.preferences.maintenance.reclaimable', {
-                  size: formatCleanupSize(data?.reclaimableThumbnailBytes),
-                  count: data?.reclaimableThumbnailCount ?? 0,
-                })
-              }}
-            </p>
-            <p class="mt-0.5 text-xs text-muted-foreground/75">
-              {{ t('gallery.preferences.maintenance.retentionNotice') }}
-            </p>
-          </div>
+        <div class="min-w-0 space-y-0.5">
+          <p class="text-sm font-medium text-foreground">
+            {{
+              t('gallery.preferences.maintenance.summary', {
+                count: data?.totalCount ?? 0,
+              })
+            }}
+          </p>
+          <p class="text-xs text-muted-foreground">
+            {{
+              t('gallery.preferences.maintenance.reclaimable', {
+                size: formatCleanupSize(data?.reclaimableThumbnailBytes),
+                count: data?.reclaimableThumbnailCount ?? 0,
+              })
+            }}
+          </p>
         </div>
         <Button
           variant="destructive"
@@ -173,8 +169,14 @@ onMounted(load)
           {{ t('gallery.preferences.maintenance.purgeAll') }}
         </Button>
       </div>
+
+      <!-- 规则与风险说明微型提示块 -->
+      <p class="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        {{ t('gallery.preferences.maintenance.retentionNotice') }}
+      </p>
     </div>
 
+    <!-- 3. 无失效文件时的空状态 -->
     <div
       v-if="!data?.totalCount"
       class="flex flex-1 flex-col items-center justify-center text-center text-muted-foreground"
@@ -188,9 +190,11 @@ onMounted(load)
       </p>
     </div>
 
+    <!-- 4. 失效文件分组列表（包含按文件夹折叠与单项复制/清除操作） -->
     <ScrollArea v-else class="min-h-0 flex-1 rounded-lg border border-border/50">
       <div class="space-y-1 p-2">
         <section v-for="group in groups" :key="group.path" class="overflow-hidden rounded-md">
+          <!-- 文件夹标题栏（可点击展开/收起） -->
           <button
             type="button"
             class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted/60"
@@ -207,6 +211,7 @@ onMounted(load)
             </span>
           </button>
 
+          <!-- 文件夹内的失效单项文件 -->
           <div v-if="isExpanded(group.path)" class="ml-8 border-l pl-2">
             <div
               v-for="item in group.items"
@@ -242,6 +247,7 @@ onMounted(load)
       </div>
     </ScrollArea>
 
+    <!-- 5. 批量清除全部确认对话框 -->
     <AlertDialog v-model:open="confirmAllOpen">
       <AlertDialogContent>
         <AlertDialogHeader>

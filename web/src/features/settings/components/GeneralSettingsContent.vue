@@ -93,7 +93,7 @@ const handleReset = async () => {
               :model-value="appSettings.app.language.current"
               @update:model-value="(v) => updateLanguage(v as string)"
             >
-              <SelectTrigger class="w-48">
+              <SelectTrigger class="w-36">
                 <SelectValue :placeholder="t('common.languageLabelBilingual')" />
               </SelectTrigger>
               <SelectContent>
@@ -130,7 +130,7 @@ const handleReset = async () => {
               :model-value="appSettings.app.logger.level"
               @update:model-value="(v) => updateLoggerLevel(v as string)"
             >
-              <SelectTrigger class="w-48">
+              <SelectTrigger class="w-36">
                 <SelectValue :placeholder="t('settings.general.logger.level')" />
               </SelectTrigger>
               <SelectContent>
@@ -175,7 +175,7 @@ const handleReset = async () => {
               :model-value="getCurrentUpdateSourceMode()"
               @update:model-value="(v) => updateDownloadSourceMode(v as UpdateSourceMode)"
             >
-              <SelectTrigger class="w-56">
+              <SelectTrigger class="w-36">
                 <SelectValue :placeholder="t('settings.general.update.sourceMode.label')" />
               </SelectTrigger>
               <SelectContent>
