@@ -17,8 +17,7 @@
 
 ## 环境要求
 
-C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）工具链。MSVC 同样可用，
-只需将 `xmake.lua` 中的工具链改为 `msvc`，但项目对其验证较少。
+C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）进行日常开发，正式发布使用 MSVC。
 
 | 工具 | 要求 | 说明 |
 |------|------|------|
@@ -72,6 +71,13 @@ npm ci --prefix web
 ```bash
 node scripts/patch-xmake-7554.js
 node scripts/patch-xmake-clang-cl-cxx23.js
+
+# Clang-cl + LLD（默认）
+xmake f --toolchain="clang-cl[llvm]" -y
+
+# 或使用 MSVC
+# xmake f --toolchain=msvc -y
+
 xmake f -m release -y && xmake f -m debug -y
 node scripts/patch-vcpkg.js
 ```

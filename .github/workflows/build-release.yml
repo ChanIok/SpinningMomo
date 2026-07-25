@@ -1,9 +1,10 @@
 # Build and Release workflow
-# Manually builds release artifacts, and optionally publishes an existing tag.
+# Builds pull requests and manually builds release artifacts, optionally publishing an existing tag.
 
 name: Build Release
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       publish_release:
@@ -50,9 +51,6 @@ jobs:
 
       - name: Patch xmake #7554
         run: node scripts/patch-xmake-7554.js
-
-      - name: Patch xmake clang-cl C++23 selection
-        run: node scripts/patch-xmake-clang-cl-cxx23.js
 
       - name: Cache xmake/vcpkg dependencies
         id: cache_xmake_vcpkg
@@ -164,10 +162,7 @@ jobs:
           npm ci --prefix web
 
       - name: Prepare xmake release dependencies
-        run: xmake f -m release -y
-
-      - name: Patch Asio for clang-cl Release
-        run: node scripts/patch-vcpkg.js
+        run: xmake f -m release --toolchain=msvc -y
 
       - name: Build C++ backend (Release)
         run: xmake build -y

@@ -11,12 +11,14 @@ This project uses a hybrid architecture with a **C++23 native backend** and a **
 
 ## Prerequisites
 
+The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development. Release builds use MSVC.
+
 | Tool | Requirement | Notes |
 |------|-------------|-------|
-| **Visual Studio 2026 / LLVM** | Includes Clang compiler (`clang-cl`) | **Default / recommended compiler (`clang-cl`)** |
+| **Visual Studio 2026 / LLVM** | Includes C++ and Clang (`clang-cl`) toolchains | |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
-| **xmake** | Latest | C++ build system (configured with `clang-cl`) |
+| **xmake** | Latest | C++ build system |
 | **Node.js** | v20+ | Web frontend build and npm scripts |
 
 ### Install xmake
@@ -63,6 +65,13 @@ npm ci --prefix web
 ```bash
 node scripts/patch-xmake-7554.js
 node scripts/patch-xmake-clang-cl-cxx23.js
+
+# Clang-cl + LLD (default)
+xmake f --toolchain="clang-cl[llvm]" -y
+
+# Or use MSVC
+# xmake f --toolchain=msvc -y
+
 xmake f -m release -y && xmake f -m debug -y
 node scripts/patch-vcpkg.js
 ```

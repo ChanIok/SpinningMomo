@@ -8,8 +8,8 @@ includes("tests")
 -- 设置C++23标准
 set_languages("c++23")
 
--- 固定使用 LLVM 工具链
-set_toolchains("clang-cl[llvm]")
+-- 默认使用 LLVM 工具链，可通过 --toolchain 覆盖
+set_config("toolchain", "clang-cl[llvm]")
 
 -- 统一源文件编码
 add_cxflags("/utf-8", "/bigobj")
