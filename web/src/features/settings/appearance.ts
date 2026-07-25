@@ -77,13 +77,18 @@ const resolvePrimaryForeground = (primaryColor: string): string => {
   return luminance >= 0.45 ? '#18181B' : '#FFFFFF'
 }
 
+export const DEFAULT_PRIMARY_COLOR: Record<'light' | 'dark', string> = {
+  light: '#C66900',
+  dark: '#F5A623',
+}
+
 const applyPrimaryColor = (
   root: HTMLElement,
   primaryColorValue: string,
   themeMode: WebThemeMode
 ): void => {
   const resolvedTheme = resolveTheme(themeMode)
-  const primaryFallback = resolvedTheme === 'light' ? '#C66900' : '#F59F0A'
+  const primaryFallback = DEFAULT_PRIMARY_COLOR[resolvedTheme]
   const primaryColor = normalizeHexColor(primaryColorValue, primaryFallback)
   const primaryForeground = resolvePrimaryForeground(primaryColor)
 

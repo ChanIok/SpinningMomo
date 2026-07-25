@@ -1,11 +1,16 @@
 import { ref, shallowRef } from 'vue'
 import type { Locale, Messages, I18nInstance } from './types'
 
+const DEFAULT_LOCALE: Locale = 'zh-CN'
+
 // 当前语言
-const locale = ref<Locale>('zh-CN')
+const locale = ref<Locale>(DEFAULT_LOCALE)
 
 // 翻译字典（使用 shallowRef 避免深度响应式，提升性能）
 const messages = shallowRef<Messages>({})
+// 默认语言（zh-CN）降级字典
+let fallbackMessages: Messages = {}
+
 const LOCALE_DOMAINS = [
   'common',
   'app',
@@ -20,6 +25,31 @@ const LOCALE_DOMAINS = [
 ] as const
 
 /**
+ * 加载并合并指定语言的所有 domain 字典
+ */
+async function loadLocaleMessages(targetLocale: Locale): Promise<Messages> {
+  const modules = await Promise.all(
+    LOCALE_DOMAINS.map(async (domain) => {
+      const mod = await import(`./locales/${targetLocale}/${domain}.json`)
+      return { domain, dict: (mod.default || mod) as Messages }
+    })
+  )
+
+  const merged: Messages = {}
+  for (const { domain, dict } of modules) {
+    for (const [key, value] of Object.entries(dict)) {
+      if (key in merged) {
+        console.warn(
+          `[i18n] Duplicate translation key detected while loading ${targetLocale}/${domain}.json: ${key}`
+        )
+      }
+      merged[key] = value
+    }
+  }
+  return merged
+}
+
+/**
  * 参数插值：替换文本中的 {key} 占位符
  */
 function interpolate(text: string, params: Record<string, any>): string {
@@ -32,7 +62,7 @@ function interpolate(text: string, params: Record<string, any>): string {
  * 翻译函数
  */
 function t(key: string, params?: Record<string, any>): string {
-  const text = messages.value[key] ?? key
+  const text = messages.value[key] ?? fallbackMessages[key] ?? key
   return params ? interpolate(text, params) : text
 }
 
@@ -41,23 +71,23 @@ function t(key: string, params?: Record<string, any>): string {
  */
 async function setLocale(newLocale: Locale): Promise<void> {
   try {
-    const merged: Messages = {}
-
-    for (const domain of LOCALE_DOMAINS) {
-      const module = await import(`./locales/${newLocale}/${domain}.json`)
-      const dict = (module.default || module) as Messages
-
-      for (const [key, value] of Object.entries(dict)) {
-        if (key in merged) {
-          console.warn(
-            `[i18n] Duplicate translation key detected while loading ${newLocale}/${domain}.json: ${key}`
-          )
-        }
-        merged[key] = value
+    // 确保默认语言兜底字典已加载
+    if (Object.keys(fallbackMessages).length === 0) {
+      if (newLocale === DEFAULT_LOCALE) {
+        const loaded = await loadLocaleMessages(DEFAULT_LOCALE)
+        fallbackMessages = loaded
+        messages.value = loaded
+        locale.value = newLocale
+        return
+      } else {
+        fallbackMessages = await loadLocaleMessages(DEFAULT_LOCALE)
       }
     }
 
-    messages.value = merged
+    const loaded =
+      newLocale === DEFAULT_LOCALE ? fallbackMessages : await loadLocaleMessages(newLocale)
+
+    messages.value = loaded
     locale.value = newLocale
   } catch (error) {
     console.error(`Failed to load locale: ${newLocale}`, error)
@@ -67,7 +97,7 @@ async function setLocale(newLocale: Locale): Promise<void> {
 /**
  * 初始化 i18n
  */
-export async function initI18n(initialLocale: Locale = 'zh-CN'): Promise<void> {
+export async function initI18n(initialLocale: Locale = DEFAULT_LOCALE): Promise<void> {
   await setLocale(initialLocale)
 }
 

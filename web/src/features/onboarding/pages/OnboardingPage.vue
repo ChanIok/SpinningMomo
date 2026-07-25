@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Check, ChevronRight } from 'lucide-vue-next'
+import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
+import zongziMomoSvg from '@/assets/zongzi-momo.svg?raw'
 import { Button } from '@/components/ui/button'
 import WindowTitleInput from '@/components/WindowTitleInput.vue'
 import {
@@ -20,7 +23,7 @@ import {
   type FloatingWindowThemeMode,
   type WebThemeMode,
 } from '@/features/settings/types'
-import { applyAppearanceToDocument } from '@/features/settings/appearance'
+import { applyAppearanceToDocument, DEFAULT_PRIMARY_COLOR } from '@/features/settings/appearance'
 import { OVERLAY_PALETTE_PRESETS } from '@/features/settings/overlayPalette'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -29,6 +32,7 @@ import { onboardingApi } from '../api'
 type Step = 1 | 2 | 3 | 4
 
 const store = useSettingsStore()
+const router = useRouter()
 const { t, setLocale } = useI18n()
 const { toast } = useToast()
 
@@ -49,13 +53,10 @@ const configuredInfinityNikkiGameDir = ref<string>(
 )
 const resolvedInfinityNikkiGameDir = ref<string | null>(null)
 
-const isFirstStep = computed(() => step.value === 1)
-const isLastStep = computed(() => step.value === 3)
 const stepTransitionName = computed(() =>
   direction.value === 'forward' ? 'ob-step-forward' : 'ob-step-backward'
 )
-const getDefaultTargetTitle = (lang: string) =>
-  lang === 'en-US' ? 'Infinity Nikki  ' : '无限暖暖  '
+const getDefaultTargetTitle = () => t('onboarding.step2.defaultTargetTitle')
 const isDefaultInfinityNikkiTargetTitle = (title: string) =>
   title === '无限暖暖  ' || title === 'Infinity Nikki  '
 const isInfinityNikkiUser = computed(() => resolvedInfinityNikkiGameDir.value !== null)
@@ -89,7 +90,7 @@ const getDefaultOverlayColorsByTheme = (mode: 'light' | 'dark'): string[] => {
 }
 
 const getDefaultPrimaryColorByTheme = (mode: 'light' | 'dark'): string =>
-  mode === 'light' ? '#C66900' : '#F59F0A'
+  DEFAULT_PRIMARY_COLOR[mode]
 
 const getFloatingWindowThemeByWebTheme = (mode: 'light' | 'dark'): FloatingWindowThemeMode => mode
 
@@ -126,7 +127,7 @@ watch(
     await setLocale(nextLanguage as 'zh-CN' | 'en-US')
 
     if (isInfinityNikkiUser.value && isDefaultInfinityNikkiTargetTitle(targetTitle.value)) {
-      targetTitle.value = getDefaultTargetTitle(nextLanguage)
+      targetTitle.value = getDefaultTargetTitle()
     }
   }
 )
@@ -220,7 +221,7 @@ onMounted(() => {
     resolvedInfinityNikkiGameDir.value = resolvedGameDir
 
     if (resolvedGameDir && targetTitle.value.trim() === '') {
-      targetTitle.value = getDefaultTargetTitle(language.value)
+      targetTitle.value = getDefaultTargetTitle()
     }
   })()
 })
@@ -308,38 +309,98 @@ const completeOnboarding = async () => {
     isSubmitting.value = false
   }
 }
+
+const enterMainInterface = async () => {
+  isSubmitting.value = true
+  try {
+    const activatedNativeWindow = await onboardingApi.activateMainWindow()
+    if (!activatedNativeWindow) {
+      await router.replace('/home')
+    }
+  } catch (error) {
+    toast.error(t('onboarding.common.enterFailed'))
+    console.error('Failed to enter main interface:', error)
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
   <div class="h-full w-full p-2 pt-0">
-    <div class="surface-middle flex h-full w-full flex-col rounded-md">
+    <div class="surface-middle relative flex h-full w-full flex-col overflow-hidden rounded-md">
+      <!-- Background Watermarks -->
+      <Transition name="ob-watermark">
+        <!-- Step 1 Background Watermark (Full Surface Viewport) -->
+        <div
+          v-if="step === 1"
+          key="watermark-1"
+          class="pointer-events-none absolute top-20 -right-250 bottom-0 z-0 h-[350%] w-auto max-w-full text-foreground/5 opacity-75 select-none dark:text-white/10"
+          aria-hidden="true"
+        >
+          <div
+            class="flex h-full w-full items-center justify-end [&_svg]:h-full [&_svg]:w-auto [&_svg]:max-w-none [&_svg]:shrink-0"
+            v-html="momoOutlineSvg"
+          ></div>
+        </div>
+
+        <!-- Step 3 Background Watermark (Full Surface Viewport) -->
+        <div
+          v-else-if="step === 3"
+          key="watermark-3"
+          class="pointer-events-none absolute -top-70 bottom-0 -left-20 z-0 h-[350%] w-auto text-foreground/5 opacity-75 select-none dark:text-white/10 [&_path]:fill-current"
+          aria-hidden="true"
+        >
+          <div
+            class="flex h-full w-full items-center justify-start [&_svg]:h-full [&_svg]:w-auto [&_svg]:max-w-none [&_svg]:shrink-0"
+            v-html="zongziMomoSvg"
+          ></div>
+        </div>
+      </Transition>
+
       <!-- Main Content Area -->
-      <ScrollArea class="min-h-0 flex-1">
-        <div class="flex min-h-full items-center justify-center px-4">
-          <div class="relative flex w-full max-w-2xl flex-col justify-center py-8">
+      <ScrollArea class="relative z-10 min-h-0 flex-1">
+        <div class="relative flex min-h-full items-center justify-center px-4">
+          <div class="relative z-10 flex w-full max-w-3xl flex-col justify-center py-8">
             <Transition :name="stepTransitionName" mode="out-in">
               <!-- Step 1: Start -->
               <div
                 v-if="step === 1"
                 key="step-1"
-                class="flex w-full flex-col items-center space-y-8"
+                class="relative z-10 flex min-h-[300px] w-full flex-col justify-center py-6 text-left"
               >
-                <div class="space-y-4 pt-12 pb-6 text-center">
-                  <h1 class="text-4xl font-bold tracking-tight text-foreground">
-                    {{ t('onboarding.title') }}
-                  </h1>
-                  <p class="mx-auto max-w-md text-base leading-relaxed text-muted-foreground">
+                <!-- Minimalist Content Area -->
+                <div class="relative z-10 max-w-md space-y-4">
+                  <div class="space-y-2">
+                    <span
+                      class="text-[0.65rem] font-medium tracking-[0.25em] text-primary uppercase"
+                    >
+                      {{ t('onboarding.step1.badge') }}
+                    </span>
+                    <h1 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                      {{ t('onboarding.title') }}
+                    </h1>
+                  </div>
+                  <p class="text-sm leading-relaxed text-muted-foreground">
                     {{ t('onboarding.description') }}
                   </p>
+
+                  <!-- Action Button -->
+                  <div class="pt-4">
+                    <Button
+                      class="h-10 gap-2 rounded-sm text-sm font-medium transition-all has-[>svg]:px-11"
+                      :disabled="isSubmitting"
+                      @click="goToNextStep"
+                    >
+                      {{ t('onboarding.actions.start') }}
+                      <ChevronRight class="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               <!-- Step 2: Theme & Language -->
-              <div
-                v-else-if="step === 2"
-                key="step-2"
-                class="ob-step2-content flex w-full flex-col items-center"
-              >
+              <div v-else-if="step === 2" key="step-2" class="flex w-full flex-col items-center">
                 <div class="space-y-3 text-center">
                   <h2 class="text-2xl font-semibold tracking-tight text-foreground">
                     {{ t('onboarding.step1.title') }}
@@ -353,7 +414,7 @@ const completeOnboarding = async () => {
                 <div class="ob-step2-theme-cards flex justify-center gap-5 pt-10">
                   <!-- Light Theme -->
                   <button
-                    class="relative flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
+                    class="relative flex cursor-default flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
                     :class="
                       themeMode === 'light'
                         ? 'border-primary bg-background'
@@ -399,7 +460,7 @@ const completeOnboarding = async () => {
 
                   <!-- Dark Theme -->
                   <button
-                    class="relative flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
+                    class="relative flex cursor-default flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
                     :class="
                       themeMode === 'dark'
                         ? 'border-primary bg-background'
@@ -459,7 +520,7 @@ const completeOnboarding = async () => {
                     @update:model-value="(v) => (language = String(v))"
                   >
                     <SelectTrigger
-                      class="surface-top h-11 w-full cursor-pointer justify-center gap-2 rounded-sm text-center"
+                      class="surface-top h-11 w-full cursor-default justify-center gap-2 rounded-sm text-center"
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -469,31 +530,67 @@ const completeOnboarding = async () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div
+                  class="ob-step2-action mx-auto mt-16 flex w-full max-w-sm items-center justify-center"
+                >
+                  <Button
+                    class="h-10 w-64 rounded-sm text-sm"
+                    :disabled="isSubmitting"
+                    @click="goToNextStep"
+                  >
+                    {{ t('onboarding.actions.next') }}
+                  </Button>
+                </div>
               </div>
 
               <!-- Step 3: Target Window -->
               <div
                 v-else-if="step === 3"
                 key="step-3"
-                class="mx-auto flex w-full max-w-md flex-col items-center space-y-8 pb-12 text-center"
+                class="relative z-10 flex min-h-[300px] w-full flex-col items-end justify-center py-6 text-right"
               >
-                <div class="space-y-3 pb-2">
-                  <h2 class="text-2xl font-semibold tracking-tight text-foreground">
-                    {{ t('onboarding.step2.title') }}
-                  </h2>
-                  <p class="text-sm text-muted-foreground">
+                <!-- Minimalist Content Area (Right Aligned) -->
+                <div class="relative z-10 max-w-md space-y-4 text-right">
+                  <div class="space-y-2">
+                    <span
+                      class="text-[0.65rem] font-medium tracking-[0.25em] text-primary uppercase"
+                    >
+                      {{ t('onboarding.step2.badge') }}
+                    </span>
+                    <h2 class="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                      {{ t('onboarding.step2.title') }}
+                    </h2>
+                  </div>
+                  <p class="text-sm leading-relaxed text-muted-foreground">
                     {{ t('onboarding.step2.description') }}
                   </p>
-                </div>
 
-                <div class="surface-top w-full max-w-sm">
-                  <WindowTitleInput
-                    v-model="targetTitle"
-                    :placeholder="t('onboarding.step2.targetTitlePlaceholder')"
-                    balanced-center
-                    popover-no-shadow
-                    input-class="h-10 text-center"
-                  />
+                  <!-- Input -->
+                  <div class="ml-auto w-full pt-2">
+                    <WindowTitleInput
+                      v-model="targetTitle"
+                      :placeholder="t('onboarding.step2.targetTitlePlaceholder')"
+                      popover-no-shadow
+                      input-class="h-10 text-left px-3.5"
+                    />
+                  </div>
+
+                  <!-- Action Button -->
+                  <div class="flex justify-end pt-4">
+                    <Button
+                      class="h-10 gap-2 rounded-sm text-sm font-medium transition-all has-[>svg]:px-11"
+                      :disabled="isSubmitting"
+                      @click="completeOnboarding"
+                    >
+                      {{
+                        isSubmitting
+                          ? t('onboarding.actions.completing')
+                          : t('onboarding.actions.complete')
+                      }}
+                      <ChevronRight class="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -514,47 +611,17 @@ const completeOnboarding = async () => {
                 <p class="max-w-md text-base text-muted-foreground">
                   {{ t('onboarding.completed.description') }}
                 </p>
-              </div>
-            </Transition>
-
-            <Transition name="ob-action-fade" mode="out-in">
-              <div
-                v-if="step < 4"
-                :key="`step-action-${step}`"
-                class="onboarding-step-action mx-auto mt-16 flex w-full max-w-sm flex-col items-center"
-              >
-                <div class="flex w-full items-center justify-center gap-4">
-                  <Button
-                    v-if="isFirstStep"
-                    class="h-10 w-64 rounded-sm text-sm"
-                    :disabled="isSubmitting"
-                    @click="goToNextStep"
-                  >
-                    {{ t('onboarding.actions.start') }}
-                  </Button>
-
-                  <Button
-                    v-else-if="!isLastStep"
-                    class="h-10 w-64 rounded-sm text-sm"
-                    :disabled="isSubmitting"
-                    @click="goToNextStep"
-                  >
-                    {{ t('onboarding.actions.next') }}
-                  </Button>
-
-                  <Button
-                    v-else
-                    class="h-10 w-64 rounded-sm text-sm"
-                    :disabled="isSubmitting"
-                    @click="completeOnboarding"
-                  >
-                    {{
-                      isSubmitting
-                        ? t('onboarding.actions.completing')
-                        : t('onboarding.actions.complete')
-                    }}
-                  </Button>
-                </div>
+                <Button
+                  class="h-10 min-w-48 rounded-sm px-6 text-sm"
+                  :disabled="isSubmitting"
+                  @click="enterMainInterface"
+                >
+                  {{
+                    isSubmitting
+                      ? t('onboarding.actions.enteringMain')
+                      : t('onboarding.actions.enterMain')
+                  }}
+                </Button>
               </div>
             </Transition>
           </div>
@@ -570,7 +637,7 @@ const completeOnboarding = async () => {
             class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
             :class="step === 1 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
             :disabled="isSubmitting"
-            :aria-label="`${t('onboarding.actions.start')}: 1`"
+            :aria-label="t('onboarding.actions.stepLabel', { step: 1 })"
             @click="goToStep(1)"
           ></button>
           <button
@@ -578,7 +645,7 @@ const completeOnboarding = async () => {
             class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
             :class="step === 2 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
             :disabled="isSubmitting"
-            aria-label="Step 2"
+            :aria-label="t('onboarding.actions.stepLabel', { step: 2 })"
             @click="goToStep(2)"
           ></button>
           <button
@@ -586,7 +653,7 @@ const completeOnboarding = async () => {
             class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
             :class="step === 3 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
             :disabled="isSubmitting"
-            aria-label="Step 3"
+            :aria-label="t('onboarding.actions.stepLabel', { step: 3 })"
             @click="goToStep(3)"
           ></button>
         </div>
@@ -632,16 +699,18 @@ const completeOnboarding = async () => {
   transform: translateX(30px);
 }
 
-.ob-action-fade-enter-active,
-.ob-action-fade-leave-active {
+/* 背景水印过渡：柔和淡入淡出与微缩放 */
+.ob-watermark-enter-active,
+.ob-watermark-leave-active {
   transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
+    opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.ob-action-fade-enter-from,
-.ob-action-fade-leave-to {
+.ob-watermark-enter-from,
+.ob-watermark-leave-to {
   opacity: 0;
+  transform: scale(0.96);
 }
 
 :deep([data-slot='scroll-area-viewport'] > div) {
@@ -658,7 +727,7 @@ const completeOnboarding = async () => {
     padding-bottom: 1rem;
   }
 
-  .ob-step2-content ~ .onboarding-step-action {
+  .ob-step2-action {
     margin-top: 2rem; /* mt-8 */
   }
 }
