@@ -1,16 +1,15 @@
-module;
+#include "utils/dialog/dialog.hpp"
 
-module Utils.Dialog;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Logger;
-import Utils.String;
-import Vendor.Windows;
-import <shobjidl.h>;
-import <wil/com.h>;
-import <wil/result.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/shobjidl.hpp"
 
-namespace Utils::Dialog {
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace utils::dialog {
 
 // 辅助函数：解析文件过滤器 - 修复解析逻辑
 auto parse_file_filter(const std::string& filter)
@@ -22,7 +21,7 @@ auto parse_file_filter(const std::string& filter)
     return {filter_names, filter_patterns};
   }
 
-  std::wstring filter_wide = Utils::String::FromUtf8(filter);
+  std::wstring filter_wide = utils::string::FromUtf8(filter);
 
   // 按'|'分割，确保成对出现
   std::vector<std::wstring> segments;
@@ -73,7 +72,7 @@ auto select_folder(const FolderSelectorParams& params, HWND hwnd)
 
     // 设置标题
     if (!params.title.empty()) {
-      std::wstring title_wide = Utils::String::FromUtf8(params.title);
+      std::wstring title_wide = utils::string::FromUtf8(params.title);
       THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
     } else {
       THROW_IF_FAILED(pFileDialog->SetTitle(L"选择文件夹"));
@@ -99,8 +98,7 @@ auto select_folder(const FolderSelectorParams& params, HWND hwnd)
     return folder_result;
 
   } catch (const wil::ResultException& ex) {
-    if (ex.GetErrorCode() ==
-        Vendor::Windows::_HRESULT_FROM_WIN32(Vendor::Windows::kERROR_CANCELLED)) {
+    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
       return std::unexpected("User cancelled the operation");
     }
     return std::unexpected(std::string("Dialog operation failed: ") + ex.what());
@@ -154,7 +152,7 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
 
     // 设置标题
     if (!params.title.empty()) {
-      std::wstring title_wide = Utils::String::FromUtf8(params.title);
+      std::wstring title_wide = utils::string::FromUtf8(params.title);
       THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
     }
 
@@ -213,12 +211,11 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     return file_selector_result;
 
   } catch (const wil::ResultException& ex) {
-    if (ex.GetErrorCode() ==
-        Vendor::Windows::_HRESULT_FROM_WIN32(Vendor::Windows::kERROR_CANCELLED)) {
+    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
       return std::unexpected("User cancelled the operation");
     }
     return std::unexpected(std::string("Dialog operation failed: ") + ex.what());
   }
 }
 
-}  // namespace Utils::Dialog
+}  // namespace utils::dialog

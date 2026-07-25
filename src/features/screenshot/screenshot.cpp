@@ -1,36 +1,35 @@
-module;
+#include "features/screenshot/screenshot.hpp"
 
-#include <winrt/Windows.Graphics.Capture.h>
+#include "vendor/std.hpp"
 
-module Features.Screenshot;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/wincodec.hpp"
+#include "vendor/windows/winrt/windows_graphics_capture.hpp"
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Screenshot.State;
-import Features.Settings.State;
-import Features.Screenshot.HdrEncoder;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.Graphics.Capture;
-import Utils.Graphics.D3D;
-import Utils.Graphics.HDR;
-import Utils.Graphics.PhotoProcessing;
-import Utils.Graphics.CaptureRegion;
-import Utils.Image;
-import <d3d11.h>;
-import <wil/com.h>;
-import <wincodec.h>;
-import <windows.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/screenshot/hdr_encoder.hpp"
+#include "features/screenshot/state.hpp"
+#include "features/settings/state.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/capture_region.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/graphics/hdr.hpp"
+#include "utils/graphics/photo_processing.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
-namespace Features::Screenshot {
+namespace features::screenshot {
 
-auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) -> void;
+auto start_cleanup_timer(features::screenshot::ScreenshotState& state) -> void;
 
 // WIC 编码保存纹理
 auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_path,
-                           Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG,
+                           utils::image::ImageFormat format = utils::image::ImageFormat::PNG,
                            float jpeg_quality = 1.0f) -> std::expected<void, std::string> {
   try {
     if (!texture) {
@@ -73,13 +72,13 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
     auto unmap_on_exit = wil::scope_exit([&] { context->Unmap(staging_texture.get(), 0); });
 
     // 创建WIC工厂
-    auto wic_factory_result = Utils::Image::create_factory();
+    auto wic_factory_result = utils::image::create_factory();
     if (!wic_factory_result) {
       return std::unexpected("Failed to create WIC imaging factory: " + wic_factory_result.error());
     }
     auto wic_factory = wic_factory_result.value();
 
-    auto save_result = Utils::Image::save_pixel_data_to_file(
+    auto save_result = utils::image::save_pixel_data_to_file(
         wic_factory.get(), static_cast<const uint8_t*>(mapped.pData), desc.Width, desc.Height,
         mapped.RowPitch, file_path, format, jpeg_quality);
 
@@ -94,8 +93,8 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
 }
 
 // 安全调用完成回调的辅助函数
-auto safe_call_completion_callback(Features::Screenshot::State::ScreenshotRequest& request,
-                                   bool success) -> void {
+auto safe_call_completion_callback(features::screenshot::ScreenshotRequest& request, bool success)
+    -> void {
   if (!request.completion_callback) {
     return;
   }
@@ -110,15 +109,15 @@ auto safe_call_completion_callback(Features::Screenshot::State::ScreenshotReques
 
 // 根据 HDR 标记选择 UltraHDR JPEG 或 WIC 通用编码保存纹理
 auto save_capture_texture(ID3D11Texture2D* texture,
-                          const Features::Screenshot::State::ScreenshotRequest& request)
+                          const features::screenshot::ScreenshotRequest& request)
     -> std::expected<void, std::string> {
   if (!texture) {
     return std::unexpected("Texture cannot be null");
   }
 
-  return request.use_hdr ? Features::Screenshot::HdrEncoder::save_texture_as_ultrahdr_jpeg(
+  return request.use_hdr ? features::screenshot::hdr_encoder::save_texture_as_ultrahdr_jpeg(
                                texture, request.file_path,
-                               Features::Screenshot::HdrEncoder::UltraHdrEncodeOptions{
+                               features::screenshot::hdr_encoder::UltraHdrEncodeOptions{
                                    .target_display_peak_nits = request.hdr_target_peak_nits})
                          : save_texture_with_wic(texture, request.file_path, request.format,
                                                  request.jpeg_quality);
@@ -126,8 +125,8 @@ auto save_capture_texture(ID3D11Texture2D* texture,
 
 // 截图完成收尾：恢复光标 → 停止捕获 → 回调 → 移除会话 → 检查是否启动空闲清理
 auto finish_screenshot_session(
-    Features::Screenshot::State::ScreenshotState& state,
-    std::unordered_map<size_t, Features::Screenshot::State::SessionInfo>::iterator session_it,
+    features::screenshot::ScreenshotState& state,
+    std::unordered_map<size_t, features::screenshot::SessionInfo>::iterator session_it,
     size_t session_id, bool success) -> void {
   auto& session_info = session_it->second;
 
@@ -135,8 +134,8 @@ auto finish_screenshot_session(
     ShowCursor(TRUE);
   }
 
-  Utils::Graphics::Capture::stop_capture(session_info.session);
-  Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+  utils::graphics::capture::stop_capture(session_info.session);
+  utils::graphics::capture::cleanup_capture_session(session_info.session);
   safe_call_completion_callback(session_info.request, success);
   state.active_sessions.erase(session_it);
   Logger().debug("Session {} completed and removed", session_id);
@@ -150,8 +149,8 @@ auto finish_screenshot_session(
 }
 
 // 核心截图捕获逻辑
-auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& request,
-                           Features::Screenshot::State::ScreenshotState& state)
+auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
+                           features::screenshot::ScreenshotState& state)
     -> std::expected<void, std::string> {
   try {
     // 最小化窗口不执行截图，避免创建无法完成的捕获会话
@@ -161,7 +160,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
 
     // 获取 WGC 真实的捕获宽高以消除阴影引起的黑边
     auto capture_size_result =
-        Utils::Graphics::Capture::get_capture_item_size(request.target_window);
+        utils::graphics::capture::get_capture_item_size(request.target_window);
     if (!capture_size_result) {
       return std::unexpected("Failed to get capture item size: " + capture_size_result.error());
     }
@@ -177,7 +176,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
 
     // 创建帧回调，通过会话ID管理生命周期
     auto frame_callback = [&state,
-                           session_id](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
+                           session_id](utils::graphics::capture::Direct3D11CaptureFrame frame) {
       bool success = false;
 
       // 查找对应的会话信息
@@ -193,7 +192,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
         auto surface = frame.Surface();
         if (surface) {
           auto texture =
-              Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+              utils::graphics::capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
           if (texture) {
             ID3D11Texture2D* texture_to_save = texture.get();
             const int shutter_frames = std::max(0, session_info.request.shutter_frames);
@@ -201,7 +200,8 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
               // 首帧初始化 GPU 均值累积器，后续帧做加权混合
               if (!session_info.average_accumulator) {
                 auto accumulator_result =
-                    Utils::Graphics::PhotoProcessing::initialize_average_accumulator(texture.get());
+                    utils::graphics::photo_processing::initialize_average_accumulator(
+                        texture.get());
                 if (!accumulator_result) {
                   Logger().error("Failed to initialize long exposure for session {}: {}",
                                  session_id, accumulator_result.error());
@@ -210,8 +210,9 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
                 }
                 session_info.average_accumulator = std::move(accumulator_result.value());
               } else {
-                auto accumulate_result = Utils::Graphics::PhotoProcessing::accumulate_average_frame(
-                    *session_info.average_accumulator, texture.get());
+                auto accumulate_result =
+                    utils::graphics::photo_processing::accumulate_average_frame(
+                        *session_info.average_accumulator, texture.get());
                 if (!accumulate_result) {
                   Logger().error("Failed to accumulate long exposure for session {}: {}",
                                  session_id, accumulate_result.error());
@@ -237,7 +238,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
               texture_to_save->GetDesc(&desc);
 
               auto crop_region_result =
-                  Utils::Graphics::CaptureRegion::calculate_client_crop_region(
+                  utils::graphics::capture_region::calculate_client_crop_region(
                       session_info.request.target_window, desc.Width, desc.Height);
               if (crop_region_result) {
                 wil::com_ptr<ID3D11Device> device;
@@ -247,7 +248,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
                   device->GetImmediateContext(context.put());
                 }
                 if (device && context) {
-                  auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
+                  auto crop_result = utils::graphics::capture_region::crop_texture_to_region(
                       device.get(), context.get(), texture_to_save, *crop_region_result,
                       cropped_texture);
                   if (crop_result) {
@@ -267,7 +268,7 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
               success = true;
               if (session_info.request.use_hdr) {
                 Logger().info("HDR screenshot saved for session {}: {}", session_id,
-                              Utils::String::ToUtf8(session_info.request.file_path));
+                              utils::string::ToUtf8(session_info.request.file_path));
               } else if (shutter_frames > 0) {
                 Logger().debug("Long exposure screenshot saved successfully for session {}",
                                session_id);
@@ -293,14 +294,14 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
     };
 
     // 创建捕获会话
-    Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+    utils::graphics::capture::CaptureSessionOptions capture_options;
     // 默认可捕获 8-bit BGRA；HDR 截图需要半精度浮点帧池才能保留高光动态范围。
     if (request.use_hdr) {
       capture_options.pixel_format =
           winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
     }
 
-    auto session_result = Utils::Graphics::Capture::create_capture_session(
+    auto session_result = utils::graphics::capture::create_capture_session(
         request.target_window, state.winrt_device, width, height, frame_callback, 1,
         capture_options);
     if (!session_result) {
@@ -322,13 +323,13 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
     }
 
     // 开始捕获 - 不等待，直接返回
-    auto start_result = Utils::Graphics::Capture::start_capture(session_info.session);
+    auto start_result = utils::graphics::capture::start_capture(session_info.session);
     if (!start_result) {
       // request 已归活动会话所有；启动失败由这里完成通知和资源回收。
       if (session_info.session.need_hide_cursor) {
         ShowCursor(TRUE);
       }
-      Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+      utils::graphics::capture::cleanup_capture_session(session_info.session);
       safe_call_completion_callback(session_info.request, false);
       state.active_sessions.erase(session_it);
       return std::unexpected("Failed to start capture: " + start_result.error());
@@ -342,8 +343,8 @@ auto do_screenshot_capture(Features::Screenshot::State::ScreenshotRequest& reque
 }
 
 // 处理单个截图请求
-auto process_single_request(Features::Screenshot::State::ScreenshotRequest request,
-                            Core::State::AppState& app_state) -> void {
+auto process_single_request(features::screenshot::ScreenshotRequest request,
+                            core::AppState& app_state) -> void {
   auto& state = *app_state.screenshot;
   Logger().debug("Processing screenshot request for window: {}",
                  reinterpret_cast<uintptr_t>(request.target_window));
@@ -363,7 +364,7 @@ auto process_single_request(Features::Screenshot::State::ScreenshotRequest reque
 }
 
 // 启动清理定时器
-auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) -> void {
+auto start_cleanup_timer(features::screenshot::ScreenshotState& state) -> void {
   if (!state.d3d_initialized) {
     return;
   }
@@ -389,12 +390,12 @@ auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) ->
 }
 
 // 工作线程主函数
-auto worker_thread_proc(Core::State::AppState& app_state) -> void {
+auto worker_thread_proc(core::AppState& app_state) -> void {
   auto& state = *app_state.screenshot;
   Logger().debug("Screenshot worker thread started");
 
   while (!state.should_stop) {
-    Features::Screenshot::State::ScreenshotRequest request;
+    features::screenshot::ScreenshotRequest request;
     bool has_request = false;
 
     // 等待新请求或清理请求
@@ -452,8 +453,7 @@ auto worker_thread_proc(Core::State::AppState& app_state) -> void {
 }
 
 // 只初始化D3D资源（不创建工作线程）
-auto initialize_d3d_resources_only(Core::State::AppState& app_state)
-    -> std::expected<void, std::string> {
+auto initialize_d3d_resources_only(core::AppState& app_state) -> std::expected<void, std::string> {
   try {
     auto& state = *app_state.screenshot;
     Logger().debug("Initializing D3D resources only");
@@ -468,13 +468,13 @@ auto initialize_d3d_resources_only(Core::State::AppState& app_state)
     auto co_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
 
     // 创建无头D3D设备（不需要窗口和交换链）
-    auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
+    auto d3d_result = utils::graphics::d3d::create_headless_d3d_device();
     if (!d3d_result) {
       return std::unexpected("Failed to create headless D3D device: " + d3d_result.error());
     }
 
     // 创建一个简化的D3DContext，只包含设备和上下文
-    Utils::Graphics::D3D::D3DContext context;
+    utils::graphics::d3d::D3DContext context;
     context.device = d3d_result->first;
     context.context = d3d_result->second;
     // 注意：swap_chain 和 render_target 保持为空，因为截图不需要它们
@@ -483,7 +483,7 @@ auto initialize_d3d_resources_only(Core::State::AppState& app_state)
 
     // 创建WinRT设备
     auto winrt_result =
-        Utils::Graphics::Capture::create_winrt_device(state.d3d_context->device.get());
+        utils::graphics::capture::create_winrt_device(state.d3d_context->device.get());
     if (!winrt_result) {
       state.cleanup_d3d_resources();
       return std::unexpected("Failed to create WinRT device: " + winrt_result.error());
@@ -500,7 +500,7 @@ auto initialize_d3d_resources_only(Core::State::AppState& app_state)
 }
 
 // 初始化完整系统
-auto initialize_system(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto initialize_system(core::AppState& app_state) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
   Logger().debug("Initializing screenshot system");
 
@@ -525,7 +525,7 @@ auto initialize_system(Core::State::AppState& app_state) -> std::expected<void, 
   return {};
 }
 
-auto cleanup_system(Core::State::AppState& app_state) -> void {
+auto cleanup_system(core::AppState& app_state) -> void {
   auto& state = *app_state.screenshot;
   Logger().debug("Cleaning up screenshot system");
 
@@ -554,9 +554,9 @@ auto cleanup_system(Core::State::AppState& app_state) -> void {
 }
 
 auto take_screenshot(
-    Core::State::AppState& app_state, HWND target_window,
+    core::AppState& app_state, HWND target_window,
     std::move_only_function<void(bool success, const std::wstring& path)> completion_callback,
-    Utils::Image::ImageFormat format, float jpeg_quality,
+    utils::image::ImageFormat format, float jpeg_quality,
     std::optional<std::filesystem::path> output_dir_override, int shutter_frames,
     bool capture_client_area) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
@@ -572,25 +572,25 @@ auto take_screenshot(
 
   if (output_dir_override.has_value()) {
     screenshots_dir = *output_dir_override;
-    auto ensure_result = Utils::Path::EnsureDirectoryExists(screenshots_dir);
+    auto ensure_result = utils::path::EnsureDirectoryExists(screenshots_dir);
     if (!ensure_result) {
       return std::unexpected("Failed to create output directory: " + ensure_result.error());
     }
   } else {
     auto output_dir_result =
-        Utils::Path::GetOutputDirectory(app_state.settings->raw.features.output_dir_path);
+        utils::path::GetOutputDirectory(app_state.settings->raw.features.output_dir_path);
     if (!output_dir_result) {
       return std::unexpected("Failed to get output directory: " + output_dir_result.error());
     }
     screenshots_dir = output_dir_result.value();
   }
 
-  auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
+  auto filename = utils::string::FormatTimestamp(std::chrono::system_clock::now());
   // 用户打开「HDR 截图」且当前输出处于 HDR10 路径时，走 Ultra HDR；否则维持原有 8-bit 流程。
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
   if (app_state.settings->raw.features.screenshot.enable_hdr) {
-    auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target_window);
+    auto hdr_info = utils::graphics::hdr::query_monitor_hdr_info(target_window);
     if (hdr_info) {
       use_hdr = hdr_info->hdr_active;
       hdr_target_peak_nits = hdr_info->max_luminance_nits;
@@ -600,7 +600,7 @@ auto take_screenshot(
   }
 
   // Ultra HDR 仅 JPEG 容器；Motion Photo 也用 .jpg，统一在这里改扩展名。
-  if (use_hdr || format == Utils::Image::ImageFormat::JPEG) {
+  if (use_hdr || format == utils::image::ImageFormat::JPEG) {
     auto dot_pos = filename.rfind('.');
     if (dot_pos != std::string::npos) {
       filename = filename.substr(0, dot_pos) + ".jpg";
@@ -641,11 +641,11 @@ auto take_screenshot(
   state.cleanup_requested = false;  // 取消任何待处理的清理请求
 
   // 创建截图请求
-  Features::Screenshot::State::ScreenshotRequest request;
+  features::screenshot::ScreenshotRequest request;
   request.target_window = target_window;
   request.file_path = file_path.wstring();
   // 与落盘格式一致：HDR 路径实际为 JPEG，避免 request.format 仍为 PNG 导致语义错乱。
-  request.format = use_hdr ? Utils::Image::ImageFormat::JPEG : format;
+  request.format = use_hdr ? utils::image::ImageFormat::JPEG : format;
   request.jpeg_quality = jpeg_quality;
   request.use_hdr = use_hdr;
   request.hdr_target_peak_nits = hdr_target_peak_nits;
@@ -661,10 +661,10 @@ auto take_screenshot(
       const int capture_height = window_rect.bottom - window_rect.top;
       Logger().info("HDR screenshot requested: {}x{}, target_peak={:.0f} nits, path={}",
                     capture_width, capture_height, hdr_target_peak_nits,
-                    Utils::String::ToUtf8(file_path.wstring()));
+                    utils::string::ToUtf8(file_path.wstring()));
     } else {
       Logger().info("HDR screenshot requested: target_peak={:.0f} nits, path={}",
-                    hdr_target_peak_nits, Utils::String::ToUtf8(file_path.wstring()));
+                    hdr_target_peak_nits, utils::string::ToUtf8(file_path.wstring()));
     }
   }
 
@@ -680,4 +680,4 @@ auto take_screenshot(
   return {};
 }
 
-}  // namespace Features::Screenshot
+}  // namespace features::screenshot

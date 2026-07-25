@@ -1,20 +1,21 @@
-module;
+#include "core/dialog_service/dialog_service.hpp"
 
-module Core.DialogService;
+#include "vendor/std.hpp"
 
-import std;
-import Core.DialogService.State;
-import Core.State;
-import Utils.Dialog;
-import Utils.Logger;
-import <wil/com.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
 
-namespace Core::DialogService {
+#include "core/dialog_service/state.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/dialog/dialog.hpp"
+#include "utils/logger/logger.hpp"
 
-namespace Detail {
+namespace core::dialog_service {
 
-auto run_worker_loop(Core::DialogService::State::DialogServiceState& service,
-                     std::stop_token stop_token) -> void {
+namespace detail {
+
+auto run_worker_loop(core::dialog_service::DialogServiceState& service, std::stop_token stop_token)
+    -> void {
   auto com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
   while (!stop_token.stop_requested()) {
@@ -57,7 +58,7 @@ using DialogResult = std::expected<Result, std::string>;
 
 template <typename Result, typename Task>
   requires std::invocable<Task&> && std::same_as<std::invoke_result_t<Task&>, DialogResult<Result>>
-auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service, Task&& task)
+auto submit_dialog_task(core::dialog_service::DialogServiceState& service, Task&& task)
     -> DialogResult<Result> {
   if (!service.is_running.load()) {
     return std::unexpected("DialogService is not running");
@@ -92,9 +93,9 @@ auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service,
   }
 }
 
-}  // namespace Detail
+}  // namespace detail
 
-auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto start(core::AppState& state) -> std::expected<void, std::string> {
   if (!state.dialog_service) {
     return std::unexpected("DialogServiceState is not initialized");
   }
@@ -108,7 +109,7 @@ auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
   try {
     service.shutdown_requested = false;
     service.worker_thread = std::jthread(
-        [&service](std::stop_token stop_token) { Detail::run_worker_loop(service, stop_token); });
+        [&service](std::stop_token stop_token) { detail::run_worker_loop(service, stop_token); });
 
     Logger().info("DialogService started successfully");
     return {};
@@ -119,7 +120,7 @@ auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
   }
 }
 
-auto stop(Core::State::AppState& state) -> void {
+auto stop(core::AppState& state) -> void {
   if (!state.dialog_service) {
     return;
   }
@@ -148,25 +149,25 @@ auto stop(Core::State::AppState& state) -> void {
   Logger().info("DialogService stopped");
 }
 
-auto open_file(Core::State::AppState& state, const Utils::Dialog::FileSelectorParams& params,
-               HWND hwnd) -> std::expected<Utils::Dialog::FileSelectorResult, std::string> {
+auto open_file(core::AppState& state, const utils::dialog::FileSelectorParams& params, HWND hwnd)
+    -> std::expected<utils::dialog::FileSelectorResult, std::string> {
   if (!state.dialog_service) {
     return std::unexpected("DialogService state is not initialized");
   }
 
-  return Detail::submit_dialog_task<Utils::Dialog::FileSelectorResult>(
-      *state.dialog_service, [params, hwnd]() { return Utils::Dialog::select_file(params, hwnd); });
+  return detail::submit_dialog_task<utils::dialog::FileSelectorResult>(
+      *state.dialog_service, [params, hwnd]() { return utils::dialog::select_file(params, hwnd); });
 }
 
-auto open_folder(Core::State::AppState& state, const Utils::Dialog::FolderSelectorParams& params,
-                 HWND hwnd) -> std::expected<Utils::Dialog::FolderSelectorResult, std::string> {
+auto open_folder(core::AppState& state, const utils::dialog::FolderSelectorParams& params,
+                 HWND hwnd) -> std::expected<utils::dialog::FolderSelectorResult, std::string> {
   if (!state.dialog_service) {
     return std::unexpected("DialogService state is not initialized");
   }
 
-  return Detail::submit_dialog_task<Utils::Dialog::FolderSelectorResult>(
+  return detail::submit_dialog_task<utils::dialog::FolderSelectorResult>(
       *state.dialog_service,
-      [params, hwnd]() { return Utils::Dialog::select_folder(params, hwnd); });
+      [params, hwnd]() { return utils::dialog::select_folder(params, hwnd); });
 }
 
-}  // namespace Core::DialogService
+}  // namespace core::dialog_service

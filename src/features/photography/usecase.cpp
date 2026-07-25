@@ -1,20 +1,19 @@
-module;
+#include "features/photography/usecase.hpp"
 
-module Features.Photography.UseCase;
+#include "vendor/std.hpp"
 
-import std;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.State;
-import Features.Photography.State;
-import UI.PhotographyPanel;
-import Utils.Logger;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/state/app_state.hpp"
+#include "features/photography/state.hpp"
+#include "ui/photography_panel/photography_panel.hpp"
+#include "utils/logger/logger.hpp"
 
-namespace Features::Photography::UseCase {
+namespace features::photography {
 
 // 显示面板并标记高级摄影启用
-auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto show_result = UI::PhotographyPanel::show(state);
+auto start(core::AppState& state) -> std::expected<void, std::string> {
+  auto show_result = ui::photography_panel::show(state);
   if (!show_result) {
     return std::unexpected(show_result.error());
   }
@@ -27,9 +26,9 @@ auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
 }
 
 // 停止高级摄影时关闭面板
-auto stop(Core::State::AppState& state) -> void {
+auto stop(core::AppState& state) -> void {
   const bool previous = state.photography->enabled.exchange(false, std::memory_order_acq_rel);
-  UI::PhotographyPanel::hide(state);
+  ui::photography_panel::hide(state);
 
   if (previous) {
     Logger().info("Photography mode stopped");
@@ -37,7 +36,7 @@ auto stop(Core::State::AppState& state) -> void {
 }
 
 // 已启用则停止；否则尝试启动，失败时弹通知。
-auto toggle(Core::State::AppState& state) -> void {
+auto toggle(core::AppState& state) -> void {
   if (state.photography->enabled.load(std::memory_order_acquire)) {
     stop(state);
     return;
@@ -45,18 +44,18 @@ auto toggle(Core::State::AppState& state) -> void {
 
   if (auto result = start(state); !result) {
     Logger().error("Failed to start photography mode: {}", result.error());
-    Core::Notifications::show_notification(
+    core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.photography_start_failed"] + result.error());
   }
 }
 
-auto cleanup(Core::State::AppState& state) -> void {
+auto cleanup(core::AppState& state) -> void {
   state.photography->enabled.store(false, std::memory_order_release);
 }
 
-auto handle_panel_close(Core::State::AppState& state) -> void {
+auto handle_panel_close(core::AppState& state) -> void {
   state.photography->enabled.store(false, std::memory_order_release);
 }
 
-}  // namespace Features::Photography::UseCase
+}  // namespace features::photography

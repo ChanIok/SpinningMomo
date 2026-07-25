@@ -1,17 +1,16 @@
-module;
+#include "features/gallery/recovery/repository.hpp"
 
-module Features.Gallery.Recovery.Repository;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.Types;
-import Features.Gallery.Recovery.Types;
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/recovery/types.hpp"
 
-namespace Features::Gallery::Recovery::Repository {
+namespace features::gallery::recovery::repository {
 
-auto get_state_by_root_path(Core::State::AppState& app_state, const std::string& root_path)
-    -> std::expected<std::optional<Types::WatchRootRecoveryState>, std::string> {
+auto get_state_by_root_path(core::AppState& app_state, const std::string& root_path)
+    -> std::expected<std::optional<WatchRootRecoveryState>, std::string> {
   // 按 root_path 查询上次保存的恢复检查点。
   std::string sql = R"(
     SELECT root_path, volume_identity, journal_id, checkpoint_usn, rule_fingerprint, updated_at
@@ -19,8 +18,7 @@ auto get_state_by_root_path(Core::State::AppState& app_state, const std::string&
     WHERE root_path = ?
   )";
 
-  auto result =
-      Core::Database::query_single<Types::WatchRootRecoveryState>(app_state, sql, {root_path});
+  auto result = core::database::query_single<WatchRootRecoveryState>(app_state, sql, {root_path});
   if (!result) {
     return std::unexpected("Failed to query watch root recovery state: " + result.error());
   }
@@ -28,7 +26,7 @@ auto get_state_by_root_path(Core::State::AppState& app_state, const std::string&
   return result.value();
 }
 
-auto upsert_state(Core::State::AppState& app_state, const Types::WatchRootRecoveryState& state)
+auto upsert_state(core::AppState& app_state, const WatchRootRecoveryState& state)
     -> std::expected<void, std::string> {
   // root_path 是主键，重复写入时直接覆盖为最新检查点。
   std::string sql = R"(
@@ -43,18 +41,17 @@ auto upsert_state(Core::State::AppState& app_state, const Types::WatchRootRecove
       updated_at = (unixepoch('subsec') * 1000)
   )";
 
-  std::vector<Core::Database::Types::DbParam> params = {
+  std::vector<core::database::DbParam> params = {
       state.root_path,
       state.volume_identity,
-      state.journal_id.has_value() ? Core::Database::Types::DbParam{state.journal_id.value()}
-                                   : Core::Database::Types::DbParam{std::monostate{}},
-      state.checkpoint_usn.has_value()
-          ? Core::Database::Types::DbParam{state.checkpoint_usn.value()}
-          : Core::Database::Types::DbParam{std::monostate{}},
+      state.journal_id.has_value() ? core::database::DbParam{state.journal_id.value()}
+                                   : core::database::DbParam{std::monostate{}},
+      state.checkpoint_usn.has_value() ? core::database::DbParam{state.checkpoint_usn.value()}
+                                       : core::database::DbParam{std::monostate{}},
       state.rule_fingerprint,
   };
 
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to upsert watch root recovery state: " + result.error());
   }
@@ -62,10 +59,10 @@ auto upsert_state(Core::State::AppState& app_state, const Types::WatchRootRecove
   return {};
 }
 
-auto delete_state_by_root_path(Core::State::AppState& app_state, const std::string& root_path)
+auto delete_state_by_root_path(core::AppState& app_state, const std::string& root_path)
     -> std::expected<void, std::string> {
   // root 被移除时清理对应的恢复状态。
-  auto result = Core::Database::execute(
+  auto result = core::database::execute(
       app_state, "DELETE FROM watch_root_recovery_state WHERE root_path = ?", {root_path});
   if (!result) {
     return std::unexpected("Failed to delete watch root recovery state: " + result.error());
@@ -74,4 +71,4 @@ auto delete_state_by_root_path(Core::State::AppState& app_state, const std::stri
   return {};
 }
 
-}  // namespace Features::Gallery::Recovery::Repository
+}  // namespace features::gallery::recovery::repository

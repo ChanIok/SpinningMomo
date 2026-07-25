@@ -1,18 +1,17 @@
-module;
+#include "ui/context_menu/interaction.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-module UI.ContextMenu.Interaction;
+#include "vendor/windows.hpp"
 
-import std;
-import Core.State;
-import UI.ContextMenu.State;
-import UI.ContextMenu.Types;
+#include "core/state/app_state.hpp"
+#include "ui/context_menu/state.hpp"
+#include "ui/context_menu/types.hpp"
 
-namespace {
+namespace ui::context_menu::interaction::detail {
 
-using UI::ContextMenu::State::ContextMenuState;
-using UI::ContextMenu::Types::PendingIntentType;
+using ui::context_menu::ContextMenuState;
+using ui::context_menu::PendingIntentType;
 
 auto resolve_timer_owner(const ContextMenuState& menu_state, HWND fallback) -> HWND {
   return menu_state.hwnd ? menu_state.hwnd : fallback;
@@ -55,25 +54,26 @@ auto request_intent(ContextMenuState& menu_state, HWND timer_owner, PendingInten
   }
 }
 
-}  // anonymous namespace
+}  // namespace ui::context_menu::interaction::detail
 
-namespace UI::ContextMenu::Interaction {
+namespace ui::context_menu::interaction {
 
-auto reset(Core::State::AppState& state) -> void { state.context_menu->interaction = {}; }
+auto reset(core::AppState& state) -> void { state.context_menu->interaction = {}; }
 
-auto cancel_pending_intent(Core::State::AppState& state, HWND timer_owner) -> void {
+auto cancel_pending_intent(core::AppState& state, HWND timer_owner) -> void {
   auto& menu_state = *state.context_menu;
-  cancel_pending_intent_impl(menu_state, resolve_timer_owner(menu_state, timer_owner));
+  detail::cancel_pending_intent_impl(menu_state,
+                                     detail::resolve_timer_owner(menu_state, timer_owner));
 }
 
-auto on_main_mouse_move(Core::State::AppState& state, int hover_index, HWND timer_owner) -> bool {
+auto on_main_mouse_move(core::AppState& state, int hover_index, HWND timer_owner) -> bool {
   auto& menu_state = *state.context_menu;
   auto& interaction = menu_state.interaction;
-  timer_owner = resolve_timer_owner(menu_state, timer_owner);
+  timer_owner = detail::resolve_timer_owner(menu_state, timer_owner);
   const auto previous_zone = interaction.cursor_zone;
-  interaction.cursor_zone = Types::CursorZone::MainMenu;
+  interaction.cursor_zone = CursorZone::MainMenu;
 
-  bool should_repaint = previous_zone != Types::CursorZone::MainMenu && menu_state.submenu_hwnd &&
+  bool should_repaint = previous_zone != CursorZone::MainMenu && menu_state.submenu_hwnd &&
                         menu_state.submenu_parent_index >= 0 &&
                         menu_state.submenu_parent_index < static_cast<int>(menu_state.items.size());
 
@@ -84,10 +84,10 @@ auto on_main_mouse_move(Core::State::AppState& state, int hover_index, HWND time
 
   if (hover_index < 0 || hover_index >= static_cast<int>(menu_state.items.size())) {
     if (menu_state.submenu_hwnd) {
-      request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
-                     interaction.HIDE_SUBMENU_DELAY);
+      detail::request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
+                             interaction.HIDE_SUBMENU_DELAY);
     } else {
-      request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
+      detail::request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
     }
     return should_repaint;
   }
@@ -95,21 +95,21 @@ auto on_main_mouse_move(Core::State::AppState& state, int hover_index, HWND time
   const auto& item = menu_state.items[hover_index];
   if (!item.has_submenu()) {
     if (menu_state.submenu_hwnd) {
-      request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
-                     interaction.HIDE_SUBMENU_DELAY);
+      detail::request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
+                             interaction.HIDE_SUBMENU_DELAY);
     } else {
-      request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
+      detail::request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
     }
     return should_repaint;
   }
 
   if (menu_state.submenu_hwnd && menu_state.submenu_parent_index == hover_index) {
-    request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
+    detail::request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
     return should_repaint;
   }
 
   const bool has_open_submenu = menu_state.submenu_hwnd != nullptr;
-  request_intent(
+  detail::request_intent(
       menu_state, timer_owner,
       has_open_submenu ? PendingIntentType::SwitchSubmenu : PendingIntentType::OpenSubmenu,
       hover_index,
@@ -118,12 +118,12 @@ auto on_main_mouse_move(Core::State::AppState& state, int hover_index, HWND time
   return should_repaint;
 }
 
-auto on_submenu_mouse_move(Core::State::AppState& state, int submenu_hover_index, HWND timer_owner)
+auto on_submenu_mouse_move(core::AppState& state, int submenu_hover_index, HWND timer_owner)
     -> bool {
   auto& menu_state = *state.context_menu;
   auto& interaction = menu_state.interaction;
-  timer_owner = resolve_timer_owner(menu_state, timer_owner);
-  interaction.cursor_zone = Types::CursorZone::Submenu;
+  timer_owner = detail::resolve_timer_owner(menu_state, timer_owner);
+  interaction.cursor_zone = CursorZone::Submenu;
 
   bool should_repaint = false;
   if (submenu_hover_index != interaction.submenu_hover_index) {
@@ -132,20 +132,20 @@ auto on_submenu_mouse_move(Core::State::AppState& state, int submenu_hover_index
   }
 
   // 进入当前子菜单即取消任何待处理意图（切换/隐藏）。
-  request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
+  detail::request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
   return should_repaint;
 }
 
-auto on_mouse_leave(Core::State::AppState& state, HWND source_hwnd, HWND timer_owner) -> bool {
+auto on_mouse_leave(core::AppState& state, HWND source_hwnd, HWND timer_owner) -> bool {
   auto& menu_state = *state.context_menu;
   auto& interaction = menu_state.interaction;
-  timer_owner = resolve_timer_owner(menu_state, timer_owner);
+  timer_owner = detail::resolve_timer_owner(menu_state, timer_owner);
 
   const auto previous_zone = interaction.cursor_zone;
-  interaction.cursor_zone = Types::CursorZone::Outside;
+  interaction.cursor_zone = CursorZone::Outside;
   bool should_repaint = false;
 
-  if (source_hwnd == menu_state.hwnd && previous_zone == Types::CursorZone::MainMenu &&
+  if (source_hwnd == menu_state.hwnd && previous_zone == CursorZone::MainMenu &&
       menu_state.submenu_hwnd && menu_state.submenu_parent_index >= 0 &&
       menu_state.submenu_parent_index < static_cast<int>(menu_state.items.size())) {
     should_repaint = true;
@@ -164,19 +164,19 @@ auto on_mouse_leave(Core::State::AppState& state, HWND source_hwnd, HWND timer_o
   }
 
   if (menu_state.submenu_hwnd) {
-    request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
-                   interaction.HIDE_SUBMENU_DELAY);
+    detail::request_intent(menu_state, timer_owner, PendingIntentType::HideSubmenu, -1,
+                           interaction.HIDE_SUBMENU_DELAY);
   } else {
-    request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
+    detail::request_intent(menu_state, timer_owner, PendingIntentType::None, -1, 0);
   }
 
   return should_repaint;
 }
 
-auto on_timer(Core::State::AppState& state, HWND timer_owner, WPARAM timer_id) -> TimerAction {
+auto on_timer(core::AppState& state, HWND timer_owner, WPARAM timer_id) -> TimerAction {
   auto& menu_state = *state.context_menu;
   auto& interaction = menu_state.interaction;
-  timer_owner = resolve_timer_owner(menu_state, timer_owner);
+  timer_owner = detail::resolve_timer_owner(menu_state, timer_owner);
 
   if (timer_id != interaction.INTENT_TIMER_ID) {
     return {};
@@ -190,7 +190,7 @@ auto on_timer(Core::State::AppState& state, HWND timer_owner, WPARAM timer_id) -
   interaction.pending_intent = PendingIntentType::None;
   interaction.pending_parent_index = -1;
 
-  if (interaction.cursor_zone == Types::CursorZone::Submenu) {
+  if (interaction.cursor_zone == CursorZone::Submenu) {
     return {};
   }
 
@@ -221,7 +221,7 @@ auto on_timer(Core::State::AppState& state, HWND timer_owner, WPARAM timer_id) -
   }
 }
 
-auto get_main_highlight_index(const Core::State::AppState& state) -> int {
+auto get_main_highlight_index(const core::AppState& state) -> int {
   const auto& menu_state = *state.context_menu;
   const auto& interaction = menu_state.interaction;
 
@@ -231,11 +231,11 @@ auto get_main_highlight_index(const Core::State::AppState& state) -> int {
   }
 
   // 子菜单打开时：主菜单区域遵循实时 hover；离开主菜单后回显当前子菜单父项。
-  if (interaction.cursor_zone == Types::CursorZone::MainMenu) {
+  if (interaction.cursor_zone == CursorZone::MainMenu) {
     return interaction.hover_index;
   }
 
   return menu_state.submenu_parent_index;
 }
 
-}  // namespace UI::ContextMenu::Interaction
+}  // namespace ui::context_menu::interaction

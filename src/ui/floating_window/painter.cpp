@@ -1,27 +1,27 @@
-module;
+#include "ui/floating_window/painter.hpp"
 
-module UI.FloatingWindow.Painter;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Commands;
-import Core.Commands.Types;
-import UI.SharedRenderResources.State;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import UI.FloatingWindow.RenderContext;
-import Features.Settings.Menu;
-import <d2d1_3.h>;
-import <dwrite_3.h>;
-import <windows.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dwrite_3.hpp"
 
-namespace UI::FloatingWindow::Painter {
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "ui/floating_window/layout.hpp"
+#include "ui/floating_window/render_context.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "ui/shared_render_resources/state.hpp"
+
+namespace ui::floating_window::painter {
 
 // 列数据结构：包含原始索引和项指针
 struct ColumnItems {
-  std::vector<size_t> indices;                             // 在原数组中的索引（用于 hover 判断）
-  std::vector<const UI::FloatingWindow::MenuItem*> items;  // 项指针
+  std::vector<size_t> indices;                              // 在原数组中的索引（用于 hover 判断）
+  std::vector<const ui::floating_window::MenuItem*> items;  // 项指针
 };
 
 // 列绘制参数
@@ -41,7 +41,7 @@ auto to_cache_key(float value, float scale) -> int {
   return static_cast<int>(std::lround(value * scale));
 }
 
-auto find_cached_font_key(const UI::FloatingWindow::RenderResources& d2d, std::wstring_view text,
+auto find_cached_font_key(const ui::floating_window::RenderResources& d2d, std::wstring_view text,
                           int width_key, int base_font_key) -> std::optional<int> {
   for (const auto& entry : d2d.text_measure_cache) {
     if (entry.width_key == width_key && entry.base_font_key == base_font_key &&
@@ -52,13 +52,13 @@ auto find_cached_font_key(const UI::FloatingWindow::RenderResources& d2d, std::w
   return std::nullopt;
 }
 
-auto store_text_measure_cache(UI::FloatingWindow::RenderResources& d2d, std::wstring_view text,
+auto store_text_measure_cache(ui::floating_window::RenderResources& d2d, std::wstring_view text,
                               int width_key, int base_font_key, int resolved_font_key) -> void {
   if (d2d.text_measure_cache.size() >= kMaxTextMeasureCacheEntries) {
     d2d.text_measure_cache.clear();
   }
 
-  d2d.text_measure_cache.push_back(UI::FloatingWindow::TextMeasureCacheEntry{
+  d2d.text_measure_cache.push_back(ui::floating_window::TextMeasureCacheEntry{
       .text = std::wstring(text),
       .width_key = width_key,
       .base_font_key = base_font_key,
@@ -66,7 +66,7 @@ auto store_text_measure_cache(UI::FloatingWindow::RenderResources& d2d, std::wst
   });
 }
 
-auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderResources& d2d,
+auto get_or_create_adjusted_text_format(ui::floating_window::RenderResources& d2d,
                                         IDWriteFactory7* write_factory, int font_key)
     -> IDWriteTextFormat* {
   if (auto it = d2d.adjusted_text_formats.find(font_key); it != d2d.adjusted_text_formats.end()) {
@@ -79,7 +79,7 @@ auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderResources& d2d
 
   const float font_size = static_cast<float>(font_key) / kFontCacheScale;
   auto text_format =
-      UI::FloatingWindow::RenderContext::create_text_format_with_size(write_factory, font_size);
+      ui::floating_window::render_context::create_text_format_with_size(write_factory, font_size);
   if (!text_format) {
     return nullptr;
   }
@@ -90,21 +90,21 @@ auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderResources& d2d
 }
 
 // 按类别分组菜单项
-auto group_items_by_column(const std::vector<UI::FloatingWindow::MenuItem>& items)
+auto group_items_by_column(const std::vector<ui::floating_window::MenuItem>& items)
     -> std::tuple<ColumnItems, ColumnItems, ColumnItems> {
   ColumnItems ratio, resolution, feature;
 
   for (size_t i = 0; i < items.size(); ++i) {
     switch (items[i].category) {
-      case UI::FloatingWindow::MenuItemCategory::AspectRatio:
+      case ui::floating_window::MenuItemCategory::AspectRatio:
         ratio.indices.push_back(i);
         ratio.items.push_back(&items[i]);
         break;
-      case UI::FloatingWindow::MenuItemCategory::Resolution:
+      case ui::floating_window::MenuItemCategory::Resolution:
         resolution.indices.push_back(i);
         resolution.items.push_back(&items[i]);
         break;
-      case UI::FloatingWindow::MenuItemCategory::Feature:
+      case ui::floating_window::MenuItemCategory::Feature:
         feature.indices.push_back(i);
         feature.items.push_back(&items[i]);
         break;
@@ -115,8 +115,8 @@ auto group_items_by_column(const std::vector<UI::FloatingWindow::MenuItem>& item
 }
 
 // 绘制单个列
-auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
-                        const ColumnItems& column, const ColumnDrawParams& params) -> void {
+auto draw_single_column(core::AppState& state, const D2D1_RECT_F& rect, const ColumnItems& column,
+                        const ColumnDrawParams& params) -> void {
   const auto& render = state.floating_window->layout;
   float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
 
@@ -128,7 +128,7 @@ auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
     const auto& item = *column.items[i];
     const size_t original_index = column.indices[i];
 
-    D2D1_RECT_F item_rect = UI::FloatingWindow::make_d2d_rect(
+    D2D1_RECT_F item_rect = ui::floating_window::make_d2d_rect(
         params.x_left, y, params.x_right, y + static_cast<float>(render.item_height));
 
     const bool is_hovered =
@@ -140,7 +140,7 @@ auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
 }
 
 // 绘制滚动条指示器
-auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
+auto draw_scroll_indicator(const core::AppState& state, const D2D1_RECT_F& column_rect,
                            size_t total_items, size_t scroll_offset, bool is_hovered,
                            bool is_last_column) -> void {
   const auto& render = state.floating_window->layout;
@@ -178,13 +178,13 @@ auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F
   const float indicator_left = indicator_right - indicator_width;
 
   // 绘制滑块
-  D2D1_RECT_F thumb_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F thumb_rect = ui::floating_window::make_d2d_rect(
       indicator_left, thumb_top, indicator_right, thumb_top + thumb_height);
   d2d.device_context->FillRectangle(thumb_rect, d2d.scroll_indicator_brush.get());
 }
 
 // 主绘制函数实现
-auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
+auto paint(core::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
   auto& d2d = state.floating_window->render_resources;
 
   if (!d2d.is_initialized || !d2d.device_context) {
@@ -193,7 +193,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 
   // 先处理字体更新（如果需要）
   if (d2d.needs_font_update) {
-    if (!UI::FloatingWindow::RenderContext::update_text_format_if_needed(state)) {
+    if (!ui::floating_window::render_context::update_text_format_if_needed(state)) {
       return;  // 字体更新失败，无法继续绘制
     }
   }
@@ -212,7 +212,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
   // 全局设置替换混合模式，避免所有颜色叠加
   d2d.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
 
-  const auto rect_f = UI::FloatingWindow::rect_to_d2d(client_rect);
+  const auto rect_f = ui::floating_window::rect_to_d2d(client_rect);
 
   // 绘制各个部分
   draw_background(state, rect_f);
@@ -226,7 +226,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
   if (hr == D2DERR_RECREATE_TARGET) {
     // composition back buffer 已失效时，直接重建整套后端比局部修补更可靠，
     // 上层布局和交互状态保持不动。
-    UI::FloatingWindow::RenderContext::initialize_render_context(state, hwnd);
+    ui::floating_window::render_context::initialize_render_context(state, hwnd);
     d2d.is_rendering = false;
     return;
   }
@@ -240,14 +240,14 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 }
 
 // 绘制背景
-auto draw_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_background(const core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->render_resources;
   // 使用半透明白色背景
   d2d.device_context->FillRectangle(rect, d2d.background_brush.get());
 }
 
 // 绘制关闭按钮
-auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& title_rect) -> void {
+auto draw_close_button(const core::AppState& state, const D2D1_RECT_F& title_rect) -> void {
   const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
@@ -287,17 +287,17 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 }
 
 // 绘制标题栏
-auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_title_bar(const core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
   // 绘制标题栏背景
-  D2D1_RECT_F title_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F title_rect = ui::floating_window::make_d2d_rect(
       rect.left, rect.top, rect.right, rect.top + static_cast<float>(render.title_height));
   d2d.device_context->FillRectangle(title_rect, d2d.title_brush.get());
 
   // 绘制标题文本（保持完全不透明）
-  D2D1_RECT_F text_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F text_rect = ui::floating_window::make_d2d_rect(
       rect.left + static_cast<float>(render.text_padding), rect.top, rect.right,
       rect.top + static_cast<float>(render.title_height));
 
@@ -310,28 +310,28 @@ auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 }
 
 // 绘制分隔线
-auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_separators(const core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
   // 使用简单的列边界计算
-  const auto bounds = UI::FloatingWindow::Layout::get_column_bounds(state);
+  const auto bounds = ui::floating_window::layout::get_column_bounds(state);
 
   // 绘制水平分隔线（使用半透明画刷）
-  D2D1_RECT_F h_sep_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F h_sep_rect = ui::floating_window::make_d2d_rect(
       rect.left, rect.top + static_cast<float>(render.title_height), rect.right,
       rect.top + static_cast<float>(render.title_height + render.separator_height));
   d2d.device_context->FillRectangle(h_sep_rect, d2d.separator_brush.get());
 
   // 绘制垂直分隔线1（使用半透明画刷）
-  D2D1_RECT_F v_sep_rect1 = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F v_sep_rect1 = ui::floating_window::make_d2d_rect(
       static_cast<float>(bounds.ratio_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.bottom);
   d2d.device_context->FillRectangle(v_sep_rect1, d2d.separator_brush.get());
 
   // 绘制垂直分隔线2（使用半透明画刷）
-  D2D1_RECT_F v_sep_rect2 = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F v_sep_rect2 = ui::floating_window::make_d2d_rect(
       static_cast<float>(bounds.resolution_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.bottom);
@@ -339,11 +339,11 @@ auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect
 }
 
 // 绘制所有菜单项
-auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_items(core::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render = state.floating_window->layout;
   const auto& ui = state.floating_window->ui;
   const auto& items = state.floating_window->data.menu_items;
-  const auto bounds = UI::FloatingWindow::Layout::get_column_bounds(state);
+  const auto bounds = ui::floating_window::layout::get_column_bounds(state);
 
   // 按类别分组
   auto [ratio_col, resolution_col, feature_col] = group_items_by_column(items);
@@ -374,42 +374,42 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
        .max_visible = max_visible});
 
   // 比例列滚动条
-  D2D1_RECT_F ratio_column_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F ratio_column_rect = ui::floating_window::make_d2d_rect(
       rect.left, rect.top, static_cast<float>(bounds.ratio_column_right), rect.bottom);
   draw_scroll_indicator(state, ratio_column_rect, ratio_col.items.size(), ui.ratio_scroll_offset,
                         ui.hovered_column == 0, false);
 
   // 分辨率列滚动条
-  D2D1_RECT_F resolution_column_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F resolution_column_rect = ui::floating_window::make_d2d_rect(
       static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.top,
       static_cast<float>(bounds.resolution_column_right), rect.bottom);
   draw_scroll_indicator(state, resolution_column_rect, resolution_col.items.size(),
                         ui.resolution_scroll_offset, ui.hovered_column == 1, false);
 
   // 功能列滚动条
-  D2D1_RECT_F feature_column_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F feature_column_rect = ui::floating_window::make_d2d_rect(
       static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.top,
       rect.right, rect.bottom);
   draw_scroll_indicator(state, feature_column_rect, feature_col.items.size(),
                         ui.feature_scroll_offset, ui.hovered_column == 2, true);
 }
 
-auto is_item_selected(const UI::FloatingWindow::MenuItem& item,
-                      const Core::State::AppState& app_state) -> bool {
+auto is_item_selected(const ui::floating_window::MenuItem& item, const core::AppState& app_state)
+    -> bool {
   switch (item.category) {
-    case UI::FloatingWindow::MenuItemCategory::AspectRatio:
+    case ui::floating_window::MenuItemCategory::AspectRatio:
       return item.index == static_cast<int>(app_state.floating_window->ui.current_ratio_index);
-    case UI::FloatingWindow::MenuItemCategory::Resolution:
+    case ui::floating_window::MenuItemCategory::Resolution:
       return item.index == static_cast<int>(app_state.floating_window->ui.current_resolution_index);
-    case UI::FloatingWindow::MenuItemCategory::Feature:
-      return Core::Commands::is_toggle_on(app_state, item.action_id);
+    case ui::floating_window::MenuItemCategory::Feature:
+      return core::commands::is_toggle_on(app_state, item.action_id);
     default:
       return false;
   }
 }
 
 // 绘制单个菜单项
-auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
+auto draw_single_item(core::AppState& state, const ui::floating_window::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
@@ -424,16 +424,16 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   const bool is_selected = is_item_selected(item, state);
   if (is_selected) {
     float indicator_left = item_rect.left;
-    if (item.category == UI::FloatingWindow::MenuItemCategory::AspectRatio) {
+    if (item.category == ui::floating_window::MenuItemCategory::AspectRatio) {
       // 比例列贴着窗口左沿，需避开 DWM 覆盖在客户区上的系统描边。
       indicator_left +=
           static_cast<float>(state.floating_window->window.visible_frame_border_thickness);
     }
-    D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
+    D2D1_RECT_F indicator_rect = ui::floating_window::make_d2d_rect(
         indicator_left, item_rect.top, indicator_left + static_cast<float>(indicator_width),
         item_rect.bottom);
     ID2D1SolidColorBrush* indicator_brush = d2d.indicator_brush.get();
-    if (item.category == UI::FloatingWindow::MenuItemCategory::Feature &&
+    if (item.category == ui::floating_window::MenuItemCategory::Feature &&
         item.action_id == "recording.toggle" && d2d.recording_indicator_brush) {
       indicator_brush = d2d.recording_indicator_brush.get();
     }
@@ -443,7 +443,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   }
 
   // 绘制文本（保持完全不透明）
-  D2D1_RECT_F text_rect = UI::FloatingWindow::make_d2d_rect(
+  D2D1_RECT_F text_rect = ui::floating_window::make_d2d_rect(
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
       item_rect.right - static_cast<float>(render.text_padding / 2), item_rect.bottom);
   const auto draw_default_text = [&]() -> void {
@@ -468,17 +468,17 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   if (const auto cached_font_key = find_cached_font_key(d2d, item.text, width_key, base_font_key)) {
     resolved_font_key = *cached_font_key;
   } else {
-    float text_width = UI::FloatingWindow::RenderContext::measure_text_width(
+    float text_width = ui::floating_window::render_context::measure_text_width(
         item.text, d2d.text_format.get(), write_factory);
 
     if (text_width > available_width) {
       float adjusted_font_size = render.font_size;
 
-      for (adjusted_font_size -= UI::FloatingWindow::LayoutConfig::FONT_SIZE_STEP;
-           adjusted_font_size >= UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE;
-           adjusted_font_size -= UI::FloatingWindow::LayoutConfig::FONT_SIZE_STEP) {
+      for (adjusted_font_size -= ui::floating_window::LayoutConfig::FONT_SIZE_STEP;
+           adjusted_font_size >= ui::floating_window::LayoutConfig::MIN_FONT_SIZE;
+           adjusted_font_size -= ui::floating_window::LayoutConfig::FONT_SIZE_STEP) {
         const float clamped_font_size =
-            std::max(adjusted_font_size, UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE);
+            std::max(adjusted_font_size, ui::floating_window::LayoutConfig::MIN_FONT_SIZE);
 
         const int adjusted_font_key = to_cache_key(clamped_font_size, kFontCacheScale);
         auto* adjusted_text_format =
@@ -487,7 +487,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
           break;
         }
 
-        text_width = UI::FloatingWindow::RenderContext::measure_text_width(
+        text_width = ui::floating_window::render_context::measure_text_width(
             item.text, adjusted_text_format, write_factory);
         if (text_width <= available_width) {
           resolved_font_key = adjusted_font_key;
@@ -515,4 +515,4 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   draw_default_text();
 }
 
-}  // namespace UI::FloatingWindow::Painter
+}  // namespace ui::floating_window::painter

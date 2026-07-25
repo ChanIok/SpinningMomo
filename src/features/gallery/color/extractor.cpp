@@ -1,12 +1,11 @@
-module;
+#include "features/gallery/color/extractor.hpp"
 
-module Features.Gallery.Color.Extractor;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Image;
-import Features.Gallery.Color.Types;
+#include "features/gallery/color/types.hpp"
+#include "utils/image/image.hpp"
 
-namespace Features::Gallery::Color::Extractor {
+namespace features::gallery::color::extractor {
 
 auto parse_hex_nibble(char ch) -> std::optional<uint8_t> {
   if (ch >= '0' && ch <= '9') {
@@ -49,13 +48,13 @@ auto parse_hex_color(std::string_view hex) -> std::expected<std::array<uint8_t, 
 }
 
 // 将 Lab 坐标量化到 bin，供按色筛选 SQL 做粗匹配
-auto bin_lab_color(const Utils::Image::LabColor& lab, float l_bin_size, float ab_bin_size)
-    -> Types::LabColor {
+auto bin_lab_color(const utils::image::LabColor& lab, float l_bin_size, float ab_bin_size)
+    -> LabColor {
   int l_bin = std::max(0, static_cast<int>(std::floor(lab.l / l_bin_size)));
   int a_bin = std::max(0, static_cast<int>(std::floor((lab.a + 128.0f) / ab_bin_size)));
   int b_bin = std::max(0, static_cast<int>(std::floor((lab.b + 128.0f) / ab_bin_size)));
 
-  return Types::LabColor{
+  return LabColor{
       .l = lab.l,
       .a = lab.a,
       .b = lab.b,
@@ -66,11 +65,11 @@ auto bin_lab_color(const Utils::Image::LabColor& lab, float l_bin_size, float ab
 }
 
 auto rgb_to_lab_color(uint8_t r, uint8_t g, uint8_t b, float l_bin_size, float ab_bin_size)
-    -> Types::LabColor {
-  return bin_lab_color(Utils::Image::rgb_to_lab_color(r, g, b), l_bin_size, ab_bin_size);
+    -> LabColor {
+  return bin_lab_color(utils::image::rgb_to_lab_color(r, g, b), l_bin_size, ab_bin_size);
 }
 
-auto delta_e_76(const Types::ExtractedColor& lhs, const Types::ExtractedColor& rhs) -> float {
+auto delta_e_76(const ExtractedColor& lhs, const ExtractedColor& rhs) -> float {
   float dl = lhs.lab_l - rhs.lab_l;
   float da = lhs.lab_a - rhs.lab_a;
   float db = lhs.lab_b - rhs.lab_b;
@@ -78,12 +77,12 @@ auto delta_e_76(const Types::ExtractedColor& lhs, const Types::ExtractedColor& r
 }
 
 // 从 BGRA 位图提取入库主色：聚类 → 合并相近色 → 按覆盖率筛选
-auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_data,
-                                   const Types::MainColorExtractOptions& options)
-    -> std::expected<std::vector<Types::ExtractedColor>, std::string> {
-  auto palette_result = Utils::Image::extract_lab_palette_from_bgra_rect(
+auto extract_main_colors_from_bgra(const utils::image::BGRABitmapData& bitmap_data,
+                                   const MainColorExtractOptions& options)
+    -> std::expected<std::vector<ExtractedColor>, std::string> {
+  auto palette_result = utils::image::extract_lab_palette_from_bgra_rect(
       bitmap_data, 0, 0, static_cast<int>(bitmap_data.width), static_cast<int>(bitmap_data.height),
-      Utils::Image::PaletteExtractOptions{
+      utils::image::PaletteExtractOptions{
           .max_samples = options.max_samples,
           .cluster_count = options.cluster_count,
       });
@@ -91,14 +90,14 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
     return std::unexpected("Color clustering failed: " + palette_result.error());
   }
 
-  std::vector<Types::ExtractedColor> palette;
+  std::vector<ExtractedColor> palette;
   palette.reserve(palette_result->size());
 
   // 将通用调色板转为 Gallery 入库结构，并量化 Lab bin 供按色筛选
   for (const auto& color : palette_result.value()) {
     auto lab = bin_lab_color(color.lab, options.l_bin_size, options.ab_bin_size);
 
-    palette.push_back(Types::ExtractedColor{
+    palette.push_back(ExtractedColor{
         .r = color.rgb.r,
         .g = color.rgb.g,
         .b = color.rgb.b,
@@ -112,7 +111,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
     });
   }
 
-  std::vector<Types::ExtractedColor> merged_palette;
+  std::vector<ExtractedColor> merged_palette;
   for (const auto& color : palette) {
     bool merged = false;
     for (auto& existing : merged_palette) {
@@ -138,7 +137,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
           auto lab =
               rgb_to_lab_color(mixed_r, mixed_g, mixed_b, options.l_bin_size, options.ab_bin_size);
 
-          existing = Types::ExtractedColor{
+          existing = ExtractedColor{
               .r = mixed_r,
               .g = mixed_g,
               .b = mixed_b,
@@ -161,10 +160,9 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
     }
   }
 
-  std::ranges::sort(merged_palette,
-                    [](const Types::ExtractedColor& lhs, const Types::ExtractedColor& rhs) {
-                      return lhs.weight > rhs.weight;
-                    });
+  std::ranges::sort(merged_palette, [](const ExtractedColor& lhs, const ExtractedColor& rhs) {
+    return lhs.weight > rhs.weight;
+  });
 
   float merged_weight_sum = 0.0f;
   for (const auto& color : merged_palette) {
@@ -177,7 +175,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
     }
   }
 
-  std::vector<Types::ExtractedColor> selected_palette;
+  std::vector<ExtractedColor> selected_palette;
   float cumulative_weight = 0.0f;
   for (const auto& color : merged_palette) {
     if (selected_palette.size() >= options.max_colors) {
@@ -217,9 +215,9 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
 }
 
 // 缩放解码后提取主色；无现成 bitmap 时按 sample_short_edge 加载
-auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesystem::path& path,
-                         const Types::MainColorExtractOptions& options)
-    -> std::expected<std::vector<Types::ExtractedColor>, std::string> {
+auto extract_main_colors(utils::image::WICFactory& factory, const std::filesystem::path& path,
+                         const MainColorExtractOptions& options)
+    -> std::expected<std::vector<ExtractedColor>, std::string> {
   if (!factory) {
     return std::unexpected("WIC factory is null");
   }
@@ -228,7 +226,7 @@ auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesyste
   }
 
   auto bitmap_data_result =
-      Utils::Image::load_scaled_bgra_bitmap_data(factory.get(), path, options.sample_short_edge);
+      utils::image::load_scaled_bgra_bitmap_data(factory.get(), path, options.sample_short_edge);
   if (!bitmap_data_result) {
     return std::unexpected(bitmap_data_result.error());
   }
@@ -236,4 +234,4 @@ auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesyste
   return extract_main_colors_from_bgra(bitmap_data_result.value(), options);
 }
 
-}  // namespace Features::Gallery::Color::Extractor
+}  // namespace features::gallery::color::extractor

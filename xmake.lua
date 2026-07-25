@@ -1,13 +1,15 @@
 add_rules("mode.debug", "mode.release")
 
 -- 引入自定义任务
-includes("tasks/build-all.lua")
 includes("tasks/release.lua")
 includes("tasks/vs.lua")
 includes("tests")
 
 -- 设置C++23标准
 set_languages("c++23")
+
+-- 默认使用 LLVM 工具链，可通过 --toolchain 覆盖
+set_config("toolchain", "clang-cl[llvm]")
 
 -- 统一源文件编码
 add_cxflags("/utf-8", "/bigobj")
@@ -29,10 +31,9 @@ target("SpinningMomo")
     set_kind("binary")
     set_plat("windows")
     set_arch("x64")
-    
-    -- 启用C++模块支持
-    set_policy("build.c++.modules", true)
-    -- set_policy("build.c++.modules.non_cascading_changes", true)
+    -- 设置预编译头文件
+    set_pcxxheader("src/pch.hpp")
+    add_cxflags("clang_cl::-Wno-microsoft-include")
 
     -- Release 也保留调试符号，便于分析生产崩溃 dump
     if is_mode("release") then
@@ -51,7 +52,7 @@ target("SpinningMomo")
     
     -- 添加源文件
     add_files("src/main.cpp")
-    add_files("src/**.cpp", "src/**.ixx")
+    add_files("src/**.cpp")
     add_files("resources/*.rc", "resources/*.manifest")
     
     -- 链接vcpkg包

@@ -1,25 +1,24 @@
-module;
+#include "features/preview/capture.hpp"
 
-#include <wil/com.h>
+#include "vendor/std.hpp"
 
-module Features.Preview.Capture;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Rendering;
-import Features.Preview.Window;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import Vendor.Windows;
-import <d3d11.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "features/preview/window.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
 
-namespace Features::Preview::Capture {
+namespace features::preview::capture {
 
-auto on_frame_arrived(Core::State::AppState& state,
-                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
+auto on_frame_arrived(core::AppState& state, utils::graphics::capture::Direct3D11CaptureFrame frame)
+    -> void {
   if (!state.preview->running.load(std::memory_order_acquire) || !frame) {
     return;
   }
@@ -35,10 +34,9 @@ auto on_frame_arrived(Core::State::AppState& state,
 
   if (size_changed) {
     // 捕获回调线程只负责发现尺寸变化；帧池重建与窗口尺寸应用统一收口到窗口线程。
-    if (!Vendor::Windows::PostMessageW(state.preview->hwnd,
-                                       Features::Preview::Types::WM_APPLY_CAPTURE_SIZE,
-                                       static_cast<Vendor::Windows::WPARAM>(content_size.Width),
-                                       static_cast<Vendor::Windows::LPARAM>(content_size.Height))) {
+    if (!PostMessageW(state.preview->hwnd, features::preview::WM_APPLY_CAPTURE_SIZE,
+                      static_cast<WPARAM>(content_size.Width),
+                      static_cast<LPARAM>(content_size.Height))) {
       Logger().warn("Failed to post preview capture size update message");
     }
 
@@ -48,17 +46,17 @@ auto on_frame_arrived(Core::State::AppState& state,
   auto surface = frame.Surface();
   if (surface) {
     auto texture =
-        Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+        utils::graphics::capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
     if (texture) {
       // 触发渲染
-      Features::Preview::Rendering::render_frame(state, texture);
+      features::preview::rendering::render_frame(state, texture);
     }
   }
 }
 
-auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND target_window,
-                        int width, int height) -> std::expected<void, std::string> {
-  if (!target_window || !Vendor::Windows::IsWindow(target_window)) {
+auto initialize_capture(core::AppState& state, HWND target_window, int width, int height)
+    -> std::expected<void, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
 
@@ -75,7 +73,7 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
 
   // 创建WinRT设备
   auto winrt_device_result =
-      Utils::Graphics::Capture::create_winrt_device(rendering_resources.d3d_context.device.get());
+      utils::graphics::capture::create_winrt_device(rendering_resources.d3d_context.device.get());
   if (!winrt_device_result) {
     Logger().error("Failed to create WinRT device for capture");
     return std::unexpected("Failed to create WinRT device");
@@ -86,14 +84,14 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
     on_frame_arrived(state, frame);
   };
 
-  Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+  utils::graphics::capture::CaptureSessionOptions capture_options;
   if (state.preview->enable_hdr) {
     capture_options.pixel_format =
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
   }
 
   // 创建捕获会话
-  auto session_result = Utils::Graphics::Capture::create_capture_session(
+  auto session_result = utils::graphics::capture::create_capture_session(
       target_window, winrt_device_result.value(), width, height, frame_callback, 1,
       capture_options);
 
@@ -110,10 +108,10 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   return {};
 }
 
-auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto start_capture(core::AppState& state) -> std::expected<void, std::string> {
   auto& session = state.preview->capture_state.session;
 
-  auto start_result = Utils::Graphics::Capture::start_capture(session);
+  auto start_result = utils::graphics::capture::start_capture(session);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected("Failed to start capture");
@@ -123,19 +121,19 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
   return {};
 }
 
-auto stop_capture(Core::State::AppState& state) -> void {
+auto stop_capture(core::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
-  Utils::Graphics::Capture::stop_capture(session);
+  utils::graphics::capture::stop_capture(session);
   Logger().debug("Capture stopped");
 }
 
-auto cleanup_capture(Core::State::AppState& state) -> void {
+auto cleanup_capture(core::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
-  Utils::Graphics::Capture::cleanup_capture_session(session);
+  utils::graphics::capture::cleanup_capture_session(session);
 
   Logger().info("Capture resources cleaned up");
 }
 
-}  // namespace Features::Preview::Capture
+}  // namespace features::preview::capture

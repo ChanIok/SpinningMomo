@@ -1,14 +1,13 @@
-module;
+#include "features/gallery/scanner/common.hpp"
 
-module Features.Gallery.Scanner.Common;
+#include "vendor/std.hpp"
 
-import std;
-import Vendor.BuildConfig;
-import Vendor.XXHash;
-import Utils.Media.VideoAsset;
-import Utils.String;
+#include "core/build_config.hpp"
+#include "utils/hash/xxhash.hpp"
+#include "utils/media/video_asset.hpp"
+#include "utils/string/string.hpp"
 
-namespace Features::Gallery::Scanner::Common {
+namespace features::gallery::scanner::common {
 
 auto default_supported_extensions() -> const std::vector<std::string>& {
   // 与 web GalleryScanDialog 默认列表、RPC 扫描选项保持一致，避免前后端可扫范围不一致。
@@ -22,7 +21,7 @@ auto lower_extension(const std::filesystem::path& file_path) -> std::string {
   if (!file_path.has_extension()) {
     return {};
   }
-  return Utils::String::ToLowerAscii(file_path.extension().string());
+  return utils::string::ToLowerAscii(file_path.extension().string());
 }
 
 auto is_photo_extension(const std::string& extension) -> bool {
@@ -77,16 +76,15 @@ auto calculate_sampled_media_fingerprint(std::uint64_t file_size, std::ifstream&
     -> std::expected<std::string, std::string> {
   // 以合法起点范围均分五处，让首尾采样块严格覆盖文件边界
   auto last_offset = file_size - kMediaSampleSize;
-  const std::array<Vendor::XXHash::StreamRange, kMediaSampleCount> ranges{
-      Vendor::XXHash::StreamRange{.offset = 0, .size = kMediaSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset / 4, .size = kMediaSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset / 2, .size = kMediaSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset - last_offset / 4,
-                                  .size = kMediaSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset, .size = kMediaSampleSize},
+  const std::array<utils::hash::StreamRange, kMediaSampleCount> ranges{
+      utils::hash::StreamRange{.offset = 0, .size = kMediaSampleSize},
+      utils::hash::StreamRange{.offset = last_offset / 4, .size = kMediaSampleSize},
+      utils::hash::StreamRange{.offset = last_offset / 2, .size = kMediaSampleSize},
+      utils::hash::StreamRange{.offset = last_offset - last_offset / 4, .size = kMediaSampleSize},
+      utils::hash::StreamRange{.offset = last_offset, .size = kMediaSampleSize},
   };
 
-  return Vendor::XXHash::hash_stream_ranges_to_hex(file, metadata, ranges, stop_token);
+  return utils::hash::hash_stream_ranges_to_hex(file, metadata, ranges, stop_token);
 }
 
 // 为大视频计算“稳定媒体元数据 + 五个均匀采样块”的内容指纹
@@ -98,7 +96,7 @@ auto calculate_sampled_video_fingerprint(const std::filesystem::path& file_path,
   std::uint64_t width = 0;
   std::uint64_t height = 0;
   std::uint64_t duration_millis = 0;
-  auto video_result = Utils::Media::VideoAsset::analyze_video_file(file_path, std::nullopt);
+  auto video_result = utils::media::video_asset::analyze_video_file(file_path, std::nullopt);
   if (video_result) {
     width = video_result->width;
     height = video_result->height;
@@ -120,7 +118,7 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
   }
 
   // Debug 保留轻量路径哈希，避免开发时为大文件读取完整内容
-  if (Vendor::BuildConfig::is_debug_build()) {
+  if (core::build_config::is_debug_build()) {
     auto path_str = file_path.string();
     auto hash = std::hash<std::string>{}(path_str);
     return std::format("{:016x}", hash);
@@ -149,7 +147,7 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
     hash_result = calculate_sampled_video_fingerprint(file_path, unsigned_size, file, stop_token);
   } else {
     // 小媒体直接完整哈希，避免五个采样区间互相重叠
-    hash_result = Vendor::XXHash::hash_stream_to_hex(file, stop_token);
+    hash_result = utils::hash::hash_stream_to_hex(file, stop_token);
   }
 
   if (!hash_result) {
@@ -160,4 +158,4 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
   return hash_result;
 }
 
-}  // namespace Features::Gallery::Scanner::Common
+}  // namespace features::gallery::scanner::common

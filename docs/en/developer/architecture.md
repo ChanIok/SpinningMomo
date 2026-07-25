@@ -7,13 +7,15 @@
 >
 > Pull requests are very welcome for issues with confirmed scope, clear bug fixes, documentation improvements, and technical challenges that have already been discussed. Unsolicited feature PRs may not be merged if they do not align with the project direction.
 
-This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. For the full design philosophy, module breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
+This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. The backend uses self-contained `.hpp + .cpp` sources with a PCH used only for build acceleration. Project code includes external headers through exact facades under `src/vendor/`; Windows SDK facades map one-to-one to physical headers so domain aggregates do not couple unrelated call sites to the PCH. For the full design philosophy, component breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
 
 ## Prerequisites
 
+The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development. Release builds use MSVC.
+
 | Tool | Requirement | Notes |
 |------|-------------|-------|
-| **Visual Studio 2026** | "Desktop development with C++" workload | |
+| **Visual Studio 2026 / LLVM** | Includes C++ and Clang (`clang-cl`) toolchains | |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
 | **xmake** | Latest | C++ build system |
@@ -58,17 +60,45 @@ npm install
 npm ci --prefix web
 ```
 
-### 3. Initialize xmake deps and apply patches
+### 3. Initialize xmake dependencies and apply patches
 
 ```bash
 node scripts/patch-xmake-7554.js
+node scripts/patch-xmake-clang-cl-cxx23.js
+
+# Clang-cl + LLD (default)
+xmake f --toolchain="clang-cl[llvm]" -y
+
+# Or use MSVC
+# xmake f --toolchain=msvc -y
+
 xmake f -m release -y && xmake f -m debug -y
-npm run patch:vcpkg
+node scripts/patch-vcpkg.js
+```
+
+---
+
+## Visual Studio Development (Optional)
+
+To browse, edit, and debug the C++ code in Visual Studio, generate an
+Xmake-managed solution:
+
+```powershell
+xmake vs
+```
+
+Then open:
+
+```text
+vsxmake2026\SpinningMomo.sln
 ```
 
 ---
 
 ## Build
+
+> [!TIP]
+> If you encounter environment, dependency, or toolchain issues during local setup, you can refer to the [Build Release Workflow](https://github.com/ChanIok/SpinningMomo/blob/main/.github/workflows/build-release.yml) for an up-to-date, automated reference build procedure.
 
 ### Full Build (Recommended)
 
@@ -90,7 +120,7 @@ xmake build
 xmake release    # automatically restores debug config after release build
 
 # Web frontend
-cd web && npm run build
+npm run build --prefix web
 
 # Assemble dist/ (exe + web resources)
 npm run build:prepare

@@ -1,20 +1,19 @@
-module;
+#include "features/settings/background.hpp"
 
-module Features.Settings.Background;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.HttpServer.Static;
-import Core.HttpServer.Types;
-import Core.WebView.State;
-import Core.WebView.Static;
-import Core.WebView.Types;
-import Features.Settings.Types;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
+#include "core/http_server/static.hpp"
+#include "core/http_server/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/static.hpp"
+#include "core/webview/types.hpp"
+#include "features/settings/types.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
-namespace Features::Settings::Background {
+namespace features::settings::background {
 
 struct HslColor {
   double h = 0.0;
@@ -142,7 +141,7 @@ auto extract_path_from_url(std::string_view url) -> std::optional<std::string> {
 
 // 获取应用数据目录下的 backgrounds 文件夹路径
 auto get_backgrounds_directory() -> std::expected<std::filesystem::path, std::string> {
-  return Utils::Path::GetAppDataSubdirectory("backgrounds");
+  return utils::path::GetAppDataSubdirectory("backgrounds");
 }
 
 // 解析托管背景文件的绝对路径，进行安全校验
@@ -159,7 +158,7 @@ auto resolve_managed_background_file(const std::filesystem::path& file_name)
                            backgrounds_dir_result.error());
   }
 
-  auto resolved_path_result = Utils::Path::ResolvePath(backgrounds_dir_result.value() / file_name);
+  auto resolved_path_result = utils::path::ResolvePath(backgrounds_dir_result.value() / file_name);
   if (!resolved_path_result) {
     return std::unexpected("Failed to resolve managed background file path: " +
                            resolved_path_result.error());
@@ -214,7 +213,7 @@ auto generate_background_filename(const std::filesystem::path& source_path) -> s
 }
 
 // 将 RGB 颜色转换为十六进制字符串格式
-auto rgb_to_hex(const Utils::Image::RgbColor& color) -> std::string {
+auto rgb_to_hex(const utils::image::RgbColor& color) -> std::string {
   return std::format("#{:02X}{:02X}{:02X}", color.r, color.g, color.b);
 }
 
@@ -229,7 +228,7 @@ auto srgb_channel_to_linear(double channel) -> double {
 }
 
 // WCAG 2.x 相对亮度公式，系数来自 BT.709 标准（人眼对绿色最敏感）
-auto relative_luminance(const Utils::Image::RgbColor& color) -> double {
+auto relative_luminance(const utils::image::RgbColor& color) -> double {
   double r = srgb_channel_to_linear(static_cast<double>(color.r));
   double g = srgb_channel_to_linear(static_cast<double>(color.g));
   double b = srgb_channel_to_linear(static_cast<double>(color.b));
@@ -237,7 +236,7 @@ auto relative_luminance(const Utils::Image::RgbColor& color) -> double {
 }
 
 // 将 RGB 颜色转换为 HSL 颜色空间
-auto rgb_to_hsl(const Utils::Image::RgbColor& color) -> HslColor {
+auto rgb_to_hsl(const utils::image::RgbColor& color) -> HslColor {
   double r = static_cast<double>(color.r) / 255.0;
   double g = static_cast<double>(color.g) / 255.0;
   double b = static_cast<double>(color.b) / 255.0;
@@ -275,7 +274,7 @@ auto rgb_to_hsl(const Utils::Image::RgbColor& color) -> HslColor {
 }
 
 // 将 HSL 颜色转换回 RGB 颜色空间
-auto hsl_to_rgb(const HslColor& hsl) -> Utils::Image::RgbColor {
+auto hsl_to_rgb(const HslColor& hsl) -> utils::image::RgbColor {
   double saturation = std::clamp(hsl.s, 0.0, 100.0) / 100.0;
   double lightness = std::clamp(hsl.l, 0.0, 100.0) / 100.0;
   double chroma = (1.0 - std::abs(2.0 * lightness - 1.0)) * saturation;
@@ -313,7 +312,7 @@ auto hsl_to_rgb(const HslColor& hsl) -> Utils::Image::RgbColor {
     return static_cast<std::uint8_t>(std::clamp(rounded, 0l, 255l));
   };
 
-  return Utils::Image::RgbColor{
+  return utils::image::RgbColor{
       .r = to_channel(r + m),
       .g = to_channel(g + m),
       .b = to_channel(b + m),
@@ -329,8 +328,8 @@ auto saturation_cap_for_lightness(double l) -> double {
 
 // 将输入颜色的亮度钳制到目标区间，饱和度由目标亮度决定上限（只降不升）。
 // 低饱和输入（S<12）视为灰色系，保持低饱和不推高色调。
-auto compensate_for_theme(const Utils::Image::RgbColor& color, std::string_view theme_mode,
-                          bool primary) -> Utils::Image::RgbColor {
+auto compensate_for_theme(const utils::image::RgbColor& color, std::string_view theme_mode,
+                          bool primary) -> utils::image::RgbColor {
   auto hsl = rgb_to_hsl(color);
 
   double l_min, l_max;
@@ -375,14 +374,14 @@ auto resolve_background_file(std::string_view raw_file_name)
 
 // 加载壁纸位图并缩放到分析尺寸，转换为 BGRA 格式
 auto load_wallpaper_bitmap(const std::filesystem::path& path)
-    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
-  auto wic_result = Utils::Image::get_thread_wic_factory();
+    -> std::expected<utils::image::BGRABitmapData, std::string> {
+  auto wic_result = utils::image::get_thread_wic_factory();
   if (!wic_result) {
     return std::unexpected("Failed to initialize WIC factory: " + wic_result.error());
   }
 
   auto bitmap_data_result =
-      Utils::Image::load_scaled_bgra_bitmap_data(wic_result->get(), path, kAnalysisSampleShortEdge);
+      utils::image::load_scaled_bgra_bitmap_data(wic_result->get(), path, kAnalysisSampleShortEdge);
   if (!bitmap_data_result) {
     return std::unexpected(bitmap_data_result.error());
   }
@@ -391,12 +390,12 @@ auto load_wallpaper_bitmap(const std::filesystem::path& path)
 }
 
 // 在 Lab 感知空间聚类后取权重最高的颜色，作为背景区域主色。
-auto dominant_color_from_rect(const Utils::Image::BGRABitmapData& bitmap, int x0, int y0, int x1,
+auto dominant_color_from_rect(const utils::image::BGRABitmapData& bitmap, int x0, int y0, int x1,
                               int y1, std::uint32_t max_samples)
-    -> std::expected<Utils::Image::RgbColor, std::string> {
-  auto palette_result = Utils::Image::extract_lab_palette_from_bgra_rect(
+    -> std::expected<utils::image::RgbColor, std::string> {
+  auto palette_result = utils::image::extract_lab_palette_from_bgra_rect(
       bitmap, x0, y0, x1, y1,
-      Utils::Image::PaletteExtractOptions{
+      utils::image::PaletteExtractOptions{
           .max_samples = max_samples,
           .cluster_count = static_cast<std::uint32_t>(kRegionClusterCount),
       });
@@ -413,8 +412,8 @@ auto dominant_color_from_rect(const Utils::Image::BGRABitmapData& bitmap, int x0
 }
 
 // 在图像指定相对坐标位置采样区域主色
-auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_ratio, float y_ratio)
-    -> std::expected<Utils::Image::RgbColor, std::string> {
+auto sample_region_color(const utils::image::BGRABitmapData& bitmap, float x_ratio, float y_ratio)
+    -> std::expected<utils::image::RgbColor, std::string> {
   int width = static_cast<int>(bitmap.width);
   int height = static_cast<int>(bitmap.height);
   if (width <= 0 || height <= 0) {
@@ -435,15 +434,15 @@ auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_rat
 }
 
 // 估算全图主色
-auto estimate_primary_color(const Utils::Image::BGRABitmapData& bitmap)
-    -> std::expected<Utils::Image::RgbColor, std::string> {
+auto estimate_primary_color(const utils::image::BGRABitmapData& bitmap)
+    -> std::expected<utils::image::RgbColor, std::string> {
   return dominant_color_from_rect(bitmap, 0, 0, static_cast<int>(bitmap.width),
                                   static_cast<int>(bitmap.height), kMaxPrimarySamples);
 }
 
 // 计算壁纸的平均相对亮度，以 alpha 通道作为加权系数，忽略完全透明像素。
 // 使用固定步长均匀采样，将计算量控制在 kMaxBrightnessSamples 以内。
-auto compute_wallpaper_brightness(const Utils::Image::BGRABitmapData& bitmap) -> double {
+auto compute_wallpaper_brightness(const utils::image::BGRABitmapData& bitmap) -> double {
   std::uint64_t total_pixels = static_cast<std::uint64_t>(bitmap.width) * bitmap.height;
   if (total_pixels == 0) {
     return 0.0;
@@ -461,7 +460,7 @@ auto compute_wallpaper_brightness(const Utils::Image::BGRABitmapData& bitmap) ->
     double alpha = static_cast<double>(bitmap.pixels[offset + 3]) / 255.0;
     if (alpha <= 0.0) continue;
 
-    Utils::Image::RgbColor color{
+    utils::image::RgbColor color{
         .r = bitmap.pixels[offset + 2],
         .g = bitmap.pixels[offset + 1],
         .b = bitmap.pixels[offset + 0],
@@ -512,8 +511,8 @@ auto overlay_sample_points(int mode) -> std::vector<std::pair<float, float>> {
 
 // 壁纸分析主入口：解析路径 → 加载并缩放位图 → 计算亮度/主题 → 提取各锚点叠加色和全图主色，
 // 所有颜色均经过主题补偿后以十六进制字符串返回。
-auto analyze_background(const Types::BackgroundAnalysisParams& params)
-    -> std::expected<Types::BackgroundAnalysisResult, std::string> {
+auto analyze_background(const BackgroundAnalysisParams& params)
+    -> std::expected<BackgroundAnalysisResult, std::string> {
   auto path_result = resolve_background_file(params.image_file_name);
   if (!path_result) {
     return std::unexpected(path_result.error());
@@ -549,7 +548,7 @@ auto analyze_background(const Types::BackgroundAnalysisParams& params)
 
   auto compensated_primary = compensate_for_theme(primary_color.value(), theme_mode, true);
 
-  return Types::BackgroundAnalysisResult{
+  return BackgroundAnalysisResult{
       .theme_mode = theme_mode,
       .primary_color = rgb_to_hex(compensated_primary),
       .overlay_colors = std::move(overlay_colors),
@@ -558,12 +557,12 @@ auto analyze_background(const Types::BackgroundAnalysisParams& params)
 }
 
 // 导入背景图片到应用托管目录
-auto import_background_image(const Types::BackgroundImportParams& params)
-    -> std::expected<Types::BackgroundImportResult, std::string> {
+auto import_background_image(const BackgroundImportParams& params)
+    -> std::expected<BackgroundImportResult, std::string> {
   try {
     // 导入阶段把用户原始文件复制到 app data 托管目录，
     // 设置里只保存逻辑路径，不直接保存物理文件系统路径。
-    auto source_path_result = Utils::Path::ResolvePath(std::filesystem::path(params.source_path));
+    auto source_path_result = utils::path::ResolvePath(std::filesystem::path(params.source_path));
     if (!source_path_result) {
       return std::unexpected("Failed to resolve source background path: " +
                              source_path_result.error());
@@ -585,7 +584,7 @@ auto import_background_image(const Types::BackgroundImportParams& params)
     std::filesystem::copy_file(source_path, destination_path,
                                std::filesystem::copy_options::overwrite_existing);
 
-    return Types::BackgroundImportResult{
+    return BackgroundImportResult{
         .image_file_name = destination_path.filename().generic_string(),
     };
   } catch (const std::exception& e) {
@@ -594,8 +593,8 @@ auto import_background_image(const Types::BackgroundImportParams& params)
 }
 
 // 删除托管的背景图片
-auto remove_background_image(const Types::BackgroundRemoveParams& params)
-    -> std::expected<Types::BackgroundRemoveResult, std::string> {
+auto remove_background_image(const BackgroundRemoveParams& params)
+    -> std::expected<BackgroundRemoveResult, std::string> {
   try {
     // 删除只接受托管路径，避免误删任意本地文件。
     auto resolved_path_result = resolve_managed_background_file_name(params.image_file_name);
@@ -608,20 +607,20 @@ auto remove_background_image(const Types::BackgroundRemoveParams& params)
       removed = std::filesystem::remove(resolved_path_result.value());
     }
 
-    return Types::BackgroundRemoveResult{.removed = removed};
+    return BackgroundRemoveResult{.removed = removed};
   } catch (const std::exception& e) {
     return std::unexpected("Failed to remove background image: " + std::string(e.what()));
   }
 }
 
 // 注册背景图片的静态资源解析器（HTTP 和 WebView 两条链路）
-auto register_static_resolvers(Core::State::AppState& app_state) -> void {
+auto register_static_resolvers(core::AppState& app_state) -> void {
   // 开发环境下浏览器通过 HTTP 访问 /static/backgrounds/*，
   // 生产环境下 WebView 通过 static host 访问同一组逻辑路径。
   // 两条链路最终都落到 app data 的背景目录，不再依赖 resources/web。
-  Core::HttpServer::Static::register_path_resolver(
+  core::http_server::static_content::register_path_resolver(
       app_state, std::string(kBackgroundWebPrefix),
-      [](std::string_view url) -> Core::HttpServer::Types::PathResolution {
+      [](std::string_view url) -> core::http_server::PathResolution {
         auto relative_path = extract_relative_path_generic(url, kBackgroundWebPrefix);
         if (!relative_path) {
           return std::unexpected("Invalid managed background URL");
@@ -633,7 +632,7 @@ auto register_static_resolvers(Core::State::AppState& app_state) -> void {
           return std::unexpected(background_path_result.error());
         }
 
-        return Core::HttpServer::Types::PathResolutionData{
+        return core::http_server::PathResolutionData{
             .file_path = background_path_result.value(),
             .cache_duration = std::chrono::hours(1),
         };
@@ -645,9 +644,9 @@ auto register_static_resolvers(Core::State::AppState& app_state) -> void {
 
   auto web_prefix = L"https://" + app_state.webview->config.static_host_name +
                     std::wstring(kBackgroundWebPrefixW);
-  Core::WebView::Static::register_web_resource_resolver(
+  core::webview::static_content::register_web_resource_resolver(
       app_state, web_prefix,
-      [web_prefix](std::wstring_view url) -> Core::WebView::Types::WebResourceResolution {
+      [web_prefix](std::wstring_view url) -> core::webview::WebResourceResolution {
         auto relative_path = extract_relative_path_generic(url, std::wstring_view(web_prefix));
         if (!relative_path) {
           return {.success = false,
@@ -677,4 +676,4 @@ auto register_static_resolvers(Core::State::AppState& app_state) -> void {
   Logger().info("Registered background static resolvers for {}", std::string(kBackgroundWebPrefix));
 }
 
-}  // namespace Features::Settings::Background
+}  // namespace features::settings::background

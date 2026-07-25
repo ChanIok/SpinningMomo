@@ -1,20 +1,20 @@
-module;
+#include "features/gallery/asset/repository.hpp"
 
-module Features.Gallery.Asset.Repository;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.Types;
-import Features.Gallery.State;
-import Utils.Logger;
-import Utils.Time;
-import Utils.LRUCache;
-import <rfl/json.hpp>;
+#include "vendor/rfl.hpp"
 
-namespace Features::Gallery::Asset::Repository::Detail {
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/lru_cache.hpp"
+#include "utils/time.hpp"
+
+namespace features::gallery::asset::repository::detail {
 
 auto escape_like_pattern(const std::string& input) -> std::string {
   // SQLite 的 LIKE 会把 % 和 _ 当成通配符。
@@ -31,45 +31,43 @@ auto escape_like_pattern(const std::string& input) -> std::string {
   return escaped;
 }
 
-// 提取 Scanner 可写字段，确保批量与单条更新共享同一字段边界。
-auto make_scanner_update_params(const Types::Asset& item)
-    -> std::vector<Core::Database::Types::DbParam> {
-  std::vector<Core::Database::Types::DbParam> params;
+// 提取 scanner 可写字段，确保批量与单条更新共享同一字段边界。
+auto make_scanner_update_params(const Asset& item) -> std::vector<core::database::DbParam> {
+  std::vector<core::database::DbParam> params;
   params.reserve(13);
 
   params.push_back(item.name);
   params.push_back(item.path);
   params.push_back(item.type);
   params.push_back(item.width.has_value()
-                       ? Core::Database::Types::DbParam{static_cast<std::int64_t>(*item.width)}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{static_cast<std::int64_t>(*item.width)}
+                       : core::database::DbParam{std::monostate{}});
   params.push_back(item.height.has_value()
-                       ? Core::Database::Types::DbParam{static_cast<std::int64_t>(*item.height)}
-                       : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{*item.size}
-                                         : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.extension.has_value() ? Core::Database::Types::DbParam{*item.extension}
-                                              : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{static_cast<std::int64_t>(*item.height)}
+                       : core::database::DbParam{std::monostate{}});
+  params.push_back(item.size.has_value() ? core::database::DbParam{*item.size}
+                                         : core::database::DbParam{std::monostate{}});
+  params.push_back(item.extension.has_value() ? core::database::DbParam{*item.extension}
+                                              : core::database::DbParam{std::monostate{}});
   params.push_back(item.mime_type);
-  params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{*item.hash}
-                                         : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.folder_id.has_value() ? Core::Database::Types::DbParam{*item.folder_id}
-                                              : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.file_created_at.has_value()
-                       ? Core::Database::Types::DbParam{*item.file_created_at}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.hash.has_value() ? core::database::DbParam{*item.hash}
+                                         : core::database::DbParam{std::monostate{}});
+  params.push_back(item.folder_id.has_value() ? core::database::DbParam{*item.folder_id}
+                                              : core::database::DbParam{std::monostate{}});
+  params.push_back(item.file_created_at.has_value() ? core::database::DbParam{*item.file_created_at}
+                                                    : core::database::DbParam{std::monostate{}});
   params.push_back(item.file_modified_at.has_value()
-                       ? Core::Database::Types::DbParam{*item.file_modified_at}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{*item.file_modified_at}
+                       : core::database::DbParam{std::monostate{}});
   params.push_back(item.id);
   return params;
 }
 
-}  // namespace Features::Gallery::Asset::Repository::Detail
+}  // namespace features::gallery::asset::repository::detail
 
-namespace Features::Gallery::Asset::Repository {
+namespace features::gallery::asset::repository {
 
-auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
+auto create_asset(core::AppState& app_state, const Asset& item)
     -> std::expected<int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO assets (
@@ -80,45 +78,42 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
             RETURNING id
         )";
 
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   params.push_back(item.name);
   params.push_back(item.path);
   params.push_back(item.type);
 
-  params.push_back(item.description.has_value()
-                       ? Core::Database::Types::DbParam{item.description.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.description.has_value() ? core::database::DbParam{item.description.value()}
+                                                : core::database::DbParam{std::monostate{}});
 
   params.push_back(item.width.has_value()
-                       ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{static_cast<int64_t>(item.width.value())}
+                       : core::database::DbParam{std::monostate{}});
   params.push_back(item.height.has_value()
-                       ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
-                       : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
-                                         : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{static_cast<int64_t>(item.height.value())}
+                       : core::database::DbParam{std::monostate{}});
+  params.push_back(item.size.has_value() ? core::database::DbParam{item.size.value()}
+                                         : core::database::DbParam{std::monostate{}});
 
-  params.push_back(item.extension.has_value()
-                       ? Core::Database::Types::DbParam{item.extension.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.extension.has_value() ? core::database::DbParam{item.extension.value()}
+                                              : core::database::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
 
-  params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
-                                         : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.hash.has_value() ? core::database::DbParam{item.hash.value()}
+                                         : core::database::DbParam{std::monostate{}});
 
-  params.push_back(item.folder_id.has_value()
-                       ? Core::Database::Types::DbParam{item.folder_id.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.folder_id.has_value() ? core::database::DbParam{item.folder_id.value()}
+                                              : core::database::DbParam{std::monostate{}});
 
   params.push_back(item.file_created_at.has_value()
-                       ? Core::Database::Types::DbParam{item.file_created_at.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{item.file_created_at.value()}
+                       : core::database::DbParam{std::monostate{}});
   params.push_back(item.file_modified_at.has_value()
-                       ? Core::Database::Types::DbParam{item.file_modified_at.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{item.file_modified_at.value()}
+                       : core::database::DbParam{std::monostate{}});
 
-  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
+  auto result = core::database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to insert asset item: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -127,8 +122,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   return result->value();
 }
 
-auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_state,
-                                                     const Types::Asset& item)
+auto create_asset_with_inherited_data_in_transaction(core::AppState& app_state, const Asset& item)
     -> std::expected<std::int64_t, std::string> {
   auto create_result = create_asset(app_state, item);
   if (!create_result) {
@@ -140,7 +134,7 @@ auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_
     return new_asset_id;
   }
 
-  auto source_result = Core::Database::query_scalar<std::int64_t>(
+  auto source_result = core::database::query_scalar<std::int64_t>(
       app_state, "SELECT id FROM assets WHERE hash = ? AND id <> ? ORDER BY id ASC LIMIT 1",
       {*item.hash, new_asset_id});
   if (!source_result) {
@@ -152,7 +146,7 @@ auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_
 
   const auto source_asset_id = source_result->value();
   auto fields_result =
-      Core::Database::execute(app_state,
+      core::database::execute(app_state,
                               R"(
         UPDATE assets
         SET description = (SELECT description FROM assets WHERE id = ?),
@@ -165,7 +159,7 @@ auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_
     return std::unexpected("Failed to inherit asset user fields: " + fields_result.error());
   }
 
-  auto tags_result = Core::Database::execute(app_state,
+  auto tags_result = core::database::execute(app_state,
                                              R"(
         INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
         SELECT ?, tag_id FROM asset_tags WHERE asset_id = ?
@@ -186,8 +180,8 @@ auto create_asset_with_inherited_data_in_transaction(Core::State::AppState& app_
   return new_asset_id;
 }
 
-auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
-    -> std::expected<std::optional<Types::Asset>, std::string> {
+auto get_asset_by_id(core::AppState& app_state, int64_t id)
+    -> std::expected<std::optional<Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
                    NULL AS dominant_color_hex,
@@ -200,9 +194,9 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
             WHERE id = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::query_single<Types::Asset>(app_state, sql, params);
+  auto result = core::database::query_single<Asset>(app_state, sql, params);
 
   if (!result) {
     return std::unexpected("Failed to get asset by id: " + result.error());
@@ -211,8 +205,8 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
   return result.value();
 }
 
-auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path)
-    -> std::expected<std::optional<Types::Asset>, std::string> {
+auto get_asset_by_path(core::AppState& app_state, const std::string& path)
+    -> std::expected<std::optional<Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
                    NULL AS dominant_color_hex,
@@ -225,9 +219,9 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
             WHERE path = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {path};
+  std::vector<core::database::DbParam> params = {path};
 
-  auto result = Core::Database::query_single<Types::Asset>(app_state, sql, params);
+  auto result = core::database::query_single<Asset>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query asset item by path: " + result.error());
   }
@@ -235,7 +229,7 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
   return result.value();
 }
 
-auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::string& path_prefix)
+auto has_assets_under_path_prefix(core::AppState& app_state, const std::string& path_prefix)
     -> std::expected<bool, std::string> {
   // 这里不是查“这个目录本身是否有一条 folder 记录”，
   // 而是查 assets 表里是否已经存在任何文件路径落在该目录下面。
@@ -245,7 +239,7 @@ auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::s
     normalized_prefix.pop_back();
   }
 
-  auto escaped_prefix = Detail::escape_like_pattern(normalized_prefix);
+  auto escaped_prefix = detail::escape_like_pattern(normalized_prefix);
   std::string sql = R"(
             SELECT EXISTS(
                 SELECT 1
@@ -256,9 +250,9 @@ auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::s
 
   // 这里拼成 "prefix/%"，只匹配“这个目录的子内容”，
   // 不会把名称相似但不在该目录下的路径误算进去。
-  std::vector<Core::Database::Types::DbParam> params = {escaped_prefix + "/%"};
+  std::vector<core::database::DbParam> params = {escaped_prefix + "/%"};
 
-  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
+  auto result = core::database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query assets by path prefix: " + result.error());
   }
@@ -266,8 +260,8 @@ auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::s
   return result->value_or(0) != 0;
 }
 
-// 只更新 Scanner 从文件系统派生的索引字段，不触碰用户编辑字段。
-auto update_asset_scanner_fields(Core::State::AppState& app_state, const Types::Asset& item)
+// 只更新 scanner 从文件系统派生的索引字段，不触碰用户编辑字段。
+auto update_asset_scanner_fields(core::AppState& app_state, const Asset& item)
     -> std::expected<void, std::string> {
   std::string sql = R"(
             UPDATE assets SET
@@ -277,7 +271,7 @@ auto update_asset_scanner_fields(Core::State::AppState& app_state, const Types::
             WHERE id = ?
         )";
 
-  auto result = Core::Database::execute(app_state, sql, Detail::make_scanner_update_params(item));
+  auto result = core::database::execute(app_state, sql, detail::make_scanner_update_params(item));
   if (!result) {
     return std::unexpected("Failed to update asset scanner fields: " + result.error());
   }
@@ -286,7 +280,7 @@ auto update_asset_scanner_fields(Core::State::AppState& app_state, const Types::
 }
 
 // 手动移动文件后只更新位置字段，避免把旧对象中的其他字段顺手写回。
-auto update_asset_location(Core::State::AppState& app_state, std::int64_t asset_id,
+auto update_asset_location(core::AppState& app_state, std::int64_t asset_id,
                            const std::string& name, const std::string& path,
                            std::optional<std::int64_t> folder_id)
     -> std::expected<void, std::string> {
@@ -296,14 +290,14 @@ auto update_asset_location(Core::State::AppState& app_state, std::int64_t asset_
     WHERE id = ?
   )";
 
-  std::vector<Core::Database::Types::DbParam> params = {
+  std::vector<core::database::DbParam> params = {
       name,
       path,
-      folder_id.has_value() ? Core::Database::Types::DbParam{*folder_id}
-                            : Core::Database::Types::DbParam{std::monostate{}},
+      folder_id.has_value() ? core::database::DbParam{*folder_id}
+                            : core::database::DbParam{std::monostate{}},
       asset_id,
   };
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to update asset location: " + result.error());
   }
@@ -311,16 +305,15 @@ auto update_asset_location(Core::State::AppState& app_state, std::int64_t asset_
 }
 
 // 同步内容未变资产的文件状态，避免后续扫描重复计算指纹
-auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asset_id,
-                             std::int64_t size, std::int64_t file_modified_at)
-    -> std::expected<void, std::string> {
+auto update_asset_file_state(core::AppState& app_state, std::int64_t asset_id, std::int64_t size,
+                             std::int64_t file_modified_at) -> std::expected<void, std::string> {
   std::string sql = R"(
     UPDATE assets
     SET size = ?, file_modified_at = ?, missing_at = NULL
     WHERE id = ?
   )";
 
-  auto result = Core::Database::execute(app_state, sql, {size, file_modified_at, asset_id});
+  auto result = core::database::execute(app_state, sql, {size, file_modified_at, asset_id});
   if (!result) {
     return std::unexpected("Failed to update asset file state: " + result.error());
   }
@@ -328,9 +321,9 @@ auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asse
   return {};
 }
 
-auto mark_asset_missing_by_path(Core::State::AppState& app_state, const std::string& path)
+auto mark_asset_missing_by_path(core::AppState& app_state, const std::string& path)
     -> std::expected<bool, std::string> {
-  auto result = Core::Database::query_scalar<std::int64_t>(app_state,
+  auto result = core::database::query_scalar<std::int64_t>(app_state,
                                                            R"(
         UPDATE assets
         SET missing_at = unixepoch('subsec') * 1000
@@ -344,16 +337,16 @@ auto mark_asset_missing_by_path(Core::State::AppState& app_state, const std::str
   return result->has_value();
 }
 
-auto restore_assets_by_ids(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
+auto restore_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string> {
   if (ids.empty()) {
     return {};
   }
 
-  return Core::Database::execute_transaction(
-      app_state, [&ids](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+  return core::database::execute_transaction(
+      app_state, [&ids](core::AppState& txn_app_state) -> std::expected<void, std::string> {
         for (const auto id : ids) {
-          auto result = Core::Database::execute(
+          auto result = core::database::execute(
               txn_app_state, "UPDATE assets SET missing_at = NULL WHERE id = ?", {id});
           if (!result) {
             return std::unexpected("Failed to restore asset (id=" + std::to_string(id) +
@@ -364,9 +357,9 @@ auto restore_assets_by_ids(Core::State::AppState& app_state, const std::vector<s
       });
 }
 
-auto restore_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
+auto restore_asset_by_id(core::AppState& app_state, std::int64_t id)
     -> std::expected<bool, std::string> {
-  auto result = Core::Database::query_scalar<std::int64_t>(
+  auto result = core::database::query_scalar<std::int64_t>(
       app_state,
       "UPDATE assets SET missing_at = NULL WHERE id = ? AND missing_at IS NOT NULL RETURNING id",
       {id});
@@ -376,9 +369,9 @@ auto restore_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
   return result->has_value();
 }
 
-auto purge_expired_missing_assets(Core::State::AppState& app_state, std::int64_t cutoff_millis)
+auto purge_expired_missing_assets(core::AppState& app_state, std::int64_t cutoff_millis)
     -> std::expected<std::int64_t, std::string> {
-  auto result = Core::Database::query<Core::Database::ReturningIdRow>(
+  auto result = core::database::query<core::database::ReturningIdRow>(
       app_state, "DELETE FROM assets WHERE missing_at IS NOT NULL AND missing_at < ? RETURNING id",
       {cutoff_millis});
   if (!result) {
@@ -387,12 +380,11 @@ auto purge_expired_missing_assets(Core::State::AppState& app_state, std::int64_t
   return static_cast<std::int64_t>(result->size());
 }
 
-auto delete_asset(Core::State::AppState& app_state, int64_t id)
-    -> std::expected<void, std::string> {
+auto delete_asset(core::AppState& app_state, int64_t id) -> std::expected<void, std::string> {
   std::string sql = "DELETE FROM assets WHERE id = ?";
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to delete asset item: " + result.error());
   }
@@ -400,20 +392,18 @@ auto delete_asset(Core::State::AppState& app_state, int64_t id)
   return {};
 }
 
-auto batch_delete_assets_by_ids(Core::State::AppState& app_state,
-                                const std::vector<std::int64_t>& ids)
+auto batch_delete_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string> {
   if (ids.empty()) {
     return {};
   }
 
   std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
-  return Core::Database::execute_transaction(
-      app_state,
-      [&unique_ids](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+  return core::database::execute_transaction(
+      app_state, [&unique_ids](core::AppState& txn_app_state) -> std::expected<void, std::string> {
         constexpr std::string_view sql = "DELETE FROM assets WHERE id = ?";
         for (auto id : unique_ids) {
-          auto result = Core::Database::execute(txn_app_state, std::string(sql), {id});
+          auto result = core::database::execute(txn_app_state, std::string(sql), {id});
           if (!result) {
             return std::unexpected("Failed to delete asset item (id=" + std::to_string(id) +
                                    "): " + result.error());
@@ -424,4 +414,4 @@ auto batch_delete_assets_by_ids(Core::State::AppState& app_state,
       });
 }
 
-}  // namespace Features::Gallery::Asset::Repository
+}  // namespace features::gallery::asset::repository

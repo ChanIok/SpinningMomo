@@ -1,20 +1,19 @@
-module;
+#include "features/gallery/color/repository.hpp"
 
-module Features.Gallery.Color.Repository;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.State;
-import Core.Database.Types;
-import Features.Gallery.Color.Types;
-import Features.Gallery.Types;
+#include "core/database/database.hpp"
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/color/types.hpp"
+#include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Color::Repository {
+namespace features::gallery::color::repository {
 
 // 在外层资产事务中替换颜色，任一步失败都交由调用方回滚整个资产聚合。
-auto replace_asset_colors_in_transaction(Core::State::AppState& app_state, std::int64_t asset_id,
-                                         const std::vector<Types::ExtractedColor>& colors)
+auto replace_asset_colors_in_transaction(core::AppState& app_state, std::int64_t asset_id,
+                                         const std::vector<ExtractedColor>& colors)
     -> std::expected<void, std::string> {
   if (asset_id <= 0) {
     return std::unexpected("Invalid asset_id in color replacement");
@@ -27,15 +26,15 @@ auto replace_asset_colors_in_transaction(Core::State::AppState& app_state, std::
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   )";
 
-  auto delete_result = Core::Database::execute(
-      app_state, kDeleteSql, std::vector<Core::Database::Types::DbParam>{asset_id});
+  auto delete_result = core::database::execute(app_state, kDeleteSql,
+                                               std::vector<core::database::DbParam>{asset_id});
   if (!delete_result) {
     return std::unexpected("Failed to delete existing asset colors for asset_id " +
                            std::to_string(asset_id) + ": " + delete_result.error());
   }
 
   for (const auto& color : colors) {
-    std::vector<Core::Database::Types::DbParam> params = {
+    std::vector<core::database::DbParam> params = {
         asset_id,
         static_cast<int64_t>(color.r),
         static_cast<int64_t>(color.g),
@@ -49,7 +48,7 @@ auto replace_asset_colors_in_transaction(Core::State::AppState& app_state, std::
         static_cast<int64_t>(color.b_bin),
     };
 
-    auto insert_result = Core::Database::execute(app_state, kInsertSql, params);
+    auto insert_result = core::database::execute(app_state, kInsertSql, params);
     if (!insert_result) {
       return std::unexpected("Failed to insert asset color for asset_id " +
                              std::to_string(asset_id) + ": " + insert_result.error());
@@ -59,8 +58,8 @@ auto replace_asset_colors_in_transaction(Core::State::AppState& app_state, std::
   return {};
 }
 
-auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_id)
-    -> std::expected<std::vector<Features::Gallery::Types::AssetMainColor>, std::string> {
+auto get_asset_main_colors(core::AppState& app_state, std::int64_t asset_id)
+    -> std::expected<std::vector<features::gallery::AssetMainColor>, std::string> {
   if (asset_id <= 0) {
     return std::unexpected("Invalid asset_id");
   }
@@ -72,8 +71,8 @@ auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_
     ORDER BY weight DESC, id ASC
   )";
 
-  auto result = Core::Database::query<Features::Gallery::Types::AssetMainColor>(
-      app_state, kQuerySql, std::vector<Core::Database::Types::DbParam>{asset_id});
+  auto result = core::database::query<features::gallery::AssetMainColor>(
+      app_state, kQuerySql, std::vector<core::database::DbParam>{asset_id});
   if (!result) {
     return std::unexpected("Failed to query asset main colors: " + result.error());
   }
@@ -81,4 +80,4 @@ auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_
   return result.value();
 }
 
-}  // namespace Features::Gallery::Color::Repository
+}  // namespace features::gallery::color::repository

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-// 本地化模块生成脚本
-// 将 locales 目录下的 JSON 文件转换为 C++ 模块文件
+// 本地化头文件生成脚本
+// 将 locales 目录下的 JSON 文件转换为 C++ 头文件
 
 const fs = require("fs");
 const path = require("path");
@@ -16,12 +16,10 @@ const embeddedDir = path.join(projectRoot, "src", "core", "i18n", "embedded");
 // 语言映射配置
 const languageMappings = {
   "en-US": {
-    moduleName: "Core.I18n.Embedded.EnUS",
     variableName: "en_us_json",
     comment: "English",
   },
   "zh-CN": {
-    moduleName: "Core.I18n.Embedded.ZhCN",
     variableName: "zh_cn_json",
     comment: "Chinese",
   },
@@ -32,19 +30,10 @@ function toFileNameFormat(langCode) {
   return langCode.toLowerCase().replace(/-/g, "_");
 }
 
-// 将语言代码转换为模块名格式 (如 en-US -> EnUS)
-function toModuleNameFormat(langCode) {
-  return langCode
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
-
-// 生成 C++ 模块文件内容
-function generateCppModule(
+// 生成 C++ 头文件内容
+function generateCppHeader(
   sourceFile,
   jsonContent,
-  moduleName,
   variableName,
   languageComment
 ) {
@@ -53,24 +42,23 @@ function generateCppModule(
   // 转义 JSON 内容中的特殊字符
   const escapedJson = jsonContent.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-  return `// Auto-generated embedded ${languageComment} locale module
+  return `#pragma once
+
+#include "vendor/std.hpp"
+
+// Auto-generated embedded ${languageComment} locale header
 // DO NOT EDIT - This file contains embedded locale data
 //
 // Source: ${sourceFile}
-// Module: ${moduleName}
 // Variable: ${variableName}
 
-module;
+namespace embedded_locales {
 
-export module ${moduleName};
+// Embedded ${languageComment} JSON content as string_view
+// Size: ${fileSize} bytes
+constexpr std::string_view ${variableName} = R"EmbeddedJson(${jsonContent})EmbeddedJson";
 
-import std;
-
-namespace EmbeddedLocales {
-    // Embedded ${languageComment} JSON content as string_view
-    // Size: ${fileSize} bytes
-    export constexpr std::string_view ${variableName} = R"EmbeddedJson(${jsonContent})EmbeddedJson";
-}
+}  // namespace embedded_locales
 `;
 }
 
@@ -83,7 +71,7 @@ function processLanguageFile(fileName) {
   const inputPath = path.join(localesDir, fileName);
   const outputPath = path.join(
     embeddedDir,
-    `${toFileNameFormat(langCode)}.ixx`
+    `${toFileNameFormat(langCode)}.hpp`
   );
 
   // 读取 JSON 文件内容
@@ -96,16 +84,14 @@ function processLanguageFile(fileName) {
 
   // 获取映射配置或使用默认配置
   const mapping = languageMappings[langCode] || {
-    moduleName: `Core.I18n.Embedded.${toModuleNameFormat(langCode)}`,
     variableName: `${toFileNameFormat(langCode)}_json`,
     comment: langCode,
   };
 
-  // 生成 C++ 模块内容
-  const cppContent = generateCppModule(
+  // 生成 C++ 头文件内容
+  const cppContent = generateCppHeader(
     relativePath,
     jsonContent,
-    mapping.moduleName,
     mapping.variableName,
     mapping.comment
   );
@@ -122,7 +108,7 @@ function processLanguageFile(fileName) {
 
 // 主函数
 function main() {
-  console.log("Generating embedded locale modules...");
+  console.log("Generating embedded locale headers...");
 
   // 确保输出目录存在
   if (!fs.existsSync(embeddedDir)) {
@@ -138,7 +124,7 @@ function main() {
   // 处理每个 JSON 文件
   jsonFiles.forEach(processLanguageFile);
 
-  console.log("Successfully generated all embedded locale modules");
+  console.log("Successfully generated all embedded locale headers");
 }
 
 // 执行主函数

@@ -1,44 +1,44 @@
-module;
+#include "features/gallery/gallery.hpp"
 
-module Features.Gallery;
+#include "vendor/std.hpp"
 
-import std;
-import Core.Async;
-import Core.RPC.NotificationHub;
-import Core.State;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Folder.Service;
-import Features.Gallery.RootAvailability;
-import Features.Gallery.StaticResolver;
-import Features.Gallery.Watcher;
-import Utils.Logger;
-import Utils.Path;
-import <asio.hpp>;
-import <mfapi.h>;
+#include "vendor/asio.hpp"
+#include "vendor/windows/mfapi.hpp"
 
-namespace Features::Gallery {
+#include "core/async/async.hpp"
+#include "core/rpc/notification_hub.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/folder/service.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/scanner.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/static_resolver.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+
+namespace features::gallery {
 
 // 为输出目录补齐 Gallery 默认支持的媒体扩展名。
-auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> Types::ScanOptions {
-  Types::ScanOptions options;
+auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> ScanOptions {
+  ScanOptions options;
   options.directory = directory.string();
-  options.supported_extensions = Scanner::Common::default_supported_extensions();
+  options.supported_extensions = scanner::common::default_supported_extensions();
   return options;
 }
 
 // 异步扫描当前输出目录，并把它接入 Gallery 的持续监听。
-auto ensure_output_directory_media_source(Core::State::AppState& app_state,
+auto ensure_output_directory_media_source(core::AppState& app_state,
                                           const std::string& output_dir_path) -> void {
   if (!app_state.async) {
     Logger().warn("Skip output-directory gallery sync: async state is not ready");
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip output-directory gallery sync: async runtime is not available");
     return;
@@ -50,7 +50,7 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
       [&app_state, output_dir_path_snapshot]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
 
-        auto output_dir_result = Utils::Path::GetOutputDirectory(output_dir_path_snapshot);
+        auto output_dir_result = utils::path::GetOutputDirectory(output_dir_path_snapshot);
         if (!output_dir_result) {
           Logger().warn("Failed to resolve output directory for gallery sync: {}",
                         output_dir_result.error());
@@ -63,7 +63,7 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
           } else {
             Logger().info("Output directory added to gallery sources: {}",
                           output_dir_result->string());
-            Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+            core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
           }
         }
       },
@@ -73,36 +73,35 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
 // ============= 初始化和清理 =============
 
 // 准备 Gallery 运行资源：媒体运行时、缩略图目录、根可达性和静态映射。
-auto prepare_runtime_resources(Core::State::AppState& app_state)
-    -> std::expected<void, std::string> {
+auto prepare_runtime_resources(core::AppState& app_state) -> std::expected<void, std::string> {
   try {
     Logger().info("Initializing gallery module...");
 
-    // 供 Utils::Media::VideoAsset（SourceReader）使用；须在任意 analyze 之前成功。
+    // 供 utils::media::video_asset（SourceReader）使用；须在任意 analyze 之前成功。
     if (FAILED(MFStartup(MF_VERSION))) {
       return std::unexpected("Failed to initialize Media Foundation for gallery");
     }
 
     // 确保缩略图目录存在
-    auto ensure_dir_result = Asset::Thumbnail::ensure_thumbnails_directory_exists(app_state);
+    auto ensure_dir_result = asset::thumbnail::ensure_thumbnails_directory_exists(app_state);
     if (!ensure_dir_result) {
       Logger().error("Failed to ensure thumbnails directory exists: {}", ensure_dir_result.error());
       return std::unexpected("Failed to ensure thumbnails directory exists: " +
                              ensure_dir_result.error());
     }
 
-    if (auto availability_result = Features::Gallery::RootAvailability::initialize(app_state);
+    if (auto availability_result = features::gallery::root_availability::initialize(app_state);
         !availability_result) {
       return std::unexpected("Failed to initialize gallery root availability: " +
                              availability_result.error());
     }
 
     // 注册静态服务解析器
-    StaticResolver::register_http_resolvers(app_state);
-    StaticResolver::register_webview_resolvers(app_state);
+    static_resolver::register_http_resolvers(app_state);
+    static_resolver::register_webview_resolvers(app_state);
 
     // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
-    if (auto mapping_result = Folder::Service::ensure_all_root_folder_webview_mappings(app_state);
+    if (auto mapping_result = folder::service::ensure_all_root_folder_webview_mappings(app_state);
         !mapping_result) {
       return std::unexpected("Failed to sync gallery root WebView mappings: " +
                              mapping_result.error());
@@ -120,8 +119,7 @@ auto prepare_runtime_resources(Core::State::AppState& app_state)
 }
 
 // 执行 Gallery 后台启动任务：准备资源后恢复 watcher，并让外部扩展接入。
-auto run_startup_task(Core::State::AppState& app_state,
-                      std::function<void(Core::State::AppState&)> after_ready,
+auto run_startup_task(core::AppState& app_state, std::function<void(core::AppState&)> after_ready,
                       std::stop_token stop_token) -> void {
   try {
     Logger().info("Gallery startup initialization started");
@@ -139,7 +137,7 @@ auto run_startup_task(Core::State::AppState& app_state,
     }
 
     if (auto watcher_restore_result =
-            Features::Gallery::Watcher::restore_watchers_from_db(app_state);
+            features::gallery::watcher::restore_watchers_from_db(app_state);
         !watcher_restore_result) {
       Logger().warn("Gallery watcher registration restore failed: {}",
                     watcher_restore_result.error());
@@ -152,7 +150,7 @@ auto run_startup_task(Core::State::AppState& app_state,
 
     if (!stop_token.stop_requested()) {
       // 复用 Gallery 启动线程串行恢复，避免占用并等待扫描内部使用的 WorkerPool。
-      auto watcher_start_result = Features::Gallery::Watcher::start_registered_watchers(app_state);
+      auto watcher_start_result = features::gallery::watcher::start_registered_watchers(app_state);
       if (!watcher_start_result && !stop_token.stop_requested()) {
         Logger().warn("Gallery watcher startup recovery failed: {}", watcher_start_result.error());
       }
@@ -167,8 +165,7 @@ auto run_startup_task(Core::State::AppState& app_state,
 }
 
 // 启动 Gallery 模块；慢启动链路在模块自己的后台线程中继续推进。
-auto initialize(Core::State::AppState& app_state,
-                std::function<void(Core::State::AppState&)> after_ready)
+auto initialize(core::AppState& app_state, std::function<void(core::AppState&)> after_ready)
     -> std::expected<void, std::string> {
   try {
     app_state.gallery->shutdown_requested.store(false, std::memory_order_release);
@@ -186,8 +183,8 @@ auto initialize(Core::State::AppState& app_state,
 }
 
 // 清理 Gallery 模块：先收敛后台启动和 watcher，再释放资源。
-auto cleanup(Core::State::AppState& app_state,
-             std::function<void(Core::State::AppState&)> before_watchers_shutdown) -> void {
+auto cleanup(core::AppState& app_state,
+             std::function<void(core::AppState&)> before_watchers_shutdown) -> void {
   try {
     Logger().info("Cleaning up gallery module resources...");
 
@@ -205,13 +202,13 @@ auto cleanup(Core::State::AppState& app_state,
     if (before_watchers_shutdown) {
       before_watchers_shutdown(app_state);
     }
-    Features::Gallery::Watcher::shutdown_watchers(app_state);
+    features::gallery::watcher::shutdown_watchers(app_state);
 
     // 等所有扫描离开共享区后再释放 Media Foundation 和缩略图路径等运行资源。
     std::unique_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
 
     // 注销静态服务解析器
-    StaticResolver::unregister_all_resolvers(app_state);
+    static_resolver::unregister_all_resolvers(app_state);
 
     // 重置缩略图路径状态
     app_state.gallery->thumbnails_directory.clear();
@@ -228,9 +225,9 @@ auto cleanup(Core::State::AppState& app_state,
 // ============= 扫描和索引 =============
 
 // 扫描指定目录并补齐缺失缩略图，成功后确保对应 watcher 已注册
-auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
-                    std::function<void(const Types::ScanProgress&)> progress_callback)
-    -> std::expected<Types::ScanResult, std::string> {
+auto scan_directory(core::AppState& app_state, const ScanOptions& options,
+                    std::function<void(const ScanProgress&)> progress_callback)
+    -> std::expected<ScanResult, std::string> {
   auto stop_token = app_state.gallery->scan_stop_source.get_token();
   // 一个业务扫描全程持有共享锁，cleanup 会在释放媒体资源前等待它结束。
   std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
@@ -239,7 +236,7 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   }
 
   auto scan_result =
-      Scanner::scan_asset_directory(app_state, options, std::move(progress_callback));
+      scanner::scan_asset_directory(app_state, options, std::move(progress_callback));
   if (!scan_result) {
     Logger().error("Asset scan failed: {}", scan_result.error());
     return std::unexpected("Asset scan failed: " + scan_result.error());
@@ -256,8 +253,8 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   // 手动/显式扫描后只做当前目录的“缺失缩略图补回”，
   // 不在这里顺手做全局孤儿清理，避免把启动级别的缓存对账混进日常扫描。
   if (!options.rebuild_thumbnails.value_or(false)) {
-    auto thumbnail_repair_result = Asset::Thumbnail::repair_missing_thumbnails(
-        app_state, std::filesystem::path(options.directory), Types::kDefaultThumbnailShortEdge);
+    auto thumbnail_repair_result = asset::thumbnail::repair_missing_thumbnails(
+        app_state, std::filesystem::path(options.directory), kDefaultThumbnailShortEdge);
     if (!thumbnail_repair_result) {
       Logger().warn("Gallery thumbnail repair failed after scan '{}': {}", options.directory,
                     thumbnail_repair_result.error());
@@ -276,7 +273,7 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
     return std::unexpected("Asset scan cancelled");
   }
 
-  auto watcher_result = Watcher::register_watcher_for_directory(
+  auto watcher_result = watcher::register_watcher_for_directory(
       app_state, std::filesystem::path(options.directory), options);
   if (!watcher_result) {
     // 扫描已经成功，监听失败这里只记日志，不中断流程。
@@ -285,7 +282,7 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
     return result;
   }
 
-  auto start_result = Watcher::start_watcher_for_directory(
+  auto start_result = watcher::start_watcher_for_directory(
       app_state, std::filesystem::path(options.directory), false);
   if (!start_result) {
     Logger().warn("Failed to start watcher for '{}': {}", options.directory, start_result.error());
@@ -295,12 +292,11 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
 }
 
 // 清理已经没有任何资产引用的缩略图文件。
-auto cleanup_thumbnails(Core::State::AppState& app_state)
-    -> std::expected<Types::OperationResult, std::string> {
+auto cleanup_thumbnails(core::AppState& app_state) -> std::expected<OperationResult, std::string> {
   try {
-    auto cleanup_result = Asset::Thumbnail::cleanup_orphaned_thumbnails(app_state);
+    auto cleanup_result = asset::thumbnail::cleanup_orphaned_thumbnails(app_state);
 
-    Types::OperationResult result;
+    OperationResult result;
     if (cleanup_result) {
       result.success = true;
       result.message = std::format("Cleaned up {} orphaned thumbnails", cleanup_result.value());
@@ -322,10 +318,9 @@ auto cleanup_thumbnails(Core::State::AppState& app_state)
 // ============= 统计和信息 =============
 
 // 汇总缩略图目录的文件数量、占用空间和异常状态。
-auto get_thumbnail_stats(Core::State::AppState& app_state)
-    -> std::expected<std::string, std::string> {
+auto get_thumbnail_stats(core::AppState& app_state) -> std::expected<std::string, std::string> {
   try {
-    auto stats_result = Asset::Thumbnail::get_thumbnail_stats(app_state);
+    auto stats_result = asset::thumbnail::get_thumbnail_stats(app_state);
     if (!stats_result) {
       return std::unexpected(stats_result.error());
     }
@@ -349,4 +344,4 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   }
 }
 
-}  // namespace Features::Gallery
+}  // namespace features::gallery

@@ -1,126 +1,125 @@
-module;
+#include "core/rpc/endpoints/settings/settings.hpp"
 
-module Core.RPC.Endpoints.Settings;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Features.Settings;
-import Features.Settings.Types;
-import Features.Settings.Background;
-import <asio.hpp>;
+#include "vendor/asio.hpp"
 
-namespace Core::RPC::Endpoints::Settings {
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/background.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/types.hpp"
 
-auto handle_get_settings(
-    Core::State::AppState& app_state,
-    [[maybe_unused]] const Features::Settings::Types::GetSettingsParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::GetSettingsResult>> {
-  co_return Features::Settings::get_settings(app_state);
+namespace core::rpc::endpoints::settings {
+
+auto handle_get_settings(core::AppState& app_state,
+                         [[maybe_unused]] const features::settings::GetSettingsParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::GetSettingsResult>> {
+  co_return features::settings::get_settings(app_state);
 }
 
-auto handle_update_settings(Core::State::AppState& app_state,
-                            const Features::Settings::Types::UpdateSettingsParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::UpdateSettingsResult>> {
-  auto result = Features::Settings::update_settings(app_state, params);
+auto handle_update_settings(core::AppState& app_state,
+                            const features::settings::UpdateSettingsParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::UpdateSettingsResult>> {
+  auto result = features::settings::update_settings(app_state, params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_patch_settings(Core::State::AppState& app_state,
-                           const Features::Settings::Types::PatchSettingsParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::PatchSettingsResult>> {
-  auto result = Features::Settings::patch_settings(app_state, params);
+auto handle_patch_settings(core::AppState& app_state,
+                           const features::settings::PatchSettingsParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::PatchSettingsResult>> {
+  auto result = features::settings::patch_settings(app_state, params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_analyze_background([[maybe_unused]] Core::State::AppState& app_state,
-                               const Features::Settings::Types::BackgroundAnalysisParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundAnalysisResult>> {
-  auto result = Features::Settings::Background::analyze_background(params);
+auto handle_analyze_background([[maybe_unused]] core::AppState& app_state,
+                               const features::settings::BackgroundAnalysisParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::BackgroundAnalysisResult>> {
+  auto result = features::settings::background::analyze_background(params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_import_background([[maybe_unused]] Core::State::AppState& app_state,
-                              const Features::Settings::Types::BackgroundImportParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundImportResult>> {
-  auto result = Features::Settings::Background::import_background_image(params);
+auto handle_import_background([[maybe_unused]] core::AppState& app_state,
+                              const features::settings::BackgroundImportParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::BackgroundImportResult>> {
+  auto result = features::settings::background::import_background_image(params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto handle_remove_background([[maybe_unused]] Core::State::AppState& app_state,
-                              const Features::Settings::Types::BackgroundRemoveParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundRemoveResult>> {
-  auto result = Features::Settings::Background::remove_background_image(params);
+auto handle_remove_background([[maybe_unused]] core::AppState& app_state,
+                              const features::settings::BackgroundRemoveParams& params)
+    -> asio::awaitable<core::rpc::RpcResult<features::settings::BackgroundRemoveResult>> {
+  auto result = features::settings::background::remove_background_image(params);
 
   if (!result) {
     co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),
                             .message = "Service error: " + result.error()});
   }
 
   co_return result.value();
 }
 
-auto register_all(Core::State::AppState& app_state) -> void {
-  Core::RPC::register_method<Features::Settings::Types::GetSettingsParams,
-                             Features::Settings::Types::GetSettingsResult>(
+auto register_all(core::AppState& app_state) -> void {
+  core::rpc::register_method<features::settings::GetSettingsParams,
+                             features::settings::GetSettingsResult>(
       app_state, app_state.rpc->registry, "settings.get", handle_get_settings,
       "Get current settings configuration");
 
-  Core::RPC::register_method<Features::Settings::Types::UpdateSettingsParams,
-                             Features::Settings::Types::UpdateSettingsResult>(
+  core::rpc::register_method<features::settings::UpdateSettingsParams,
+                             features::settings::UpdateSettingsResult>(
       app_state, app_state.rpc->registry, "settings.update", handle_update_settings,
       "Update settings configuration");
 
-  Core::RPC::register_method<Features::Settings::Types::PatchSettingsParams,
-                             Features::Settings::Types::PatchSettingsResult>(
+  core::rpc::register_method<features::settings::PatchSettingsParams,
+                             features::settings::PatchSettingsResult>(
       app_state, app_state.rpc->registry, "settings.patch", handle_patch_settings,
       "Patch settings configuration");
 
-  Core::RPC::register_method<Features::Settings::Types::BackgroundAnalysisParams,
-                             Features::Settings::Types::BackgroundAnalysisResult>(
+  core::rpc::register_method<features::settings::BackgroundAnalysisParams,
+                             features::settings::BackgroundAnalysisResult>(
       app_state, app_state.rpc->registry, "settings.background.analyze", handle_analyze_background,
       "Analyze background image and return recommended theme and overlay colors");
 
-  Core::RPC::register_method<Features::Settings::Types::BackgroundImportParams,
-                             Features::Settings::Types::BackgroundImportResult>(
+  core::rpc::register_method<features::settings::BackgroundImportParams,
+                             features::settings::BackgroundImportResult>(
       app_state, app_state.rpc->registry, "settings.background.import", handle_import_background,
       "Import a background image into managed app storage and return its logical path");
 
-  Core::RPC::register_method<Features::Settings::Types::BackgroundRemoveParams,
-                             Features::Settings::Types::BackgroundRemoveResult>(
+  core::rpc::register_method<features::settings::BackgroundRemoveParams,
+                             features::settings::BackgroundRemoveResult>(
       app_state, app_state.rpc->registry, "settings.background.remove", handle_remove_background,
       "Remove a managed background image from app storage");
 }
 
-}  // namespace Core::RPC::Endpoints::Settings
+}  // namespace core::rpc::endpoints::settings

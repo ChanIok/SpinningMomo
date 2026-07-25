@@ -1,15 +1,15 @@
-module;
+#include "features/overlay/geometry.hpp"
 
-module Features.Overlay.Geometry;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import <dwmapi.h>;
-import <windows.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
 
-namespace Features::Overlay::Geometry {
+#include "core/state/app_state.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+
+namespace features::overlay::geometry {
 
 auto calculate_overlay_dimensions(int game_width, int game_height, int screen_width,
                                   int screen_height) -> std::pair<int, int> {
@@ -78,4 +78,4 @@ auto calculate_letterbox_area(int screen_width, int screen_height, int game_widt
   return std::make_tuple(content_left, content_top, content_width, content_height);
 }
 
-}  // namespace Features::Overlay::Geometry
+}  // namespace features::overlay::geometry

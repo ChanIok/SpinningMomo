@@ -1,13 +1,12 @@
-module;
+#include "utils/timer/timeout.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-module Utils.Timeout;
+#include "vendor/windows.hpp"
 
-import std;
-import Utils.Logger;
+#include "utils/logger/logger.hpp"
 
-namespace Utils::Timeout {
+namespace utils::timeout {
 
 struct Timeout::shared_state {
   std::mutex mutex;
@@ -122,4 +121,4 @@ auto Timeout::is_pending() const -> bool {
   return m_shared->pending.load(std::memory_order_acquire);
 }
 
-}  // namespace Utils::Timeout
+}  // namespace utils::timeout

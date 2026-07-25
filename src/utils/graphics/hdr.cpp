@@ -1,16 +1,16 @@
-module;
+#include "utils/graphics/hdr.hpp"
 
-module Utils.Graphics.HDR;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Logger;
-import <dxgi1_6.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/dxgi1_6.hpp"
 
-namespace Utils::Graphics::HDR {
+#include "utils/logger/logger.hpp"
 
-namespace Detail {
+namespace utils::graphics::hdr {
+
+namespace detail {
 
 // Windows 桌面 HDR 常用该 DXGI 色彩空间枚举值表示「HDR 正在驱动该输出」。
 auto is_hdr_color_space(DXGI_COLOR_SPACE_TYPE color_space) -> bool {
@@ -32,7 +32,7 @@ auto make_info_from_output_desc(const DXGI_OUTPUT_DESC1& desc) -> HdrMonitorInfo
   };
 }
 
-}  // namespace Detail
+}  // namespace detail
 
 // 通过 HWND → HMONITOR，在 DXGI 适配器/输出枚举中找到对应输出，再读 IDXGIOutput6::GetDesc1。
 auto query_monitor_hdr_info(HWND target_window) -> std::expected<HdrMonitorInfo, std::string> {
@@ -98,11 +98,11 @@ auto query_monitor_hdr_info(HWND target_window) -> std::expected<HdrMonitorInfo,
                         static_cast<unsigned int>(hr)));
       }
 
-      return Detail::make_info_from_output_desc(output_desc1);
+      return detail::make_info_from_output_desc(output_desc1);
     }
   }
 
   return std::unexpected("Failed to match target monitor to a DXGI output");
 }
 
-}  // namespace Utils::Graphics::HDR
+}  // namespace utils::graphics::hdr

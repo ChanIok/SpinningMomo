@@ -1,18 +1,18 @@
-module;
+#include "core/events/registrar.hpp"
 
-module Core.Events.Registrar;
+#include "vendor/std.hpp"
 
-import Core.State;
-import Core.Events.Handlers.Feature;
-import Core.Events.Handlers.Settings;
-import Core.Events.Handlers.System;
+#include "core/events/handlers/feature_handlers.hpp"
+#include "core/events/handlers/settings_handlers.hpp"
+#include "core/events/handlers/system_handlers.hpp"
+#include "core/state/app_state.hpp"
 
-namespace Core::Events {
+namespace core::events {
 
-auto register_all_handlers(Core::State::AppState& app_state) -> void {
-  Handlers::register_feature_handlers(app_state);
-  Handlers::register_settings_handlers(app_state);
-  Handlers::register_system_handlers(app_state);
+auto register_all_handlers(core::AppState& app_state) -> void {
+  handlers::register_feature_handlers(app_state);
+  handlers::register_settings_handlers(app_state);
+  handlers::register_system_handlers(app_state);
 }
 
-}  // namespace Core::Events
+}  // namespace core::events

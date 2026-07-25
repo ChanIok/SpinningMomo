@@ -1,22 +1,21 @@
-module;
+#include "features/gallery/clipboard/clipboard.hpp"
 
-module Features.Gallery.Clipboard;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Scanner;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Watcher;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.System;
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/scanner.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
-namespace Features::Gallery::Clipboard {
+namespace features::gallery::clipboard {
 
 std::atomic<std::uint64_t> clipboard_temp_file_sequence = 0;
 
@@ -57,12 +56,12 @@ auto make_unique_clipboard_destination(const std::filesystem::path& target_folde
                                                           suffix, filename.extension().wstring()));
   }
 
-  auto normalized_result = Utils::Path::NormalizePath(candidate);
+  auto normalized_result = utils::path::NormalizePath(candidate);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize clipboard destination: " +
                            normalized_result.error());
   }
-  if (!Utils::Path::IsPathWithinBase(normalized_result.value(), target_folder)) {
+  if (!utils::path::IsPathWithinBase(normalized_result.value(), target_folder)) {
     return std::unexpected("Clipboard destination escaped the target folder");
   }
   return normalized_result.value();
@@ -136,12 +135,12 @@ auto cleanup_clipboard_temp_file(const std::filesystem::path& temporary_path) ->
 }
 
 // 将选中资产解析为真实文件并写入系统剪贴板。
-auto copy_assets(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
-    -> std::expected<Types::OperationResult, std::string> {
+auto copy_assets(core::AppState& app_state, const std::vector<std::int64_t>& ids)
+    -> std::expected<OperationResult, std::string> {
   // 这一层负责把“选中的资产 ID”转换成真正可复制的磁盘文件路径。
-  // 真正的系统剪贴板写入由 Utils::System 负责。
+  // 真正的系统剪贴板写入由 utils::system 负责。
   if (ids.empty()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "No assets selected",
         .affected_count = 0,
@@ -170,7 +169,7 @@ auto copy_assets(Core::State::AppState& app_state, const std::vector<std::int64_
 
   // 逐个把资产 ID 转成文件路径，并过滤掉索引不存在或磁盘不存在的项。
   for (auto id : unique_ids) {
-    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    auto asset_result = asset::repository::get_asset_by_id(app_state, id);
     if (!asset_result) {
       errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
       continue;
@@ -205,7 +204,7 @@ auto copy_assets(Core::State::AppState& app_state, const std::vector<std::int64_
 
   // 只有在至少找到一个真实文件时，才真正写入系统剪贴板。
   if (!clipboard_paths.empty()) {
-    auto copy_result = Utils::System::copy_files_to_clipboard(clipboard_paths);
+    auto copy_result = utils::system::copy_files_to_clipboard(clipboard_paths);
     if (!copy_result) {
       errors.push_back("Failed to copy files to clipboard: " + copy_result.error());
     } else {
@@ -218,7 +217,7 @@ auto copy_assets(Core::State::AppState& app_state, const std::vector<std::int64_
 
   // 这里沿用 gallery 现有的 OperationResult 风格，
   // 方便前端统一做 success / partial / failed 的 toast 提示。
-  Types::OperationResult result{
+  OperationResult result{
       .success = copied_count == total_count,
       .message = "",
       .affected_count = copied_count,
@@ -249,10 +248,10 @@ auto copy_assets(Core::State::AppState& app_state, const std::vector<std::int64_
 }
 
 // 将剪贴板文件或截图无覆盖地写入指定图库目录，再同步建立资产索引。
-auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
-    -> std::expected<Types::OperationResult, std::string> {
+auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<OperationResult, std::string> {
   if (folder_id <= 0) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Invalid target folder",
         .affected_count = 0,
@@ -260,12 +259,12 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
   }
 
   // 目标路径只从已索引 folder_id 解析，RPC 调用方不能指定任意磁盘位置。
-  auto folder_result = Folder::Repository::get_folder_by_id(app_state, folder_id);
+  auto folder_result = folder::repository::get_folder_by_id(app_state, folder_id);
   if (!folder_result) {
     return std::unexpected("Failed to query clipboard target folder: " + folder_result.error());
   }
   if (!folder_result->has_value()) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = "Target folder not found",
         .affected_count = 0,
@@ -273,7 +272,7 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
   }
 
   auto target_result =
-      Utils::Path::NormalizePath(std::filesystem::path(folder_result->value().path));
+      utils::path::NormalizePath(std::filesystem::path(folder_result->value().path));
   if (!target_result) {
     return std::unexpected("Failed to normalize clipboard target folder: " + target_result.error());
   }
@@ -281,7 +280,7 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
 
   std::error_code target_error;
   if (!std::filesystem::is_directory(target_folder, target_error)) {
-    return Types::OperationResult{
+    return OperationResult{
         .success = false,
         .message = target_error ? "Failed to access target folder: " + target_error.message()
                                 : "Target folder does not exist",
@@ -289,13 +288,13 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
     };
   }
 
-  auto clipboard_result = Utils::System::read_clipboard_media();
+  auto clipboard_result = utils::system::read_clipboard_media();
   if (!clipboard_result) {
     return std::unexpected("Failed to read clipboard media: " + clipboard_result.error());
   }
   auto clipboard = std::move(clipboard_result.value());
-  if (clipboard.kind == Utils::System::ClipboardMediaKind::Empty) {
-    return Types::OperationResult{
+  if (clipboard.kind == utils::system::ClipboardMediaKind::Empty) {
+    return OperationResult{
         .success = false,
         .message = "Clipboard does not contain supported media",
         .affected_count = 0,
@@ -303,17 +302,17 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
   }
 
   std::vector<std::filesystem::path> created_paths;
-  std::vector<Types::ScanChange> indexed_changes;
+  std::vector<ScanChange> indexed_changes;
   std::int64_t not_found_count = 0;
   std::int64_t unchanged_count = 0;
   std::int64_t indexed_count = 0;
   std::vector<std::string> errors;
 
   // 文件列表逐项复制，单个失败不阻断同一批次中的其他媒体。
-  if (clipboard.kind == Utils::System::ClipboardMediaKind::Files) {
+  if (clipboard.kind == utils::system::ClipboardMediaKind::Files) {
     created_paths.reserve(clipboard.file_paths.size());
     for (const auto& source : clipboard.file_paths) {
-      auto normalized_source_result = Utils::Path::NormalizePath(source);
+      auto normalized_source_result = utils::path::NormalizePath(source);
       if (!normalized_source_result) {
         errors.push_back("Failed to normalize clipboard source '" + source.string() +
                          "': " + normalized_source_result.error());
@@ -344,8 +343,8 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
         continue;
       }
 
-      const auto& supported_extensions = Scanner::Common::default_supported_extensions();
-      if (!Scanner::Common::is_supported_file(normalized_source, supported_extensions)) {
+      const auto& supported_extensions = scanner::common::default_supported_extensions();
+      if (!scanner::common::is_supported_file(normalized_source, supported_extensions)) {
         unchanged_count++;
         continue;
       }
@@ -385,19 +384,19 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
     auto temporary_path = temporary_result.value();
 
     std::expected<void, std::string> write_result;
-    if (clipboard.kind == Utils::System::ClipboardMediaKind::EncodedPng) {
+    if (clipboard.kind == utils::system::ClipboardMediaKind::EncodedPng) {
       write_result = write_clipboard_bytes(temporary_path, clipboard.encoded_png);
-    } else if (clipboard.kind == Utils::System::ClipboardMediaKind::Bitmap &&
+    } else if (clipboard.kind == utils::system::ClipboardMediaKind::Bitmap &&
                clipboard.bitmap.has_value()) {
-      auto factory_result = Utils::Image::get_thread_wic_factory();
+      auto factory_result = utils::image::get_thread_wic_factory();
       if (!factory_result) {
         cleanup_clipboard_temp_file(temporary_path);
         return std::unexpected("Failed to create image encoder: " + factory_result.error());
       }
       const auto& bitmap = clipboard.bitmap.value();
-      write_result = Utils::Image::save_pixel_data_to_file(
+      write_result = utils::image::save_pixel_data_to_file(
           factory_result->get(), bitmap.bgra_pixels.data(), bitmap.width, bitmap.height,
-          bitmap.stride, temporary_path.wstring(), Utils::Image::ImageFormat::PNG);
+          bitmap.stride, temporary_path.wstring(), utils::image::ImageFormat::PNG);
     } else {
       cleanup_clipboard_temp_file(temporary_path);
       return std::unexpected("Clipboard bitmap payload is missing");
@@ -409,7 +408,7 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
     }
 
     auto requested_name = std::filesystem::path(
-        Utils::String::FromUtf8(Utils::String::FormatTimestamp(std::chrono::system_clock::now())));
+        utils::string::FromUtf8(utils::string::FormatTimestamp(std::chrono::system_clock::now())));
     auto commit_result = commit_clipboard_temp_file(temporary_path, target_folder, requested_name);
     if (!commit_result) {
       cleanup_clipboard_temp_file(temporary_path);
@@ -420,14 +419,14 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
 
   // 主动创建由 Gallery 同步建立索引，watcher 只负责随后可能到达的外部文件通知。
   for (const auto& created_path : created_paths) {
-    auto index_result = Scanner::upsert_created_file(app_state, folder_id, created_path);
+    auto index_result = scanner::upsert_created_file(app_state, folder_id, created_path);
     if (!index_result) {
       errors.push_back("Failed to index pasted file '" + created_path.string() +
                        "': " + index_result.error());
       continue;
     }
 
-    auto asset_result = Asset::Repository::get_asset_by_path(app_state, created_path.string());
+    auto asset_result = asset::repository::get_asset_by_path(app_state, created_path.string());
     if (!asset_result) {
       errors.push_back("Failed to verify pasted file index '" + created_path.string() +
                        "': " + asset_result.error());
@@ -446,7 +445,7 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
 
   // 索引已经落库后再把真实 UPSERT 分发给扩展消费者。
   if (!indexed_changes.empty()) {
-    auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, indexed_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, indexed_changes);
     if (!dispatch_result) {
       errors.push_back("Failed to dispatch pasted file changes: " + dispatch_result.error());
     }
@@ -454,7 +453,7 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
 
   const auto affected_count = indexed_count;
   const auto failed_count = static_cast<std::int64_t>(errors.size());
-  Types::OperationResult result{
+  OperationResult result{
       .success = affected_count > 0 && errors.empty(),
       .message = "",
       .affected_count = affected_count,
@@ -480,4 +479,4 @@ auto paste_to_folder(Core::State::AppState& app_state, std::int64_t folder_id)
   return result;
 }
 
-}  // namespace Features::Gallery::Clipboard
+}  // namespace features::gallery::clipboard

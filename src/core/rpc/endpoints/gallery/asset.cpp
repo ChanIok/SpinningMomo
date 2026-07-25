@@ -1,23 +1,23 @@
-module;
+#include "core/rpc/endpoints/gallery/asset.hpp"
 
-module Core.RPC.Endpoints.Gallery.Asset;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.RPC.NotificationHub;
-import Features.Gallery.Types;
-import Features.Gallery.Clipboard;
-import Features.Gallery.FileOperations;
-import Features.Gallery.Asset.Service;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.OriginalLocator;
-import Features.Gallery.RootAvailability;
-import <asio.hpp>;
+#include "vendor/asio.hpp"
 
-namespace Core::RPC::Endpoints::Gallery::Asset {
+#include "core/rpc/notification_hub.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/asset/repository.hpp"
+#include "features/gallery/asset/service.hpp"
+#include "features/gallery/clipboard/clipboard.hpp"
+#include "features/gallery/file_operations/file_operations.hpp"
+#include "features/gallery/original_locator.hpp"
+#include "features/gallery/root_availability.hpp"
+#include "features/gallery/types.hpp"
+
+namespace core::rpc::endpoints::gallery::asset {
 
 struct CheckAssetReachableParams {
   std::int64_t asset_id = 0;
@@ -36,10 +36,10 @@ struct CheckAssetReachableResult {
 
 // ============= 时间线视图 RPC 处理函数 =============
 
-auto handle_get_timeline_buckets(Core::State::AppState& app_state,
-                                 const Features::Gallery::Types::TimelineBucketsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::TimelineBucketsResponse> {
-  auto result = Features::Gallery::Asset::Service::get_timeline_buckets(app_state, params);
+auto handle_get_timeline_buckets(core::AppState& app_state,
+                                 const features::gallery::TimelineBucketsParams& params)
+    -> RpcAwaitable<features::gallery::TimelineBucketsResponse> {
+  auto result = features::gallery::asset::service::get_timeline_buckets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -49,10 +49,10 @@ auto handle_get_timeline_buckets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_get_assets_by_month(Core::State::AppState& app_state,
-                                const Features::Gallery::Types::GetAssetsByMonthParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::GetAssetsByMonthResponse> {
-  auto result = Features::Gallery::Asset::Service::get_assets_by_month(app_state, params);
+auto handle_get_assets_by_month(core::AppState& app_state,
+                                const features::gallery::GetAssetsByMonthParams& params)
+    -> RpcAwaitable<features::gallery::GetAssetsByMonthResponse> {
+  auto result = features::gallery::asset::service::get_assets_by_month(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -64,10 +64,10 @@ auto handle_get_assets_by_month(Core::State::AppState& app_state,
 
 // ============= 统一查询 RPC 处理函数 =============
 
-auto handle_query_assets(Core::State::AppState& app_state,
-                         const Features::Gallery::Types::QueryAssetsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::ListResponse> {
-  auto result = Features::Gallery::Asset::Service::query_assets(app_state, params);
+auto handle_query_assets(core::AppState& app_state,
+                         const features::gallery::QueryAssetsParams& params)
+    -> RpcAwaitable<features::gallery::ListResponse> {
+  auto result = features::gallery::asset::service::query_assets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -77,11 +77,10 @@ auto handle_query_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_query_asset_layout_meta(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::QueryAssetLayoutMetaParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::QueryAssetLayoutMetaResponse> {
-  auto result = Features::Gallery::Asset::Service::query_asset_layout_meta(app_state, params);
+auto handle_query_asset_layout_meta(core::AppState& app_state,
+                                    const features::gallery::QueryAssetLayoutMetaParams& params)
+    -> RpcAwaitable<features::gallery::QueryAssetLayoutMetaResponse> {
+  auto result = features::gallery::asset::service::query_asset_layout_meta(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -91,10 +90,10 @@ auto handle_query_asset_layout_meta(
   co_return result.value();
 }
 
-auto handle_get_asset_main_colors(Core::State::AppState& app_state,
-                                  const Features::Gallery::Types::GetAssetMainColorsParams& params)
-    -> RpcAwaitable<std::vector<Features::Gallery::Types::AssetMainColor>> {
-  auto result = Features::Gallery::Asset::Service::get_asset_main_colors(app_state, params);
+auto handle_get_asset_main_colors(core::AppState& app_state,
+                                  const features::gallery::GetAssetMainColorsParams& params)
+    -> RpcAwaitable<std::vector<features::gallery::AssetMainColor>> {
+  auto result = features::gallery::asset::service::get_asset_main_colors(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -104,10 +103,9 @@ auto handle_get_asset_main_colors(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_get_home_stats(Core::State::AppState& app_state,
-                           [[maybe_unused]] const EmptyParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::HomeStats> {
-  auto result = Features::Gallery::Asset::Service::get_home_stats(app_state);
+auto handle_get_home_stats(core::AppState& app_state, [[maybe_unused]] const EmptyParams& params)
+    -> RpcAwaitable<features::gallery::HomeStats> {
+  auto result = features::gallery::asset::service::get_home_stats(app_state);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -118,10 +116,9 @@ auto handle_get_home_stats(Core::State::AppState& app_state,
 }
 
 auto handle_get_batch_selection_summary(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::BatchSelectionSummaryParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::BatchSelectionSummary> {
-  auto result = Features::Gallery::Asset::Service::get_batch_selection_summary(app_state, params);
+    core::AppState& app_state, const features::gallery::BatchSelectionSummaryParams& params)
+    -> RpcAwaitable<features::gallery::BatchSelectionSummary> {
+  auto result = features::gallery::asset::service::get_batch_selection_summary(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -131,10 +128,10 @@ auto handle_get_batch_selection_summary(
   co_return result.value();
 }
 
-auto handle_get_missing_assets(Core::State::AppState& app_state,
+auto handle_get_missing_assets(core::AppState& app_state,
                                [[maybe_unused]] const EmptyParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::MissingAssetsResponse> {
-  auto result = Features::Gallery::Asset::Service::get_missing_assets(app_state);
+    -> RpcAwaitable<features::gallery::MissingAssetsResponse> {
+  auto result = features::gallery::asset::service::get_missing_assets(app_state);
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
@@ -142,28 +139,28 @@ auto handle_get_missing_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_purge_missing_assets(Core::State::AppState& app_state,
-                                 const Features::Gallery::Types::PurgeMissingAssetsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::PurgeMissingAssetsResult> {
-  auto result = Features::Gallery::Asset::Service::purge_missing_assets(app_state, params);
+auto handle_purge_missing_assets(core::AppState& app_state,
+                                 const features::gallery::PurgeMissingAssetsParams& params)
+    -> RpcAwaitable<features::gallery::PurgeMissingAssetsResult> {
+  auto result = features::gallery::asset::service::purge_missing_assets(app_state, params);
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
   }
 
   if (result->deleted_asset_count > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
   co_return result.value();
 }
 
 // ============= 资产动作 RPC 处理函数 =============
 
-auto handle_open_asset_default(Core::State::AppState& app_state,
-                               const Features::Gallery::Types::GetParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+auto handle_open_asset_default(core::AppState& app_state,
+                               const features::gallery::GetParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
   auto result =
-      Features::Gallery::FileOperations::open_asset_with_default_app(app_state, params.id);
+      features::gallery::file_operations::open_asset_with_default_app(app_state, params.id);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -173,10 +170,10 @@ auto handle_open_asset_default(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_reveal_asset_in_explorer(Core::State::AppState& app_state,
-                                     const Features::Gallery::Types::GetParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::FileOperations::reveal_asset_in_explorer(app_state, params.id);
+auto handle_reveal_asset_in_explorer(core::AppState& app_state,
+                                     const features::gallery::GetParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::file_operations::reveal_asset_in_explorer(app_state, params.id);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -186,10 +183,10 @@ auto handle_reveal_asset_in_explorer(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
-                                     const Features::Gallery::Types::AssetIdsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::Clipboard::copy_assets(app_state, params.ids);
+auto handle_copy_assets_to_clipboard(core::AppState& app_state,
+                                     const features::gallery::AssetIdsParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::clipboard::copy_assets(app_state, params.ids);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -200,24 +197,24 @@ auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
 }
 
 // 将系统剪贴板中的文件或截图导入指定的已索引图库文件夹。
-auto handle_paste_clipboard_to_folder(Core::State::AppState& app_state,
+auto handle_paste_clipboard_to_folder(core::AppState& app_state,
                                       const PasteClipboardToFolderParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::Clipboard::paste_to_folder(app_state, params.folder_id);
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::clipboard::paste_to_folder(app_state, params.folder_id);
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
   }
   if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
   co_return result.value();
 }
 
-auto handle_delete_assets(Core::State::AppState& app_state,
-                          const Features::Gallery::Types::DeleteAssetsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::DeleteAssetsResult> {
-  auto result = Features::Gallery::FileOperations::delete_assets(app_state, params);
+auto handle_delete_assets(core::AppState& app_state,
+                          const features::gallery::DeleteAssetsParams& params)
+    -> RpcAwaitable<features::gallery::DeleteAssetsResult> {
+  auto result = features::gallery::file_operations::delete_assets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -225,16 +222,16 @@ auto handle_delete_assets(Core::State::AppState& app_state,
   }
 
   if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   co_return result.value();
 }
 
-auto handle_move_assets_to_folder(Core::State::AppState& app_state,
-                                  const Features::Gallery::Types::MoveAssetsToFolderParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::FileOperations::move_assets_to_folder(app_state, params);
+auto handle_move_assets_to_folder(core::AppState& app_state,
+                                  const features::gallery::MoveAssetsToFolderParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::file_operations::move_assets_to_folder(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -242,17 +239,16 @@ auto handle_move_assets_to_folder(Core::State::AppState& app_state,
   }
 
   if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   co_return result.value();
 }
 
 auto handle_update_assets_review_state(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::UpdateAssetsReviewStateParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::Asset::Service::update_assets_review_state(app_state, params);
+    core::AppState& app_state, const features::gallery::UpdateAssetsReviewStateParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::asset::service::update_assets_review_state(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -262,11 +258,10 @@ auto handle_update_assets_review_state(
   co_return result.value();
 }
 
-auto handle_update_asset_description(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::UpdateAssetDescriptionParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::Asset::Service::update_asset_description(app_state, params);
+auto handle_update_asset_description(core::AppState& app_state,
+                                     const features::gallery::UpdateAssetDescriptionParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::asset::service::update_asset_description(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -274,17 +269,16 @@ auto handle_update_asset_description(
   }
 
   if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   co_return result.value();
 }
 
 auto handle_update_assets_description(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::UpdateAssetsDescriptionParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::Asset::Service::update_assets_description(app_state, params);
+    core::AppState& app_state, const features::gallery::UpdateAssetsDescriptionParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  auto result = features::gallery::asset::service::update_assets_description(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -292,13 +286,13 @@ auto handle_update_assets_description(
   }
 
   if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   co_return result.value();
 }
 
-auto handle_check_asset_reachable(Core::State::AppState& app_state,
+auto handle_check_asset_reachable(core::AppState& app_state,
                                   const CheckAssetReachableParams& params)
     -> RpcAwaitable<CheckAssetReachableResult> {
   if (params.asset_id <= 0) {
@@ -309,7 +303,7 @@ auto handle_check_asset_reachable(Core::State::AppState& app_state,
   }
 
   auto asset_result =
-      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+      features::gallery::asset::repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
     co_return std::unexpected(RpcError{
         .code = static_cast<int>(ErrorCode::ServerError),
@@ -327,15 +321,15 @@ auto handle_check_asset_reachable(Core::State::AppState& app_state,
   }
 
   auto asset = asset_result->value();
-  std::vector<Features::Gallery::Types::Asset> assets{asset};
+  std::vector<features::gallery::Asset> assets{asset};
   auto locator_result =
-      Features::Gallery::OriginalLocator::populate_asset_locators(app_state, assets);
+      features::gallery::original_locator::populate_asset_locators(app_state, assets);
   if (locator_result && !assets.empty()) {
     asset = std::move(assets.front());
   }
 
   if (asset.root_id.has_value() &&
-      Features::Gallery::RootAvailability::is_remote_unreachable(app_state, *asset.root_id)) {
+      features::gallery::root_availability::is_remote_unreachable(app_state, *asset.root_id)) {
     co_return CheckAssetReachableResult{
         .exists = false,
         .readable = false,
@@ -377,99 +371,95 @@ auto handle_check_asset_reachable(Core::State::AppState& app_state,
 
 // ============= RPC 方法注册 =============
 
-auto register_all(Core::State::AppState& app_state) -> void {
+auto register_all(core::AppState& app_state) -> void {
   // 时间线视图
-  register_method<Features::Gallery::Types::TimelineBucketsParams,
-                  Features::Gallery::Types::TimelineBucketsResponse>(
+  register_method<features::gallery::TimelineBucketsParams,
+                  features::gallery::TimelineBucketsResponse>(
       app_state, app_state.rpc->registry, "gallery.getTimelineBuckets", handle_get_timeline_buckets,
       "Get timeline buckets (months) with asset counts for timeline view");
 
-  register_method<Features::Gallery::Types::GetAssetsByMonthParams,
-                  Features::Gallery::Types::GetAssetsByMonthResponse>(
+  register_method<features::gallery::GetAssetsByMonthParams,
+                  features::gallery::GetAssetsByMonthResponse>(
       app_state, app_state.rpc->registry, "gallery.getAssetsByMonth", handle_get_assets_by_month,
       "Get all assets for a specific month in timeline view");
 
   // 统一资产查询接口
-  register_method<Features::Gallery::Types::QueryAssetsParams,
-                  Features::Gallery::Types::ListResponse>(
+  register_method<features::gallery::QueryAssetsParams, features::gallery::ListResponse>(
       app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
       "Unified asset query interface with flexible filters (folder, month, year, type, search) "
       "and optional pagination");
 
-  register_method<Features::Gallery::Types::QueryAssetLayoutMetaParams,
-                  Features::Gallery::Types::QueryAssetLayoutMetaResponse>(
+  register_method<features::gallery::QueryAssetLayoutMetaParams,
+                  features::gallery::QueryAssetLayoutMetaResponse>(
       app_state, app_state.rpc->registry, "gallery.queryAssetLayoutMeta",
       handle_query_asset_layout_meta,
       "Query lightweight asset layout metadata for adaptive gallery layout calculation");
 
-  register_method<Features::Gallery::Types::GetAssetMainColorsParams,
-                  std::vector<Features::Gallery::Types::AssetMainColor>>(
+  register_method<features::gallery::GetAssetMainColorsParams,
+                  std::vector<features::gallery::AssetMainColor>>(
       app_state, app_state.rpc->registry, "gallery.getAssetMainColors",
       handle_get_asset_main_colors, "Get extracted main colors for the specified asset");
 
-  register_method<EmptyParams, Features::Gallery::Types::HomeStats>(
+  register_method<EmptyParams, features::gallery::HomeStats>(
       app_state, app_state.rpc->registry, "gallery.getHomeStats", handle_get_home_stats,
       "Get home page gallery stats summary");
 
-  register_method<Features::Gallery::Types::BatchSelectionSummaryParams,
-                  Features::Gallery::Types::BatchSelectionSummary>(
+  register_method<features::gallery::BatchSelectionSummaryParams,
+                  features::gallery::BatchSelectionSummary>(
       app_state, app_state.rpc->registry, "gallery.getBatchSelectionSummary",
       handle_get_batch_selection_summary,
       "Get the aggregated review and common-tag summary for the current selection");
 
-  register_method<EmptyParams, Features::Gallery::Types::MissingAssetsResponse>(
+  register_method<EmptyParams, features::gallery::MissingAssetsResponse>(
       app_state, app_state.rpc->registry, "gallery.getMissingAssets", handle_get_missing_assets,
       "List assets in the missing recovery period and their reclaimable thumbnail storage");
 
-  register_method<Features::Gallery::Types::PurgeMissingAssetsParams,
-                  Features::Gallery::Types::PurgeMissingAssetsResult>(
+  register_method<features::gallery::PurgeMissingAssetsParams,
+                  features::gallery::PurgeMissingAssetsResult>(
       app_state, app_state.rpc->registry, "gallery.purgeMissingAssets", handle_purge_missing_assets,
       "Permanently purge selected or all assets that are still marked missing");
 
-  register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::GetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,
       "Open the selected asset file with the default system application");
 
-  register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::GetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.revealAssetInExplorer",
       handle_reveal_asset_in_explorer, "Reveal and select the asset file in explorer");
 
-  register_method<Features::Gallery::Types::AssetIdsParams,
-                  Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::AssetIdsParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.copyAssetsToClipboard",
       handle_copy_assets_to_clipboard,
       "Copy selected asset files to the system clipboard as files");
 
-  register_method<PasteClipboardToFolderParams, Features::Gallery::Types::OperationResult>(
+  register_method<PasteClipboardToFolderParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.pasteClipboardToFolder",
       handle_paste_clipboard_to_folder,
       "Paste clipboard files or bitmap media into an indexed gallery folder");
 
-  register_method<Features::Gallery::Types::DeleteAssetsParams,
-                  Features::Gallery::Types::DeleteAssetsResult>(
+  register_method<features::gallery::DeleteAssetsParams, features::gallery::DeleteAssetsResult>(
       app_state, app_state.rpc->registry, "gallery.deleteAssets", handle_delete_assets,
       "Recycle selected asset files where possible or permanently delete them");
 
-  register_method<Features::Gallery::Types::MoveAssetsToFolderParams,
-                  Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::MoveAssetsToFolderParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.moveAssetsToFolder",
       handle_move_assets_to_folder,
       "Move selected assets to an indexed target folder and update gallery index paths");
 
-  register_method<Features::Gallery::Types::UpdateAssetsReviewStateParams,
-                  Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::UpdateAssetsReviewStateParams,
+                  features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetsReviewState",
       handle_update_assets_review_state,
       "Batch update Lightroom-style review metadata such as rating and pick/reject state");
 
-  register_method<Features::Gallery::Types::UpdateAssetDescriptionParams,
-                  Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::UpdateAssetDescriptionParams,
+                  features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetDescription",
       handle_update_asset_description,
       "Update a single asset description in the gallery details panel");
 
-  register_method<Features::Gallery::Types::UpdateAssetsDescriptionParams,
-                  Features::Gallery::Types::OperationResult>(
+  register_method<features::gallery::UpdateAssetsDescriptionParams,
+                  features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetsDescription",
       handle_update_assets_description,
       "Batch update selected assets description in the gallery details panel");
@@ -480,4 +470,4 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Check whether an indexed asset file still exists and is readable on disk");
 }
 
-}  // namespace Core::RPC::Endpoints::Gallery::Asset
+}  // namespace core::rpc::endpoints::gallery::asset

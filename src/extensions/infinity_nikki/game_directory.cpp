@@ -1,19 +1,19 @@
-module;
+#include "extensions/infinity_nikki/game_directory.hpp"
 
-module Extensions.InfinityNikki.GameDirectory;
+#include "vendor/std.hpp"
 
-import std;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import Utils.String;
-import Vendor.ShellApi;
-import Vendor.Windows;
-import <wil/com.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/shlobj_core.hpp"
 
-namespace Extensions::InfinityNikki::GameDirectory {
+#include "extensions/infinity_nikki/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace extensions::infinity_nikki::game_directory {
 
 auto to_filesystem_path(const std::string& utf8_path) -> std::filesystem::path {
-  return std::filesystem::path(Utils::String::FromUtf8(utf8_path));
+  return std::filesystem::path(utils::string::FromUtf8(utf8_path));
 }
 
 auto has_valid_game_executable(const std::string& game_dir_utf8) -> bool {
@@ -29,28 +29,27 @@ auto has_valid_game_executable(const std::string& game_dir_utf8) -> bool {
 
 auto get_game_directory_from_config(const std::filesystem::path& config_path)
     -> std::expected<std::string, std::string> {
-  constexpr Vendor::Windows::DWORD buffer_size = Vendor::Windows::kMAX_PATH * 2;
+  constexpr DWORD buffer_size = MAX_PATH * 2;
   auto buffer = wil::make_unique_hlocal_nothrow<wchar_t[]>(buffer_size);
   if (!buffer) {
     return std::unexpected("Memory allocation failed");
   }
 
-  Vendor::Windows::DWORD result = Vendor::Windows::GetPrivateProfileStringW(
-      L"Download", L"gameDir", L"", buffer.get(), buffer_size, config_path.wstring().c_str());
+  DWORD result = GetPrivateProfileStringW(L"Download", L"gameDir", L"", buffer.get(), buffer_size,
+                                          config_path.wstring().c_str());
   if (result == 0) {
     return std::unexpected("gameDir not found in config file");
   }
 
-  return Utils::String::ToUtf8(buffer.get());
+  return utils::string::ToUtf8(buffer.get());
 }
 
 auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::string> {
   InfinityNikkiGameDirResult result;
 
   wil::unique_cotaskmem_string local_app_data_path;
-  HRESULT hr = Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_LocalAppData, 0,
-                                                      nullptr, &local_app_data_path);
-  if (!Vendor::Windows::_SUCCEEDED(hr) || !local_app_data_path) {
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local_app_data_path);
+  if (!SUCCEEDED(hr) || !local_app_data_path) {
     result.message = "Failed to get user profile path";
     return result;
   }
@@ -101,4 +100,4 @@ auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::stri
   return result;
 }
 
-}  // namespace Extensions::InfinityNikki::GameDirectory
+}  // namespace extensions::infinity_nikki::game_directory

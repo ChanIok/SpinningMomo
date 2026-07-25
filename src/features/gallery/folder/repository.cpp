@@ -1,19 +1,19 @@
-module;
+#include "features/gallery/folder/repository.hpp"
 
-module Features.Gallery.Folder.Repository;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Database;
-import Core.Database.Types;
-import Features.Gallery.Types;
-import Utils.Logger;
-import Utils.Path;
-import <rfl/json.hpp>;
+#include "vendor/rfl.hpp"
 
-namespace Features::Gallery::Folder::Repository {
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 
-auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder)
+namespace features::gallery::folder::repository {
+
+auto create_folder(core::AppState& app_state, const Folder& folder)
     -> std::expected<std::int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO folders (
@@ -23,23 +23,22 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
             RETURNING id
         )";
 
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   params.push_back(folder.path);
 
-  params.push_back(folder.parent_id.has_value()
-                       ? Core::Database::Types::DbParam{folder.parent_id.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(folder.parent_id.has_value() ? core::database::DbParam{folder.parent_id.value()}
+                                                : core::database::DbParam{std::monostate{}});
 
   params.push_back(folder.name);
 
   params.push_back(folder.display_name.has_value()
-                       ? Core::Database::Types::DbParam{folder.display_name.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{folder.display_name.value()}
+                       : core::database::DbParam{std::monostate{}});
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
 
-  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
+  auto result = core::database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to insert folder: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -48,8 +47,8 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
   return result->value();
 }
 
-auto get_folder_by_path(Core::State::AppState& app_state, const std::string& path)
-    -> std::expected<std::optional<Types::Folder>, std::string> {
+auto get_folder_by_path(core::AppState& app_state, const std::string& path)
+    -> std::expected<std::optional<Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
                    cover_asset_id, sort_order, is_hidden,
@@ -58,9 +57,9 @@ auto get_folder_by_path(Core::State::AppState& app_state, const std::string& pat
             WHERE path = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {path};
+  std::vector<core::database::DbParam> params = {path};
 
-  auto result = Core::Database::query_single<Types::Folder>(app_state, sql, params);
+  auto result = core::database::query_single<Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query folder by path: " + result.error());
   }
@@ -68,8 +67,8 @@ auto get_folder_by_path(Core::State::AppState& app_state, const std::string& pat
   return result.value();
 }
 
-auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<std::optional<Types::Folder>, std::string> {
+auto get_folder_by_id(core::AppState& app_state, std::int64_t id)
+    -> std::expected<std::optional<Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
                    cover_asset_id, sort_order, is_hidden,
@@ -78,9 +77,9 @@ auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
             WHERE id = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::query_single<Types::Folder>(app_state, sql, params);
+  auto result = core::database::query_single<Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query folder by id: " + result.error());
   }
@@ -88,7 +87,7 @@ auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
   return result.value();
 }
 
-auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder)
+auto update_folder(core::AppState& app_state, const Folder& folder)
     -> std::expected<void, std::string> {
   std::string sql = R"(
             UPDATE folders SET
@@ -97,28 +96,27 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
             WHERE id = ?
         )";
 
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   params.push_back(folder.path);
 
-  params.push_back(folder.parent_id.has_value()
-                       ? Core::Database::Types::DbParam{folder.parent_id.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(folder.parent_id.has_value() ? core::database::DbParam{folder.parent_id.value()}
+                                                : core::database::DbParam{std::monostate{}});
 
   params.push_back(folder.name);
 
   params.push_back(folder.display_name.has_value()
-                       ? Core::Database::Types::DbParam{folder.display_name.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{folder.display_name.value()}
+                       : core::database::DbParam{std::monostate{}});
 
   params.push_back(folder.cover_asset_id.has_value()
-                       ? Core::Database::Types::DbParam{folder.cover_asset_id.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+                       ? core::database::DbParam{folder.cover_asset_id.value()}
+                       : core::database::DbParam{std::monostate{}});
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
   params.push_back(folder.id);
 
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to update folder: " + result.error());
   }
@@ -126,13 +124,12 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
   return {};
 }
 
-auto delete_folder(Core::State::AppState& app_state, std::int64_t id)
-    -> std::expected<void, std::string> {
+auto delete_folder(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string> {
   // 暂时实现硬删除，实际项目中可能需要考虑级联删除等问题
   std::string sql = "DELETE FROM folders WHERE id = ?";
-  std::vector<Core::Database::Types::DbParam> params = {id};
+  std::vector<core::database::DbParam> params = {id};
 
-  auto result = Core::Database::execute(app_state, sql, params);
+  auto result = core::database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to delete folder: " + result.error());
   }
@@ -140,8 +137,8 @@ auto delete_folder(Core::State::AppState& app_state, std::int64_t id)
   return {};
 }
 
-auto list_all_folders(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::Folder>, std::string> {
+auto list_all_folders(core::AppState& app_state)
+    -> std::expected<std::vector<Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
                    cover_asset_id, sort_order, is_hidden,
@@ -150,7 +147,7 @@ auto list_all_folders(Core::State::AppState& app_state)
             ORDER BY path
         )";
 
-  auto result = Core::Database::query<Types::Folder>(app_state, sql);
+  auto result = core::database::query<Folder>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to list all folders: " + result.error());
   }
@@ -158,10 +155,10 @@ auto list_all_folders(Core::State::AppState& app_state)
   return result.value();
 }
 
-auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int64_t> parent_id)
-    -> std::expected<std::vector<Types::Folder>, std::string> {
+auto get_child_folders(core::AppState& app_state, std::optional<std::int64_t> parent_id)
+    -> std::expected<std::vector<Folder>, std::string> {
   std::string sql;
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
 
   if (parent_id.has_value()) {
     sql = R"(
@@ -185,7 +182,7 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
         )";
   }
 
-  auto result = Core::Database::query<Types::Folder>(app_state, sql, params);
+  auto result = core::database::query<Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to get child folders: " + result.error());
   }
@@ -193,8 +190,8 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
   return result.value();
 }
 
-auto get_folder_tree(Core::State::AppState& app_state)
-    -> std::expected<std::vector<Types::FolderTreeNode>, std::string> {
+auto get_folder_tree(core::AppState& app_state)
+    -> std::expected<std::vector<FolderTreeNode>, std::string> {
   // 1. 获取所有文件夹
   auto folders_result = list_all_folders(app_state);
   if (!folders_result) {
@@ -218,7 +215,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
     std::int64_t count;
   };
 
-  auto count_result = Core::Database::query<FolderAssetCount>(app_state, count_sql);
+  auto count_result = core::database::query<FolderAssetCount>(app_state, count_sql);
   if (!count_result) {
     return std::unexpected("Failed to query asset counts: " + count_result.error());
   }
@@ -229,24 +226,23 @@ auto get_folder_tree(Core::State::AppState& app_state)
   }
 
   // 2. 创建 id -> FolderTreeNode 的映射，用于快速查找
-  std::unordered_map<std::int64_t, Types::FolderTreeNode> node_map;
+  std::unordered_map<std::int64_t, FolderTreeNode> node_map;
 
   // 第一次遍历：创建所有节点
   for (const auto& folder : folders) {
-    Types::FolderTreeNode node{
-        .id = folder.id,
-        .path = folder.path,
-        .parent_id = folder.parent_id,
-        .name = folder.name,
-        .display_name = folder.display_name,
-        .cover_asset_id = folder.cover_asset_id,
-        .sort_order = folder.sort_order,
-        .is_hidden = folder.is_hidden,
-        .created_at = folder.created_at,
-        .updated_at = folder.updated_at,
-        .is_network = Utils::Path::ClassifyPathStorageKind(std::filesystem::path(folder.path)) ==
-                      Utils::Path::PathStorageKind::RemoteUnc,
-        .children = {}};
+    FolderTreeNode node{.id = folder.id,
+                        .path = folder.path,
+                        .parent_id = folder.parent_id,
+                        .name = folder.name,
+                        .display_name = folder.display_name,
+                        .cover_asset_id = folder.cover_asset_id,
+                        .sort_order = folder.sort_order,
+                        .is_hidden = folder.is_hidden,
+                        .created_at = folder.created_at,
+                        .updated_at = folder.updated_at,
+                        .is_network = utils::path::ClassifyPathStorageKind(std::filesystem::path(
+                                          folder.path)) == utils::path::PathStorageKind::RemoteUnc,
+                        .children = {}};
 
     node_map[folder.id] = std::move(node);
   }
@@ -266,14 +262,14 @@ auto get_folder_tree(Core::State::AppState& app_state)
   }
 
   // 4. 递归构建树结构
-  auto build_tree = [&](this auto&& self, std::int64_t folder_id) -> Types::FolderTreeNode {
+  auto build_tree = [&](this auto&& self, std::int64_t folder_id) -> FolderTreeNode {
     auto node_it = node_map.find(folder_id);
     if (node_it == node_map.end()) {
       Logger().error("Folder {} not found in node_map", folder_id);
-      return Types::FolderTreeNode{};
+      return FolderTreeNode{};
     }
 
-    Types::FolderTreeNode node = std::move(node_it->second);
+    FolderTreeNode node = std::move(node_it->second);
 
     // 递归构建子节点
     auto children_it = parent_to_children.find(folder_id);
@@ -287,14 +283,14 @@ auto get_folder_tree(Core::State::AppState& app_state)
   };
 
   // 5. 构建所有根节点
-  std::vector<Types::FolderTreeNode> root_nodes;
+  std::vector<FolderTreeNode> root_nodes;
   for (std::int64_t root_id : root_ids) {
     root_nodes.push_back(build_tree(root_id));
   }
 
   // 6. 对根节点按 sort_order 和 name 排序
   std::sort(root_nodes.begin(), root_nodes.end(),
-            [](const Types::FolderTreeNode& a, const Types::FolderTreeNode& b) {
+            [](const FolderTreeNode& a, const FolderTreeNode& b) {
               if (a.sort_order != b.sort_order) {
                 return a.sort_order < b.sort_order;
               }
@@ -302,9 +298,9 @@ auto get_folder_tree(Core::State::AppState& app_state)
             });
 
   // 递归排序所有子节点
-  auto sort_children = [&](this auto&& self, Types::FolderTreeNode& node) -> void {
+  auto sort_children = [&](this auto&& self, FolderTreeNode& node) -> void {
     std::sort(node.children.begin(), node.children.end(),
-              [](const Types::FolderTreeNode& a, const Types::FolderTreeNode& b) {
+              [](const FolderTreeNode& a, const FolderTreeNode& b) {
                 if (a.sort_order != b.sort_order) {
                   return a.sort_order < b.sort_order;
                 }
@@ -321,7 +317,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
   }
 
   // 7. 递归计算每个文件夹的 asset_count（包含所有子文件夹）
-  auto calculate_total_assets = [&](this auto&& self, Types::FolderTreeNode& node) -> std::int64_t {
+  auto calculate_total_assets = [&](this auto&& self, FolderTreeNode& node) -> std::int64_t {
     // 当前文件夹的直接 assets 数量
     std::int64_t total = 0;
     auto it = direct_asset_counts.find(node.id);
@@ -347,4 +343,4 @@ auto get_folder_tree(Core::State::AppState& app_state)
   return root_nodes;
 }
 
-}  // namespace Features::Gallery::Folder::Repository
+}  // namespace features::gallery::folder::repository

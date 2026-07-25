@@ -1,23 +1,23 @@
-module;
+#include "features/letterbox/letterbox.hpp"
 
-module Features.Letterbox;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Letterbox.State;
-import UI.FloatingWindow.State;
-import Utils.Display;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
 
-namespace Features::Letterbox {
+#include "core/state/app_state.hpp"
+#include "features/letterbox/state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "utils/display/display.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace features::letterbox {
 
 // 全局状态指针，用于钩子回调
-Core::State::AppState* g_app_state = nullptr;
+core::AppState* g_app_state = nullptr;
 
 // 检查是否需要显示letterbox（相对工作显示器判断）
-auto needs_letterbox(HWND target_window, const Utils::Display::MonitorInfo& working_monitor)
+auto needs_letterbox(HWND target_window, const utils::display::MonitorInfo& working_monitor)
     -> bool {
   if (!target_window || !IsWindow(target_window)) {
     return false;
@@ -28,15 +28,15 @@ auto needs_letterbox(HWND target_window, const Utils::Display::MonitorInfo& work
   int window_width = rect.right - rect.left;
   int window_height = rect.bottom - rect.top;
 
-  int screen_width = Utils::Display::rect_width(working_monitor.monitor_rect);
-  int screen_height = Utils::Display::rect_height(working_monitor.monitor_rect);
+  int screen_width = utils::display::rect_width(working_monitor.monitor_rect);
+  int screen_height = utils::display::rect_height(working_monitor.monitor_rect);
 
   return ((window_width >= screen_width && window_height < screen_height) ||
           (window_height >= screen_height && window_width < screen_width));
 }
 
 // 更新位置
-auto update_position(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto update_position(core::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
@@ -54,37 +54,37 @@ auto update_position(Core::State::AppState& state) -> std::expected<void, std::s
   }
 
   const auto& fw = *state.floating_window;
-  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     [[maybe_unused]] auto hide_result = hide(state);
     return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
   const auto& screen_rect = monitor_info->monitor_rect;
-  int screen_width = Utils::Display::rect_width(screen_rect);
-  int screen_height = Utils::Display::rect_height(screen_rect);
+  int screen_width = utils::display::rect_width(screen_rect);
+  int screen_height = utils::display::rect_height(screen_rect);
 
   // 设置letterbox窗口为全屏
   SetWindowPos(letterbox.window_handle, letterbox.target_window, screen_rect.left, screen_rect.top,
                screen_width, screen_height, SWP_NOACTIVATE);
 
   // 设置计时器处理任务栏置底
-  SetTimer(letterbox.window_handle, State::TIMER_TASKBAR_ZORDER, 10, nullptr);
+  SetTimer(letterbox.window_handle, TIMER_TASKBAR_ZORDER, 10, nullptr);
 
   return {};
 }
 
 // 静态回调函数实现
 LRESULT CALLBACK letterbox_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  core::AppState* state = nullptr;
 
   // 添加WM_NCCREATE处理逻辑
   if (message == WM_NCCREATE) {
     const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = reinterpret_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   // 添加空状态检查
@@ -96,11 +96,11 @@ LRESULT CALLBACK letterbox_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPAR
 
   switch (message) {
     case WM_TIMER:
-      if (wParam == State::TIMER_TASKBAR_ZORDER) {
+      if (wParam == TIMER_TASKBAR_ZORDER) {
         if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
           SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
-        KillTimer(hwnd, State::TIMER_TASKBAR_ZORDER);
+        KillTimer(hwnd, TIMER_TASKBAR_ZORDER);
       }
       break;
 
@@ -111,7 +111,7 @@ LRESULT CALLBACK letterbox_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPAR
         SetForegroundWindow(letterbox.target_window);
         SetWindowPos(letterbox.window_handle, letterbox.target_window, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        SetTimer(letterbox.window_handle, State::TIMER_TASKBAR_ZORDER, 10, nullptr);
+        SetTimer(letterbox.window_handle, TIMER_TASKBAR_ZORDER, 10, nullptr);
       }
       break;
   }
@@ -137,7 +137,7 @@ auto register_window_class(HINSTANCE instance) -> std::expected<void, std::strin
   return {};
 }
 
-auto create_letterbox_window(State::LetterboxState& letterbox, Core::State::AppState* state)
+auto create_letterbox_window(LetterboxState& letterbox, core::AppState* state)
     -> std::expected<void, std::string> {
   letterbox.window_handle = CreateWindowExW(WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
                                             L"LetterboxWindowClass", L"Letterbox", WS_POPUP, 0, 0,
@@ -154,8 +154,7 @@ auto create_letterbox_window(State::LetterboxState& letterbox, Core::State::AppS
 }
 
 // 初始化
-auto initialize(Core::State::AppState& state, HINSTANCE instance)
-    -> std::expected<void, std::string> {
+auto initialize(core::AppState& state, HINSTANCE instance) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (letterbox.is_initialized) {
@@ -182,15 +181,15 @@ auto initialize(Core::State::AppState& state, HINSTANCE instance)
 }
 
 LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  core::AppState* state = nullptr;
 
   // 添加WM_NCCREATE处理逻辑
   if (message == WM_NCCREATE) {
     const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = reinterpret_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   // 添加空状态检查
@@ -199,7 +198,7 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
   }
 
   switch (message) {
-    case State::WM_TARGET_WINDOW_FOREGROUND: {
+    case WM_TARGET_WINDOW_FOREGROUND: {
       if (!IsWindowVisible(hwnd)) {
         [[maybe_unused]] auto result = show(*state);
       } else {
@@ -208,12 +207,12 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
       break;
     }
 
-    case State::WM_HIDE_LETTERBOX: {
+    case WM_HIDE_LETTERBOX: {
       [[maybe_unused]] auto result = hide(*state);
       break;
     }
 
-    case State::WM_SHOW_LETTERBOX: {
+    case WM_SHOW_LETTERBOX: {
       [[maybe_unused]] auto result = show(*state);
       break;
     }
@@ -237,22 +236,22 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   if (hwnd == letterbox.target_window) {
     switch (event) {
       case EVENT_SYSTEM_FOREGROUND:
-        PostMessage(letterbox.message_window, State::WM_TARGET_WINDOW_FOREGROUND, 0, 0);
+        PostMessage(letterbox.message_window, WM_TARGET_WINDOW_FOREGROUND, 0, 0);
         break;
 
       case EVENT_SYSTEM_MINIMIZESTART:
-        PostMessage(letterbox.message_window, State::WM_HIDE_LETTERBOX, 0, 0);
+        PostMessage(letterbox.message_window, WM_HIDE_LETTERBOX, 0, 0);
         break;
 
       case EVENT_OBJECT_DESTROY:
-        PostMessage(letterbox.message_window, State::WM_HIDE_LETTERBOX, 0, 0);
+        PostMessage(letterbox.message_window, WM_HIDE_LETTERBOX, 0, 0);
         break;
     }
   }
 }
 
-auto event_thread_proc(Core::State::AppState& state, std::stop_token stoken,
-                       const State::LetterboxConfig& config) -> void {
+auto event_thread_proc(core::AppState& state, std::stop_token stoken, const LetterboxConfig& config)
+    -> void {
   auto& letterbox = *state.letterbox;
 
   // 保存线程ID
@@ -314,7 +313,7 @@ auto event_thread_proc(Core::State::AppState& state, std::stop_token stoken,
 }
 
 // 启动事件监听
-auto start_event_monitoring(Core::State::AppState& state, const State::LetterboxConfig& config)
+auto start_event_monitoring(core::AppState& state, const LetterboxConfig& config)
     -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
@@ -332,7 +331,7 @@ auto start_event_monitoring(Core::State::AppState& state, const State::Letterbox
 }
 
 // 显示
-auto show(Core::State::AppState& state, HWND target_window) -> std::expected<void, std::string> {
+auto show(core::AppState& state, HWND target_window) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   // 检查Letterbox是否已初始化，如果未初始化则进行初始化
@@ -357,7 +356,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
   }
 
   const auto& fw = *state.floating_window;
-  auto working_monitor = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto working_monitor = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!working_monitor) {
     return std::unexpected{"Failed to resolve working monitor: " + working_monitor.error()};
   }
@@ -370,7 +369,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
 
   // 确保事件监听线程已启动
   if (!state.letterbox->event_thread.joinable()) {
-    if (auto result = start_event_monitoring(state, State::LetterboxConfig{}); !result) {
+    if (auto result = start_event_monitoring(state, LetterboxConfig{}); !result) {
       return std::unexpected{"Failed to start event monitoring: " + result.error()};
     }
   }
@@ -385,7 +384,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
 }
 
 // 隐藏
-auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto hide(core::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
@@ -400,7 +399,7 @@ auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
 }
 
 // 停止事件监听
-auto stop_event_monitoring(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto stop_event_monitoring(core::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (letterbox.event_thread.joinable()) {
@@ -420,7 +419,7 @@ auto stop_event_monitoring(Core::State::AppState& state) -> std::expected<void, 
 }
 
 // 关闭
-auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto shutdown(core::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
@@ -454,4 +453,4 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
   return {};
 }
 
-}  // namespace Features::Letterbox
+}  // namespace features::letterbox

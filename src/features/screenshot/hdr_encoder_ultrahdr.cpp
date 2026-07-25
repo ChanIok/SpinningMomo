@@ -1,14 +1,14 @@
-module;
 
-module Features.Screenshot.HdrEncoder;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Image;
-import <windows.h>;
+#include "vendor/windows.hpp"
 
-namespace Features::Screenshot::HdrEncoder {
+#include "features/screenshot/hdr_encoder.hpp"
+#include "utils/image/image.hpp"
 
-namespace LocalUltraHdr {
+namespace features::screenshot::hdr_encoder {
+
+namespace local_ultra_hdr {
 
 constexpr std::uint8_t kJpegMarkerPrefix = 0xFF;
 constexpr std::uint8_t kJpegMarkerSoi = 0xD8;
@@ -652,7 +652,7 @@ auto assemble_ultrahdr_jpeg(std::span<const std::uint8_t> base_jpeg,
   return out;
 }
 
-}  // namespace LocalUltraHdr
+}  // namespace local_ultra_hdr
 
 auto build_gainmap_metadata(const UltraHdrPreparedImages& images,
                             const UltraHdrEncodeOptions& options) -> GainMapMetadata {
@@ -679,11 +679,11 @@ auto build_gainmap_metadata(const UltraHdrPreparedImages& images,
 auto encode_bgra_layer_to_jpeg(const std::vector<std::uint8_t>& pixels, std::uint32_t width,
                                std::uint32_t height, float jpeg_quality)
     -> std::expected<std::vector<std::uint8_t>, std::string> {
-  auto factory_result = Utils::Image::get_thread_wic_factory();
+  auto factory_result = utils::image::get_thread_wic_factory();
   if (!factory_result) {
     return std::unexpected(factory_result.error());
   }
-  return Utils::Image::encode_bgra_to_jpeg_bytes(factory_result->get(), pixels.data(), width,
+  return utils::image::encode_bgra_to_jpeg_bytes(factory_result->get(), pixels.data(), width,
                                                  height, width * 4, jpeg_quality);
 }
 
@@ -735,7 +735,7 @@ auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
     return std::unexpected("Gain map JPEG encode failed: " + gainmap_jpeg.error());
   }
 
-  return LocalUltraHdr::assemble_ultrahdr_jpeg(base_jpeg.value(), gainmap_jpeg.value(), metadata);
+  return local_ultra_hdr::assemble_ultrahdr_jpeg(base_jpeg.value(), gainmap_jpeg.value(), metadata);
 }
 
 auto write_file(const std::wstring& file_path, const std::vector<std::uint8_t>& data)
@@ -754,4 +754,4 @@ auto write_file(const std::wstring& file_path, const std::vector<std::uint8_t>& 
   return {};
 }
 
-}  // namespace Features::Screenshot::HdrEncoder
+}  // namespace features::screenshot::hdr_encoder

@@ -9,17 +9,22 @@
 
 ## 架构与代码规范说明
 
-本项目核心采用 C++23 Modules 与 Vue 3 混合双端架构。
-关于详细的设计哲学、C++ 组件系统划分以及所有的模块依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
+本项目核心采用 C++23 原生后端与 Vue 3 Web 前端的混合双端架构。C++ 后端使用
+`.hpp + .cpp + PCH`，所有项目头保持自包含，PCH 只负责构建加速。
+项目代码通过 `src/vendor/` 下的精确门面引入外部头；Windows SDK 门面与物理头文件
+一一对应，避免领域聚合头把不相关调用点和 PCH 绑定在一起。
+关于详细的设计哲学、C++ 组件划分以及依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
 
 ## 环境要求
 
+C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）进行日常开发，正式发布使用 MSVC。
+
 | 工具 | 要求 | 说明 |
 |------|------|------|
-| **Visual Studio 2026** | 含「使用 C++ 的桌面开发」工作负载 | |
+| **Visual Studio 2026 / Build Tools** | 安装「使用 C++ 的桌面开发」及 C++ Clang 工具 | Visual Studio IDE 可选 |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
-| **xmake** | 最新版 | C++ 构建系统 |
+| **xmake** | 3.0.9+ | C++ 构建系统 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
 
 ### 安装 xmake
@@ -65,13 +70,40 @@ npm ci --prefix web
 
 ```bash
 node scripts/patch-xmake-7554.js
+node scripts/patch-xmake-clang-cl-cxx23.js
+
+# Clang-cl + LLD（默认）
+xmake f --toolchain="clang-cl[llvm]" -y
+
+# 或使用 MSVC
+# xmake f --toolchain=msvc -y
+
 xmake f -m release -y && xmake f -m debug -y
-npm run patch:vcpkg
+node scripts/patch-vcpkg.js
+```
+
+---
+
+## 使用 Visual Studio IDE 开发（可选）
+
+如需使用 Visual Studio 浏览、编辑和调试 C++ 代码，可生成由 Xmake 管理的解决方案：
+
+```powershell
+xmake vs
+```
+
+生成后打开：
+
+```text
+vsxmake2026\SpinningMomo.sln
 ```
 
 ---
 
 ## 构建
+
+> [!TIP]
+> 如果在本地搭建或构建过程中遇到工具链、依赖或环境问题，建议参考 GitHub CI 的 [Build Release 工作流](https://github.com/ChanIok/SpinningMomo/blob/main/.github/workflows/build-release.yml)，它记录了当前最新且自动化跑通的标准环境配置与构建顺序。
 
 ### 完整构建（推荐）
 
@@ -93,7 +125,7 @@ xmake build
 xmake release    # 构建 release 后自动恢复 debug 配置
 
 # Web 前端
-cd web && npm run build
+npm run build --prefix web
 
 # 打包 dist/（汇总 exe + web 资源）
 npm run build:prepare

@@ -1,18 +1,20 @@
-module Core.HttpClient;
+#include "core/http_client/http_client.hpp"
 
-import std;
-import Core.State;
-import Core.HttpClient.State;
-import Core.HttpClient.Types;
-import Utils.Logger;
-import Utils.String;
-import Vendor.WinHttp;
-import <asio.hpp>;
-import <windows.h>;
+#include "vendor/std.hpp"
 
-namespace Core::HttpClient::Detail {
+#include "vendor/asio.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/winhttp.hpp"
 
-using RequestOperation = Core::HttpClient::State::RequestOperation;
+#include "core/http_client/state.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace core::http_client::detail {
+
+using RequestOperation = core::http_client::RequestOperation;
 
 // 延长异步操作生命周期，确保在底层 WinHTTP 回调结束前对象不被析构
 auto acquire_keepalive(RequestOperation* operation) -> std::shared_ptr<RequestOperation> {
@@ -47,7 +49,7 @@ auto notify_waiter(RequestOperation& operation) -> void {
 
 auto close_connect_handle(RequestOperation& operation) -> void {
   if (operation.connect_handle != nullptr) {
-    Vendor::WinHttp::WinHttpCloseHandle(operation.connect_handle);
+    WinHttpCloseHandle(operation.connect_handle);
     operation.connect_handle = nullptr;
   }
 }
@@ -61,7 +63,7 @@ auto close_request_handle(RequestOperation& operation) -> void {
   if (operation.close_requested.exchange(true)) {
     return;
   }
-  Vendor::WinHttp::WinHttpCloseHandle(operation.request_handle);
+  WinHttpCloseHandle(operation.request_handle);
   if (!operation.callback_registered) {
     operation.request_handle = nullptr;
   }
@@ -69,7 +71,7 @@ auto close_request_handle(RequestOperation& operation) -> void {
 
 // 完成整个操作周期：保存结果、清理所有关联的 WinHTTP 句柄并唤醒等待的协程
 auto complete_operation(std::shared_ptr<RequestOperation> operation,
-                        std::expected<Types::Response, std::string> result) -> void {
+                        std::expected<Response, std::string> result) -> void {
   if (operation == nullptr) {
     return;
   }
@@ -96,7 +98,7 @@ auto complete_with_error(std::shared_ptr<RequestOperation> operation, std::strin
 // 将 UTF-8 编码的字符串转换为 WinHTTP 接口所需的宽字符串（UTF-16）
 auto to_wide_utf8(const std::string& value, std::string_view field_name)
     -> std::expected<std::wstring, std::string> {
-  auto wide = Utils::String::FromUtf8(value);
+  auto wide = utils::string::FromUtf8(value);
   if (!value.empty() && wide.empty()) {
     return std::unexpected(std::format("Invalid UTF-8 for {}", field_name));
   }
@@ -124,8 +126,8 @@ auto trim_wstring(std::wstring_view value) -> std::wstring_view {
 }
 
 // 逐行解析 WinHTTP 返回的原始响应头字符串，过滤状态行并拆分键值对
-auto parse_raw_headers(std::wstring_view raw_headers) -> std::vector<Types::Header> {
-  std::vector<Types::Header> headers;
+auto parse_raw_headers(std::wstring_view raw_headers) -> std::vector<Header> {
+  std::vector<Header> headers;
 
   size_t cursor = 0;
   bool skipped_status_line = false;
@@ -157,9 +159,9 @@ auto parse_raw_headers(std::wstring_view raw_headers) -> std::vector<Types::Head
       continue;
     }
 
-    headers.push_back(Types::Header{
-        .name = Utils::String::ToUtf8(std::wstring(name)),
-        .value = Utils::String::ToUtf8(std::wstring(value)),
+    headers.push_back(Header{
+        .name = utils::string::ToUtf8(std::wstring(name)),
+        .value = utils::string::ToUtf8(std::wstring(value)),
     });
   }
 
@@ -167,14 +169,14 @@ auto parse_raw_headers(std::wstring_view raw_headers) -> std::vector<Types::Head
 }
 
 // 从响应头中查找 Content-Length 并解析为无符号整数；服务器不保证提供，失败时返回 nullopt
-auto find_content_length(const Types::Response& response) -> std::optional<std::uint64_t> {
+auto find_content_length(const Response& response) -> std::optional<std::uint64_t> {
   for (const auto& header : response.headers) {
-    if (Utils::String::ToLowerAscii(header.name) != "content-length") {
+    if (utils::string::ToLowerAscii(header.name) != "content-length") {
       continue;
     }
 
     try {
-      return static_cast<std::uint64_t>(std::stoull(Utils::String::TrimAscii(header.value)));
+      return static_cast<std::uint64_t>(std::stoull(utils::string::TrimAscii(header.value)));
     } catch (...) {
       return std::nullopt;
     }
@@ -189,7 +191,7 @@ auto emit_download_progress(RequestOperation& operation) -> void {
     return;
   }
 
-  operation.download->progress_callback(Types::DownloadProgress{
+  operation.download->progress_callback(DownloadProgress{
       .downloaded_bytes = operation.download->downloaded_bytes,
       .total_bytes = operation.download->total_bytes,
   });
@@ -224,16 +226,15 @@ auto parse_request_url(RequestOperation& operation) -> std::expected<void, std::
   }
   operation.wide_url = std::move(wide_url_result.value());
 
-  Vendor::WinHttp::URL_COMPONENTS components{};
+  URL_COMPONENTS components{};
   components.dwStructSize = sizeof(components);
-  components.dwSchemeLength = static_cast<Vendor::WinHttp::DWORD>(-1);
-  components.dwHostNameLength = static_cast<Vendor::WinHttp::DWORD>(-1);
-  components.dwUrlPathLength = static_cast<Vendor::WinHttp::DWORD>(-1);
-  components.dwExtraInfoLength = static_cast<Vendor::WinHttp::DWORD>(-1);
+  components.dwSchemeLength = static_cast<DWORD>(-1);
+  components.dwHostNameLength = static_cast<DWORD>(-1);
+  components.dwUrlPathLength = static_cast<DWORD>(-1);
+  components.dwExtraInfoLength = static_cast<DWORD>(-1);
 
-  if (!Vendor::WinHttp::WinHttpCrackUrl(
-          operation.wide_url.c_str(),
-          static_cast<Vendor::WinHttp::DWORD>(operation.wide_url.size()), 0, &components)) {
+  if (!WinHttpCrackUrl(operation.wide_url.c_str(), static_cast<DWORD>(operation.wide_url.size()), 0,
+                       &components)) {
     return std::unexpected(make_winhttp_error("WinHttpCrackUrl"));
   }
 
@@ -255,7 +256,7 @@ auto parse_request_url(RequestOperation& operation) -> std::expected<void, std::
   }
 
   operation.port = components.nPort;
-  operation.secure = components.nScheme == Vendor::WinHttp::kINTERNET_SCHEME_HTTPS;
+  operation.secure = components.nScheme == INTERNET_SCHEME_HTTPS;
   return {};
 }
 
@@ -288,13 +289,12 @@ auto build_request_headers(RequestOperation& operation) -> std::expected<void, s
 
 // 从 WinHTTP 句柄中读取 HTTP 状态码（如 200、404）并写入 response
 auto query_response_status(RequestOperation& operation) -> std::expected<void, std::string> {
-  Vendor::WinHttp::DWORD status_code = 0;
-  Vendor::WinHttp::DWORD status_size = sizeof(status_code);
+  DWORD status_code = 0;
+  DWORD status_size = sizeof(status_code);
 
-  if (!Vendor::WinHttp::WinHttpQueryHeaders(
-          operation.request_handle,
-          Vendor::WinHttp::kWINHTTP_QUERY_STATUS_CODE | Vendor::WinHttp::kWINHTTP_QUERY_FLAG_NUMBER,
-          Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_size, nullptr)) {
+  if (!WinHttpQueryHeaders(operation.request_handle,
+                           WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                           WINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_size, nullptr)) {
     return std::unexpected(make_winhttp_error("WinHttpQueryHeaders(status)"));
   }
 
@@ -304,19 +304,17 @@ auto query_response_status(RequestOperation& operation) -> std::expected<void, s
 
 // 查询并解析完整响应头列表，解析失败时静默跳过（状态码已单独提取）
 auto query_response_headers(RequestOperation& operation) -> void {
-  Vendor::WinHttp::DWORD header_size = 0;
-  (void)Vendor::WinHttp::WinHttpQueryHeaders(
-      operation.request_handle, Vendor::WinHttp::kWINHTTP_QUERY_RAW_HEADERS_CRLF,
-      Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX, nullptr, &header_size, nullptr);
+  DWORD header_size = 0;
+  (void)WinHttpQueryHeaders(operation.request_handle, WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                            WINHTTP_HEADER_NAME_BY_INDEX, nullptr, &header_size, nullptr);
   if (header_size == 0) {
     return;
   }
 
   std::wstring raw_headers(header_size / sizeof(wchar_t), L'\0');
-  if (!Vendor::WinHttp::WinHttpQueryHeaders(operation.request_handle,
-                                            Vendor::WinHttp::kWINHTTP_QUERY_RAW_HEADERS_CRLF,
-                                            Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX,
-                                            raw_headers.data(), &header_size, nullptr)) {
+  if (!WinHttpQueryHeaders(operation.request_handle, WINHTTP_QUERY_RAW_HEADERS_CRLF,
+                           WINHTTP_HEADER_NAME_BY_INDEX, raw_headers.data(), &header_size,
+                           nullptr)) {
     return;
   }
 
@@ -329,7 +327,7 @@ auto query_response_headers(RequestOperation& operation) -> void {
 // 向 WinHTTP 查询当前可读字节数，触发后续 DATA_AVAILABLE 回调
 auto request_more_data(std::shared_ptr<RequestOperation> operation)
     -> std::expected<void, std::string> {
-  if (!Vendor::WinHttp::WinHttpQueryDataAvailable(operation->request_handle, nullptr)) {
+  if (!WinHttpQueryDataAvailable(operation->request_handle, nullptr)) {
     return std::unexpected(make_winhttp_error("WinHttpQueryDataAvailable"));
   }
   return {};
@@ -353,11 +351,9 @@ auto post_status_callback(std::shared_ptr<RequestOperation> operation, F&& fn) -
 }
 
 // WinHTTP 核心异步回调函数：由系统底层触发，负责处理连接、收发数据等不同阶段的状态变更
-auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
-                                      Vendor::WinHttp::DWORD_PTR context,
-                                      Vendor::WinHttp::DWORD internet_status,
-                                      Vendor::WinHttp::LPVOID status_information,
-                                      Vendor::WinHttp::DWORD status_information_length) -> void {
+auto CALLBACK winhttp_status_callback(HINTERNET h_internet, DWORD_PTR context,
+                                      DWORD internet_status, LPVOID status_information,
+                                      DWORD status_information_length) -> void {
   auto* raw_operation = reinterpret_cast<RequestOperation*>(context);
   auto operation = acquire_keepalive(raw_operation);
   if (!operation) {
@@ -365,19 +361,19 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
   }
 
   switch (internet_status) {
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE: {
+    case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE: {
       post_status_callback(operation, [operation]() mutable {
         if (operation->completed.load()) {
           return;
         }
         // 请求发送完毕，开始等待并接收服务器的响应
-        if (!Vendor::WinHttp::WinHttpReceiveResponse(operation->request_handle, nullptr)) {
+        if (!WinHttpReceiveResponse(operation->request_handle, nullptr)) {
           complete_with_error(operation, make_winhttp_error("WinHttpReceiveResponse"));
         }
       });
       break;
     }
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE: {
+    case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE: {
       post_status_callback(operation, [operation]() mutable {
         if (operation->completed.load()) {
           return;
@@ -403,8 +399,8 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
       });
       break;
     }
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_DATA_AVAILABLE: {
-      auto available_bytes = *reinterpret_cast<Vendor::WinHttp::DWORD*>(status_information);
+    case WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE: {
+      auto available_bytes = *reinterpret_cast<DWORD*>(status_information);
 
       post_status_callback(operation, [operation, available_bytes]() mutable {
         if (operation->completed.load()) {
@@ -417,17 +413,17 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
         }
 
         // 发起异步读取操作，将数据读入预分配的内部 buffer 中
-        auto bytes_to_read = static_cast<Vendor::WinHttp::DWORD>(
+        auto bytes_to_read = static_cast<DWORD>(
             std::min<std::size_t>(available_bytes, operation->read_buffer.size()));
 
-        if (!Vendor::WinHttp::WinHttpReadData(
-                operation->request_handle, operation->read_buffer.data(), bytes_to_read, nullptr)) {
+        if (!WinHttpReadData(operation->request_handle, operation->read_buffer.data(),
+                             bytes_to_read, nullptr)) {
           complete_with_error(operation, make_winhttp_error("WinHttpReadData"));
         }
       });
       break;
     }
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_READ_COMPLETE: {
+    case WINHTTP_CALLBACK_STATUS_READ_COMPLETE: {
       auto bytes_read = static_cast<std::size_t>(status_information_length);
       post_status_callback(operation, [operation, bytes_read]() mutable {
         if (operation->completed.load()) {
@@ -468,9 +464,8 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
       });
       break;
     }
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
-      auto async_result =
-          *reinterpret_cast<Vendor::WinHttp::WINHTTP_ASYNC_RESULT*>(status_information);
+    case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
+      auto async_result = *reinterpret_cast<WINHTTP_ASYNC_RESULT*>(status_information);
 
       post_status_callback(operation, [operation, async_result]() mutable {
         if (operation->completed.load()) {
@@ -481,7 +476,7 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
       });
       break;
     }
-    case Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_HANDLE_CLOSING: {
+    case WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING: {
       post_status_callback(operation, [operation, h_internet]() mutable {
         if (operation->request_handle == h_internet) {
           operation->request_handle = nullptr;
@@ -501,7 +496,7 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
 
 // 解析请求参数、创建且配置相应的 WinHTTP 连接和请求句柄，绑定异步回调后开始发送。
 // 若此函数返回错误，说明请求完全未进入系统队列，调用方需自行释放 keepalive。
-auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOperation> operation)
+auto prepare_operation(HttpClientState& state, std::shared_ptr<RequestOperation> operation)
     -> std::expected<void, std::string> {
   operation->request.method = normalize_method(operation->request.method);
   operation->request_body.assign(operation->request.body.begin(), operation->request.body.end());
@@ -520,19 +515,17 @@ auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOpe
   }
 
   // 第一步：创建一个到目标主机端口的连接 (Connect)
-  operation->connect_handle = Vendor::WinHttp::WinHttpConnect(
-      state.session.get(), operation->wide_host.c_str(), operation->port, 0);
+  operation->connect_handle =
+      WinHttpConnect(state.session.get(), operation->wide_host.c_str(), operation->port, 0);
   if (operation->connect_handle == nullptr) {
     return std::unexpected(make_winhttp_error("WinHttpConnect"));
   }
 
   // 第二步：利用上面建立的连接去初始化一个特定 URI 的请求句柄 (Request)
-  Vendor::WinHttp::DWORD request_flags =
-      operation->secure ? Vendor::WinHttp::kWINHTTP_FLAG_SECURE : 0;
-  operation->request_handle = Vendor::WinHttp::WinHttpOpenRequest(
+  DWORD request_flags = operation->secure ? WINHTTP_FLAG_SECURE : 0;
+  operation->request_handle = WinHttpOpenRequest(
       operation->connect_handle, operation->wide_method.c_str(), operation->wide_path.c_str(),
-      nullptr, Vendor::WinHttp::kWINHTTP_NO_REFERER, Vendor::WinHttp::kWINHTTP_DEFAULT_ACCEPT_TYPES,
-      request_flags);
+      nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, request_flags);
   if (operation->request_handle == nullptr) {
     close_connect_handle(*operation);
     return std::unexpected(make_winhttp_error("WinHttpOpenRequest"));
@@ -541,8 +534,8 @@ auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOpe
   int connect_timeout = operation->request.connect_timeout_ms.value_or(state.connect_timeout_ms);
   int send_timeout = operation->request.send_timeout_ms.value_or(state.send_timeout_ms);
   int receive_timeout = operation->request.receive_timeout_ms.value_or(state.receive_timeout_ms);
-  if (!Vendor::WinHttp::WinHttpSetTimeouts(operation->request_handle, state.resolve_timeout_ms,
-                                           connect_timeout, send_timeout, receive_timeout)) {
+  if (!WinHttpSetTimeouts(operation->request_handle, state.resolve_timeout_ms, connect_timeout,
+                          send_timeout, receive_timeout)) {
     close_request_handle(*operation);
     close_connect_handle(*operation);
     return std::unexpected(make_winhttp_error("WinHttpSetTimeouts"));
@@ -550,46 +543,39 @@ auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOpe
 
   // 绑定上下文：非常关键，将 operation 指针与该请求句柄关联，后续 WinHTTP
   // 回调才能拿到我们的操作上下文
-  Vendor::WinHttp::DWORD_PTR context =
-      reinterpret_cast<Vendor::WinHttp::DWORD_PTR>(operation.get());
-  if (!Vendor::WinHttp::WinHttpSetOption(operation->request_handle,
-                                         Vendor::WinHttp::kWINHTTP_OPTION_CONTEXT_VALUE, &context,
-                                         sizeof(context))) {
+  DWORD_PTR context = reinterpret_cast<DWORD_PTR>(operation.get());
+  if (!WinHttpSetOption(operation->request_handle, WINHTTP_OPTION_CONTEXT_VALUE, &context,
+                        sizeof(context))) {
     close_request_handle(*operation);
     close_connect_handle(*operation);
     return std::unexpected(make_winhttp_error("WinHttpSetOption(context)"));
   }
 
   // 设置我们感兴趣的 WinHTTP 异步回调阶段，并挂载 winhttp_status_callback
-  auto callback_flags = Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE |
-                        Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE |
-                        Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_DATA_AVAILABLE |
-                        Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_READ_COMPLETE |
-                        Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_REQUEST_ERROR |
-                        Vendor::WinHttp::kWINHTTP_CALLBACK_STATUS_HANDLE_CLOSING;
-  auto callback_result = Vendor::WinHttp::WinHttpSetStatusCallback(
-      operation->request_handle, winhttp_status_callback, callback_flags, 0);
-  if (callback_result == Vendor::WinHttp::kWINHTTP_INVALID_STATUS_CALLBACK) {
+  auto callback_flags =
+      WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE | WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE |
+      WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE | WINHTTP_CALLBACK_STATUS_READ_COMPLETE |
+      WINHTTP_CALLBACK_STATUS_REQUEST_ERROR | WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING;
+  auto callback_result = WinHttpSetStatusCallback(operation->request_handle,
+                                                  winhttp_status_callback, callback_flags, 0);
+  if (callback_result == WINHTTP_INVALID_STATUS_CALLBACK) {
     close_request_handle(*operation);
     close_connect_handle(*operation);
     return std::unexpected(make_winhttp_error("WinHttpSetStatusCallback"));
   }
   operation->callback_registered = true;
 
-  const wchar_t* header_ptr = operation->wide_headers.empty()
-                                  ? Vendor::WinHttp::kWINHTTP_NO_ADDITIONAL_HEADERS
-                                  : operation->wide_headers.c_str();
-  auto header_len = operation->wide_headers.empty()
-                        ? 0
-                        : static_cast<Vendor::WinHttp::DWORD>(operation->wide_headers.size());
+  const wchar_t* header_ptr = operation->wide_headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS
+                                                              : operation->wide_headers.c_str();
+  auto header_len =
+      operation->wide_headers.empty() ? 0 : static_cast<DWORD>(operation->wide_headers.size());
 
-  auto body_size = static_cast<Vendor::WinHttp::DWORD>(operation->request_body.size());
-  void* request_data =
-      body_size == 0 ? Vendor::WinHttp::kWINHTTP_NO_REQUEST_DATA : operation->request_body.data();
+  auto body_size = static_cast<DWORD>(operation->request_body.size());
+  void* request_data = body_size == 0 ? WINHTTP_NO_REQUEST_DATA : operation->request_body.data();
 
   // 第三步：将请求头发往服务器，由于设定了 ASYNC 标志，此函数会立刻返回，后续流程交由系统回调处理
-  if (!Vendor::WinHttp::WinHttpSendRequest(operation->request_handle, header_ptr, header_len,
-                                           request_data, body_size, body_size, 0)) {
+  if (!WinHttpSendRequest(operation->request_handle, header_ptr, header_len, request_data,
+                          body_size, body_size, 0)) {
     complete_with_error(operation, make_winhttp_error("WinHttpSendRequest"));
   }
 
@@ -598,8 +584,8 @@ auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOpe
 
 // 通用 operation 执行：设保活、投递至 WinHTTP、挂起协程直至完成或中断。
 // fetch 和 download_to_file 均通过此函数统一驱动请求生命周期。
-auto execute_operation(State::HttpClientState& client_state,
-                       std::shared_ptr<RequestOperation> operation) -> asio::awaitable<void> {
+auto execute_operation(HttpClientState& client_state, std::shared_ptr<RequestOperation> operation)
+    -> asio::awaitable<void> {
   {
     // 自引用保活：防止局部运行完后 shared_ptr 被回收导致在 WinHTTP 后台回调里出现空指针
     std::lock_guard<std::mutex> lock(operation->keepalive_mutex);
@@ -627,12 +613,12 @@ auto execute_operation(State::HttpClientState& client_state,
   }
 }
 
-}  // namespace Core::HttpClient::Detail
+}  // namespace core::http_client::detail
 
-namespace Core::HttpClient {
+namespace core::http_client {
 
 // 初始化 HTTP 客户端全局状态，使用系统的自适应代理配置创建 WinHTTP 会话 (Session)
-auto initialize(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& state) -> std::expected<void, std::string> {
   if (!state.http_client) {
     return std::unexpected("HTTP client state is not initialized");
   }
@@ -641,10 +627,9 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
     return {};
   }
 
-  state.http_client->session = Vendor::WinHttp::UniqueHInternet{Vendor::WinHttp::WinHttpOpen(
-      state.http_client->user_agent.c_str(), Vendor::WinHttp::kWINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-      Vendor::WinHttp::kWINHTTP_NO_PROXY_NAME, Vendor::WinHttp::kWINHTTP_NO_PROXY_BYPASS,
-      Vendor::WinHttp::kWINHTTP_FLAG_ASYNC)};
+  state.http_client->session = core::http_client::UniqueHInternet{
+      WinHttpOpen(state.http_client->user_agent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                  WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC)};
   if (!state.http_client->session) {
     return std::unexpected("Failed to open WinHTTP async session");
   }
@@ -655,18 +640,18 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
 }
 
 // 关闭 HTTP 会话释放内核资源，后续请求将无法被挂起执行
-auto shutdown(Core::State::AppState& state) -> void {
+auto shutdown(core::AppState& state) -> void {
   if (!state.http_client) {
     return;
   }
   state.http_client->is_initialized = false;
-  state.http_client->session = Vendor::WinHttp::UniqueHInternet{};
+  state.http_client->session = core::http_client::UniqueHInternet{};
   Logger().info("HTTP client shut down");
 }
 
 // 核心异步 HTTP 请求：负责封装请求上下文，投递至 WinHTTP 进行处理并挂起当前协程直至完成
-auto fetch(Core::State::AppState& state, const Core::HttpClient::Types::Request& request)
-    -> asio::awaitable<std::expected<Core::HttpClient::Types::Response, std::string>> {
+auto fetch(core::AppState& state, const core::http_client::Request& request)
+    -> asio::awaitable<std::expected<core::http_client::Response, std::string>> {
   if (!state.http_client) {
     co_return std::unexpected("HTTP client state is not initialized");
   }
@@ -679,20 +664,20 @@ auto fetch(Core::State::AppState& state, const Core::HttpClient::Types::Request&
 
   auto executor = co_await asio::this_coro::executor;
 
-  auto operation = std::make_shared<Core::HttpClient::State::RequestOperation>();
+  auto operation = std::make_shared<core::http_client::RequestOperation>();
   operation->executor = executor;
   operation->completion_timer.emplace(executor);
   operation->completion_timer->expires_at((std::chrono::steady_clock::time_point::max)());
   operation->request = request;
 
-  co_await Detail::execute_operation(*state.http_client, operation);
+  co_await detail::execute_operation(*state.http_client, operation);
   co_return operation->result;
 }
 
 // 便捷封装：执行 HTTP 抓取请求后，将接收到的响应体直接以二进制流写入本地文件中
-auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Types::Request& request,
+auto download_to_file(core::AppState& state, const core::http_client::Request& request,
                       const std::filesystem::path& output_path,
-                      Core::HttpClient::Types::DownloadProgressCallback progress_callback)
+                      core::http_client::DownloadProgressCallback progress_callback)
     -> asio::awaitable<std::expected<void, std::string>> {
   if (!state.http_client) {
     co_return std::unexpected("HTTP client state is not initialized");
@@ -706,7 +691,7 @@ auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Type
 
   auto executor = co_await asio::this_coro::executor;
 
-  auto operation = std::make_shared<Core::HttpClient::State::RequestOperation>();
+  auto operation = std::make_shared<core::http_client::RequestOperation>();
   operation->executor = executor;
   operation->completion_timer.emplace(executor);
   operation->completion_timer->expires_at((std::chrono::steady_clock::time_point::max)());
@@ -720,7 +705,7 @@ auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Type
     co_return std::unexpected("Failed to open output file: " + output_path.string());
   }
 
-  co_await Detail::execute_operation(*state.http_client, operation);
+  co_await detail::execute_operation(*state.http_client, operation);
 
   if (!operation->result) {
     operation->download->output_file.reset();
@@ -734,4 +719,4 @@ auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Type
   co_return std::expected<void, std::string>{};
 }
 
-}  // namespace Core::HttpClient
+}  // namespace core::http_client

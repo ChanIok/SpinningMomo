@@ -1,30 +1,29 @@
-module;
+#include "ui/webview_window/webview_window.hpp"
 
-module UI.WebViewWindow;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.WebView;
-import Core.WebView.State;
-import Features.Settings;
-import Features.Settings.State;
-import Features.Settings.Types;
-import UI.FloatingWindow.State;
-import UI.TrayIcon.Types;
-import Utils.Logger;
-import Vendor.BuildConfig;
-import Vendor.Windows;
-import Vendor.ShellApi;
-import Core.State.RuntimeInfo;
-import Core.HttpServer.State;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/shellapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
-namespace UI::WebViewWindow {
+#include "core/build_config.hpp"
+#include "core/http_server/state.hpp"
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/webview.hpp"
+#include "features/settings/settings.hpp"
+#include "features/settings/state.hpp"
+#include "features/settings/types.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/tray_icon/types.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace ui::webview_window {
 
 // 按当前透明背景设置刷新宿主窗口扩展样式。
-auto apply_window_ex_style_from_settings(Core::State::AppState& state) -> void {
+auto apply_window_ex_style_from_settings(core::AppState& state) -> void {
   auto hwnd = state.webview->window.webview_hwnd;
   if (!hwnd) {
     return;
@@ -64,16 +63,16 @@ auto get_window_frame_insets_for_dpi(UINT dpi) -> WindowFrameInsets {
 }
 
 // 将最大化/全屏状态变更通知给前端标题栏。
-auto send_window_state_changed_notification(Core::State::AppState& state) -> void {
+auto send_window_state_changed_notification(core::AppState& state) -> void {
   auto payload = std::format(
       R"({{"jsonrpc":"2.0","method":"window.stateChanged","params":{{"maximized":{},"fullscreen":{}}}}})",
       state.webview->window.is_maximized ? "true" : "false",
       state.webview->window.is_fullscreen ? "true" : "false");
-  Core::WebView::post_message(state, payload);
+  core::webview::post_message(state, payload);
 }
 
 // 同步 Win32 最大化状态，避免前端按钮状态滞后。
-auto sync_window_state(Core::State::AppState& state, bool notify) -> void {
+auto sync_window_state(core::AppState& state, bool notify) -> void {
   auto& window = state.webview->window;
   auto hwnd = window.webview_hwnd;
   auto is_maximized = hwnd && IsZoomed(hwnd) == TRUE;
@@ -90,18 +89,18 @@ auto sync_window_state(Core::State::AppState& state, bool notify) -> void {
   }
 }
 
-auto should_paint_loading_background(Core::State::AppState* state) -> bool {
+auto should_paint_loading_background(core::AppState* state) -> bool {
   return state && !state->webview->has_initial_content;
 }
 
-auto paint_loading_background(Core::State::AppState& state, HDC hdc, const RECT& rect) -> void {
-  auto background = CreateSolidBrush(Core::WebView::get_loading_background_color(state));
+auto paint_loading_background(core::AppState& state, HDC hdc, const RECT& rect) -> void {
+  auto background = CreateSolidBrush(core::webview::get_loading_background_color(state));
   FillRect(hdc, &rect, background);
   DeleteObject(background);
 }
 
 // 显示已有宿主窗口；冷启动时由 WebView 导航回调触发。
-auto reveal_existing_window(Core::State::AppState& state, bool activate)
+auto reveal_existing_window(core::AppState& state, bool activate)
     -> std::expected<void, std::string> {
   if (!state.webview->window.webview_hwnd) {
     return std::unexpected("WebView window not created");
@@ -122,7 +121,7 @@ auto reveal_existing_window(Core::State::AppState& state, bool activate)
     const int height = client_rect.bottom - client_rect.top;
     state.webview->window.width = width;
     state.webview->window.height = height;
-    Core::WebView::resize_webview(state, width, height);
+    core::webview::resize_webview(state, width, height);
     state.webview->resources.controller->put_IsVisible(TRUE);
   }
 
@@ -155,31 +154,31 @@ auto append_hash_route(std::wstring url, std::wstring_view route) -> std::wstrin
   return url;
 }
 
-auto make_webview_url(Core::State::AppState& state, std::wstring_view route) -> std::wstring {
-  std::wstring url = Vendor::BuildConfig::is_debug_build()
+auto make_webview_url(core::AppState& state, std::wstring_view route) -> std::wstring {
+  std::wstring url = core::build_config::is_debug_build()
                          ? state.webview->config.dev_server_url
                          : L"https://" + state.webview->config.virtual_host_name + L"/index.html";
   return append_hash_route(std::move(url), route);
 }
 
-auto make_browser_url(Core::State::AppState& state, std::wstring_view route) -> std::wstring {
+auto make_browser_url(core::AppState& state, std::wstring_view route) -> std::wstring {
   std::string url = std::format("http://localhost:{}/", state.http_server->port);
   return append_hash_route(std::wstring(url.begin(), url.end()), route);
 }
 
 // WebView2 不可用时退回浏览器开发入口。
-auto open_in_browser(Core::State::AppState& state, std::wstring_view route) -> void {
+auto open_in_browser(core::AppState& state, std::wstring_view route) -> void {
   auto url = make_browser_url(state, route);
-  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{.cbSize = sizeof(exec_info),
-                                                .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
-                                                .lpVerb = L"open",
-                                                .lpFile = url.c_str(),
-                                                .nShow = Vendor::ShellApi::kSW_SHOWNORMAL};
-  Vendor::ShellApi::ShellExecuteExW(&exec_info);
+  SHELLEXECUTEINFOW exec_info{.cbSize = sizeof(exec_info),
+                              .fMask = SEE_MASK_NOASYNC,
+                              .lpVerb = L"open",
+                              .lpFile = url.c_str(),
+                              .nShow = SW_SHOWNORMAL};
+  ShellExecuteExW(&exec_info);
 }
 
 // 激活主界面：冷启动延迟到导航开始后显示，热启动直接拉起窗口。
-auto activate_window(Core::State::AppState& state, std::wstring_view route) -> void {
+auto activate_window(core::AppState& state, std::wstring_view route) -> void {
   if (state.runtime_info && !state.runtime_info->is_webview2_available) {
     Logger().warn("WebView2 runtime is unavailable. Opening in browser.");
     open_in_browser(state, route);
@@ -220,7 +219,7 @@ auto activate_window(Core::State::AppState& state, std::wstring_view route) -> v
 
   if (!route.empty() && state.webview->is_ready) {
     // 已有 WebView 时直接切换前端 hash 路由。
-    if (auto result = Core::WebView::navigate_to_url(state, make_webview_url(state, route));
+    if (auto result = core::webview::navigate_to_url(state, make_webview_url(state, route));
         !result) {
       Logger().warn("Failed to navigate WebView to route: {}", result.error());
     }
@@ -241,7 +240,7 @@ auto activate_window(Core::State::AppState& state, std::wstring_view route) -> v
 }
 
 // 最小化主窗口，供前端标题栏按钮调用。
-auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto minimize_window(core::AppState& state) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
   if (!webview_state.window.webview_hwnd) {
@@ -254,7 +253,7 @@ auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::s
 }
 
 // 在全屏状态外切换最大化，保持系统 Snap/还原行为。
-auto toggle_maximize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto toggle_maximize_window(core::AppState& state) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
   if (!webview_state.window.webview_hwnd) {
@@ -276,7 +275,7 @@ auto toggle_maximize_window(Core::State::AppState& state) -> std::expected<void,
 }
 
 // 切换无边框全屏，并保存还原所需的窗口样式和位置。
-auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
+auto set_fullscreen_window(core::AppState& state, bool fullscreen)
     -> std::expected<void, std::string> {
   auto& window = state.webview->window;
   auto hwnd = window.webview_hwnd;
@@ -346,7 +345,7 @@ auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
 }
 
 // 走 WM_CLOSE 统一清理 WebView、保存窗口位置并销毁宿主窗口。
-auto close_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto close_window(core::AppState& state) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
   if (!webview_state.window.webview_hwnd) {
@@ -359,21 +358,19 @@ auto close_window(Core::State::AppState& state) -> std::expected<void, std::stri
 }
 
 // 处理宿主窗口消息：转发输入、同步尺寸状态，并承接 WebView 生命周期清理。
-auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
-                 Vendor::Windows::WPARAM wparam, Vendor::Windows::LPARAM lparam)
-    -> Vendor::Windows::LRESULT {
-  Core::State::AppState* state = nullptr;
+auto window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
+  core::AppState* state = nullptr;
 
   if (msg == WM_NCCREATE) {
     CREATESTRUCTW* cs = reinterpret_cast<CREATESTRUCTW*>(lparam);
-    state = static_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = static_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   }
 
   switch (msg) {
-    case Core::WebView::State::kWM_APP_BEGIN_RESIZE: {
+    case core::webview::kWM_APP_BEGIN_RESIZE: {
       if (!state || !state->webview->window.webview_hwnd) {
         return 0;
       }
@@ -392,13 +389,13 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     }
 
     // 处理虚拟主机映射协调请求，确保 WebView COM 调用在窗口线程中执行
-    case Core::WebView::State::kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS: {
+    case core::webview::kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS: {
       if (!state || !state->webview->window.webview_hwnd) {
         return 0;
       }
 
       // WebView COM 资源必须在宿主窗口线程中协调。
-      Core::WebView::reconcile_virtual_host_folder_mappings(*state);
+      core::webview::reconcile_virtual_host_folder_mappings(*state);
       return 0;
     }
 
@@ -446,9 +443,9 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     }
 
     case WM_NCHITTEST: {
-      if (state && Core::WebView::is_composition_active(*state)) {
+      if (state && core::webview::is_composition_active(*state)) {
         // 透明背景走 Composition Hosting，需要自己处理非客户区命中。
-        if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
+        if (auto non_client_hit = core::webview::hit_test_non_client_region(*state, hwnd, lparam)) {
           return *non_client_hit;
         }
       }
@@ -470,7 +467,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
         if (state->webview->is_ready) {
           // 调用WebView的resize函数来调整WebView控件大小
-          Core::WebView::resize_webview(*state, width, height);
+          core::webview::resize_webview(*state, width, height);
         }
       }
       break;
@@ -478,8 +475,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_NCRBUTTONDOWN:
     case WM_NCRBUTTONUP: {
-      if (state && Core::WebView::is_composition_active(*state) &&
-          Core::WebView::forward_non_client_right_button_message(*state, hwnd, msg, wparam,
+      if (state && core::webview::is_composition_active(*state) &&
+          core::webview::forward_non_client_right_button_message(*state, hwnd, msg, wparam,
                                                                  lparam)) {
         return 0;
       }
@@ -507,7 +504,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
         return 1;
       }
 
-      if (state && Core::WebView::is_composition_active(*state)) {
+      if (state && core::webview::is_composition_active(*state)) {
         return 1;
       }
       break;
@@ -548,8 +545,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     case WM_XBUTTONDOWN:
     case WM_XBUTTONUP:
     case WM_XBUTTONDBLCLK: {
-      if (state && Core::WebView::is_composition_active(*state)) {
-        Core::WebView::forward_mouse_message(*state, hwnd, msg, wparam, lparam);
+      if (state && core::webview::is_composition_active(*state)) {
+        core::webview::forward_mouse_message(*state, hwnd, msg, wparam, lparam);
       }
       break;
     }
@@ -574,7 +571,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
   return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
-auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
+auto register_window_class(HINSTANCE instance) -> void {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
   wc.lpfnWndProc = window_proc;
@@ -585,14 +582,14 @@ auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
   wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
 
   // 同一资源同时覆盖 Alt+Tab 大图标和任务栏小图标。
-  wc.hIcon = static_cast<HICON>(
-      LoadImageW(instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
-                 GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
+  wc.hIcon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(ui::tray_icon::IDI_ICON1),
+                                           IMAGE_ICON, GetSystemMetrics(SM_CXICON),
+                                           GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
   if (!wc.hIcon) wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
 
-  wc.hIconSm = static_cast<HICON>(
-      LoadImageW(instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
-                 GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+  wc.hIconSm = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(ui::tray_icon::IDI_ICON1),
+                                             IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
+                                             GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
   if (!wc.hIconSm) wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
 
   RegisterClassExW(&wc);
@@ -608,7 +605,7 @@ auto apply_window_style(HWND hwnd) -> void {
 }
 
 // 创建隐藏的 WebView 宿主窗口，并恢复用户上次保存的位置和尺寸。
-auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto create(core::AppState& state) -> std::expected<void, std::string> {
   register_window_class(state.floating_window->window.instance);
 
   auto style = WS_OVERLAPPEDWINDOW;
@@ -712,7 +709,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
 }
 
 // 按新的宿主模式重建 WebView controller，保留当前窗口可见性。
-auto recreate_webview_host(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto recreate_webview_host(core::AppState& state) -> std::expected<void, std::string> {
   auto hwnd = state.webview->window.webview_hwnd;
   if (!hwnd) {
     return {};
@@ -728,8 +725,8 @@ auto recreate_webview_host(Core::State::AppState& state) -> std::expected<void, 
   bool was_visible = IsWindowVisible(hwnd) == TRUE;
 
   // 透明背景模式切换需要重建 controller，单纯改背景色不够。
-  Core::WebView::shutdown(state);
-  if (auto result = Core::WebView::initialize(state, hwnd); !result) {
+  core::webview::shutdown(state);
+  if (auto result = core::webview::initialize(state, hwnd); !result) {
     return std::unexpected("Failed to recreate WebView host: " + result.error());
   }
 
@@ -739,9 +736,9 @@ auto recreate_webview_host(Core::State::AppState& state) -> std::expected<void, 
 }
 
 // 清理 WebView 主窗口，并把可恢复的窗口位置写回设置。
-auto cleanup(Core::State::AppState& state) -> void {
+auto cleanup(core::AppState& state) -> void {
   // 关闭 WebView
-  Core::WebView::shutdown(state);
+  core::webview::shutdown(state);
 
   if (state.webview->window.webview_hwnd) {
     HWND hwnd = state.webview->window.webview_hwnd;
@@ -786,15 +783,15 @@ auto cleanup(Core::State::AppState& state) -> void {
     state.settings->raw.ui.webview_window.x = x_to_save;
     state.settings->raw.ui.webview_window.y = y_to_save;
 
-    auto settings_path = Features::Settings::get_settings_path();
+    auto settings_path = features::settings::get_settings_path();
     if (settings_path) {
       // 通过 settings 通知同步前端状态，避免关闭窗口后设置页仍拿旧尺寸。
       if (auto save_result =
-              Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
+              features::settings::save_settings_to_file(settings_path.value(), state.settings->raw);
           !save_result) {
         Logger().warn("Failed to persist WebView window bounds: {}", save_result.error());
       } else {
-        Features::Settings::notify_settings_changed(state, old_settings,
+        features::settings::notify_settings_changed(state, old_settings,
                                                     "Settings updated via WebView window bounds");
       }
     }
@@ -810,14 +807,14 @@ auto cleanup(Core::State::AppState& state) -> void {
 }
 
 // 初始化 WebView 主窗口：先创建隐藏宿主，再启动 WebView2 异步初始化。
-auto initialize(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& state) -> std::expected<void, std::string> {
   // 创建窗口
   if (auto result = create(state); !result) {
     return std::unexpected("Failed to create WebView window: " + result.error());
   }
 
   // 初始化 WebView
-  if (auto result = Core::WebView::initialize(state, state.webview->window.webview_hwnd); !result) {
+  if (auto result = core::webview::initialize(state, state.webview->window.webview_hwnd); !result) {
     return std::unexpected("Failed to initialize WebView: " + result.error());
   }
 
@@ -825,4 +822,4 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
   return {};
 }
 
-}  // namespace UI::WebViewWindow
+}  // namespace ui::webview_window

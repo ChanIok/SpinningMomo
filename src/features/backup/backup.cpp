@@ -1,18 +1,18 @@
-module;
+#include "features/backup/backup.hpp"
 
-module Features.Backup;
+#include "vendor/std.hpp"
 
-import std;
-import Core.Database;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Backup.Types;
-import Utils.Path;
-import Utils.PowerShell;
-import Utils.String;
-import Vendor.Windows;
+#include "vendor/windows.hpp"
 
-namespace Features::Backup::Detail {
+#include "core/database/database.hpp"
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/backup/types.hpp"
+#include "utils/path/path.hpp"
+#include "utils/powershell/powershell.hpp"
+#include "utils/string/string.hpp"
+
+namespace features::backup::detail {
 
 // 返回当前 Unix 毫秒时间，用于生成不会互相覆盖的备份文件名。
 auto now_millis() -> std::int64_t {
@@ -23,7 +23,7 @@ auto now_millis() -> std::int64_t {
 
 // 把 Windows 路径转换为 UTF-8，供 RPC 返回使用。
 auto path_to_utf8(const std::filesystem::path& path) -> std::string {
-  return Utils::String::ToUtf8(path.wstring());
+  return utils::string::ToUtf8(path.wstring());
 }
 
 // 写入备份中的版本文件和临时 PowerShell 脚本。
@@ -44,14 +44,13 @@ auto write_text_file(const std::filesystem::path& path, std::string_view content
 
 // 创建位于 AppData/temp 下的本次备份工作目录。
 auto create_operation_directory() -> std::expected<std::filesystem::path, std::string> {
-  auto temp_directory_result = Utils::Path::GetAppDataSubdirectory("temp");
+  auto temp_directory_result = utils::path::GetAppDataSubdirectory("temp");
   if (!temp_directory_result) {
     return std::unexpected(temp_directory_result.error());
   }
 
   const auto operation_directory =
-      *temp_directory_result /
-      std::format("backup-{}-{}", now_millis(), Vendor::Windows::GetCurrentProcessId());
+      *temp_directory_result / std::format("backup-{}-{}", now_millis(), GetCurrentProcessId());
   std::error_code create_error;
   std::filesystem::create_directories(operation_directory, create_error);
   if (create_error) {
@@ -62,9 +61,9 @@ auto create_operation_directory() -> std::expected<std::filesystem::path, std::s
 
 // 删除经过 AppData/temp 边界检查的工作目录。
 auto remove_operation_directory(const std::filesystem::path& operation_directory) -> void {
-  auto temp_directory_result = Utils::Path::GetAppDataSubdirectory("temp");
+  auto temp_directory_result = utils::path::GetAppDataSubdirectory("temp");
   if (!temp_directory_result ||
-      !Utils::Path::IsPathWithinBase(operation_directory, *temp_directory_result)) {
+      !utils::path::IsPathWithinBase(operation_directory, *temp_directory_result)) {
     return;
   }
 
@@ -156,7 +155,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 // 复制当前设置文件到备份工作目录。
 auto copy_settings(const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
-  auto settings_path_result = Utils::Path::GetAppDataFilePath("settings.json");
+  auto settings_path_result = utils::path::GetAppDataFilePath("settings.json");
   if (!settings_path_result) {
     return std::unexpected(settings_path_result.error());
   }
@@ -173,7 +172,7 @@ auto copy_settings(const std::filesystem::path& destination_path)
 // 复制托管背景目录，恢复时会以该目录完整替换现有背景。
 auto copy_backgrounds(const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
-  auto backgrounds_path_result = Utils::Path::GetAppDataSubdirectory("backgrounds");
+  auto backgrounds_path_result = utils::path::GetAppDataSubdirectory("backgrounds");
   if (!backgrounds_path_result) {
     return std::unexpected(backgrounds_path_result.error());
   }
@@ -189,11 +188,11 @@ auto copy_backgrounds(const std::filesystem::path& destination_path)
   return {};
 }
 
-// 导出数据库快照、Settings、App Version 和托管背景到单个 ZIP。
-auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportParams& params)
-    -> std::expected<Types::ExportResult, std::string> {
+// 导出数据库快照、settings、App Version 和托管背景到单个 ZIP。
+auto export_backup_impl(core::AppState& app_state, const ExportParams& params)
+    -> std::expected<ExportResult, std::string> {
   const auto destination_directory =
-      std::filesystem::path(Utils::String::FromUtf8(params.destination_directory));
+      std::filesystem::path(utils::string::FromUtf8(params.destination_directory));
   if (!std::filesystem::is_directory(destination_directory)) {
     return std::unexpected("Backup destination directory does not exist");
   }
@@ -215,7 +214,7 @@ auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportPar
   }
 
   // SQLiteCpp 在线备份会把 WAL 中的当前状态合并为独立数据库快照。
-  auto database_result = Core::Database::backup_to(app_state, payload_directory / L"database.db");
+  auto database_result = core::database::backup_to(app_state, payload_directory / L"database.db");
   if (!database_result) {
     remove_operation_directory(operation_directory);
     return std::unexpected(database_result.error());
@@ -239,7 +238,7 @@ auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportPar
   }
 
   const auto created_at = now_millis();
-  std::wstring safe_version = Utils::String::FromUtf8(app_state.runtime_info->version);
+  std::wstring safe_version = utils::string::FromUtf8(app_state.runtime_info->version);
   std::ranges::replace_if(
       safe_version,
       [](wchar_t character) {
@@ -257,7 +256,7 @@ auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportPar
     remove_operation_directory(operation_directory);
     return std::unexpected(script_result.error());
   }
-  auto compress_result = Utils::PowerShell::run_script_and_wait(
+  auto compress_result = utils::powershell::run_script_and_wait(
       script_path, {L"-SourceDirectory", payload_directory.wstring(), L"-DestinationPath",
                     temporary_path.wstring()});
   if (!compress_result || *compress_result != 0) {
@@ -283,7 +282,7 @@ auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportPar
   if (size_error) {
     return std::unexpected("Failed to read backup archive size: " + size_error.message());
   }
-  return Types::ExportResult{
+  return ExportResult{
       .backup_path = path_to_utf8(final_path),
       .app_version = app_state.runtime_info->version,
       .created_at = created_at,
@@ -292,9 +291,8 @@ auto export_backup_impl(Core::State::AppState& app_state, const Types::ExportPar
 }
 
 // 准备恢复脚本，脚本会在当前进程退出后直接替换 AppData 中的数据文件。
-auto restore_backup_impl(const Types::RestoreParams& params)
-    -> std::expected<Types::RestoreResult, std::string> {
-  const auto archive_path = std::filesystem::path(Utils::String::FromUtf8(params.backup_path));
+auto restore_backup_impl(const RestoreParams& params) -> std::expected<RestoreResult, std::string> {
+  const auto archive_path = std::filesystem::path(utils::string::FromUtf8(params.backup_path));
   if (!std::filesystem::is_regular_file(archive_path)) {
     return std::unexpected("Backup archive does not exist");
   }
@@ -306,9 +304,9 @@ auto restore_backup_impl(const Types::RestoreParams& params)
     return std::unexpected("Backup archive must be a .zip file");
   }
 
-  auto temp_directory_result = Utils::Path::GetAppDataSubdirectory("temp");
-  auto app_data_result = Utils::Path::GetAppDataDirectory();
-  auto executable_path_result = Utils::Path::GetExecutablePath();
+  auto temp_directory_result = utils::path::GetAppDataSubdirectory("temp");
+  auto app_data_result = utils::path::GetAppDataDirectory();
+  auto executable_path_result = utils::path::GetExecutablePath();
   if (!temp_directory_result || !app_data_result || !executable_path_result) {
     return std::unexpected("Failed to prepare application restore paths");
   }
@@ -320,7 +318,7 @@ auto restore_backup_impl(const Types::RestoreParams& params)
   if (!validate_script_result) {
     return std::unexpected(validate_script_result.error());
   }
-  auto validate_result = Utils::PowerShell::run_script_and_wait(
+  auto validate_result = utils::powershell::run_script_and_wait(
       validate_script_path, {L"-ArchivePath", archive_path.wstring()});
   std::error_code remove_error;
   std::filesystem::remove(validate_script_path, remove_error);
@@ -340,42 +338,40 @@ auto restore_backup_impl(const Types::RestoreParams& params)
     return std::unexpected(script_result.error());
   }
 
-  auto launch_result = Utils::PowerShell::launch_script(
-      script_path,
-      {L"-PidToWait", std::to_wstring(Vendor::Windows::GetCurrentProcessId()), L"-ArchivePath",
-       archive_path.wstring(), L"-AppDataDirectory", app_data_result->wstring(), L"-ExecutablePath",
-       executable_path_result->wstring()});
+  auto launch_result = utils::powershell::launch_script(
+      script_path, {L"-PidToWait", std::to_wstring(GetCurrentProcessId()), L"-ArchivePath",
+                    archive_path.wstring(), L"-AppDataDirectory", app_data_result->wstring(),
+                    L"-ExecutablePath", executable_path_result->wstring()});
   if (!launch_result) {
     std::error_code remove_error;
     std::filesystem::remove(script_path, remove_error);
     return std::unexpected(launch_result.error());
   }
 
-  return Types::RestoreResult{.scheduled = true};
+  return RestoreResult{.scheduled = true};
 }
 
-}  // namespace Features::Backup::Detail
+}  // namespace features::backup::detail
 
-namespace Features::Backup {
+namespace features::backup {
 
-// 导出数据库快照、Settings、App Version 和托管背景到单个 ZIP。
-auto export_backup(Core::State::AppState& app_state, const Types::ExportParams& params)
-    -> std::expected<Types::ExportResult, std::string> {
+// 导出数据库快照、settings、App Version 和托管背景到单个 ZIP。
+auto export_backup(core::AppState& app_state, const ExportParams& params)
+    -> std::expected<ExportResult, std::string> {
   try {
-    return Detail::export_backup_impl(app_state, params);
+    return detail::export_backup_impl(app_state, params);
   } catch (const std::exception& e) {
     return std::unexpected("Backup export failed: " + std::string(e.what()));
   }
 }
 
 // 启动完全替换恢复脚本，当前进程退出后直接解压备份并重启应用。
-auto restore_backup(const Types::RestoreParams& params)
-    -> std::expected<Types::RestoreResult, std::string> {
+auto restore_backup(const RestoreParams& params) -> std::expected<RestoreResult, std::string> {
   try {
-    return Detail::restore_backup_impl(params);
+    return detail::restore_backup_impl(params);
   } catch (const std::exception& e) {
     return std::unexpected("Backup restore failed: " + std::string(e.what()));
   }
 }
 
-}  // namespace Features::Backup
+}  // namespace features::backup

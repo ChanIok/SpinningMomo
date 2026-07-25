@@ -1,17 +1,17 @@
-module;
+#include "extensions/infinity_nikki/metadata_dict.hpp"
 
-module Extensions.InfinityNikki.MetadataDict;
+#include "vendor/std.hpp"
 
-import std;
-import Core.HttpClient;
-import Core.HttpClient.Types;
-import Core.State;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import <asio.hpp>;
-import <rfl/json.hpp>;
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
 
-namespace Extensions::InfinityNikki::MetadataDict {
+#include "core/http_client/http_client.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace extensions::infinity_nikki::metadata_dict {
 
 // 远端在线字典地址：不随客户端打包发布。
 constexpr std::string_view kDictionaryUrl =
@@ -117,16 +117,16 @@ auto parse_dictionary_payload(const std::string& body)
   return dictionary;
 }
 
-auto fetch_and_parse_dictionary(Core::State::AppState& app_state)
+auto fetch_and_parse_dictionary(core::AppState& app_state)
     -> asio::awaitable<std::expected<MetadataDictionary, std::string>> {
   // 只读取公开 JSON，不带业务副作用。
-  Core::HttpClient::Types::Request request{
+  core::http_client::Request request{
       .method = "GET",
       .url = std::string(kDictionaryUrl),
-      .headers = {Core::HttpClient::Types::Header{.name = "Accept", .value = "application/json"}},
+      .headers = {core::http_client::Header{.name = "Accept", .value = "application/json"}},
   };
 
-  auto response = co_await Core::HttpClient::fetch(app_state, request);
+  auto response = co_await core::http_client::fetch(app_state, request);
   if (!response) {
     co_return std::unexpected("Failed to fetch camera metadata dictionary: " + response.error());
   }
@@ -140,7 +140,7 @@ auto fetch_and_parse_dictionary(Core::State::AppState& app_state)
   co_return parse_dictionary_payload(response->body);
 }
 
-auto load_dictionary(Core::State::AppState& app_state)
+auto load_dictionary(core::AppState& app_state)
     -> asio::awaitable<std::expected<MetadataDictionary, std::string>> {
   auto& cache = dictionary_cache();
 
@@ -173,7 +173,7 @@ auto load_dictionary(Core::State::AppState& app_state)
   }
 }
 
-auto resolve_metadata_names(Core::State::AppState& app_state,
+auto resolve_metadata_names(core::AppState& app_state,
                             const GetInfinityNikkiMetadataNamesParams& params)
     -> asio::awaitable<std::expected<InfinityNikkiMetadataNames, std::string>> {
   // 统一入口：先拿字典，再按传入 id + locale 做“最小响应”映射。
@@ -191,4 +191,4 @@ auto resolve_metadata_names(Core::State::AppState& app_state,
   };
 }
 
-}  // namespace Extensions::InfinityNikki::MetadataDict
+}  // namespace extensions::infinity_nikki::metadata_dict

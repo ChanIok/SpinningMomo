@@ -1,25 +1,23 @@
-module;
+#include "core/webview/static.hpp"
 
-#include <wil/com.h>
+#include "vendor/std.hpp"
 
-#include <WebView2.h>  // 必须放最后面
+#include "vendor/webview2.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/shlwapi.hpp"
+#include "vendor/windows/wrl.hpp"
 
-module Core.WebView.Static;
+#include "core/build_config.hpp"
+#include "core/state/app_state.hpp"
+#include "core/webview/state.hpp"
+#include "core/webview/types.hpp"
+#include "utils/file/mime.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "utils/time.hpp"
 
-import std;
-import Core.State;
-import Core.WebView.State;
-import Core.WebView.Types;
-import Utils.File.Mime;
-import Utils.Logger;
-import Utils.String;
-import Utils.Time;
-import Vendor.BuildConfig;
-import <Shlwapi.h>;
-import <windows.h>;
-import <wrl.h>;
-
-namespace Core::WebView::Static {
+namespace core::webview::static_content {
 
 // ---- 自定义静态资源须支持 Range；否则嵌入式 <video> 无法 seek ----
 struct ByteRange {
@@ -180,8 +178,8 @@ auto build_cache_validators(const std::filesystem::path& file_path, std::uint64_
   }
 
   auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
-      Utils::Time::file_time_to_system_clock(last_write_time));
-  auto modified_seconds = Utils::Time::file_time_to_seconds(last_write_time);
+      utils::time::file_time_to_system_clock(last_write_time));
+  auto modified_seconds = utils::time::file_time_to_seconds(last_write_time);
 
   return CacheValidators{
       .etag = std::format(L"\"{:x}-{:x}\"", file_size, modified_seconds),
@@ -271,8 +269,8 @@ auto build_not_modified_headers(std::wstring_view cache_control, const CacheVali
 }
 
 // 按注册顺序查找并调用首个能够解析当前 URL 的 WebView resolver
-auto try_web_resource_resolve(Core::State::AppState& state, std::wstring_view url)
-    -> std::optional<Types::WebResourceResolution> {
+auto try_web_resource_resolve(core::AppState& state, std::wstring_view url)
+    -> std::optional<WebResourceResolution> {
   if (!state.webview || !state.webview->resources.web_resolvers) {
     return std::nullopt;
   }
@@ -293,7 +291,7 @@ auto try_web_resource_resolve(Core::State::AppState& state, std::wstring_view ur
   return std::nullopt;
 }
 
-auto handle_custom_web_resource_request(Core::State::AppState& state,
+auto handle_custom_web_resource_request(core::AppState& state,
                                         ICoreWebView2Environment* environment,
                                         ICoreWebView2WebResourceRequestedEventArgs* args)
     -> HRESULT {
@@ -334,13 +332,13 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   auto file_size = std::filesystem::file_size(resolution.file_path, file_ec);
   if (file_ec) {
     Logger().error("Failed to query custom resource file size: {} ({})",
-                   Utils::String::ToUtf8(resolution.file_path.wstring()), file_ec.message());
+                   utils::string::ToUtf8(resolution.file_path.wstring()), file_ec.message());
     return S_OK;
   }
 
   // 图库原文件常无显式 content_type，须按扩展名补 MIME，否则播放器可能拒播。
   auto content_type = resolution.content_type.value_or(
-      Utils::String::FromUtf8(Utils::File::Mime::get_mime_type(resolution.file_path)));
+      utils::string::FromUtf8(utils::file::mime::get_mime_type(resolution.file_path)));
   auto cache_control =
       resolution.cache_control_header.value_or(std::wstring{L"public, max-age=86400"});
   auto allowed_origin =
@@ -348,7 +346,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
           ? std::optional<std::wstring>(L"https://" + state.webview->config.virtual_host_name)
           : std::nullopt;
   auto range_header = get_request_header(request.get(), L"Range");
-  auto range_parse = parse_range_header(range_header ? Utils::String::ToUtf8(*range_header) : "",
+  auto range_parse = parse_range_header(range_header ? utils::string::ToUtf8(*range_header) : "",
                                         static_cast<std::uint64_t>(file_size));
 
   if (!range_parse.valid) {
@@ -371,7 +369,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
       build_cache_validators(resolution.file_path, static_cast<std::uint64_t>(file_size));
   if (!validators_result) {
     Logger().error("Failed to build WebView cache validators: {} ({})",
-                   Utils::String::ToUtf8(resolution.file_path.wstring()),
+                   utils::string::ToUtf8(resolution.file_path.wstring()),
                    validators_result.error());
     return S_OK;
   }
@@ -395,19 +393,20 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   int status_code = resolution.status_code.value_or(200);
   const wchar_t* status_text = status_code == 200 ? L"OK" : L"Error";
 
-  // WebView2 CreateWebResourceResponse 无「文件区间流」API；Range 响应只能先读入内存再建 IStream。
+  // WebView2 CreateWebResourceResponse 无「文件区间流」API；Range 响应只能先读入内存再建
+  // IStream。
   if (range_parse.range.has_value()) {
     auto bytes_result = read_file_range(resolution.file_path, *range_parse.range);
     if (!bytes_result) {
       Logger().error("Failed to read partial custom resource file: {} ({})",
-                     Utils::String::ToUtf8(resolution.file_path.wstring()), bytes_result.error());
+                     utils::string::ToUtf8(resolution.file_path.wstring()), bytes_result.error());
       return S_OK;
     }
 
     stream = create_memory_stream_from_bytes(*bytes_result);
     if (!stream) {
       Logger().error("Failed to create memory stream for partial custom resource: {}",
-                     Utils::String::ToUtf8(resolution.file_path.wstring()));
+                     utils::string::ToUtf8(resolution.file_path.wstring()));
       return S_OK;
     }
 
@@ -422,7 +421,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
                                FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, stream.put());
     if (FAILED(hr) || !stream) {
       Logger().error("Failed to open custom resource file: {} (hr={})",
-                     Utils::String::ToUtf8(resolution.file_path.wstring()), hr);
+                     utils::string::ToUtf8(resolution.file_path.wstring()), hr);
       return S_OK;
     }
 
@@ -436,7 +435,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
                                                     headers.c_str(), response.put())) ||
       !response) {
     Logger().error("Failed to create WebView2 response for custom resource {}",
-                   Utils::String::ToUtf8(resolution.file_path.wstring()));
+                   utils::string::ToUtf8(resolution.file_path.wstring()));
     return S_OK;
   }
 
@@ -445,8 +444,8 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
 }
 
 // 注册 WebView 资源解析器：独占修改注册表并转移 resolver 所有权
-auto register_web_resource_resolver(Core::State::AppState& state, std::wstring prefix,
-                                    Types::WebResourceResolver resolver) -> void {
+auto register_web_resource_resolver(core::AppState& state, std::wstring prefix,
+                                    WebResourceResolver resolver) -> void {
   if (!state.webview || !state.webview->resources.web_resolvers) {
     Logger().error("WebView state not initialized, cannot register resource resolver");
     return;
@@ -458,13 +457,13 @@ auto register_web_resource_resolver(Core::State::AppState& state, std::wstring p
   // 注册表独占 resolver，资源请求后续只通过 const 引用重复调用
   registry.resolvers.push_back({std::move(prefix), std::move(resolver)});
   Logger().debug("Registered WebView resource resolver for: {}",
-                 Utils::String::ToUtf8(registry.resolvers.back().prefix));
+                 utils::string::ToUtf8(registry.resolvers.back().prefix));
 }
 
-auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* webview,
+auto setup_resource_interception(core::AppState& state, ICoreWebView2* webview,
                                  ICoreWebView2Environment* environment,
-                                 Core::WebView::State::CoreResources& resources,
-                                 Core::WebView::State::WebViewConfig& config) -> HRESULT {
+                                 core::webview::CoreResources& resources,
+                                 core::webview::WebViewConfig& config) -> HRESULT {
   auto webview22 = wil::com_ptr<ICoreWebView2>(webview).try_query<ICoreWebView2_22>();
   if (!webview22) {
     Logger().warn(
@@ -475,14 +474,14 @@ auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* we
   constexpr auto source_kinds = COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT;
 
   std::wstring filter;
-  if (Vendor::BuildConfig::is_debug_build()) {
+  if (core::build_config::is_debug_build()) {
     filter = config.dev_server_url + L"/static/*";
     Logger().info("Debug mode: Intercepting static resources from {}",
-                  Utils::String::ToUtf8(filter));
+                  utils::string::ToUtf8(filter));
   } else {
     filter = L"https://" + config.static_host_name + L"/*";
     Logger().info("Release mode: Intercepting static resources from {}",
-                  Utils::String::ToUtf8(filter));
+                  utils::string::ToUtf8(filter));
   }
 
   HRESULT hr = webview22->AddWebResourceRequestedFilterWithRequestSourceKinds(
@@ -528,4 +527,4 @@ auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* we
   return S_OK;
 }
 
-}  // namespace Core::WebView::Static
+}  // namespace core::webview::static_content

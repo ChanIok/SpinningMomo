@@ -1,17 +1,17 @@
-module;
+#include "utils/graphics/d3d.hpp"
 
-module Utils.Graphics.D3D;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Logger;
-import <d3d11.h>;
-import <d3dcompiler.h>;
-import <dxgi.h>;
-import <dxgi1_4.h>;
-import <windows.h>;
-import <wil/com.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/d3dcompiler.hpp"
+#include "vendor/windows/dxgi.hpp"
+#include "vendor/windows/dxgi1_4.hpp"
 
-namespace Utils::Graphics::D3D {
+#include "utils/logger/logger.hpp"
+
+namespace utils::graphics::d3d {
 
 // d3d11.h 宏在头文件单元 import 后不可见，取值与 Windows SDK 一致
 constexpr UINT k_d3d11_sdk_version = 7;
@@ -416,4 +416,4 @@ auto cleanup_shader_resources(ShaderResources& resources) -> void {
   resources.blend_state.reset();
 }
 
-}  // namespace Utils::Graphics::D3D
+}  // namespace utils::graphics::d3d

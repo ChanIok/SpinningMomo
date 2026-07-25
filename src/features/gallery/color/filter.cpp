@@ -1,13 +1,12 @@
-module;
+#include "features/gallery/color/filter.hpp"
 
-module Features.Gallery.Color.Filter;
+#include "vendor/std.hpp"
 
-import std;
-import Core.Database.Types;
-import Features.Gallery.Types;
-import Features.Gallery.Color.Extractor;
+#include "core/database/types.hpp"
+#include "features/gallery/color/extractor.hpp"
+#include "features/gallery/types.hpp"
 
-namespace Features::Gallery::Color::Filter {
+namespace features::gallery::color::filter {
 
 constexpr double kDefaultColorDistance = 18.0;
 constexpr int kColorBinTolerance = 2;
@@ -22,13 +21,13 @@ struct QueryColorTarget {
 };
 
 auto build_color_target(const std::string& hex) -> std::expected<QueryColorTarget, std::string> {
-  auto rgb_result = Features::Gallery::Color::Extractor::parse_hex_color(hex);
+  auto rgb_result = features::gallery::color::extractor::parse_hex_color(hex);
   if (!rgb_result) {
     return std::unexpected(rgb_result.error());
   }
 
   auto rgb = rgb_result.value();
-  auto lab = Features::Gallery::Color::Extractor::rgb_to_lab_color(rgb[0], rgb[1], rgb[2]);
+  auto lab = features::gallery::color::extractor::rgb_to_lab_color(rgb[0], rgb[1], rgb[2]);
   return QueryColorTarget{
       .lab_l = lab.l,
       .lab_a = lab.a,
@@ -39,7 +38,7 @@ auto build_color_target(const std::string& hex) -> std::expected<QueryColorTarge
   };
 }
 
-auto append_color_match_params(std::vector<Core::Database::Types::DbParam>& params,
+auto append_color_match_params(std::vector<core::database::DbParam>& params,
                                const QueryColorTarget& target, double distance) -> void {
   params.push_back(std::max(0, target.l_bin - kColorBinTolerance));
   params.push_back(target.l_bin + kColorBinTolerance);
@@ -78,9 +77,9 @@ auto qualify_asset_id(std::string_view asset_table_alias) -> std::string {
   return std::string(asset_table_alias) + ".id";
 }
 
-auto append_color_filter_conditions(const Features::Gallery::Types::QueryAssetsFilters& filters,
+auto append_color_filter_conditions(const features::gallery::QueryAssetsFilters& filters,
                                     std::vector<std::string>& conditions,
-                                    std::vector<Core::Database::Types::DbParam>& params,
+                                    std::vector<core::database::DbParam>& params,
                                     std::string_view asset_table_alias)
     -> std::expected<void, std::string> {
   if (!filters.color_hexes.has_value() || filters.color_hexes->empty()) {
@@ -131,4 +130,4 @@ auto append_color_filter_conditions(const Features::Gallery::Types::QueryAssetsF
   return {};
 }
 
-}  // namespace Features::Gallery::Color::Filter
+}  // namespace features::gallery::color::filter

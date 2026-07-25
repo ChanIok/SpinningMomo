@@ -1,33 +1,33 @@
-module;
+#include "ui/floating_window/floating_window.hpp"
 
-module UI.FloatingWindow;
+#include "vendor/std.hpp"
 
-import std;
-import Features.Settings.Menu;
-import Features.Settings.Types;
-import Features.Settings.State;
-import Core.Commands;
-import Core.Commands.Types;
-import Core.Events;
-import Core.State;
-import Core.I18n.Types;
-import Core.I18n.State;
-import UI.FloatingWindow.MessageHandler;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.RenderContext;
-import UI.FloatingWindow.Painter;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
-import Utils.Logger;
-import Utils.String;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
-namespace UI::FloatingWindow {
+#include "core/commands/registry.hpp"
+#include "core/commands/types.hpp"
+#include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/settings/menu.hpp"
+#include "features/settings/state.hpp"
+#include "features/settings/types.hpp"
+#include "ui/floating_window/layout.hpp"
+#include "ui/floating_window/message_handler.hpp"
+#include "ui/floating_window/painter.hpp"
+#include "ui/floating_window/render_context.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/floating_window/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace ui::floating_window {
 
 // 用于前台窗口变化回调，用于 Windows 11 TopMost Z 序失效 workaround
-static Core::State::AppState* g_floating_window_for_topmost_hook = nullptr;
+static core::AppState* g_floating_window_for_topmost_hook = nullptr;
 
 static void CALLBACK topmost_refresh_win_event_proc(HWINEVENTHOOK /*hook*/, DWORD event, HWND hwnd,
                                                     LONG /*idObject*/, LONG /*idChild*/,
@@ -51,10 +51,10 @@ static void CALLBACK topmost_refresh_win_event_proc(HWINEVENTHOOK /*hook*/, DWOR
     return;
   }
   // 当前台变为外部应用时，请求刷新置顶状态以恢复 Z 序
-  PostMessageW(state.floating_window->window.hwnd, UI::FloatingWindow::WM_REFRESH_TOPMOST, 0, 0);
+  PostMessageW(state.floating_window->window.hwnd, ui::floating_window::WM_REFRESH_TOPMOST, 0, 0);
 }
 
-auto create_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto create_window(core::AppState& state) -> std::expected<void, std::string> {
   // 获取系统DPI
   UINT dpi = 96;
   if (HDC hdc = GetDC(nullptr); hdc) {
@@ -64,7 +64,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   // 保存DPI到状态中
   state.floating_window->window.dpi = dpi;
-  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(state, dpi);
+  const auto metrics = ui::floating_window::layout::calculate_window_metrics(state, dpi);
   state.floating_window->layout = metrics.layout;
 
   // 初始化菜单项
@@ -72,7 +72,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   // 计算窗口尺寸和位置
   const auto window_size = metrics.size;
-  const auto window_pos = UI::FloatingWindow::Layout::calculate_center_position(window_size);
+  const auto window_pos = ui::floating_window::layout::calculate_center_position(window_size);
 
   register_window_class(state.floating_window->window.instance);
 
@@ -100,7 +100,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   refresh_visible_frame_border_thickness(state);
 
   // 初始化Direct2D渲染
-  if (!UI::FloatingWindow::RenderContext::initialize_render_context(
+  if (!ui::floating_window::render_context::initialize_render_context(
           state, state.floating_window->window.hwnd)) {
     Logger().error("Failed to initialize Direct2D rendering");
   }
@@ -109,13 +109,13 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 }
 
 // 标准化渲染触发机制
-auto request_repaint(Core::State::AppState& state) -> void {
+auto request_repaint(core::AppState& state) -> void {
   if (state.floating_window->window.hwnd && state.floating_window->window.is_visible) {
     InvalidateRect(state.floating_window->window.hwnd, nullptr, FALSE);
   }
 }
 
-auto refresh_visible_frame_border_thickness(Core::State::AppState& state) -> void {
+auto refresh_visible_frame_border_thickness(core::AppState& state) -> void {
   auto& window = state.floating_window->window;
   UINT thickness = 0;
   if (window.hwnd) {
@@ -125,7 +125,7 @@ auto refresh_visible_frame_border_thickness(Core::State::AppState& state) -> voi
   window.visible_frame_border_thickness = thickness;
 }
 
-auto install_topmost_refresh_hook(Core::State::AppState& state) -> void {
+auto install_topmost_refresh_hook(core::AppState& state) -> void {
   auto& win = state.floating_window->window;
   if (win.topmost_refresh_hook) {
     return;  // 已安装
@@ -140,7 +140,7 @@ auto install_topmost_refresh_hook(Core::State::AppState& state) -> void {
   }
 }
 
-auto uninstall_topmost_refresh_hook(Core::State::AppState& state) -> void {
+auto uninstall_topmost_refresh_hook(core::AppState& state) -> void {
   auto& win = state.floating_window->window;
   if (win.topmost_refresh_hook) {
     UnhookWinEvent(win.topmost_refresh_hook);
@@ -151,7 +151,7 @@ auto uninstall_topmost_refresh_hook(Core::State::AppState& state) -> void {
   }
 }
 
-auto show_window(Core::State::AppState& state) -> void {
+auto show_window(core::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     ShowWindow(state.floating_window->window.hwnd, SW_SHOWNA);
     state.floating_window->window.is_visible = true;
@@ -166,7 +166,7 @@ auto show_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto hide_window(Core::State::AppState& state) -> void {
+auto hide_window(core::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     uninstall_topmost_refresh_hook(state);
     ShowWindow(state.floating_window->window.hwnd, SW_HIDE);
@@ -174,7 +174,7 @@ auto hide_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto toggle_visibility(Core::State::AppState& state) -> void {
+auto toggle_visibility(core::AppState& state) -> void {
   if (state.floating_window->window.is_visible) {
     hide_window(state);
   } else {
@@ -182,9 +182,9 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
   }
 }
 
-auto destroy_window(Core::State::AppState& state) -> void {
+auto destroy_window(core::AppState& state) -> void {
   // 清理Direct2D资源
-  UI::FloatingWindow::RenderContext::cleanup_render_context(state);
+  ui::floating_window::render_context::cleanup_render_context(state);
 
   if (state.floating_window->window.hwnd) {
     uninstall_topmost_refresh_hook(state);
@@ -194,15 +194,15 @@ auto destroy_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
+auto set_current_ratio(core::AppState& state, size_t index) -> void {
   state.floating_window->ui.current_ratio_index = index;
   if (state.floating_window->window.hwnd) {
     request_repaint(state);
   }
 }
 
-auto set_current_resolution(Core::State::AppState& state, size_t index) -> void {
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
+auto set_current_resolution(core::AppState& state, size_t index) -> void {
+  const auto& resolutions = features::settings::menu::get_resolutions(state);
   if (index < resolutions.size()) {
     state.floating_window->ui.current_resolution_index = index;
     if (state.floating_window->window.hwnd) {
@@ -211,7 +211,7 @@ auto set_current_resolution(Core::State::AppState& state, size_t index) -> void 
   }
 }
 
-auto update_menu_items(Core::State::AppState& state) -> void {
+auto update_menu_items(core::AppState& state) -> void {
   state.floating_window->data.menu_items.clear();
   initialize_menu_items(state);
   if (state.floating_window->window.hwnd) {
@@ -222,17 +222,17 @@ auto update_menu_items(Core::State::AppState& state) -> void {
 // 内部辅助函数实现
 
 // 根据 i18n_key 获取本地化文本（扁平化版本）
-auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::TextData& texts)
+auto get_text_by_i18n_key(const std::string& i18n_key, const core::i18n::TextData& texts)
     -> std::wstring {
   auto it = texts.find(i18n_key);
   if (it != texts.end()) {
-    return Utils::String::FromUtf8(it->second);
+    return utils::string::FromUtf8(it->second);
   }
   // Fallback: 返回 key 本身
-  return Utils::String::FromUtf8(i18n_key);
+  return utils::string::FromUtf8(i18n_key);
 }
 
-auto normalize_scroll_offsets(Core::State::AppState& state) -> void {
+auto normalize_scroll_offsets(core::AppState& state) -> void {
   const size_t page_size = static_cast<size_t>(state.floating_window->layout.max_visible_rows);
   if (page_size == 0) {
     state.floating_window->ui.ratio_scroll_offset = 0;
@@ -246,13 +246,13 @@ auto normalize_scroll_offsets(Core::State::AppState& state) -> void {
   size_t feature_count = 0;
   for (const auto& item : state.floating_window->data.menu_items) {
     switch (item.category) {
-      case UI::FloatingWindow::MenuItemCategory::AspectRatio:
+      case ui::floating_window::MenuItemCategory::AspectRatio:
         ++ratio_count;
         break;
-      case UI::FloatingWindow::MenuItemCategory::Resolution:
+      case ui::floating_window::MenuItemCategory::Resolution:
         ++resolution_count;
         break;
-      case UI::FloatingWindow::MenuItemCategory::Feature:
+      case ui::floating_window::MenuItemCategory::Feature:
         ++feature_count;
         break;
     }
@@ -277,7 +277,7 @@ auto normalize_scroll_offsets(Core::State::AppState& state) -> void {
 auto register_window_class(HINSTANCE instance) -> void {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
-  wc.lpfnWndProc = MessageHandler::static_window_proc;
+  wc.lpfnWndProc = message_handler::static_window_proc;
   wc.hInstance = instance;
   wc.lpszClassName = L"SpinningMomoFloatingWindowClass";
   wc.hbrBackground = nullptr;
@@ -286,12 +286,12 @@ auto register_window_class(HINSTANCE instance) -> void {
   RegisterClassExW(&wc);
 }
 
-auto initialize_menu_items(Core::State::AppState& state) -> void {
+auto initialize_menu_items(core::AppState& state) -> void {
   state.floating_window->data.menu_items.clear();
 
   // 获取比例和分辨率预设
-  const auto& ratios = Features::Settings::Menu::get_ratios(state);
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
+  const auto& ratios = features::settings::menu::get_ratios(state);
+  const auto& resolutions = features::settings::menu::get_resolutions(state);
 
   // 从配置获取功能项顺序
   const auto& feature_config = state.settings->raw.ui.app_menu.features;
@@ -300,25 +300,25 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   // 添加比例选项
   for (size_t i = 0; i < ratios.size(); ++i) {
     state.floating_window->data.menu_items.emplace_back(
-        ratios[i].name, UI::FloatingWindow::MenuItemCategory::AspectRatio, static_cast<int>(i));
+        ratios[i].name, ui::floating_window::MenuItemCategory::AspectRatio, static_cast<int>(i));
   }
 
   // 添加分辨率选项
   for (size_t i = 0; i < resolutions.size(); ++i) {
     const auto& preset = resolutions[i];
     state.floating_window->data.menu_items.emplace_back(
-        preset.name, UI::FloatingWindow::MenuItemCategory::Resolution, static_cast<int>(i));
+        preset.name, ui::floating_window::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
   // 添加功能项（从命令注册表获取）
   for (size_t i = 0; i < feature_config.size(); ++i) {
     const auto& command_id = feature_config[i];
     // 从注册表获取命令描述
-    if (const auto* command = Core::Commands::get_command(state, command_id)) {
+    if (const auto* command = core::commands::get_command(state, command_id)) {
       // 使用 i18n_key 获取文本
       std::wstring text = get_text_by_i18n_key(command->i18n_key, texts);
       state.floating_window->data.menu_items.emplace_back(
-          text, UI::FloatingWindow::MenuItemCategory::Feature, static_cast<int>(i), command_id);
+          text, ui::floating_window::MenuItemCategory::Feature, static_cast<int>(i), command_id);
     } else {
       Logger().warn("Command not found in registry: {}", command_id);
     }
@@ -331,11 +331,11 @@ auto create_window_attributes(HWND hwnd) -> void {
 }
 
 // 设置变更响应实现
-auto refresh_from_settings(Core::State::AppState& state) -> void {
+auto refresh_from_settings(core::AppState& state) -> void {
   // 更新菜单项
   update_menu_items(state);
 
-  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(
+  const auto metrics = ui::floating_window::layout::calculate_window_metrics(
       state, state.floating_window->window.dpi);
   state.floating_window->layout = metrics.layout;
 
@@ -343,7 +343,7 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
   normalize_scroll_offsets(state);
 
   // 更新颜色配置
-  UI::FloatingWindow::RenderContext::update_all_brush_colors(state);
+  ui::floating_window::render_context::update_all_brush_colors(state);
 
   const auto new_size = metrics.size;
   if (state.floating_window->window.hwnd) {
@@ -361,4 +361,4 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
   request_repaint(state);
 }
 
-}  // namespace UI::FloatingWindow
+}  // namespace ui::floating_window

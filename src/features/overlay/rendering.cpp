@@ -1,28 +1,28 @@
-module;
+#include "features/overlay/rendering.hpp"
 
-module Features.Overlay.Rendering;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Geometry;
-import Features.Overlay.Shaders;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
-namespace Features::Overlay::Rendering {
+#include "core/state/app_state.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/shaders.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
-auto create_shader_resources(Core::State::AppState& state) -> std::expected<void, std::string> {
+namespace features::overlay::rendering {
+
+auto create_shader_resources(core::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
-  auto result = Utils::Graphics::D3D::create_basic_shader_resources(
+  auto result = utils::graphics::d3d::create_basic_shader_resources(
       overlay_state.rendering.d3d_context.device.get(),
-      Features::Overlay::Shaders::BASIC_VERTEX_SHADER,
-      Features::Overlay::Shaders::BASIC_PIXEL_SHADER);
+      features::overlay::shaders::BASIC_VERTEX_SHADER,
+      features::overlay::shaders::BASIC_PIXEL_SHADER);
 
   if (!result) {
     return std::unexpected(result.error());
@@ -31,15 +31,15 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
   overlay_state.rendering.shader_resources = std::move(result.value());
 
   // 创建顶点缓冲区，初始使用全屏顶点
-  Types::Vertex vertices[] = {
+  Vertex vertices[] = {
       {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
       {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
       {1.0f, -1.0f, 1.0f, 1.0f},   // 右下
       {1.0f, 1.0f, 1.0f, 0.0f}     // 右上
   };
 
-  auto vertex_buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
-      overlay_state.rendering.d3d_context.device.get(), vertices, 4, sizeof(Types::Vertex));
+  auto vertex_buffer_result = utils::graphics::d3d::create_vertex_buffer(
+      overlay_state.rendering.d3d_context.device.get(), vertices, 4, sizeof(Vertex));
 
   if (!vertex_buffer_result) {
     return std::unexpected(vertex_buffer_result.error());
@@ -50,11 +50,11 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
   return {};
 }
 
-auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto initialize_rendering(core::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
   // 创建D3D上下文
-  auto d3d_result = Utils::Graphics::D3D::create_d3d_context(
+  auto d3d_result = utils::graphics::d3d::create_d3d_context(
       overlay_state.window.overlay_hwnd, overlay_state.window.window_width,
       overlay_state.window.window_height, overlay_state.enable_hdr);
 
@@ -73,7 +73,7 @@ auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, s
     Logger().error(error_msg);
 
     // 清理已分配的D3D资源
-    Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
+    utils::graphics::d3d::cleanup_d3d_context(overlay_state.rendering.d3d_context);
     overlay_state.rendering.d3d_initialized = false;
 
     return std::unexpected(result.error());
@@ -85,7 +85,7 @@ auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, s
   return {};
 }
 
-auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto resize_rendering(core::AppState& state) -> std::expected<void, std::string> {
   if (!state.overlay->rendering.d3d_initialized) {
     return std::unexpected("D3D not initialized");
   }
@@ -96,7 +96,7 @@ auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::
   rendering_state.resources_busy.store(true, std::memory_order_release);
 
   // 调整交换链大小
-  auto result = Utils::Graphics::D3D::resize_swap_chain(rendering_state.d3d_context,
+  auto result = utils::graphics::d3d::resize_swap_chain(rendering_state.d3d_context,
                                                         overlay_state.window.window_width,
                                                         overlay_state.window.window_height);
 
@@ -113,7 +113,7 @@ auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::
   return {};
 }
 
-auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
+auto update_capture_srv(core::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -145,7 +145,7 @@ auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture
   return {};
 }
 
-auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
+auto update_vertex_buffer_for_letterbox(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   auto& d3d_context = overlay_state.rendering.d3d_context;
   auto& shader_resources = overlay_state.rendering.shader_resources;
@@ -156,7 +156,7 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
   if (overlay_state.window.use_letterbox_mode) {
     // 使用工具函数计算黑边区域
     auto [content_left, content_top, content_width, content_height] =
-        Geometry::calculate_letterbox_area(
+        geometry::calculate_letterbox_area(
             overlay_state.window.screen_width, overlay_state.window.screen_height,
             overlay_state.window.cached_game_width, overlay_state.window.cached_game_height);
 
@@ -169,7 +169,7 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
   }
 
   // 更新顶点数据
-  Types::Vertex vertices[] = {
+  Vertex vertices[] = {
       {left, bottom, 0.0f, 1.0f},   // 左下
       {left, top, 0.0f, 0.0f},      // 左上
       {right, bottom, 1.0f, 1.0f},  // 右下
@@ -181,8 +181,7 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
                                          0, 0);
 }
 
-auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> frame_texture)
-    -> void {
+auto render_frame(core::AppState& state, wil::com_ptr<ID3D11Texture2D> frame_texture) -> void {
   auto& overlay_state = *state.overlay;
   auto& d3d_context = overlay_state.rendering.d3d_context;
   auto& shader_resources = overlay_state.rendering.shader_resources;
@@ -235,7 +234,7 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> fr
   d3d_context.context->IASetInputLayout(shader_resources.input_layout.get());
 
   // 设置顶点缓冲区
-  UINT stride = sizeof(Types::Vertex);
+  UINT stride = sizeof(Vertex);
   UINT offset = 0;
   ID3D11Buffer* vertex_buffer = shader_resources.vertex_buffer.get();
   d3d_context.context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
@@ -267,14 +266,14 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> fr
   }
 }
 
-auto cleanup_rendering(Core::State::AppState& state) -> void {
+auto cleanup_rendering(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
   overlay_state.rendering.d3d_initialized = false;
   overlay_state.rendering.resources_busy.store(true, std::memory_order_release);
 
-  Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
-  Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
+  utils::graphics::d3d::cleanup_shader_resources(overlay_state.rendering.shader_resources);
+  utils::graphics::d3d::cleanup_d3d_context(overlay_state.rendering.d3d_context);
 
   overlay_state.rendering.frame_texture.reset();
   overlay_state.rendering.capture_srv.reset();
@@ -287,4 +286,4 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
   overlay_state.rendering.resources_busy.store(false, std::memory_order_release);
 }
 
-}  // namespace Features::Overlay::Rendering
+}  // namespace features::overlay::rendering

@@ -44,33 +44,38 @@ The application is a **native Win32 C++ backend** that hosts an embedded **WebVi
 
 The frontend auto-detects its environment (`window.chrome.webview` presence) and selects the appropriate transport.
 
-### C++ Module System
-The backend uses **C++23 modules** (`.ixx` interface files, `.cpp` implementation files). Module names follow a dotted hierarchy that mirrors the directory structure:
+### C++ Header Architecture
+The backend uses **C++23 headers and implementation files** (`.hpp + .cpp`) with a precompiled header for build acceleration:
 
-- `Core.*` — framework infrastructure (async runtime, database, events, HTTP client, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
-- `Features.*` — business logic modules such as gallery, letterbox, notifications, overlay, preview, recording, screenshot, settings, update, and window_control
-- `UI.*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
-- `Utils.*` — shared utilities such as logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, crash_dump, and crypto
-- `Vendor.*` — thin wrappers re-exporting Win32 API and third-party types through the module system (e.g. `Vendor.Windows` wraps `<windows.h>`)
+- `core::*` — framework infrastructure (async runtime, database, events, HTTP client, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
+- `features::*` — business logic such as gallery, letterbox, notifications, overlay, preview, recording, screenshot, settings, update, and window_control
+- `ui::*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
+- `utils::*` — shared utilities such as logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, crash_dump, and crypto
+- `extensions::*` — game-specific integrations
+- `vendor/**/*.hpp` — project-owned include facades for the standard library, Win32, and third-party headers. These headers do not re-export external APIs through a project namespace.
+
+Every project header must remain self-contained without the PCH. Include `vendor/std.hpp` and the required vendor facades explicitly; `src/pch.hpp` only accelerates those same dependencies.
+
+External angle-bracket includes are allowed only inside `src/vendor/`. Windows SDK facades under `src/vendor/windows/` map one-to-one to physical SDK headers; do not create domain aggregate facades. Add only stable, high-frequency exact facades to `src/pch.hpp`, while new low-frequency SDK dependencies remain local to their call sites.
 
 ### Design Philosophy
 The C++ backend does **NOT** use OOP class hierarchies. Instead it follows:
 - **POD Structs + Free Functions**: plain data structs with free functions operating on them.
 - **Centralized State**: all state lives in `AppState`, passed by reference.
-- **Feature Independence**: features depend on `Core.*` but must NOT depend on each other.
+- **Feature Independence**: features depend on `core::*` but must NOT depend on each other.
 
 ### Central AppState
-`Core::State::AppState` is the single root state object. It owns all subsystem states as `std::unique_ptr` members. Functions are free functions that accept `AppState&`.
+`core::AppState` is the single root state object. It owns all subsystem states as `std::unique_ptr` members. Functions are free functions that accept `AppState&`.
 
 ### Key Patterns
 - **Error handling**: `std::expected<T, std::string>` throughout; no exception-based control flow.
-- **Async**: Asio-based coroutine runtime (`Core::Async`). RPC handlers return `asio::awaitable<RpcResult<T>>`.
-- **Events**: Type-erased event bus (`Core::Events`) with sync `send()` and async `post()` (wakes the Win32 message loop via `PostMessageW`).
-- **RPC registration**: `Core::RPC::register_method<Req, Res>()` registers handlers with reflect-cpp for request/response (de)serialization. Field names are auto-converted between `snake_case` (C++) and `camelCase` (JSON).
-- **Commands**: `Core::Commands` registry binds actions, toggle states, i18n keys, and optional hotkeys. Context menu and tray icon are driven by this registry.
+- **Async**: Asio-based coroutine runtime (`core::async`). RPC handlers return `asio::awaitable<RpcResult<T>>`.
+- **Events**: Type-erased event bus (`core::events`) with sync `send()` and async `post()` (wakes the Win32 message loop via `PostMessageW`).
+- **RPC registration**: `core::rpc::register_method<Req, Res>()` registers handlers with reflect-cpp for request/response (de)serialization. Field names are auto-converted between `snake_case` (C++) and `camelCase` (JSON).
+- **Commands**: `core::commands` registry binds actions, toggle states, i18n keys, and optional hotkeys. Context menu and tray icon are driven by this registry.
 - **Database**: SQLite via SQLiteCpp with thread-local connections, a `DataMapper` for ORM-like row mapping, and an auto-generated migration system (`scripts/generate-migrations.js`).
-- **Vendor wrappers**: Win32 macros/functions are re-exported as proper C++ functions/constants in `Vendor::Windows` to stay compatible with the module system.
-- **String encoding**: internal processing uses UTF-8 (`std::string`); Win32 API calls use UTF-16 (`std::wstring`). Convert via utilities in `Utils.String`.
+- **Vendor facades**: `vendor/*.hpp` centralizes external includes and configuration. Use Win32 and third-party APIs directly; project behavior belongs in `core`, `features`, or `utils`.
+- **String encoding**: internal processing uses UTF-8 (`std::string`); Win32 API calls use UTF-16 (`std::wstring`). Convert via utilities in `utils::string`.
 
 ### Web Frontend (web/)
 The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + shadcn-vue/reka-ui. It is built with a Vite-compatible toolchain. Key directories:
@@ -90,14 +95,14 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 - `docs/` — VitePress documentation site for user and developer docs
 - `playground/` — standalone Node/TypeScript scripts for backend HTTP/RPC debugging and experiments
 - `installer/` — WiX source files for MSI and bundle installer generation
-- `tasks/` — custom xmake tasks such as `build-all`, `release`, and `vs`
+- `tasks/` — custom xmake tasks such as `release` and `vs`
 
 ## Subsystem Documentation
 
-Detailed design guidelines and invariants for critical subsystems live in their respective module `README.md` files. Read these on-demand only when your task directly involves modifying or refactoring the subsystem:
+Detailed design guidelines and invariants for critical subsystems live in their respective `README.md` files. Read these on-demand only when your task directly involves modifying or refactoring the subsystem:
 
 - `src/features/gallery/README.md` — Asset identity, metadata inheritance, 30-day missing lifecycle, and scanner/watcher invariants.
-- `src/core/state/README.md` — `AppState` layout, forward-declaration patterns to prevent MSVC module rebuild cascades, and cross-module API conventions.
+- `src/core/state/README.md` — `AppState` layout, header forward declarations, and API dependency conventions.
 - `src/extensions/infinity_nikki/README.md` — Infinity Nikki media hardlink mirroring, task orchestration, and modification checklist.
 
 ### RPC Endpoint Organization
@@ -105,7 +110,7 @@ Endpoints live under `src/core/rpc/endpoints/<domain>/`. Each domain exposes a `
 Game-specific adapters live under `src/extensions/` and are exposed via `rpc/endpoints/extensions/`.
 
 ### Initialization Order
-Initialization still follows `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()`.
+Initialization still follows `main.cpp` → `Application::Initialize()` → `core::initializer::initialize_application()`.
 The rough order is: core infrastructure first, then native UI, then feature services, then extensions and startup tasks.
 
 ## Build Output
@@ -120,19 +125,19 @@ Installers are built via `node scripts/build-installer.js` (or `npm run build:in
 These must be re-run when their source files change:
 - `node scripts/generate-migrations.js` — after modifying `src/migrations/*.sql`
 - `node scripts/generate-embedded-locales.js` — after modifying `src/locales/*.json` (zh-CN / en-US)
-- `node scripts/generate-map-injection-cpp.js` — after modifying `web/src/features/map/injection/source/*.js` (regenerates minified JS and C++ map injection module)
+- `node scripts/generate-map-injection-cpp.js` — after modifying `web/src/features/map/injection/source/*.js` (regenerates minified JS and its C++ header)
 
 ## Comments
 - Comments should describe intent and logic (why / what), not restate what the code already shows (how).
 - When changing code, update related comments so they stay in sync with the implementation.
 
 ## Naming Conventions
-- **C++ module names**: PascalCase with dots — `Features.Gallery`, `Core.RPC.Types`
-- **C++ files/functions**: snake_case — `gallery.ixx`, `initialize()`
-- **No anonymous namespaces**: Do not use `namespace { ... }` in C++; put helpers in the module's named namespace.
+- **C++ namespaces**: lower snake case — `features::gallery`, `core::http_server`
+- **C++ types**: PascalCase — `GalleryState`, `RpcRequest`
+- **C++ files/functions**: snake_case — `gallery.hpp`, `initialize()`
 - **Frontend components**: PascalCase — `GalleryPage.vue`
 - **Frontend modules**: camelCase — `galleryApi.ts`
-- **Module import order** in `.ixx`: `std` → `Vendor.*` → `Core.*` → `Features.*` / `UI.*` / `Utils.*`
+- **C++ include order**: the matching header first in `.cpp`, then `vendor/std.hpp`, remaining vendor headers, and project headers.
 
 ## Testing
 Backend regression tests use doctest and are executed through Xmake:
@@ -143,9 +148,9 @@ Backend regression tests use doctest and are executed through Xmake:
 5. Use the root-level `playground/` scripts for backend HTTP/RPC debugging and ad-hoc experiments.
 
 ## Adding a New Feature
-1. Create a directory under `src/features/<name>/` with at minimum a `.ixx` module interface and `.cpp` implementation.
-2. Add a state struct in `<name>/state.ixx` and register it in `Core::State::AppState`.
+1. Create a directory under `src/features/<name>/` with `.hpp` interfaces and `.cpp` implementations.
+2. Add a state struct in `<name>/state.hpp` under `features::<name>` and register it in `core::AppState`.
 3. Add RPC endpoint file under `src/core/rpc/endpoints/<name>/`, implement `register_all(state)`, and wire it in `registry.cpp`.
 4. Register commands in `src/core/commands/builtin.cpp` if the feature needs hotkeys/menu entries.
-5. If the feature needs initialization, add it to `Core::Initializer::initialize_application`.
+5. If the feature needs initialization, add it to `core::initializer::initialize_application`.
 6. On the web side, add a feature directory under `web/src/features/<name>/` with `api.ts`, `store/index.ts`, `types.ts`, components, and pages.

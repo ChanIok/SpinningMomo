@@ -1,4 +1,8 @@
-module;
+#include "features/recording/time.hpp"
+
+#include "vendor/std.hpp"
+
+#include "vendor/windows.hpp"
 
 // Features.Recording.Time
 //
@@ -11,12 +15,7 @@ module;
 // - "录制起点"（start_qpc_100ns）在 start() 中冻结，后续所有时间都是相对偏移。
 // - 音频采集线程和 WGC 帧回调都使用同一个时钟基准，保证音画同步。
 
-module Features.Recording.Time;
-
-import std;
-import <windows.h>;
-
-namespace Features::Recording::Time {
+namespace features::recording::time {
 
 // 查询当前 QPC 计数，换算成 100ns 单位。
 // QPC 是 Windows 提供的高精度单调时钟，精度通常在微秒级。
@@ -50,4 +49,4 @@ auto relative_timestamp_100ns(std::int64_t start_qpc_100ns, std::int64_t absolut
   return absolute_qpc_100ns - start_qpc_100ns;
 }
 
-}  // namespace Features::Recording::Time
+}  // namespace features::recording::time

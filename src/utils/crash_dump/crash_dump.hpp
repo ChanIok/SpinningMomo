@@ -1,0 +1,14 @@
+#pragma once
+
+#include "vendor/std.hpp"
+
+namespace utils::crash_dump {
+
+// 安装崩溃转储处理器（SEH + terminate）
+auto install() -> void;
+
+// 手动写入转储（exception_pointers 可传 nullptr）
+auto write_dump(void* exception_pointers, std::string_view reason)
+    -> std::expected<std::filesystem::path, std::string>;
+
+}  // namespace utils::crash_dump

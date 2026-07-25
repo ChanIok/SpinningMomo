@@ -1,0 +1,96 @@
+#pragma once
+
+#include "vendor/std.hpp"
+
+// Auto-generated embedded Chinese locale header
+// DO NOT EDIT - This file contains embedded locale data
+//
+// Source: src/locales/zh-CN.json
+// Variable: zh_cn_json
+
+namespace embedded_locales {
+
+// Embedded Chinese JSON content as string_view
+// Size: 4033 bytes
+constexpr std::string_view zh_cn_json = R"EmbeddedJson({
+  "version": "1.0",
+
+  "menu.app_main": "主界面",
+  "menu.app_float": "悬浮窗",
+  "menu.app_exit": "退出",
+  "menu.app_user_guide": "使用指南",
+  "menu.float_show": "显示悬浮窗",
+  "menu.float_hide": "隐藏悬浮窗",
+  "menu.float_toggle": "显示/隐藏悬浮窗",
+
+  "menu.window_select": "选择窗口",
+  "menu.window_no_available": "(无可用窗口)",
+  "menu.window_ratio": "窗口比例",
+  "menu.window_resolution": "分辨率",
+  "menu.window_reset": "重置窗口",
+  "menu.window_toggle_borderless": "切换窗口边框",
+
+  "menu.screenshot_capture": "截图",
+  "menu.output_open_folder": "输出目录",
+  "menu.external_album_open_folder": "游戏相册",
+  "menu.overlay_toggle": "叠加层",
+  "menu.photography_toggle": "高级摄影",
+  "menu.preview_toggle": "预览窗",
+  "menu.recording_toggle": "录制",
+  "menu.letterbox_toggle": "黑边模式",
+
+
+  "menu.settings_config": "打开配置文件",
+  "menu.settings_language": "语言",
+
+  "message.app_startup": "窗口比例调整工具已在后台运行。\n按 [",
+  "message.app_startup_suffix": "] 可以显示/隐藏调整窗口",
+  "message.app_feature_not_supported": "此功能需要 Windows 10 1803 或更高版本，已自动禁用。",
+
+  "message.window_selected": "已选择窗口",
+  "message.window_adjust_success": "窗口调整成功！",
+  "message.window_adjust_failed": "窗口调整失败。可能需要管理员权限，或窗口不支持调整大小。",
+  "message.window_not_found": "未找到目标窗口，请确保窗口已启动。",
+  "message.window_reset_success": "窗口已重置为屏幕大小。",
+  "message.window_reset_failed": "重置窗口尺寸失败。",
+
+  "message.screenshot_success": "截图已保存：",
+  "message.screenshot_failed": "截图失败",
+  "message.preview_overlay_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
+  "message.preview_start_failed": "预览窗启动失败: ",
+  "message.overlay_start_failed": "叠加层启动失败: ",
+  "message.photography_start_failed": "高级摄影启动失败: ",
+  "message.recording_started": "录制已开始。",
+  "message.recording_saved": "录制已保存：",
+  "message.recording_start_failed": "录制启动失败: ",
+  "message.recording_failed": "录制失败: ",
+  "message.recording_stopping": "录制正在停止并封装，请稍候。",
+  "message.recording_overload": "编码过载，建议降低分辨率或帧率。",
+  "message.recording_stop_failed": "录制停止失败: ",
+  "message.gallery_folder_sync_failed": "此文件夹的图库自动同步已暂停。请解决问题后点击重试。",
+
+  "notification.action.view": "查看",
+  "notification.action.retry": "重试",
+
+  "photography.long_exposure_off": "长曝光 关",
+  "photography.long_exposure_frames": "长曝光 {} 帧",
+
+  "message.settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
+  "message.settings_hotkey_success": "热键已设置为：",
+  "message.settings_hotkey_failed": "热键设置失败，已恢复默认热键。",
+  "message.settings_hotkey_register_failed": "热键注册失败。程序仍可使用，但快捷键将不可用。",
+  "message.settings_config_help": "配置文件说明：\n1. [AspectRatioItems] 节用于添加自定义比例\n2. [ResolutionItems] 节用于添加自定义分辨率\n3. 保存后重启软件生效",
+  "message.settings_load_failed": "加载配置失败，请检查配置文件。",
+  "message.settings_format_error": "格式错误：",
+  "message.settings_ratio_format_example": "请使用正确格式，如：16:10,17:10",
+  "message.settings_resolution_format_example": "请使用正确格式，如：3840x2160,7680x4320",
+  "message.update_available_about_prefix": "v{0} 版本已发布，可前往「关于」页面安装。",
+  "message.app_updated_to_prefix": "已成功更新到版本 ",
+
+  "label.app_name": "旋转吧大喵",
+  "label.language_zh_cn": "中文",
+  "label.language_en_us": "English"
+}
+)EmbeddedJson";
+
+}  // namespace embedded_locales

@@ -1,19 +1,20 @@
-module;
+#include "ui/shared_render_resources/shared_render_resources.hpp"
 
-module UI.SharedRenderResources;
+#include "vendor/std.hpp"
 
-import Core.State;
-import UI.SharedRenderResources.State;
-import <d2d1_3.h>;
-import <d3d11.h>;
-import <dwrite_3.h>;
-import <dxgi1_2.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
 
-namespace UI::SharedRenderResources {
+#include "core/state/app_state.hpp"
+#include "ui/shared_render_resources/state.hpp"
 
-auto create_factories(State::SharedRenderResourcesState& shared) -> bool {
+namespace ui::shared_render_resources {
+
+auto create_factories(SharedRenderResourcesState& shared) -> bool {
   const HRESULT factory_hr =
       D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory7), nullptr,
                         reinterpret_cast<void**>(shared.d2d_factory.put()));
@@ -27,7 +28,7 @@ auto create_factories(State::SharedRenderResourcesState& shared) -> bool {
   return SUCCEEDED(write_hr) && shared.write_factory;
 }
 
-auto create_d3d_device(State::SharedRenderResourcesState& shared) -> bool {
+auto create_d3d_device(SharedRenderResourcesState& shared) -> bool {
   UINT create_device_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
   create_device_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -40,7 +41,7 @@ auto create_d3d_device(State::SharedRenderResourcesState& shared) -> bool {
          shared.d3d_device && shared.d3d_device_context;
 }
 
-auto create_d2d_device(State::SharedRenderResourcesState& shared) -> bool {
+auto create_d2d_device(SharedRenderResourcesState& shared) -> bool {
   wil::com_ptr<IDXGIDevice> dxgi_device;
   if (FAILED(shared.d3d_device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()))) || !dxgi_device) {
     return false;
@@ -50,7 +51,7 @@ auto create_d2d_device(State::SharedRenderResourcesState& shared) -> bool {
          shared.d2d_device;
 }
 
-auto ensure_initialized(Core::State::AppState& state) -> bool {
+auto ensure_initialized(core::AppState& state) -> bool {
   auto& shared = *state.shared_render_resources;
   if (shared.is_initialized) {
     return true;
@@ -68,7 +69,7 @@ auto ensure_initialized(Core::State::AppState& state) -> bool {
   return true;
 }
 
-auto cleanup(Core::State::AppState& state) -> void {
+auto cleanup(core::AppState& state) -> void {
   auto& shared = *state.shared_render_resources;
   shared.d2d_device.reset();
   shared.write_factory.reset();
@@ -78,4 +79,4 @@ auto cleanup(Core::State::AppState& state) -> void {
   shared.is_initialized = false;
 }
 
-}  // namespace UI::SharedRenderResources
+}  // namespace ui::shared_render_resources

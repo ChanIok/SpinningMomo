@@ -1,14 +1,15 @@
-module;
+#include "utils/graphics/photo_processing.hpp"
 
-module Utils.Graphics.PhotoProcessing;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
-namespace Utils::Graphics::PhotoProcessing {
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace utils::graphics::photo_processing {
 
 // HLSL constant buffer，与 shader 中的 AverageConstants 对齐（16 字节对齐）
 struct AverageConstants {
@@ -190,7 +191,7 @@ auto create_constant_buffer(ID3D11Device* device, const Constants& constants)
 auto create_vertex_shader(ID3D11Device* device)
     -> std::expected<wil::com_ptr<ID3D11VertexShader>, std::string> {
   auto blob_result =
-      Utils::Graphics::D3D::compile_shader(kFullscreenVertexShader, "main", "vs_4_0");
+      utils::graphics::d3d::compile_shader(kFullscreenVertexShader, "main", "vs_4_0");
   if (!blob_result) {
     return std::unexpected(blob_result.error());
   }
@@ -207,7 +208,7 @@ auto create_vertex_shader(ID3D11Device* device)
 
 auto create_pixel_shader(ID3D11Device* device, const std::string& source, std::string_view label)
     -> std::expected<wil::com_ptr<ID3D11PixelShader>, std::string> {
-  auto blob_result = Utils::Graphics::D3D::compile_shader(source, "main", "ps_4_0");
+  auto blob_result = utils::graphics::d3d::compile_shader(source, "main", "ps_4_0");
   if (!blob_result) {
     return std::unexpected(std::format("{} shader compile failed: {}", label, blob_result.error()));
   }
@@ -225,7 +226,7 @@ auto create_pixel_shader(ID3D11Device* device, const std::string& source, std::s
 
 auto create_sampler(ID3D11Device* device)
     -> std::expected<wil::com_ptr<ID3D11SamplerState>, std::string> {
-  return Utils::Graphics::D3D::create_linear_sampler(device);
+  return utils::graphics::d3d::create_linear_sampler(device);
 }
 
 // 渲染完成后解绑所有管线资源，避免意外引用导致 GPU 资源泄漏
@@ -405,4 +406,4 @@ auto accumulate_average_frame(AverageAccumulator& accumulator, ID3D11Texture2D* 
   return {};
 }
 
-}  // namespace Utils::Graphics::PhotoProcessing
+}  // namespace utils::graphics::photo_processing

@@ -1,12 +1,10 @@
-module;
+#include "utils/display/display.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-module Utils.Display;
+#include "vendor/windows.hpp"
 
-import std;
-
-namespace Utils::Display {
+namespace utils::display {
 
 auto rect_width(const RECT& rect) -> int { return rect.right - rect.left; }
 
@@ -69,4 +67,4 @@ auto get_working_monitor(HWND anchor_hwnd, bool anchor_visible)
   return get_primary_monitor();
 }
 
-}  // namespace Utils::Display
+}  // namespace utils::display

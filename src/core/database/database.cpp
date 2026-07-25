@@ -1,21 +1,21 @@
-module;
+#include "core/database/database.hpp"
 
-module Core.Database;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.Database.State;
-import Core.Database.Types;
-import Utils.Logger;
-import <SQLiteCpp/SQLiteCpp.h>;
+#include "vendor/sqlite.hpp"
 
-namespace Core::Database {
+#include "core/database/state.hpp"
+#include "core/database/types.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace core::database {
 
 // DB worker 线程内的当前连接。业务线程只投递任务，不直接持有 SQLite 连接。
 // 事务 lambda 内再次调用 execute/query 时会命中它并直接执行，避免任务重入死锁。
 thread_local SQLite::Database* current_connection = nullptr;
 
-namespace Executor {
+namespace executor {
 
 auto resolve_thread_count() -> std::size_t {
   const auto hardware_threads = std::thread::hardware_concurrency();
@@ -35,7 +35,7 @@ auto validate_database_path(const std::filesystem::path& db_path) -> void {
   configure_connection(connection);
 }
 
-auto bind_params(SQLite::Statement& query, const std::vector<Types::DbParam>& params) -> void {
+auto bind_params(SQLite::Statement& query, const std::vector<DbParam>& params) -> void {
   for (size_t i = 0; i < params.size(); ++i) {
     const auto& param = params[i];
     int param_index = static_cast<int>(i + 1);  // SQLite 参数是 1-based 索引
@@ -56,7 +56,7 @@ auto bind_params(SQLite::Statement& query, const std::vector<Types::DbParam>& pa
   }
 }
 
-auto submit_task(State::DatabaseState& state, std::move_only_function<void()> task)
+auto submit_task(DatabaseState& state, std::move_only_function<void()> task)
     -> std::expected<void, std::string> {
   if (!state.is_running.load(std::memory_order_acquire)) {
     return std::unexpected("Database executor is not running");
@@ -94,7 +94,7 @@ auto execute_job(SQLite::Database& connection,
   }
 }
 
-auto worker_loop(State::DatabaseState& state, std::size_t index) -> void {
+auto worker_loop(DatabaseState& state, std::size_t index) -> void {
   try {
     SQLite::Database connection(state.db_path.string(),
                                 SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
@@ -146,13 +146,13 @@ auto worker_loop(State::DatabaseState& state, std::size_t index) -> void {
   }
 }
 
-}  // namespace Executor
+}  // namespace executor
 
-auto run_database_job(Core::State::AppState& app_state,
+auto run_database_job(core::AppState& app_state,
                       std::move_only_function<void(SQLite::Database&)> job)
     -> std::expected<void, std::string> {
   if (current_connection) {
-    return Executor::execute_job(*current_connection, job);
+    return executor::execute_job(*current_connection, job);
   }
 
   if (!app_state.database) {
@@ -174,17 +174,17 @@ auto run_database_job(Core::State::AppState& app_state,
       return;
     }
 
-    promise.set_value(Executor::execute_job(*current_connection, job));
+    promise.set_value(executor::execute_job(*current_connection, job));
   };
 
-  if (auto submit_result = Executor::submit_task(state, std::move(task)); !submit_result) {
+  if (auto submit_result = executor::submit_task(state, std::move(task)); !submit_result) {
     return std::unexpected(submit_result.error());
   }
 
   return future.get();
 }
 
-auto shutdown_executor(State::DatabaseState& state) -> void {
+auto shutdown_executor(DatabaseState& state) -> void {
   if (!state.is_running.exchange(false, std::memory_order_acq_rel)) {
     return;
   }
@@ -213,7 +213,7 @@ auto shutdown_executor(State::DatabaseState& state) -> void {
   Logger().info("Database executor stopped");
 }
 
-auto initialize_executor(State::DatabaseState& state, const std::filesystem::path& db_path)
+auto initialize_executor(DatabaseState& state, const std::filesystem::path& db_path)
     -> std::expected<void, std::string> {
   if (state.is_running.exchange(true, std::memory_order_acq_rel)) {
     Logger().warn("Database executor already started");
@@ -229,14 +229,14 @@ auto initialize_executor(State::DatabaseState& state, const std::filesystem::pat
     }
 
     // 先用短连接验证路径和基础 PRAGMA，避免 worker 启动后才暴露打开失败。
-    Executor::validate_database_path(db_path);
+    executor::validate_database_path(db_path);
 
-    state.thread_count = Executor::resolve_thread_count();
+    state.thread_count = executor::resolve_thread_count();
     state.worker_threads.clear();
     state.worker_threads.reserve(state.thread_count);
 
     for (std::size_t i = 0; i < state.thread_count; ++i) {
-      state.worker_threads.emplace_back([&state, i]() { Executor::worker_loop(state, i); });
+      state.worker_threads.emplace_back([&state, i]() { executor::worker_loop(state, i); });
     }
 
     Logger().info("Database executor started with {} worker(s): {}", state.thread_count,
@@ -253,7 +253,7 @@ auto initialize_executor(State::DatabaseState& state, const std::filesystem::pat
   }
 }
 
-auto initialize(Core::State::AppState& app_state, const std::filesystem::path& db_path)
+auto initialize(core::AppState& app_state, const std::filesystem::path& db_path)
     -> std::expected<void, std::string> {
   auto* const state = app_state.database ? app_state.database.get() : nullptr;
   if (!state) {
@@ -263,7 +263,7 @@ auto initialize(Core::State::AppState& app_state, const std::filesystem::path& d
   return initialize_executor(*state, db_path);
 }
 
-auto shutdown(Core::State::AppState& app_state) -> void {
+auto shutdown(core::AppState& app_state) -> void {
   auto* const state = app_state.database ? app_state.database.get() : nullptr;
   if (!state) {
     return;
@@ -273,7 +273,7 @@ auto shutdown(Core::State::AppState& app_state) -> void {
 }
 
 // 从运行中的数据库生成一致快照，避免直接复制 WAL 数据库得到不完整文件。
-auto backup_to(Core::State::AppState& app_state, const std::filesystem::path& destination_path)
+auto backup_to(core::AppState& app_state, const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
   if (destination_path.empty()) {
     return std::unexpected("Database backup destination is empty");
@@ -307,7 +307,7 @@ auto backup_to(Core::State::AppState& app_state, const std::filesystem::path& de
   return backup_result;
 }
 
-auto execute(Core::State::AppState& app_state, const std::string& sql)
+auto execute(core::AppState& app_state, const std::string& sql)
     -> std::expected<void, std::string> {
   return run_on_database<std::expected<void, std::string>>(
       app_state, [sql](SQLite::Database& connection) -> std::expected<void, std::string> {
@@ -321,13 +321,13 @@ auto execute(Core::State::AppState& app_state, const std::string& sql)
       });
 }
 
-auto execute(Core::State::AppState& app_state, const std::string& sql,
-             const std::vector<Types::DbParam>& params) -> std::expected<void, std::string> {
+auto execute(core::AppState& app_state, const std::string& sql, const std::vector<DbParam>& params)
+    -> std::expected<void, std::string> {
   return run_on_database<std::expected<void, std::string>>(
       app_state, [sql, params](SQLite::Database& connection) -> std::expected<void, std::string> {
         try {
           SQLite::Statement query(connection, sql);
-          Executor::bind_params(query, params);
+          executor::bind_params(query, params);
           query.exec();
           return {};
         } catch (const SQLite::Exception& e) {
@@ -337,4 +337,4 @@ auto execute(Core::State::AppState& app_state, const std::string& sql,
       });
 }
 
-}  // namespace Core::Database
+}  // namespace core::database

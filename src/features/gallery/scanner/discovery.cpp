@@ -1,19 +1,18 @@
-module;
+#include "features/gallery/scanner/discovery.hpp"
 
-module Features.Gallery.Scanner.Discovery;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Scanner.Common;
-import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.Ignore.Service;
-import Utils.Logger;
-import Utils.Path;
-import Utils.Time;
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/ignore/service.hpp"
+#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/scanner/progress.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/time.hpp"
 
-namespace Features::Gallery::Scanner::Discovery {
+namespace features::gallery::scanner::discovery {
 
 struct DiscoveredPaths {
   std::vector<std::filesystem::path> files;
@@ -25,7 +24,7 @@ struct DiscoveredPaths {
 auto append_folder_with_ancestors(DiscoveredPaths& paths, const std::filesystem::path& folder_path,
                                   const std::filesystem::path& scan_root) -> void {
   auto current = folder_path;
-  while (!current.empty() && Utils::Path::IsPathWithinBase(current, scan_root)) {
+  while (!current.empty() && utils::path::IsPathWithinBase(current, scan_root)) {
     auto key = current.string();
     if (paths.folder_keys.insert(key).second) {
       paths.folders.push_back(current);
@@ -40,8 +39,8 @@ auto append_folder_with_ancestors(DiscoveredPaths& paths, const std::filesystem:
 }
 
 // 一次遍历收集候选文件和可见目录，同时保留深层 include 所需的祖先链。
-auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& directory,
-                const Types::ScanOptions& options, std::int64_t folder_id)
+auto scan_paths(core::AppState& app_state, const std::filesystem::path& directory,
+                const ScanOptions& options, std::int64_t folder_id)
     -> std::expected<DiscoveredPaths, std::string> {
   if (!std::filesystem::exists(directory)) {
     return std::unexpected("Directory does not exist: " + directory.string());
@@ -52,14 +51,14 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
 
   try {
     // 规则始终相对顶层监听根匹配，子目录扫描也不改变这个基准。
-    auto root_folder_id_result = Ignore::Service::resolve_root_folder_id(app_state, folder_id);
+    auto root_folder_id_result = ignore::service::resolve_root_folder_id(app_state, folder_id);
     if (!root_folder_id_result) {
       return std::unexpected("Failed to resolve ignore rule base folder: " +
                              root_folder_id_result.error());
     }
 
     auto root_folder_result =
-        Folder::Repository::get_folder_by_id(app_state, root_folder_id_result.value());
+        folder::repository::get_folder_by_id(app_state, root_folder_id_result.value());
     if (!root_folder_result) {
       return std::unexpected("Failed to load ignore rule base folder: " +
                              root_folder_result.error());
@@ -70,15 +69,15 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
     }
 
     auto ignore_base_path = std::filesystem::path(root_folder_result->value().path);
-    auto rules_result = Ignore::Service::load_ignore_rules(app_state, folder_id);
+    auto rules_result = ignore::service::load_ignore_rules(app_state, folder_id);
     if (!rules_result) {
       return std::unexpected("Failed to load ignore rules: " + rules_result.error());
     }
 
     auto combined_rules = std::move(rules_result.value());
     auto supported_extensions =
-        options.supported_extensions.value_or(Common::default_supported_extensions());
-    auto normalized_scan_root_result = Utils::Path::NormalizePath(directory);
+        options.supported_extensions.value_or(common::default_supported_extensions());
+    auto normalized_scan_root_result = utils::path::NormalizePath(directory);
     if (!normalized_scan_root_result) {
       return std::unexpected("Failed to normalize scan root: " +
                              normalized_scan_root_result.error());
@@ -100,7 +99,7 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
         continue;
       }
 
-      auto normalized_path_result = Utils::Path::NormalizePath(entry.path());
+      auto normalized_path_result = utils::path::NormalizePath(entry.path());
       if (!normalized_path_result) {
         Logger().warn("Failed to normalize discovered path '{}': {}", entry.path().string(),
                       normalized_path_result.error());
@@ -110,19 +109,19 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
 
       if (is_directory) {
         // 只把目录本身未被排除的节点加入库存，但不剪枝，以便后续 include 重新放行深层路径。
-        if (!Ignore::Service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
+        if (!ignore::service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
                                                  true)) {
           append_folder_with_ancestors(result, normalized_path, normalized_scan_root);
         }
         continue;
       }
 
-      if (!is_regular_file || !Common::is_supported_file(normalized_path, supported_extensions)) {
+      if (!is_regular_file || !common::is_supported_file(normalized_path, supported_extensions)) {
         continue;
       }
 
       // 文件继续沿用现有后规则覆盖前规则的 include/exclude 语义。
-      if (Ignore::Service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
+      if (ignore::service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
                                               false)) {
         continue;
       }
@@ -142,8 +141,8 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
 
 // 为每个候选文件读取 size / mtime / ctime，供后续变更判定使用。
 auto scan_file_info(const std::vector<std::filesystem::path>& found_files)
-    -> std::vector<Types::FileSystemInfo> {
-  std::vector<Types::FileSystemInfo> result;
+    -> std::vector<FileSystemInfo> {
+  std::vector<FileSystemInfo> result;
   result.reserve(found_files.size());
 
   for (const auto& file_path : found_files) {
@@ -158,31 +157,31 @@ auto scan_file_info(const std::vector<std::filesystem::path>& found_files)
       continue;
     }
 
-    auto creation_time_result = Utils::Time::get_file_creation_time_millis(file_path);
+    auto creation_time_result = utils::time::get_file_creation_time_millis(file_path);
     if (!creation_time_result) {
       Logger().debug("Could not get creation time for {}: {}", file_path.string(),
                      creation_time_result.error());
       continue;
     }
 
-    result.push_back(Types::FileSystemInfo{
-        .path = file_path,
-        .size = static_cast<std::int64_t>(file_size),
-        .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
-        .file_created_millis = creation_time_result.value(),
-        .hash = ""});
+    result.push_back(
+        FileSystemInfo{.path = file_path,
+                       .size = static_cast<std::int64_t>(file_size),
+                       .file_modified_millis = utils::time::file_time_to_millis(last_write_time),
+                       .file_created_millis = creation_time_result.value(),
+                       .hash = ""});
   }
 
   return result;
 }
 
 // 发现阶段：一次枚举产出未忽略的目录库存和候选媒体信息。
-auto run_discovery_phase(Core::State::AppState& app_state, const std::filesystem::path& directory,
-                         std::int64_t folder_id, const Types::ScanOptions& options,
-                         const std::function<void(const Types::ScanProgress&)>& progress_callback)
+auto run_discovery_phase(core::AppState& app_state, const std::filesystem::path& directory,
+                         std::int64_t folder_id, const ScanOptions& options,
+                         const std::function<void(const ScanProgress&)>& progress_callback)
     -> std::expected<DiscoveryResult, std::string> {
-  Progress::report_scan_progress(progress_callback, "discovering", 0, 1,
-                                 Progress::kDiscoveringStartPercent,
+  progress::report_scan_progress(progress_callback, "discovering", 0, 1,
+                                 progress::kDiscoveringStartPercent,
                                  "Scanning files and folders from disk");
 
   auto paths_result = scan_paths(app_state, directory, options, folder_id);
@@ -193,9 +192,9 @@ auto run_discovery_phase(Core::State::AppState& app_state, const std::filesystem
 
   auto file_infos = scan_file_info(paths_result->files);
   auto folder_paths = std::move(paths_result->folders);
-  Progress::report_scan_progress(
+  progress::report_scan_progress(
       progress_callback, "discovering", static_cast<std::int64_t>(file_infos.size()),
-      static_cast<std::int64_t>(file_infos.size()), Progress::kDiscoveringEndPercent,
+      static_cast<std::int64_t>(file_infos.size()), progress::kDiscoveringEndPercent,
       std::format("Discovered {} candidate files and {} folders", file_infos.size(),
                   folder_paths.size()));
 
@@ -207,4 +206,4 @@ auto run_discovery_phase(Core::State::AppState& app_state, const std::filesystem
   };
 }
 
-}  // namespace Features::Gallery::Scanner::Discovery
+}  // namespace features::gallery::scanner::discovery

@@ -1,72 +1,71 @@
-module;
+#include "features/gallery/root_availability.hpp"
 
-module Features.Gallery.RootAvailability;
+#include "vendor/std.hpp"
 
-import std;
-import Core.Async;
-import Core.State;
-import Features.Gallery.Folder.Repository;
-import Features.Gallery.State;
-import Features.Gallery.Types;
-import Utils.Logger;
-import Utils.Network;
-import Utils.Path;
-import Utils.String;
-import <asio.hpp>;
+#include "vendor/asio.hpp"
 
-namespace Features::Gallery::RootAvailability::Detail {
+#include "core/async/async.hpp"
+#include "core/state/app_state.hpp"
+#include "features/gallery/folder/repository.hpp"
+#include "features/gallery/state.hpp"
+#include "features/gallery/types.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/network/network.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+
+namespace features::gallery::root_availability::detail {
 
 struct ProbeTarget {
-  Features::Gallery::Types::Folder folder;
+  features::gallery::Folder folder;
   std::filesystem::path normalized_path;
   std::wstring server;
 };
 
 struct ProbeTask {
   ProbeTarget target;
-  std::future<Utils::Network::TcpProbeResult> future;
+  std::future<utils::network::TcpProbeResult> future;
 };
 
 auto normalize_root_path(const std::filesystem::path& path)
     -> std::expected<std::filesystem::path, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(path);
+  auto normalized_result = utils::path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize gallery root path: " + normalized_result.error());
   }
   return normalized_result.value();
 }
 
-auto store_availability(Core::State::AppState& app_state, std::int64_t root_id,
+auto store_availability(core::AppState& app_state, std::int64_t root_id,
                         const std::filesystem::path& root_path,
-                        Features::Gallery::State::RootAvailability availability) -> void {
+                        features::gallery::RootAvailability availability) -> void {
   std::lock_guard<std::mutex> lock(app_state.gallery->root_availability_mutex);
   app_state.gallery->root_availability_by_id[root_id] = availability;
   app_state.gallery->root_availability_by_path[root_path.string()] = availability;
 }
 
-}  // namespace Features::Gallery::RootAvailability::Detail
+}  // namespace features::gallery::root_availability::detail
 
-namespace Features::Gallery::RootAvailability {
+namespace features::gallery::root_availability {
 
-auto availability_to_string(Features::Gallery::State::RootAvailability availability)
-    -> std::string_view {
+auto availability_to_string(features::gallery::RootAvailability availability) -> std::string_view {
   switch (availability) {
-    case Features::Gallery::State::RootAvailability::Local:
+    case features::gallery::RootAvailability::Local:
       return "local";
-    case Features::Gallery::State::RootAvailability::RemoteReachable:
+    case features::gallery::RootAvailability::RemoteReachable:
       return "remote_reachable";
-    case Features::Gallery::State::RootAvailability::RemoteUnreachable:
+    case features::gallery::RootAvailability::RemoteUnreachable:
       return "remote_unreachable";
   }
   return "unknown";
 }
 
-auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+auto initialize(core::AppState& app_state) -> std::expected<void, std::string> {
   if (!app_state.gallery) {
     return std::unexpected("Gallery state is not initialized");
   }
 
-  auto folders_result = Features::Gallery::Folder::Repository::list_all_folders(app_state);
+  auto folders_result = features::gallery::folder::repository::list_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected("Failed to list folders for root availability: " +
                            folders_result.error());
@@ -78,13 +77,13 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     app_state.gallery->root_availability_by_path.clear();
   }
 
-  std::vector<Detail::ProbeTarget> remote_targets;
+  std::vector<detail::ProbeTarget> remote_targets;
   for (const auto& folder : folders_result.value()) {
     if (folder.parent_id.has_value()) {
       continue;
     }
 
-    auto normalized_result = Detail::normalize_root_path(std::filesystem::path(folder.path));
+    auto normalized_result = detail::normalize_root_path(std::filesystem::path(folder.path));
     if (!normalized_result) {
       Logger().warn("Treat gallery root '{}' as unreachable: {}", folder.path,
                     normalized_result.error());
@@ -92,25 +91,25 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     auto normalized_path = normalized_result.value();
-    if (Utils::Path::ClassifyPathStorageKind(normalized_path) ==
-        Utils::Path::PathStorageKind::Local) {
-      Detail::store_availability(app_state, folder.id, normalized_path,
-                                 Features::Gallery::State::RootAvailability::Local);
+    if (utils::path::ClassifyPathStorageKind(normalized_path) ==
+        utils::path::PathStorageKind::Local) {
+      detail::store_availability(app_state, folder.id, normalized_path,
+                                 features::gallery::RootAvailability::Local);
       Logger().debug("Gallery root availability: id={}, path='{}', state=local", folder.id,
                      normalized_path.string());
       continue;
     }
 
-    auto server = Utils::Path::TryParseUncServer(normalized_path);
+    auto server = utils::path::TryParseUncServer(normalized_path);
     if (!server) {
-      Detail::store_availability(app_state, folder.id, normalized_path,
-                                 Features::Gallery::State::RootAvailability::RemoteUnreachable);
+      detail::store_availability(app_state, folder.id, normalized_path,
+                                 features::gallery::RootAvailability::RemoteUnreachable);
       Logger().warn("Gallery remote root has invalid UNC server: id={}, path='{}'", folder.id,
                     normalized_path.string());
       continue;
     }
 
-    remote_targets.push_back(Detail::ProbeTarget{
+    remote_targets.push_back(detail::ProbeTarget{
         .folder = folder,
         .normalized_path = normalized_path,
         .server = std::move(*server),
@@ -118,31 +117,31 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 
   // UNC 首启只做 server:445 探测，不访问 share/path 本身，避免不可达网络路径卡住启动。
-  auto* io_context = Core::Async::get_io_context(app_state);
+  auto* io_context = core::async::get_io_context(app_state);
   if (!io_context && !remote_targets.empty()) {
     Logger().warn("Async runtime is unavailable; mark {} remote gallery root(s) unreachable",
                   remote_targets.size());
     for (const auto& target : remote_targets) {
-      Detail::store_availability(app_state, target.folder.id, target.normalized_path,
-                                 Features::Gallery::State::RootAvailability::RemoteUnreachable);
+      detail::store_availability(app_state, target.folder.id, target.normalized_path,
+                                 features::gallery::RootAvailability::RemoteUnreachable);
     }
     remote_targets.clear();
   }
 
-  std::vector<Detail::ProbeTask> probe_tasks;
+  std::vector<detail::ProbeTask> probe_tasks;
   probe_tasks.reserve(remote_targets.size());
   for (auto& target : remote_targets) {
     auto server = target.server;
     // 每个 UNC root 独立 co_spawn，使多个离线目标的等待时间接近单个 probe 超时。
     auto future = asio::co_spawn(
         *io_context,
-        [server = std::move(server)]() -> asio::awaitable<Utils::Network::TcpProbeResult> {
-          co_return co_await Utils::Network::probe_tcp_port(server, L"445",
+        [server = std::move(server)]() -> asio::awaitable<utils::network::TcpProbeResult> {
+          co_return co_await utils::network::probe_tcp_port(server, L"445",
                                                             kDefaultRemoteProbeTimeout);
         },
         asio::use_future);
 
-    probe_tasks.push_back(Detail::ProbeTask{
+    probe_tasks.push_back(detail::ProbeTask{
         .target = std::move(target),
         .future = std::move(future),
     });
@@ -152,18 +151,18 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     auto probe_result = task.future.get();
     const auto& target = task.target;
     auto availability = probe_result.reachable
-                            ? Features::Gallery::State::RootAvailability::RemoteReachable
-                            : Features::Gallery::State::RootAvailability::RemoteUnreachable;
+                            ? features::gallery::RootAvailability::RemoteReachable
+                            : features::gallery::RootAvailability::RemoteUnreachable;
 
-    Detail::store_availability(app_state, target.folder.id, target.normalized_path, availability);
+    detail::store_availability(app_state, target.folder.id, target.normalized_path, availability);
 
     if (probe_result.reachable) {
       Logger().info("Gallery remote root reachable: id={}, server='{}', path='{}'",
-                    target.folder.id, Utils::String::ToUtf8(target.server),
+                    target.folder.id, utils::string::ToUtf8(target.server),
                     target.normalized_path.string());
     } else {
       Logger().warn("Gallery remote root unreachable: id={}, server='{}', path='{}', reason='{}'",
-                    target.folder.id, Utils::String::ToUtf8(target.server),
+                    target.folder.id, utils::string::ToUtf8(target.server),
                     target.normalized_path.string(), probe_result.reason);
     }
   }
@@ -175,7 +174,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     total_roots = app_state.gallery->root_availability_by_id.size();
     remote_unreachable = static_cast<std::size_t>(
         std::ranges::count_if(app_state.gallery->root_availability_by_id, [](const auto& pair) {
-          return pair.second == Features::Gallery::State::RootAvailability::RemoteUnreachable;
+          return pair.second == features::gallery::RootAvailability::RemoteUnreachable;
         }));
   }
 
@@ -185,8 +184,8 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   return {};
 }
 
-auto get_for_root_id(Core::State::AppState& app_state, std::int64_t root_id)
-    -> std::optional<Features::Gallery::State::RootAvailability> {
+auto get_for_root_id(core::AppState& app_state, std::int64_t root_id)
+    -> std::optional<features::gallery::RootAvailability> {
   if (!app_state.gallery) {
     return std::nullopt;
   }
@@ -199,40 +198,40 @@ auto get_for_root_id(Core::State::AppState& app_state, std::int64_t root_id)
   return it->second;
 }
 
-auto get_for_path(Core::State::AppState& app_state, const std::filesystem::path& root_path)
-    -> Features::Gallery::State::RootAvailability {
-  auto normalized_result = Detail::normalize_root_path(root_path);
+auto get_for_path(core::AppState& app_state, const std::filesystem::path& root_path)
+    -> features::gallery::RootAvailability {
+  auto normalized_result = detail::normalize_root_path(root_path);
   if (!normalized_result) {
-    return Features::Gallery::State::RootAvailability::RemoteUnreachable;
+    return features::gallery::RootAvailability::RemoteUnreachable;
   }
 
-  if (Utils::Path::ClassifyPathStorageKind(normalized_result.value()) ==
-      Utils::Path::PathStorageKind::Local) {
-    return Features::Gallery::State::RootAvailability::Local;
+  if (utils::path::ClassifyPathStorageKind(normalized_result.value()) ==
+      utils::path::PathStorageKind::Local) {
+    return features::gallery::RootAvailability::Local;
   }
 
   if (!app_state.gallery) {
-    return Features::Gallery::State::RootAvailability::RemoteUnreachable;
+    return features::gallery::RootAvailability::RemoteUnreachable;
   }
 
   std::lock_guard<std::mutex> lock(app_state.gallery->root_availability_mutex);
   auto it = app_state.gallery->root_availability_by_path.find(normalized_result->string());
   if (it == app_state.gallery->root_availability_by_path.end()) {
-    return Features::Gallery::State::RootAvailability::RemoteReachable;
+    return features::gallery::RootAvailability::RemoteReachable;
   }
   return it->second;
 }
 
-auto is_remote_unreachable(Core::State::AppState& app_state, std::int64_t root_id) -> bool {
+auto is_remote_unreachable(core::AppState& app_state, std::int64_t root_id) -> bool {
   auto availability = get_for_root_id(app_state, root_id);
   return availability.has_value() &&
-         *availability == Features::Gallery::State::RootAvailability::RemoteUnreachable;
+         *availability == features::gallery::RootAvailability::RemoteUnreachable;
 }
 
-auto is_remote_unreachable(Core::State::AppState& app_state, const std::filesystem::path& root_path)
+auto is_remote_unreachable(core::AppState& app_state, const std::filesystem::path& root_path)
     -> bool {
   return get_for_path(app_state, root_path) ==
-         Features::Gallery::State::RootAvailability::RemoteUnreachable;
+         features::gallery::RootAvailability::RemoteUnreachable;
 }
 
-}  // namespace Features::Gallery::RootAvailability
+}  // namespace features::gallery::root_availability

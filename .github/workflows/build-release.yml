@@ -1,9 +1,10 @@
 # Build and Release workflow
-# Manually builds release artifacts, and optionally publishes an existing tag.
+# Builds pull requests and manually builds release artifacts, optionally publishing an existing tag.
 
 name: Build Release
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       publish_release:
@@ -79,11 +80,13 @@ jobs:
           Write-Host "build/.packages/v -> $((Test-Path 'build/.packages/v') ? 'exists' : 'missing')"
 
       - name: Setup .NET (for WiX)
+        if: ${{ inputs.publish_release }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
       - name: Install WiX Toolset v6
+        if: ${{ inputs.publish_release }}
         run: |
           dotnet tool install --global wix --version 6.0.2
           wix extension add WixToolset.UI.wixext/6.0.2 --global
@@ -159,10 +162,7 @@ jobs:
           npm ci --prefix web
 
       - name: Prepare xmake release dependencies
-        run: xmake f -m release -y
-
-      - name: Patch vcpkg private cache
-        run: npm run patch:vcpkg
+        run: xmake f -m release --toolchain=msvc -y
 
       - name: Build C++ backend (Release)
         run: xmake build -y
@@ -205,9 +205,11 @@ jobs:
         run: npm run build:portable
 
       - name: Build MSI package
+        if: ${{ inputs.publish_release }}
         run: node scripts/build-installer.js --msi-only --version "${{ steps.final_version.outputs.VERSION }}"
 
       - name: Build setup bundle
+        if: ${{ inputs.publish_release }}
         run: node scripts/build-installer.js --bundle-only --version "${{ steps.final_version.outputs.VERSION }}"
 
       - name: Detach Burn engine
@@ -293,7 +295,7 @@ jobs:
             dist/*-Portable.zip
             dist/SHA256SUMS.txt
             build/windows/x64/release/SpinningMomo.pdb
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Create GitHub Release
         if: ${{ inputs.publish_release }}

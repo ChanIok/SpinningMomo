@@ -1,18 +1,20 @@
-module Extensions.InfinityNikki.PhotoExtract.Infra;
+#include "extensions/infinity_nikki/photo_extract/infra.hpp"
 
-import std;
-import Core.Database;
-import Core.Database.Types;
-import Core.State;
-import Core.HttpClient;
-import Core.HttpClient.Types;
-import Features.Gallery.Folder.Repository;
-import Extensions.InfinityNikki.PhotoExtract.Scan;
-import Extensions.InfinityNikki.Types;
-import <asio.hpp>;
-import <rfl/json.hpp>;
+#include "vendor/std.hpp"
 
-namespace Extensions::InfinityNikki::PhotoExtract::Infra {
+#include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
+
+#include "core/database/database.hpp"
+#include "core/database/types.hpp"
+#include "core/http_client/http_client.hpp"
+#include "core/http_client/types.hpp"
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/photo_extract/scan.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "features/gallery/folder/repository.hpp"
+
+namespace extensions::infinity_nikki::photo_extract::infra {
 
 struct DecodePhoto2ApiRequestBody {
   std::map<std::string, std::vector<std::array<std::string, 2>>> photos;
@@ -142,21 +144,21 @@ auto to_parsed_record(const Nuan5DecodedPhoto& photo) -> ParsedPhotoParamsRecord
   return record;
 }
 
-auto http_post_json(Core::State::AppState& app_state, const std::string& url_utf8,
+auto http_post_json(core::AppState& app_state, const std::string& url_utf8,
                     const std::string& request_body_utf8)
     -> asio::awaitable<std::expected<HttpJsonResponse, std::string>> {
-  Core::HttpClient::Types::Request request{
+  core::http_client::Request request{
       .method = "POST",
       .url = url_utf8,
       .headers =
           {
-              Core::HttpClient::Types::Header{.name = "Content-Type", .value = "application/json"},
-              Core::HttpClient::Types::Header{.name = "X-Client", .value = "SpinningMomo"},
+              core::http_client::Header{.name = "Content-Type", .value = "application/json"},
+              core::http_client::Header{.name = "X-Client", .value = "SpinningMomo"},
           },
       .body = request_body_utf8,
   };
 
-  auto response = co_await Core::HttpClient::fetch(app_state, request);
+  auto response = co_await core::http_client::fetch(app_state, request);
   if (!response) {
     co_return std::unexpected("Failed to send HTTP request: " + response.error());
   }
@@ -206,7 +208,7 @@ auto decode_photo2_variant_to_record(const std::variant<std::string, Nuan5Decode
   };
 }
 
-auto align_decode_photo2_response(const std::vector<Scan::PreparedPhotoExtractEntry>& entries,
+auto align_decode_photo2_response(const std::vector<scan::PreparedPhotoExtractEntry>& entries,
                                   const std::string& response_body)
     -> std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string> {
   using Item = std::variant<std::string, Nuan5DecodedPhoto>;
@@ -266,15 +268,15 @@ auto align_decode_photo2_response(const std::vector<Scan::PreparedPhotoExtractEn
 template <typename T>
   requires std::same_as<T, std::string> || std::same_as<T, std::int64_t> ||
            std::same_as<T, double> || std::same_as<T, bool>
-auto to_db_param(const std::optional<T>& value) -> Core::Database::Types::DbParam {
+auto to_db_param(const std::optional<T>& value) -> core::database::DbParam {
   if (!value) {
-    return Core::Database::Types::DbParam{std::monostate{}};
+    return core::database::DbParam{std::monostate{}};
   }
 
   if constexpr (std::same_as<T, bool>) {
-    return Core::Database::Types::DbParam{static_cast<std::int64_t>(*value)};
+    return core::database::DbParam{static_cast<std::int64_t>(*value)};
   } else {
-    return Core::Database::Types::DbParam{*value};
+    return core::database::DbParam{*value};
   }
 }
 
@@ -284,14 +286,14 @@ auto normalize_path_for_like_match(std::string path) -> std::string {
 }
 
 auto load_candidate_assets(
-    Core::State::AppState& app_state,
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
-    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string> {
+    core::AppState& app_state,
+    const extensions::infinity_nikki::InfinityNikkiExtractPhotoParamsRequest& request)
+    -> std::expected<std::vector<scan::CandidateAssetRow>, std::string> {
   auto only_missing = request.only_missing.value_or(true);
 
   if (request.folder_id.has_value()) {
     auto folder_result =
-        Features::Gallery::Folder::Repository::get_folder_by_id(app_state, *request.folder_id);
+        features::gallery::folder::repository::get_folder_by_id(app_state, *request.folder_id);
     if (!folder_result) {
       return std::unexpected("Failed to query folder for manual extract: " + folder_result.error());
     }
@@ -316,7 +318,7 @@ auto load_candidate_assets(
              OR lower(a.path) LIKE '%.jpeg')
     )";
 
-    std::vector<Core::Database::Types::DbParam> params = {
+    std::vector<core::database::DbParam> params = {
         normalized_folder_path,
         normalized_folder_path + "/%",
     };
@@ -327,7 +329,7 @@ auto load_candidate_assets(
 
     sql += " ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC";
 
-    auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, params);
+    auto query_result = core::database::query<scan::CandidateAssetRow>(app_state, sql, params);
     if (!query_result) {
       return std::unexpected("Failed to query manual extract candidate assets: " +
                              query_result.error());
@@ -355,7 +357,7 @@ auto load_candidate_assets(
 
   sql += " ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC";
 
-  auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, {});
+  auto query_result = core::database::query<scan::CandidateAssetRow>(app_state, sql, {});
   if (!query_result) {
     return std::unexpected("Failed to query candidate assets: " + query_result.error());
   }
@@ -363,11 +365,11 @@ auto load_candidate_assets(
   return query_result.value();
 }
 
-auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
+auto load_candidate_assets_by_ids(core::AppState& app_state,
                                   const std::vector<std::int64_t>& candidate_asset_ids)
-    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string> {
+    -> std::expected<std::vector<scan::CandidateAssetRow>, std::string> {
   if (candidate_asset_ids.empty()) {
-    return std::vector<Scan::CandidateAssetRow>{};
+    return std::vector<scan::CandidateAssetRow>{};
   }
 
   std::vector<std::int64_t> unique_ids;
@@ -406,13 +408,13 @@ auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
   )",
       placeholders);
 
-  std::vector<Core::Database::Types::DbParam> params;
+  std::vector<core::database::DbParam> params;
   params.reserve(unique_ids.size());
   for (auto asset_id : unique_ids) {
     params.emplace_back(asset_id);
   }
 
-  auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, params);
+  auto query_result = core::database::query<scan::CandidateAssetRow>(app_state, sql, params);
   if (!query_result) {
     return std::unexpected("Failed to query incremental candidate assets: " + query_result.error());
   }
@@ -420,8 +422,8 @@ auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
   return query_result.value();
 }
 
-auto extract_batch_photo_params(Core::State::AppState& app_state,
-                                const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
+auto extract_batch_photo_params(core::AppState& app_state,
+                                const std::vector<scan::PreparedPhotoExtractEntry>& entries)
     -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>> {
   if (entries.empty()) {
     co_return std::vector<ExtractBatchPhotoParamsRecord>{};
@@ -472,16 +474,15 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
   co_return std::move(parsed_result.value());
 }
 
-auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
+auto upsert_photo_params_batch(core::AppState& app_state, const std::string& uid,
                                const std::vector<ParsedPhotoParamsBatchItem>& items)
     -> std::expected<std::int32_t, std::string> {
   if (items.empty()) {
     return 0;
   }
 
-  auto transaction_result = Core::Database::execute_transaction(
-      app_state,
-      [&](Core::State::AppState& txn_app_state) -> std::expected<std::int32_t, std::string> {
+  auto transaction_result = core::database::execute_transaction(
+      app_state, [&](core::AppState& txn_app_state) -> std::expected<std::int32_t, std::string> {
         // 这里故意使用“整个 batch 一个事务”。
         // 目标不是减少 SQL 条数到极致，而是先把最贵的事务提交次数降下来。
         std::string upsert_sql = R"(
@@ -533,7 +534,7 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
           // 但它们现在被包在同一个事务里，整体成本会低很多。
           const auto& record = item.record;
 
-          std::vector<Core::Database::Types::DbParam> params = {
+          std::vector<core::database::DbParam> params = {
               item.asset_id,
               uid,
               to_db_param(record.camera_params),
@@ -565,13 +566,13 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
               to_db_param(record.nikki_diy_json),
           };
 
-          auto upsert_result = Core::Database::execute(txn_app_state, upsert_sql, params);
+          auto upsert_result = core::database::execute(txn_app_state, upsert_sql, params);
           if (!upsert_result) {
             return std::unexpected("Failed to upsert Infinity Nikki params: " +
                                    upsert_result.error());
           }
 
-          auto insert_cloth_result = Core::Database::execute(
+          auto insert_cloth_result = core::database::execute(
               txn_app_state, "DELETE FROM asset_infinity_nikki_clothes WHERE asset_id = ?",
               {item.asset_id});
           if (!insert_cloth_result) {
@@ -580,7 +581,7 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
           }
 
           for (const auto cloth_id : record.nikki_clothes) {
-            auto insert_cloth_result = Core::Database::execute(
+            auto insert_cloth_result = core::database::execute(
                 txn_app_state,
                 "INSERT INTO asset_infinity_nikki_clothes (asset_id, cloth_id) VALUES (?, ?)",
                 {item.asset_id, cloth_id});
@@ -598,4 +599,4 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
   return transaction_result;
 }
 
-}  // namespace Extensions::InfinityNikki::PhotoExtract::Infra
+}  // namespace extensions::infinity_nikki::photo_extract::infra

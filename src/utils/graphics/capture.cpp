@@ -1,22 +1,21 @@
-module;
+#include "utils/graphics/capture.hpp"
 
-#include <windows.graphics.capture.interop.h>
-#include <windows.graphics.directx.direct3d11.interop.h>
-#include <winrt/Windows.Foundation.Metadata.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Graphics.Capture.h>
-#include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
-#include <winrt/Windows.Graphics.DirectX.h>
+#include "vendor/std.hpp"
 
-module Utils.Graphics.Capture;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/windows_graphics_capture_interop.hpp"
+#include "vendor/windows/windows_graphics_directx_direct3d11_interop.hpp"
+#include "vendor/windows/winrt/windows_foundation.hpp"
+#include "vendor/windows/winrt/windows_foundation_metadata.hpp"
+#include "vendor/windows/winrt/windows_graphics_capture.hpp"
+#include "vendor/windows/winrt/windows_graphics_directx.hpp"
+#include "vendor/windows/winrt/windows_graphics_directx_direct3d11.hpp"
 
-import std;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "utils/logger/logger.hpp"
 
-namespace Utils::Graphics::Capture {
+namespace utils::graphics::capture {
 
 constexpr int max_capture_dimension = 30720;
 
@@ -420,4 +419,4 @@ auto get_dxgi_interface_from_object(const winrt::Windows::Foundation::IInspectab
 template auto get_dxgi_interface_from_object<ID3D11Texture2D>(
     const winrt::Windows::Foundation::IInspectable&) -> wil::com_ptr<ID3D11Texture2D>;
 
-}  // namespace Utils::Graphics::Capture
+}  // namespace utils::graphics::capture

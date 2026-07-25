@@ -1,25 +1,25 @@
-module;
+#include "features/overlay/interaction.hpp"
 
-module Features.Overlay.Interaction;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Overlay;
-import Features.Overlay.Capture;
-import Features.Overlay.Rendering;
-import Features.Overlay.State;
-import Features.Overlay.Types;
-import Features.Overlay.Geometry;
-import Features.Overlay.Window;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
 
-namespace Features::Overlay::Interaction {
+#include "core/state/app_state.hpp"
+#include "features/overlay/capture.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/overlay.hpp"
+#include "features/overlay/rendering.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/types.hpp"
+#include "features/overlay/window.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace features::overlay::interaction {
 
 // 全局状态指针，用于钩子回调
-Core::State::AppState* g_app_state = nullptr;
+core::AppState* g_app_state = nullptr;
 
 // 窗口事件钩子过程。
 // 这里故意不直接操作 overlay 状态，而是把事件转成窗口消息。
@@ -37,8 +37,8 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   // 再由 window manager 线程更新焦点状态和窗口层级。
   if (event == EVENT_SYSTEM_FOREGROUND) {
     if (overlay_state.window.timer_window) {
-      PostMessage(overlay_state.window.timer_window, Types::WM_WINDOW_EVENT,
-                  static_cast<WPARAM>(event), reinterpret_cast<LPARAM>(hwnd));
+      PostMessage(overlay_state.window.timer_window, WM_WINDOW_EVENT, static_cast<WPARAM>(event),
+                  reinterpret_cast<LPARAM>(hwnd));
     }
     return;
   }
@@ -47,13 +47,13 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   // 而是通知 overlay 窗口自己处理，避免在回调线程里做复杂停机。
   if (event == EVENT_OBJECT_DESTROY && hwnd == overlay_state.window.target_window &&
       idObject == OBJID_WINDOW && idChild == CHILDID_SELF && overlay_state.window.overlay_hwnd) {
-    PostMessage(overlay_state.window.overlay_hwnd, Types::WM_TARGET_WINDOW_DESTROYED, 0, 0);
+    PostMessage(overlay_state.window.overlay_hwnd, WM_TARGET_WINDOW_DESTROYED, 0, 0);
   }
 }
 
 // 统一维护 overlay 的“当前是否由游戏/overlay 持有焦点”状态。
 // 启动时和前台切换时都走这里，避免 direct-start 与 transform-start 行为不一致。
-auto update_focus_state(Core::State::AppState& state, HWND hwnd) -> void {
+auto update_focus_state(core::AppState& state, HWND hwnd) -> void {
   auto& overlay_state = *state.overlay;
   bool is_game_or_overlay =
       (hwnd == overlay_state.window.target_window || hwnd == overlay_state.window.overlay_hwnd);
@@ -62,14 +62,14 @@ auto update_focus_state(Core::State::AppState& state, HWND hwnd) -> void {
 
   if (is_game_or_overlay) {
     if (hwnd == overlay_state.window.target_window && overlay_state.window.overlay_hwnd) {
-      PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
+      PostMessage(overlay_state.window.overlay_hwnd, WM_GAME_WINDOW_FOREGROUND, 0, 0);
     }
   } else {
     restore_taskbar_redraw(state);
   }
 }
 
-auto initialize_interaction(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto initialize_interaction(core::AppState& state) -> std::expected<void, std::string> {
   g_app_state = &state;
 
   // 保存目标窗口所属进程 ID。
@@ -88,7 +88,7 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
   return {};
 }
 
-auto install_window_event_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto install_window_event_hook(core::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
   // 这个 hook 监听全局前台切换。
@@ -132,7 +132,7 @@ auto install_window_event_hook(Core::State::AppState& state) -> std::expected<vo
   return {};
 }
 
-auto uninstall_hooks(Core::State::AppState& state) -> void {
+auto uninstall_hooks(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
   if (overlay_state.interaction.foreground_event_hook) {
@@ -146,7 +146,7 @@ auto uninstall_hooks(Core::State::AppState& state) -> void {
   }
 }
 
-auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
+auto suppress_taskbar_redraw(core::AppState& state) -> void {
   if (state.overlay->interaction.taskbar_redraw_suppressed) {
     return;  // 已经禁止了，无需重复操作
   }
@@ -159,7 +159,7 @@ auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
   }
 }
 
-auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
+auto restore_taskbar_redraw(core::AppState& state) -> void {
   HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr);
   if (taskbar) {
     SendMessage(taskbar, WM_SETREDRAW, TRUE, 0);
@@ -168,7 +168,7 @@ auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
   }
 }
 
-auto update_game_window_position(Core::State::AppState& state) -> void {
+auto update_game_window_position(core::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
   if (!overlay_state.window.target_window) return;
@@ -218,7 +218,7 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
     if (overlay_state.window.use_letterbox_mode) {
       // 使用工具函数计算黑边区域，与渲染部分保持一致
       auto [content_left, content_top, content_width, content_height] =
-          Geometry::calculate_letterbox_area(
+          geometry::calculate_letterbox_area(
               overlay_state.window.screen_width, overlay_state.window.screen_height,
               overlay_state.window.cached_game_width, overlay_state.window.cached_game_height);
       content_left += overlay_state.window.screen_left;
@@ -243,32 +243,32 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
   }
 }
 
-auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void {
+auto handle_window_event(core::AppState& state, DWORD event, HWND hwnd) -> void {
   if (event == EVENT_SYSTEM_FOREGROUND) {
     update_focus_state(state, hwnd);
   }
 }
 
-auto refresh_focus_state(Core::State::AppState& state) -> void {
+auto refresh_focus_state(core::AppState& state) -> void {
   // 使用系统当前前台窗口做一次同步，供 direct-start 或其它无前台切换的路径复用。
   update_focus_state(state, GetForegroundWindow());
 }
 
-auto cleanup_interaction(Core::State::AppState& state) -> void {
+auto cleanup_interaction(core::AppState& state) -> void {
   uninstall_hooks(state);
   state.overlay->interaction.last_game_window_pos.reset();
   restore_taskbar_redraw(state);  // 确保任务栏重绘被恢复
   g_app_state = nullptr;
 }
 
-auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
+auto handle_overlay_message(core::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   auto& overlay_state = *state.overlay;
 
   // overlay 的“控制面板”。
   // 外部线程和系统回调尽量只投递消息，真正修改 overlay 状态统一在这里做。
   switch (message) {
-    case Types::WM_GAME_WINDOW_FOREGROUND: {
+    case WM_GAME_WINDOW_FOREGROUND: {
       // 处理游戏窗口前台事件
       if (overlay_state.window.target_window) {
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
@@ -282,9 +282,9 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       return {true, 1};
     }
 
-    case Types::WM_SCHEDULE_OVERLAY_CLEANUP: {
-      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
-      if (SetTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID, 3000, nullptr) == 0) {
+    case WM_SCHEDULE_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID);
+      if (SetTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID, 3000, nullptr) == 0) {
         Logger().error("Failed to schedule delayed overlay cleanup");
         return {true, 0};
       }
@@ -292,44 +292,44 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       return {true, 1};
     }
 
-    case Types::WM_CANCEL_OVERLAY_CLEANUP: {
-      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+    case WM_CANCEL_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID);
       return {true, 1};
     }
 
-    case Types::WM_IMMEDIATE_OVERLAY_CLEANUP: {
-      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
-      Features::Overlay::Capture::cleanup_capture(state);
-      Features::Overlay::Rendering::cleanup_rendering(state);
+    case WM_IMMEDIATE_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID);
+      features::overlay::capture::cleanup_capture(state);
+      features::overlay::rendering::cleanup_rendering(state);
       Logger().info("Overlay cleaned up");
       return {true, 1};
     }
 
-    case Types::WM_TARGET_WINDOW_DESTROYED: {
+    case WM_TARGET_WINDOW_DESTROYED: {
       Logger().info("Target window destroyed, stopping overlay");
 
       // 目标窗口已不存在，所以这里走“不恢复目标窗口”的 stop 变体。
-      Features::Overlay::stop_overlay(state, false);
+      features::overlay::stop_overlay(state, false);
 
       return {true, 1};
     }
 
-    case Types::WM_APPLY_CAPTURE_SIZE: {
+    case WM_APPLY_CAPTURE_SIZE: {
       const int capture_width = static_cast<int>(wParam);
       const int capture_height = static_cast<int>(lParam);
       auto& window = overlay_state.window;
 
-      if (!Geometry::should_use_overlay(capture_width, capture_height, window.screen_width,
+      if (!geometry::should_use_overlay(capture_width, capture_height, window.screen_width,
                                         window.screen_height)) {
-        Features::Overlay::stop_overlay(state);
+        features::overlay::stop_overlay(state);
         return {true, 0};
       }
 
-      if (auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+      if (auto recreate_result = utils::graphics::capture::recreate_frame_pool(
               state.overlay->capture_state.session, capture_width, capture_height);
           !recreate_result) {
         Logger().error("{}", recreate_result.error());
-        Features::Overlay::stop_overlay(state);
+        features::overlay::stop_overlay(state);
         return {true, 0};
       }
 
@@ -338,7 +338,7 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
                                                            std::memory_order_release);
       state.overlay->rendering.create_new_srv = true;
 
-      Window::set_overlay_window_size(state, capture_width, capture_height);
+      window::set_overlay_window_size(state, capture_width, capture_height);
 
       return {true, 0};
     }
@@ -354,7 +354,7 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       overlay_state.window.window_height = HIWORD(lParam);
 
       // 调整渲染系统大小
-      if (auto result = Rendering::resize_rendering(state); !result) {
+      if (auto result = rendering::resize_rendering(state); !result) {
         Logger().error("Failed to resize overlay rendering: {}", result.error());
       }
 
@@ -362,23 +362,23 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
     }
 
     case WM_TIMER: {
-      if (wParam != Types::OVERLAY_CLEANUP_TIMER_ID) {
+      if (wParam != OVERLAY_CLEANUP_TIMER_ID) {
         break;
       }
 
-      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
-      Features::Overlay::Capture::cleanup_capture(state);
-      Features::Overlay::Rendering::cleanup_rendering(state);
+      KillTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID);
+      features::overlay::capture::cleanup_capture(state);
+      features::overlay::rendering::cleanup_rendering(state);
       Logger().info("Overlay cleaned up");
       return {true, 1};
     }
 
     case WM_DESTROY:
-      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+      KillTimer(hwnd, OVERLAY_CLEANUP_TIMER_ID);
       return {true, 0};
   }
 
   return {false, 0};
 }
 
-}  // namespace Features::Overlay::Interaction
+}  // namespace features::overlay::interaction

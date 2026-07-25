@@ -1,27 +1,26 @@
-module;
+#include "features/overlay/capture.hpp"
 
-#include <wil/com.h>
+#include "vendor/std.hpp"
 
-module Features.Overlay.Capture;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Overlay;
-import Features.Overlay.State;
-import Features.Overlay.Rendering;
-import Features.Overlay.Geometry;
-import Features.Overlay.Interaction;
-import Features.Overlay.Window;
-import Utils.Logger;
-import Utils.Graphics.Capture;
-import Vendor.Windows;
-import <d3d11.h>;
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/overlay/geometry.hpp"
+#include "features/overlay/interaction.hpp"
+#include "features/overlay/overlay.hpp"
+#include "features/overlay/rendering.hpp"
+#include "features/overlay/state.hpp"
+#include "features/overlay/window.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
 
-namespace Features::Overlay::Capture {
+namespace features::overlay::capture {
 
-auto on_frame_arrived(Core::State::AppState& state,
-                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
+auto on_frame_arrived(core::AppState& state, utils::graphics::capture::Direct3D11CaptureFrame frame)
+    -> void {
   if (!state.overlay->running.load(std::memory_order_acquire) || !frame) {
     return;
   }
@@ -56,10 +55,9 @@ auto on_frame_arrived(Core::State::AppState& state,
                                                            std::memory_order_release);
     } else {
       // 捕获回调线程只负责上报尺寸变化；帧池重建与窗口尺寸应用统一收口到 overlay 窗口线程。
-      if (!Vendor::Windows::PostMessageW(
-              state.overlay->window.overlay_hwnd, Types::WM_APPLY_CAPTURE_SIZE,
-              static_cast<Vendor::Windows::WPARAM>(content_size.Width),
-              static_cast<Vendor::Windows::LPARAM>(content_size.Height))) {
+      if (!PostMessageW(state.overlay->window.overlay_hwnd, WM_APPLY_CAPTURE_SIZE,
+                        static_cast<WPARAM>(content_size.Width),
+                        static_cast<LPARAM>(content_size.Height))) {
         Logger().warn("Failed to post overlay capture size update message");
       }
       return;
@@ -76,17 +74,17 @@ auto on_frame_arrived(Core::State::AppState& state,
     return;
   }
 
-  auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+  auto texture = utils::graphics::capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
   if (!texture) {
     return;
   }
 
   // 触发渲染
-  Rendering::render_frame(state, texture);
+  rendering::render_frame(state, texture);
 
   // 首次渲染时显示叠加层窗口
   if (!state.overlay->window.overlay_window_shown) {
-    auto result = Window::show_overlay_window_first_time(state);
+    auto result = window::show_overlay_window_first_time(state);
     if (!result) {
       return;
     }
@@ -95,9 +93,9 @@ auto on_frame_arrived(Core::State::AppState& state,
 
     // direct-start 不一定会再收到一次前台切换事件；
     // 首次显示后主动同步一次焦点状态，确保任务栏压制与窗口层级立即进入正确状态。
-    Features::Overlay::Interaction::refresh_focus_state(state);
+    features::overlay::interaction::refresh_focus_state(state);
     if (state.overlay->interaction.is_game_focused) {
-      Features::Overlay::Interaction::suppress_taskbar_redraw(state);
+      features::overlay::interaction::suppress_taskbar_redraw(state);
     }
 
     // 首帧后自动冻结（用于窗口变换场景）
@@ -108,9 +106,9 @@ auto on_frame_arrived(Core::State::AppState& state,
   }
 }
 
-auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND target_window,
-                        int width, int height) -> std::expected<void, std::string> {
-  if (!target_window || !Vendor::Windows::IsWindow(target_window)) {
+auto initialize_capture(core::AppState& state, HWND target_window, int width, int height)
+    -> std::expected<void, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
 
@@ -126,7 +124,7 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   }
 
   // 创建WinRT设备
-  auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(
+  auto winrt_device_result = utils::graphics::capture::create_winrt_device(
       overlay_state.rendering.d3d_context.device.get());
   if (!winrt_device_result) {
     Logger().error("Failed to create WinRT device for capture");
@@ -134,18 +132,18 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   }
 
   // 创建帧回调
-  auto frame_callback = [&state](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
+  auto frame_callback = [&state](utils::graphics::capture::Direct3D11CaptureFrame frame) {
     on_frame_arrived(state, frame);
   };
 
-  Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+  utils::graphics::capture::CaptureSessionOptions capture_options;
   if (overlay_state.enable_hdr) {
     capture_options.pixel_format =
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
   }
 
   // 创建捕获会话
-  auto session_result = Utils::Graphics::Capture::create_capture_session(
+  auto session_result = utils::graphics::capture::create_capture_session(
       target_window, winrt_device_result.value(), width, height, frame_callback, 1,
       capture_options);
 
@@ -162,10 +160,10 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   return {};
 }
 
-auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto start_capture(core::AppState& state) -> std::expected<void, std::string> {
   auto& session = state.overlay->capture_state.session;
 
-  auto start_result = Utils::Graphics::Capture::start_capture(session);
+  auto start_result = utils::graphics::capture::start_capture(session);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected("Failed to start capture");
@@ -175,18 +173,18 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
   return {};
 }
 
-auto stop_capture(Core::State::AppState& state) -> void {
+auto stop_capture(core::AppState& state) -> void {
   auto& session = state.overlay->capture_state.session;
 
-  Utils::Graphics::Capture::stop_capture(session);
+  utils::graphics::capture::stop_capture(session);
   Logger().debug("Capture stopped");
 }
 
-auto cleanup_capture(Core::State::AppState& state) -> void {
+auto cleanup_capture(core::AppState& state) -> void {
   auto& session = state.overlay->capture_state.session;
 
-  Utils::Graphics::Capture::cleanup_capture_session(session);
+  utils::graphics::capture::cleanup_capture_session(session);
   Logger().info("Capture resources cleaned up");
 }
 
-}  // namespace Features::Overlay::Capture
+}  // namespace features::overlay::capture

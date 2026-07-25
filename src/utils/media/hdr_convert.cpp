@@ -1,16 +1,16 @@
-module;
+#include "utils/media/hdr_convert.hpp"
 
-module Utils.Media.HdrConvert;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import <d3d11.h>;
-import <d3d11_4.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/d3d11_4.hpp"
 
-namespace Utils::Media::HdrConvert {
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace utils::media::hdr_convert {
 
 const std::string k_fullscreen_vertex_shader = R"(
 struct VSOut {
@@ -127,7 +127,7 @@ float2 main(float4 position : SV_Position) : SV_Target {
 
 auto create_vertex_shader(ID3D11Device* device, const std::string& shader_code)
     -> std::expected<wil::com_ptr<ID3D11VertexShader>, std::string> {
-  auto blob_result = Utils::Graphics::D3D::compile_shader(shader_code, "main", "vs_4_0");
+  auto blob_result = utils::graphics::d3d::compile_shader(shader_code, "main", "vs_4_0");
   if (!blob_result) {
     return std::unexpected(blob_result.error());
   }
@@ -146,7 +146,7 @@ auto create_vertex_shader(ID3D11Device* device, const std::string& shader_code)
 auto create_pixel_shader(ID3D11Device* device, const std::string& shader_code,
                          std::string_view name)
     -> std::expected<wil::com_ptr<ID3D11PixelShader>, std::string> {
-  auto blob_result = Utils::Graphics::D3D::compile_shader(shader_code, "main", "ps_4_0");
+  auto blob_result = utils::graphics::d3d::compile_shader(shader_code, "main", "ps_4_0");
   if (!blob_result) {
     return std::unexpected(
         std::format("Failed to compile {} shader: {}", name, blob_result.error()));
@@ -365,4 +365,4 @@ auto convert_frame(ConverterContext& converter, ID3D11DeviceContext* context,
   return converter.p010_texture.get();
 }
 
-}  // namespace Utils::Media::HdrConvert
+}  // namespace utils::media::hdr_convert

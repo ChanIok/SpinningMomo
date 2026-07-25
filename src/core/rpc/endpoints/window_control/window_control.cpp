@@ -1,22 +1,24 @@
-module Core.RPC.Endpoints.WindowControl;
+#include "core/rpc/endpoints/window_control/window_control.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Features.WindowControl;
-import Features.WindowControl.Types;
-import Utils.String;
-import <asio.hpp>;
+#include "vendor/std.hpp"
 
-namespace Core::RPC::Endpoints::WindowControl {
+#include "vendor/asio.hpp"
+
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/window_control/types.hpp"
+#include "features/window_control/window_control.hpp"
+#include "utils/string/string.hpp"
+
+namespace core::rpc::endpoints::window_control {
 
 struct VisibleWindowTitleItem {
   std::string title;
 };
 
-auto is_selectable_window(const Features::WindowControl::WindowInfo& window) -> bool {
+auto is_selectable_window(const features::window_control::WindowInfo& window) -> bool {
   if (window.title.empty() || window.title == L"Program Manager") {
     return false;
   }
@@ -28,7 +30,7 @@ auto build_visible_window_title_items() -> std::vector<VisibleWindowTitleItem> {
   std::vector<VisibleWindowTitleItem> items;
   std::unordered_set<std::string> seen_titles;
 
-  auto windows = Features::WindowControl::get_visible_windows();
+  auto windows = features::window_control::get_visible_windows();
   items.reserve(windows.size());
 
   for (const auto& window : windows) {
@@ -36,7 +38,7 @@ auto build_visible_window_title_items() -> std::vector<VisibleWindowTitleItem> {
       continue;
     }
 
-    auto title = Utils::String::ToUtf8(window.title);
+    auto title = utils::string::ToUtf8(window.title);
     if (title.empty() || seen_titles.contains(title)) {
       continue;
     }
@@ -48,17 +50,17 @@ auto build_visible_window_title_items() -> std::vector<VisibleWindowTitleItem> {
   return items;
 }
 
-auto handle_list_visible_windows([[maybe_unused]] Core::State::AppState& app_state,
+auto handle_list_visible_windows([[maybe_unused]] core::AppState& app_state,
                                  [[maybe_unused]] const EmptyParams& params)
     -> asio::awaitable<RpcResult<std::vector<VisibleWindowTitleItem>>> {
   co_return build_visible_window_title_items();
 }
 
-auto register_all(Core::State::AppState& app_state) -> void {
+auto register_all(core::AppState& app_state) -> void {
   register_method<EmptyParams, std::vector<VisibleWindowTitleItem>>(
       app_state, app_state.rpc->registry, "windowControl.listVisibleWindows",
       handle_list_visible_windows,
       "List current visible window titles for target window selection");
 }
 
-}  // namespace Core::RPC::Endpoints::WindowControl
+}  // namespace core::rpc::endpoints::window_control

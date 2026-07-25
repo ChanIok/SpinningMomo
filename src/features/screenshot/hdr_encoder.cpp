@@ -1,10 +1,11 @@
-module Features.Screenshot.HdrEncoder;
+#include "features/screenshot/hdr_encoder.hpp"
 
-import std;
-import Utils.Logger;
-import Utils.String;
+#include "vendor/std.hpp"
 
-namespace Features::Screenshot::HdrEncoder {
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace features::screenshot::hdr_encoder {
 
 auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring& file_path,
                                    const UltraHdrEncodeOptions& options)
@@ -53,10 +54,10 @@ auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring&
   Logger().info(
       "HDR screenshot encoded: {}x{}, path={}, preprocess={} ms, encode={} ms, write={} ms, "
       "total={} ms, output={} bytes, gain_range=[{:.4f}, {:.4f}], target_peak={:.0f} nits",
-      prepared.width, prepared.height, Utils::String::ToUtf8(file_path), preprocess_ms, encode_ms,
+      prepared.width, prepared.height, utils::string::ToUtf8(file_path), preprocess_ms, encode_ms,
       write_ms, total_ms, encoded_result->size(), prepared.min_gain_log2, prepared.max_gain_log2,
       options.target_display_peak_nits);
   return {};
 }
 
-}  // namespace Features::Screenshot::HdrEncoder
+}  // namespace features::screenshot::hdr_encoder

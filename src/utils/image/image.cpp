@@ -1,21 +1,18 @@
-module;
+#include "utils/image/image.hpp"
 
-#include <dkm.hpp>
+#include "vendor/std.hpp"
 
-module Utils.Image;
+#include "vendor/dkm.hpp"
+#include "vendor/webp.hpp"
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/shlwapi.hpp"
+#include "vendor/windows/wincodec.hpp"
+#include "vendor/windows/winerror.hpp"
 
-import std;
-import Utils.Logger;
-import <shlwapi.h>;
-import <webp/encode.h>;
-import <webp/types.h>;
-import <wil/com.h>;
-import <wil/result.h>;
-import <wincodec.h>;
-import <windows.h>;
-import <winerror.h>;
+#include "utils/logger/logger.hpp"
 
-namespace Utils::Image {
+namespace utils::image {
 
 auto mix_kmeans_seed(std::uint64_t hash, std::uint64_t value) -> std::uint64_t {
   hash ^= value + 0x9E3779B97F4A7C15ull + (hash << 6) + (hash >> 2);
@@ -907,4 +904,4 @@ auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_d
     return std::unexpected(std::string("Exception: ") + e.what());
   }
 }
-}  // namespace Utils::Image
+}  // namespace utils::image

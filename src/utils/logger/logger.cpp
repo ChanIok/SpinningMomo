@@ -1,19 +1,16 @@
-module;
+#include "utils/logger/logger.hpp"
 
-#include <spdlog/sinks/msvc_sink.h>
-#include <spdlog/sinks/rotating_file_sink.h>
-#include <spdlog/spdlog.h>
+#include "vendor/std.hpp"
 
-module Utils.Logger;
+#include "vendor/spdlog.hpp"
 
-import std;
-import Utils.Path;
-import Vendor.BuildConfig;
+#include "core/build_config.hpp"
+#include "utils/path/path.hpp"
 
-namespace Utils::Logging::Detail {
+namespace utils::logging::detail {
 
 auto default_level() -> spdlog::level::level_enum {
-  return Vendor::BuildConfig::is_debug_build() ? spdlog::level::trace : spdlog::level::info;
+  return core::build_config::is_debug_build() ? spdlog::level::trace : spdlog::level::info;
 }
 
 auto normalize_level_string(std::string_view level) -> std::string {
@@ -61,7 +58,7 @@ auto parse_level(std::string_view level) -> std::expected<spdlog::level::level_e
   return std::unexpected("Unsupported logger level: " + std::string(level));
 }
 
-}  // namespace Utils::Logging::Detail
+}  // namespace utils::logging::detail
 
 // 构造函数实现
 Logger::Logger(std::source_location loc) : loc_(std::move(loc)) {}
@@ -104,12 +101,12 @@ auto Logger::critical(std::string_view msg) const -> void {
 }
 
 // 日志管理函数实现
-namespace Utils::Logging {
+namespace utils::logging {
 
 auto initialize(const std::optional<std::string>& configured_level)
     -> std::expected<void, std::string> {
   try {
-    auto logs_dir_result = Utils::Path::GetAppDataSubdirectory("logs");
+    auto logs_dir_result = utils::path::GetAppDataSubdirectory("logs");
     if (!logs_dir_result) {
       return std::unexpected("Failed to get log directory: " + logs_dir_result.error());
     }
@@ -123,14 +120,14 @@ auto initialize(const std::optional<std::string>& configured_level)
 
     auto logger = std::make_shared<spdlog::logger>("spinning_momo", sinks.begin(), sinks.end());
 
-    logger->set_pattern(Vendor::BuildConfig::is_debug_build()
+    logger->set_pattern(core::build_config::is_debug_build()
                             ? "%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%g:%#] %v"
                             : "%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%s:%#] %v");
 
-    auto resolved_level = Detail::default_level();
+    auto resolved_level = detail::default_level();
     std::optional<std::string> level_warning;
     if (configured_level.has_value() && !configured_level->empty()) {
-      auto parse_result = Detail::parse_level(configured_level.value());
+      auto parse_result = detail::parse_level(configured_level.value());
       if (parse_result) {
         resolved_level = parse_result.value();
       } else {
@@ -174,7 +171,7 @@ auto set_level(std::string_view level) -> std::expected<void, std::string> {
     return std::unexpected("Logger is not initialized");
   }
 
-  auto parse_result = Detail::parse_level(level);
+  auto parse_result = detail::parse_level(level);
   if (!parse_result) {
     return std::unexpected(parse_result.error());
   }
@@ -184,4 +181,4 @@ auto set_level(std::string_view level) -> std::expected<void, std::string> {
   return {};
 }
 
-}  // namespace Utils::Logging
+}  // namespace utils::logging

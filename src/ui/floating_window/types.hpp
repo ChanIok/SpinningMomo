@@ -1,0 +1,145 @@
+#pragma once
+
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d2d1_3.hpp"
+#include "vendor/windows/dcomp.hpp"
+#include "vendor/windows/dwrite_3.hpp"
+#include "vendor/windows/dxgi1_2.hpp"
+
+#include "features/settings/menu.hpp"
+
+namespace ui::floating_window {
+
+// 用于 Windows 11 TopMost Z 序失效 workaround 的自定义消息
+constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
+
+// 菜单项类别枚举（简化版本）
+enum class MenuItemCategory { AspectRatio, Resolution, Feature };
+
+// 菜单项结构
+struct MenuItem {
+  std::wstring text;
+  MenuItemCategory category;
+  int index;              // 在对应类别中的索引
+  std::string action_id;  // 仅 Feature 类别使用
+
+  // 构造函数
+  MenuItem(const std::wstring& t, MenuItemCategory cat, int idx, const std::string& action = "")
+      : text(t), category(cat), index(idx), action_id(action) {}
+};
+
+// 窗口系统状态
+struct WindowInfo {
+  HWND hwnd = nullptr;
+  HINSTANCE instance = nullptr;
+  SIZE size{};
+  POINT position{};
+  UINT dpi = 96;
+  UINT visible_frame_border_thickness = 0;
+  bool is_visible = false;
+  bool is_tracking_mouse = false;
+  HWINEVENTHOOK topmost_refresh_hook = nullptr;  // 用于 Windows 11 TopMost workaround
+};
+
+// UI交互状态
+struct InteractionState {
+  int hover_index = -1;
+  size_t current_ratio_index = std::numeric_limits<size_t>::max();
+  size_t current_resolution_index = 0;
+  bool close_button_hovered = false;
+
+  // 翻页模式状态（仅 Paged 模式使用）
+  size_t ratio_scroll_offset = 0;
+  size_t resolution_scroll_offset = 0;
+  size_t feature_scroll_offset = 0;
+  int hovered_column = -1;  // -1: 无, 0: 比例列, 1: 分辨率列, 2: 功能列
+};
+
+// 数据状态（拥有或引用外部数据）
+struct DataState {
+  std::vector<MenuItem> menu_items;  // 从settings计算生成的菜单项
+};
+
+// 渲染相关状态（实际渲染尺寸）
+struct LayoutConfig {
+  // 实际渲染尺寸（基于DPI缩放和配置）
+  int item_height = 24;
+  int title_height = 26;
+  int separator_height = 1;
+  float font_size = 12.0f;  // 改为float，DirectWrite使用浮点数
+  int text_padding = 12;
+  int indicator_width = 3;
+  int ratio_column_width = 60;
+  int resolution_column_width = 120;
+  int feature_column_width = 120;
+  int scroll_indicator_width = 2;  // 滚动条宽度
+  int max_visible_rows = 7;        // 翻页模式下每列最大可见行数，下限 1
+
+  // 字体大小调整相关常量
+  static constexpr float MIN_FONT_SIZE = 8.0f;   // 最小字体大小
+  static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
+};
+
+struct WindowMetrics {
+  LayoutConfig layout;
+  SIZE size{};
+};
+
+// 浮窗专用的Direct2D渲染状态
+struct TextMeasureCacheEntry {
+  std::wstring text;
+  int width_key = 0;
+  int base_font_key = 0;
+  int resolved_font_key = 0;
+};
+
+struct RenderResources {
+  // 设备级资源已上收至 ui::shared_render_resources。
+  // 这里仅保留浮窗自己的 composition surface 和绘制缓存。
+  wil::com_ptr<IDXGISwapChain1> swap_chain;
+  wil::com_ptr<IDCompositionTarget> composition_target;
+  wil::com_ptr<IDCompositionVisual> composition_visual;
+
+  wil::com_ptr<ID2D1DeviceContext6> device_context;
+  wil::com_ptr<ID2D1Bitmap1> target_bitmap;
+
+  // 当前 back buffer 尺寸缓存；resize 只在尺寸变化时重建目标位图。
+  SIZE surface_size = {0, 0};
+
+  // 缓存的画刷（简单的固定数组，避免动态分配）
+  wil::com_ptr<ID2D1SolidColorBrush> background_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> title_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> separator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> text_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> indicator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> recording_indicator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> hover_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> scroll_indicator_brush;  // 滚动条画刷
+
+  // 文本格式
+  wil::com_ptr<IDWriteTextFormat> text_format;
+  std::unordered_map<int, wil::com_ptr<IDWriteTextFormat>>
+      adjusted_text_formats;                              // 按字号缓存文本格式
+  std::vector<TextMeasureCacheEntry> text_measure_cache;  // 文本测量结果缓存
+
+  // 状态标志
+  bool is_initialized = false;
+  bool is_rendering = false;
+  bool needs_font_update = false;
+};
+
+// 辅助函数：将RECT转换为D2D1_RECT_F
+inline auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
+  return D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
+                     static_cast<float>(rect.right), static_cast<float>(rect.bottom));
+}
+
+// 辅助函数：创建D2D矩形
+inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D2D1_RECT_F {
+  return D2D1::RectF(left, top, right, bottom);
+}
+
+}  // namespace ui::floating_window

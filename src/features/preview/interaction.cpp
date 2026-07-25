@@ -1,27 +1,27 @@
-module;
+#include "features/preview/interaction.hpp"
 
-module Features.Preview.Interaction;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Preview.Capture;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Rendering;
-import Features.Preview.Window;
-import Utils.DisplayGeometry;
-import Utils.Graphics.Capture;
-import Utils.Logger;
-import Utils.Throttle;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
-namespace Features::Preview::Interaction {
+#include "core/state/app_state.hpp"
+#include "features/preview/capture.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "features/preview/window.hpp"
+#include "utils/display/display_geometry.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/throttle/throttle.hpp"
+
+namespace features::preview::interaction {
 
 // ==================== 任务栏重绘控制 ====================
 
-auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
+auto suppress_taskbar_redraw(core::AppState& state) -> void {
   if (state.preview->interaction.taskbar_redraw_suppressed) {
     return;  // 已经禁止了，无需重复操作
   }
@@ -34,7 +34,7 @@ auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
   }
 }
 
-auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
+auto restore_taskbar_redraw(core::AppState& state) -> void {
   if (!state.preview->interaction.taskbar_redraw_suppressed) {
     return;  // 未禁止，无需恢复
   }
@@ -50,18 +50,18 @@ auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
 
 // ==================== 辅助函数实现 ====================
 
-auto is_point_in_title_bar(const Core::State::AppState& state, POINT pt) -> bool {
+auto is_point_in_title_bar(const core::AppState& state, POINT pt) -> bool {
   return pt.y < state.preview->dpi_sizes.title_height;
 }
 
-auto is_point_in_viewport(const Core::State::AppState& state, POINT pt) -> bool {
+auto is_point_in_viewport(const core::AppState& state, POINT pt) -> bool {
   return (pt.x >= state.preview->viewport.viewport_rect.left &&
           pt.x <= state.preview->viewport.viewport_rect.right &&
           pt.y >= state.preview->viewport.viewport_rect.top &&
           pt.y <= state.preview->viewport.viewport_rect.bottom);
 }
 
-auto get_border_hit_test(const Core::State::AppState& state, HWND hwnd, POINT pt) -> LRESULT {
+auto get_border_hit_test(const core::AppState& state, HWND hwnd, POINT pt) -> LRESULT {
   RECT rc;
   GetClientRect(hwnd, &rc);
 
@@ -83,7 +83,7 @@ auto get_border_hit_test(const Core::State::AppState& state, HWND hwnd, POINT pt
   return HTCLIENT;
 }
 
-auto move_game_window_to_position(Core::State::AppState& state, float relative_x, float relative_y)
+auto move_game_window_to_position(core::AppState& state, float relative_x, float relative_y)
     -> void {
   if (!state.preview->target_window) return;
 
@@ -103,7 +103,7 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   const int game_height =
       state.preview->game_window_rect.bottom - state.preview->game_window_rect.top;
 
-  auto newPos = Utils::DisplayGeometry::calculate_window_position_for_viewport(
+  auto newPos = utils::display_geometry::calculate_window_position_for_viewport(
       screen_rect, game_width, game_height, relative_x, relative_y);
 
   // 跳过重复位置
@@ -119,13 +119,13 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
 }
 
 // 窗口拖拽实现
-auto start_window_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
+auto start_window_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
   state.preview->interaction.is_dragging = true;
   state.preview->interaction.drag_start = pt;
   SetCapture(hwnd);
 }
 
-auto update_window_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
+auto update_window_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
   if (!state.preview->interaction.is_dragging) return;
 
   RECT rect;
@@ -137,13 +137,13 @@ auto update_window_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> vo
                SWP_NOSIZE | SWP_NOZORDER);
 }
 
-auto end_window_drag(Core::State::AppState& state, HWND hwnd) -> void {
+auto end_window_drag(core::AppState& state, HWND hwnd) -> void {
   state.preview->interaction.is_dragging = false;
   ReleaseCapture();
 }
 
 // 视口拖拽实现
-auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
+auto start_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
   state.preview->interaction.viewport_dragging = true;
 
   // 重置位置缓存，确保首次移动不会被跳过
@@ -152,13 +152,13 @@ auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> v
   // 初始化/重置节流器 (约60fps)
   if (!state.preview->interaction.move_throttle) {
     state.preview->interaction.move_throttle =
-        Utils::Throttle::create<float, float>(std::chrono::milliseconds(16));
+        utils::throttle::create<float, float>(std::chrono::milliseconds(16));
   } else {
-    Utils::Throttle::reset(*state.preview->interaction.move_throttle);
+    utils::throttle::reset(*state.preview->interaction.move_throttle);
   }
 
   // 取消之前的延迟重绘定时器（如果存在）
-  KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+  KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
 
   // 禁止任务栏重绘
   suppress_taskbar_redraw(state);
@@ -166,7 +166,7 @@ auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> v
   SetCapture(hwnd);
 }
 
-auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
+auto update_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
   if (!state.preview->interaction.viewport_dragging) return;
 
   RECT clientRect;
@@ -179,15 +179,15 @@ auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> 
   float relativeY = static_cast<float>(pt.y) / previewHeight;
 
   // 使用节流机制移动窗口
-  Utils::Throttle::call(
+  utils::throttle::call(
       *state.preview->interaction.move_throttle,
       [&state](float x, float y) { move_game_window_to_position(state, x, y); }, relativeX,
       relativeY);
 }
 
-auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
+auto end_viewport_drag(core::AppState& state, HWND hwnd) -> void {
   // 确保最后一次移动被执行
-  Utils::Throttle::flush(*state.preview->interaction.move_throttle,
+  utils::throttle::flush(*state.preview->interaction.move_throttle,
                          [&state](float x, float y) { move_game_window_to_position(state, x, y); });
 
   state.preview->interaction.viewport_dragging = false;
@@ -195,13 +195,12 @@ auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
 
   // 启动延迟定时器恢复任务栏重绘
   if (state.preview->interaction.taskbar_redraw_suppressed) {
-    SetTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW,
-             Features::Preview::Types::TASKBAR_REDRAW_DELAY_MS, nullptr);
+    SetTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW,
+             features::preview::TASKBAR_REDRAW_DELAY_MS, nullptr);
   }
 }
 
-auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
+auto handle_mouse_move(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   if (state.preview->interaction.is_dragging) {
     update_window_drag(state, hwnd, {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
   } else if (state.preview->interaction.viewport_dragging) {
@@ -210,7 +209,7 @@ auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, L
   return 0;
 }
 
-auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
+auto handle_left_button_down(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
   POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
@@ -245,7 +244,7 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
   return 0;
 }
 
-auto handle_left_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
+auto handle_left_button_up(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
   if (state.preview->interaction.is_dragging) {
     end_window_drag(state, hwnd);
@@ -256,8 +255,8 @@ auto handle_left_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wPara
 }
 
 // 窗口缩放实现
-auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_delta,
-                           POINT mouse_pos) -> void {
+auto handle_window_scaling(core::AppState& state, HWND hwnd, int wheel_delta, POINT mouse_pos)
+    -> void {
   // 计算新的理想尺寸（每次改变10%）
   int oldIdealSize = state.preview->size.ideal_size;
   int newIdealSize = static_cast<int>(oldIdealSize * (1.0f + (wheel_delta > 0 ? 0.1f : -0.1f)));
@@ -300,8 +299,7 @@ auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_de
   }
 }
 
-auto handle_mouse_wheel(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
+auto handle_mouse_wheel(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   // 检查鼠标是否在标题栏
   POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
   ScreenToClient(hwnd, &pt);
@@ -315,8 +313,7 @@ auto handle_mouse_wheel(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
   return 0;
 }
 
-auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
+auto handle_sizing(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   RECT* rect = (RECT*)lParam;
   int width = rect->right - rect->left;
   int height = rect->bottom - rect->top;
@@ -376,7 +373,7 @@ auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARA
   return TRUE;
 }
 
-auto handle_size(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
+auto handle_size(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
     return 0;
   }
@@ -392,15 +389,14 @@ auto handle_size(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM 
   state.preview->size.window_height = height;
 
   // 调整渲染系统大小
-  if (auto result = Features::Preview::Rendering::resize_rendering(state, width, height); !result) {
+  if (auto result = features::preview::rendering::resize_rendering(state, width, height); !result) {
     Logger().error("Failed to resize preview rendering: {}", result.error());
   }
 
   return 0;
 }
 
-auto handle_dpi_changed(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
+auto handle_dpi_changed(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   // 更新DPI
   UINT newDpi = HIWORD(wParam);
   state.preview->dpi_sizes.update_dpi_scaling(newDpi);
@@ -413,8 +409,7 @@ auto handle_dpi_changed(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
   return 0;
 }
 
-auto handle_nc_hit_test(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
+auto handle_nc_hit_test(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
   POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
   ScreenToClient(hwnd, &pt);
 
@@ -427,7 +422,7 @@ auto handle_nc_hit_test(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
   return get_border_hit_test(state, hwnd, pt);
 }
 
-auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
+auto handle_paint(core::AppState& state, HWND hwnd) -> LRESULT {
   PAINTSTRUCT ps;
   HDC hdc = BeginPaint(hwnd, &ps);
 
@@ -466,57 +461,57 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   return 0;
 }
 
-auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
-  if (wParam == Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW) {
+auto handle_timer(core::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
+  if (wParam == features::preview::TIMER_ID_TASKBAR_REDRAW) {
     // 停止定时器
-    KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+    KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
     // 恢复任务栏重绘
     restore_taskbar_redraw(state);
     return 0;
   }
 
-  if (wParam == Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP) {
-    KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
-    Features::Preview::Capture::cleanup_capture(state);
-    Features::Preview::Rendering::cleanup_rendering(state);
+  if (wParam == features::preview::TIMER_ID_PREVIEW_CLEANUP) {
+    KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
+    features::preview::capture::cleanup_capture(state);
+    features::preview::rendering::cleanup_rendering(state);
     Logger().info("Preview resources cleaned up");
   }
 
   return 0;
 }
 
-auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
+auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   switch (message) {
-    case Features::Preview::Types::WM_SCHEDULE_PREVIEW_CLEANUP:
-      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
-      if (SetTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP, 3000, nullptr) == 0) {
+    case features::preview::WM_SCHEDULE_PREVIEW_CLEANUP:
+      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
+      if (SetTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP, 3000, nullptr) == 0) {
         Logger().error("Failed to schedule delayed preview cleanup");
         return {true, 0};
       }
       return {true, 1};
 
-    case Features::Preview::Types::WM_CANCEL_PREVIEW_CLEANUP:
-      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+    case features::preview::WM_CANCEL_PREVIEW_CLEANUP:
+      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
       return {true, 1};
 
-    case Features::Preview::Types::WM_IMMEDIATE_PREVIEW_CLEANUP:
-      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
-      Features::Preview::Capture::cleanup_capture(state);
-      Features::Preview::Rendering::cleanup_rendering(state);
+    case features::preview::WM_IMMEDIATE_PREVIEW_CLEANUP:
+      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
+      features::preview::capture::cleanup_capture(state);
+      features::preview::rendering::cleanup_rendering(state);
       Logger().info("Preview resources cleaned up");
       return {true, 1};
 
-    case Features::Preview::Types::WM_APPLY_CAPTURE_SIZE:
-      if (auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+    case features::preview::WM_APPLY_CAPTURE_SIZE:
+      if (auto recreate_result = utils::graphics::capture::recreate_frame_pool(
               state.preview->capture_state.session, static_cast<int>(wParam),
               static_cast<int>(lParam));
           !recreate_result) {
         Logger().error("{}", recreate_result.error());
         state.preview->running.store(false, std::memory_order_release);
-        Features::Preview::Window::hide_preview_window(state);
-        Features::Preview::Capture::cleanup_capture(state);
-        Features::Preview::Rendering::cleanup_rendering(state);
+        features::preview::window::hide_preview_window(state);
+        features::preview::capture::cleanup_capture(state);
+        features::preview::rendering::cleanup_rendering(state);
         return {true, 0};
       }
 
@@ -525,7 +520,7 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
       state.preview->capture_state.last_frame_height.store(static_cast<int>(lParam),
                                                            std::memory_order_release);
       state.preview->create_new_srv.store(true, std::memory_order_release);
-      Features::Preview::Window::set_preview_window_size(state, static_cast<int>(wParam),
+      features::preview::window::set_preview_window_size(state, static_cast<int>(wParam),
                                                          static_cast<int>(lParam));
       return {true, 0};
 
@@ -562,8 +557,8 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
     case WM_DESTROY:
       // 清理资源但不调用PostQuitMessage
       // 确保任务栏重绘被恢复
-      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
-      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+      KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
+      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
       restore_taskbar_redraw(state);
       return {true, 0};
 
@@ -572,4 +567,4 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
   }
 }
 
-}  // namespace Features::Preview::Interaction
+}  // namespace features::preview::interaction

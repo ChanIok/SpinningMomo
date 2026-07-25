@@ -1,35 +1,35 @@
-module;
+#include "features/preview/window.hpp"
 
-module Features.Preview.Window;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.State.RuntimeInfo;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Interaction;
-import Features.Preview.Rendering;
-import Features.Preview.Capture;
-import Utils.Graphics.D3D;
-import Utils.Graphics.Capture;
-import Utils.Display;
-import Utils.Logger;
-import <dwmapi.h>;
-import <windows.h>;
-import <windowsx.h>;
+#include "vendor/windows.hpp"
+#include "vendor/windows/dwmapi.hpp"
+#include "vendor/windows/windowsx.hpp"
 
-namespace Features::Preview::Window {
+#include "core/state/app_state.hpp"
+#include "core/state/runtime_info.hpp"
+#include "features/preview/capture.hpp"
+#include "features/preview/interaction.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "utils/display/display.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
+
+namespace features::preview::window {
 
 // 窗口过程 - 使用GWLP_USERDATA模式获取状态
 LRESULT CALLBACK preview_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  core::AppState* state = nullptr;
 
   if (message == WM_NCCREATE) {
     const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    state = reinterpret_cast<core::AppState*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    state = reinterpret_cast<core::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   if (!state) {
@@ -38,7 +38,7 @@ LRESULT CALLBACK preview_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPA
 
   // 使用交互模块处理消息
   auto [handled, lresult] =
-      Features::Preview::Interaction::handle_preview_message(*state, hwnd, message, wParam, lParam);
+      features::preview::interaction::handle_preview_message(*state, hwnd, message, wParam, lParam);
 
   if (handled) {
     return lresult;
@@ -52,7 +52,7 @@ auto register_preview_window_class(HINSTANCE instance) -> bool {
   wc.cbSize = sizeof(WNDCLASSEXW);
   wc.lpfnWndProc = preview_window_proc;
   wc.hInstance = instance;
-  wc.lpszClassName = Features::Preview::Types::PREVIEW_WINDOW_CLASS;
+  wc.lpszClassName = features::preview::PREVIEW_WINDOW_CLASS;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -60,11 +60,11 @@ auto register_preview_window_class(HINSTANCE instance) -> bool {
   return RegisterClassExW(&wc) != 0;
 }
 
-auto create_preview_window(HINSTANCE instance, int width, int height, Core::State::AppState* state)
+auto create_preview_window(HINSTANCE instance, int width, int height, core::AppState* state)
     -> HWND {
   return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
-                         Features::Preview::Types::PREVIEW_WINDOW_CLASS, L"PreviewWindow", WS_POPUP,
-                         0, 0, width, height, nullptr, nullptr, instance, state);
+                         features::preview::PREVIEW_WINDOW_CLASS, L"PreviewWindow", WS_POPUP, 0, 0,
+                         width, height, nullptr, nullptr, instance, state);
 }
 
 auto setup_window_appearance(HWND hwnd) -> void {
@@ -86,16 +86,16 @@ auto setup_window_appearance(HWND hwnd) -> void {
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 }
 
-auto set_preview_window_size(Core::State::AppState& app_state, int capture_width,
-                             int capture_height) -> void {
+auto set_preview_window_size(core::AppState& app_state, int capture_width, int capture_height)
+    -> void {
   auto* const state = app_state.preview ? app_state.preview.get() : nullptr;
   if (!state) {
     return;
   }
 
   if (state->is_first_show && state->has_screen_rect) {
-    const int screen_width = Utils::Display::rect_width(state->screen_rect);
-    const int screen_height = Utils::Display::rect_height(state->screen_rect);
+    const int screen_width = utils::display::rect_width(state->screen_rect);
+    const int screen_height = utils::display::rect_height(state->screen_rect);
     state->size.min_ideal_size = std::min(screen_width, screen_height) / 10;
     state->size.max_ideal_size = std::max(screen_width, screen_height);
     state->size.ideal_size = screen_height / 2;
@@ -131,8 +131,7 @@ auto set_preview_window_size(Core::State::AppState& app_state, int capture_width
   }
 }
 
-auto create_window(HINSTANCE instance, Core::State::AppState& state)
-    -> std::expected<HWND, std::string> {
+auto create_window(HINSTANCE instance, core::AppState& state) -> std::expected<HWND, std::string> {
   // 1. 注册窗口类
   if (!register_preview_window_class(instance)) {
     return std::unexpected("Failed to register preview window class");
@@ -152,7 +151,7 @@ auto create_window(HINSTANCE instance, Core::State::AppState& state)
   return hwnd;
 }
 
-auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
+auto initialize_preview_window(core::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {
   // 创建窗口，传递状态引用
   auto window_result = create_window(instance, state);
@@ -178,19 +177,19 @@ auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
   return {};
 }
 
-auto show_preview_window(Core::State::AppState& state) -> void {
+auto show_preview_window(core::AppState& state) -> void {
   if (state.preview->hwnd) {
     ShowWindow(state.preview->hwnd, SW_SHOW);
   }
 }
 
-auto hide_preview_window(Core::State::AppState& state) -> void {
+auto hide_preview_window(core::AppState& state) -> void {
   if (state.preview->hwnd) {
     ShowWindow(state.preview->hwnd, SW_HIDE);
   }
 }
 
-auto update_preview_window_dpi(Core::State::AppState& state, UINT new_dpi) -> void {
+auto update_preview_window_dpi(core::AppState& state, UINT new_dpi) -> void {
   if (state.preview->hwnd) {
     // 获取当前窗口位置和大小
     RECT rect;
@@ -207,11 +206,11 @@ auto update_preview_window_dpi(Core::State::AppState& state, UINT new_dpi) -> vo
   }
 }
 
-auto destroy_preview_window(Core::State::AppState& state) -> void {
+auto destroy_preview_window(core::AppState& state) -> void {
   if (state.preview->hwnd) {
     DestroyWindow(state.preview->hwnd);
     state.preview->hwnd = nullptr;
   }
 }
 
-}  // namespace Features::Preview::Window
+}  // namespace features::preview::window

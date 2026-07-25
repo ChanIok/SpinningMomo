@@ -1,21 +1,20 @@
-module;
+#include "core/http_server/routes.hpp"
 
-#include <uwebsockets/App.h>
+#include "vendor/std.hpp"
 
-module Core.HttpServer.Routes;
+#include "vendor/asio.hpp"
+#include "vendor/uwebsockets.hpp"
 
-import std;
-import Core.State;
-import Core.HttpServer.State;
-import Core.HttpServer.SseManager;
-import Core.HttpServer.Static;
-import Core.Async;
-import Core.RPC;
-import Utils.Logger;
-import Vendor.BuildConfig;
-import <asio.hpp>;
+#include "core/async/async.hpp"
+#include "core/build_config.hpp"
+#include "core/http_server/sse_manager.hpp"
+#include "core/http_server/state.hpp"
+#include "core/http_server/static.hpp"
+#include "core/rpc/rpc.hpp"
+#include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
-namespace Core::HttpServer::Routes {
+namespace core::http_server::routes {
 
 auto get_origin_header(auto* req) -> std::string { return std::string(req->getHeader("origin")); }
 
@@ -34,7 +33,7 @@ auto is_origin_allowed(std::string_view origin, int port) -> bool {
   }
 
   // 开发模式放行所有 Origin，便于局域网/多设备联调。
-  if (Vendor::BuildConfig::is_debug_build()) {
+  if (core::build_config::is_debug_build()) {
     return true;
   }
 
@@ -56,14 +55,14 @@ auto reject_forbidden(auto* res) -> void {
   res->end("Forbidden");
 }
 
-auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
+auto register_routes(core::AppState& state, uWS::App& app) -> void {
   // 检查状态是否已初始化
   if (!state.http_server) {
     Logger().error("HTTP server not initialized");
     return;
   }
 
-  // 注册RPC端点
+  // 注册rpc端点
   app.post("/rpc", [&state](auto* res, auto* req) {
     auto origin = get_origin_header(req);
     if (!is_origin_allowed(origin, state.http_server->port)) {
@@ -84,14 +83,14 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
           // 获取事件循环
           auto* loop = uWS::Loop::get();
 
-          // 在异步运行时中处理RPC请求
+          // 在异步运行时中处理rpc请求
           asio::co_spawn(
-              *Core::Async::get_io_context(state),
+              *core::async::get_io_context(state),
               [&state, buffer = std::move(buffer), origin = std::move(origin), res,
                loop]() -> asio::awaitable<void> {
                 try {
-                  // 处理RPC请求
-                  auto response_json = co_await Core::RPC::process_request(state, buffer);
+                  // 处理rpc请求
+                  auto response_json = co_await core::rpc::process_request(state, buffer);
 
                   // 在事件循环线程中发送响应
                   loop->defer([res, origin, response_json = std::move(response_json)]() {
@@ -134,7 +133,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
     }
 
     Logger().info("New SSE connection request");
-    Core::HttpServer::SseManager::add_connection(state, res, std::move(origin));
+    core::http_server::sse_manager::add_connection(state, res, std::move(origin));
   });
 
   // 配置CORS
@@ -151,6 +150,6 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
   });
 
   // 静态文件服务（fallback路由）
-  Core::HttpServer::Static::register_routes(state, app);
+  core::http_server::static_content::register_routes(state, app);
 }
-}  // namespace Core::HttpServer::Routes
+}  // namespace core::http_server::routes

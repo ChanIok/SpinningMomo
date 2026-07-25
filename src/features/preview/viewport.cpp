@@ -1,21 +1,21 @@
-module;
+#include "features/preview/viewport.hpp"
 
-module Features.Preview.Viewport;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Utils.Graphics.D3D;
-import Features.Preview.State;
-import Features.Preview.Types;
-import Features.Preview.Rendering;
-import Utils.Logger;
-import <d3d11.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
 
-namespace Features::Preview::Viewport {
+#include "core/state/app_state.hpp"
+#include "features/preview/rendering.hpp"
+#include "features/preview/state.hpp"
+#include "features/preview/types.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
 
-auto get_game_window_screen_rect(const Core::State::AppState& state) -> RECT {
+namespace features::preview::viewport {
+
+auto get_game_window_screen_rect(const core::AppState& state) -> RECT {
   RECT rect = {0, 0, 0, 0};
 
   if (state.preview->target_window && IsWindow(state.preview->target_window)) {
@@ -25,7 +25,7 @@ auto get_game_window_screen_rect(const Core::State::AppState& state) -> RECT {
   return rect;
 }
 
-auto calculate_visible_game_area(const Core::State::AppState& state) -> RECT {
+auto calculate_visible_game_area(const core::AppState& state) -> RECT {
   if (!state.preview->has_screen_rect) {
     return RECT{0, 0, 0, 0};
   }
@@ -44,8 +44,7 @@ auto calculate_visible_game_area(const Core::State::AppState& state) -> RECT {
   return visibleRect;
 }
 
-auto calculate_viewport_position(const Core::State::AppState& state, const RECT& visibleArea)
-    -> RECT {
+auto calculate_viewport_position(const core::AppState& state, const RECT& visibleArea) -> RECT {
   RECT result = {0, 0, 0, 0};
 
   if (!state.preview->hwnd || !state.preview->target_window) {
@@ -88,7 +87,7 @@ auto calculate_viewport_position(const Core::State::AppState& state, const RECT&
   return result;
 }
 
-auto check_game_window_visibility(Core::State::AppState& state) -> bool {
+auto check_game_window_visibility(core::AppState& state) -> bool {
   if (!state.preview->target_window) {
     return false;
   }
@@ -106,7 +105,7 @@ auto check_game_window_visibility(Core::State::AppState& state) -> bool {
           gameRect.right <= screen_rect.right && gameRect.bottom <= screen_rect.bottom);
 }
 
-auto update_viewport_rect(Core::State::AppState& state) -> void {
+auto update_viewport_rect(core::AppState& state) -> void {
   if (!state.preview->target_window || !state.preview->hwnd) {
     return;
   }
@@ -130,9 +129,8 @@ auto update_viewport_rect(Core::State::AppState& state) -> void {
       calculate_viewport_position(state, state.preview->viewport.visible_game_area);
 }
 
-auto create_viewport_vertices(const Core::State::AppState& state,
-                              std::vector<Features::Preview::Types::ViewportVertex>& vertices)
-    -> void {
+auto create_viewport_vertices(const core::AppState& state,
+                              std::vector<features::preview::ViewportVertex>& vertices) -> void {
   vertices.clear();
 
   if (!state.preview->viewport.visible) {
@@ -178,8 +176,8 @@ auto create_viewport_vertices(const Core::State::AppState& state,
   float halfThicknessY = (lineWidthPx / 2.0f) / previewHeight;
 
   // 视口框颜色 RGBA(255, 160, 80, 0.8)
-  Features::Preview::Types::ViewportVertex::Color frameColor = {255.0f / 255.0f, 160.0f / 255.0f,
-                                                                80.0f / 255.0f, 0.8f};
+  features::preview::ViewportVertex::Color frameColor = {255.0f / 255.0f, 160.0f / 255.0f,
+                                                         80.0f / 255.0f, 0.8f};
 
   // 创建矩形框顶点（4条边，每条边6个顶点 = 24个顶点）
   vertices.reserve(24);
@@ -222,7 +220,7 @@ auto create_viewport_vertices(const Core::State::AppState& state,
            viewportRight - halfThicknessX, viewportBottom - halfThicknessY);  // 左下
 }
 
-auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* context,
+auto render_viewport_frame(core::AppState& state, ID3D11DeviceContext* context,
                            const wil::com_ptr<ID3D11VertexShader>& vertex_shader,
                            const wil::com_ptr<ID3D11PixelShader>& pixel_shader,
                            const wil::com_ptr<ID3D11InputLayout>& input_layout) -> void {
@@ -231,7 +229,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   }
 
   // 创建视口框顶点数据
-  std::vector<Features::Preview::Types::ViewportVertex> vertices;
+  std::vector<features::preview::ViewportVertex> vertices;
   create_viewport_vertices(state, vertices);
 
   if (vertices.empty()) {
@@ -246,9 +244,9 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   }
 
   // 创建动态顶点缓冲区
-  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
+  auto buffer_result = utils::graphics::d3d::create_vertex_buffer(
       rendering_resources.d3d_context.device.get(), vertices.data(), vertices.size(),
-      sizeof(Features::Preview::Types::ViewportVertex),
+      sizeof(features::preview::ViewportVertex),
       true);  // 动态缓冲区
 
   if (!buffer_result) {
@@ -262,7 +260,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   context->IASetInputLayout(input_layout.get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  UINT stride = sizeof(Features::Preview::Types::ViewportVertex);
+  UINT stride = sizeof(features::preview::ViewportVertex);
   UINT offset = 0;
   ID3D11Buffer* buffer = viewport_buffer.get();
   context->IASetVertexBuffers(0, 1, &buffer, &stride, &offset);
@@ -274,4 +272,4 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   context->Draw(static_cast<UINT>(vertices.size()), 0);
 }
 
-}  // namespace Features::Preview::Viewport
+}  // namespace features::preview::viewport

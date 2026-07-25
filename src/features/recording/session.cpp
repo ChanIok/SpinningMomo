@@ -1,25 +1,25 @@
-module;
+#include "features/recording/session.hpp"
 
-module Features.Recording.Session;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Recording.State;
-import Features.Recording.Types;
-import Utils.Graphics.Capture;
-import Utils.Graphics.CaptureRegion;
-import Utils.Graphics.D3D;
-import Utils.Logger;
-import Utils.String;
-import <d3d11_4.h>;
-import <wil/com.h>;
-import <windows.h>;
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11_4.hpp"
 
-namespace Features::Recording::Session {
+#include "core/state/app_state.hpp"
+#include "features/recording/state.hpp"
+#include "features/recording/types.hpp"
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/capture_region.hpp"
+#include "utils/graphics/d3d.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+
+namespace features::recording::session {
 
 auto floor_to_even(int value) -> int { return (value / 2) * 2; }
 
-auto clear_queues(State::RecordingState& state) -> void {
+auto clear_queues(RecordingState& state) -> void {
   // 队列和通知标志只能在 queue_mutex 下动。音频线程、WGC 回调、编码线程都会碰它。
   std::lock_guard queue_lock(state.queue_mutex);
   state.audio_queue.clear();
@@ -27,7 +27,7 @@ auto clear_queues(State::RecordingState& state) -> void {
 }
 
 // 清空 D3D 等持久资源（录制段间不复用）
-auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
+auto clear_persistent_runtime_fields(RecordingState& state) -> void {
   state.winrt_device = nullptr;
   state.context = nullptr;
   state.device = nullptr;
@@ -37,12 +37,12 @@ auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
 // 根据源帧尺寸和目标窗口算出输出尺寸和裁剪区域
 auto resolve_capture_plan(HWND target_window, bool capture_client_area, int frame_width,
                           int frame_height)
-    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
+    -> std::expected<features::recording::CapturePlan, std::string> {
   if (frame_width <= 0 || frame_height <= 0) {
     return std::unexpected("Invalid frame size");
   }
 
-  Features::Recording::Types::CapturePlan plan;
+  features::recording::CapturePlan plan;
   plan.source_width = frame_width;
   plan.source_height = frame_height;
 
@@ -68,7 +68,7 @@ auto resolve_capture_plan(HWND target_window, bool capture_client_area, int fram
   }
 
   // 只录客户区时，WGC 给的是完整窗口画面，这里要把边框和标题栏裁掉。
-  auto crop_region_result = Utils::Graphics::CaptureRegion::calculate_client_crop_region(
+  auto crop_region_result = utils::graphics::capture_region::calculate_client_crop_region(
       target_window, static_cast<UINT>(frame_width), static_cast<UINT>(frame_height));
   if (!crop_region_result) {
     return std::unexpected("Failed to calculate client crop region: " + crop_region_result.error());
@@ -93,9 +93,9 @@ auto resolve_capture_plan(HWND target_window, bool capture_client_area, int fram
 }
 
 auto calculate_frame_crop_plan(HWND target_window,
-                               const Features::Recording::Types::RecordingConfig& config,
-                               int frame_width, int frame_height)
-    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
+                               const features::recording::RecordingConfig& config, int frame_width,
+                               int frame_height)
+    -> std::expected<features::recording::CapturePlan, std::string> {
   auto capture_plan_result =
       resolve_capture_plan(target_window, config.capture_client_area, frame_width, frame_height);
   if (!capture_plan_result) {
@@ -117,10 +117,10 @@ auto calculate_frame_crop_plan(HWND target_window,
 
 // 录制启动时以 WGC 真实尺寸计算捕获计划，不用窗口矩形猜
 auto build_startup_capture_plan(HWND target_window, bool capture_client_area)
-    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
+    -> std::expected<features::recording::CapturePlan, std::string> {
   // 启动时以 WGC 的真实尺寸为准，不用窗口矩形猜。
   // 窗口边框、DPI、奇偶像素都可能让窗口矩形和实际帧差 1px。
-  auto capture_size_result = Utils::Graphics::Capture::get_capture_item_size(target_window);
+  auto capture_size_result = utils::graphics::capture::get_capture_item_size(target_window);
   if (!capture_size_result) {
     return std::unexpected(capture_size_result.error());
   }
@@ -140,7 +140,7 @@ auto build_working_output_path(const std::filesystem::path& final_output_path)
 
 auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path {
-  auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
+  auto filename = utils::string::FormatTimestamp(std::chrono::system_clock::now());
   auto dot_pos = filename.rfind('.');
   if (dot_pos != std::string::npos) {
     filename = filename.substr(0, dot_pos) + ".mp4";
@@ -207,7 +207,7 @@ auto delete_working_output_file(const std::filesystem::path& working_output_path
 }
 
 // 清空单段录制的会话态，但保留可复用的 D3D 设备，支持高频启停
-auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
+auto clear_session_runtime_fields(core::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
   }
@@ -249,7 +249,7 @@ auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
 }
 
 // 取消 D3D 延迟释放定时器（比如新的录制马上要开始，就不等了）
-auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
+auto cancel_cleanup_timer(core::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
   }
@@ -262,8 +262,8 @@ auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
 }
 
 // 高频启停时延迟 5 秒释放 D3D 资源，避免反复创建的损耗
-auto start_cleanup_timer(Core::State::AppState& app_state,
-                         std::move_only_function<void()> on_timeout) -> void {
+auto start_cleanup_timer(core::AppState& app_state, std::move_only_function<void()> on_timeout)
+    -> void {
   if (!app_state.recording) {
     return;
   }
@@ -290,7 +290,7 @@ auto start_cleanup_timer(Core::State::AppState& app_state,
 }
 
 // 立即释放 D3D 设备（清理定时器 + 清空持久字段）
-auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void {
+auto cleanup_d3d_resources(core::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
   }
@@ -302,8 +302,7 @@ auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void {
 }
 
 // 确保录制所需 D3D device/context 和 WinRT device 已创建，没有就新建
-auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
-    -> std::expected<void, std::string> {
+auto ensure_d3d_resources_ready(core::AppState& app_state) -> std::expected<void, std::string> {
   if (!app_state.recording) {
     return std::unexpected("RecordingState is not initialized");
   }
@@ -314,7 +313,7 @@ auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
     return {};
   }
 
-  auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
+  auto d3d_result = utils::graphics::d3d::create_headless_d3d_device();
   if (!d3d_result) {
     cleanup_d3d_resources(app_state);
     return std::unexpected("Failed to create D3D device: " + d3d_result.error());
@@ -327,7 +326,7 @@ auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
     multithread->SetMultithreadProtected(TRUE);
   }
 
-  auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(state.device.get());
+  auto winrt_device_result = utils::graphics::capture::create_winrt_device(state.device.get());
   if (!winrt_device_result) {
     cleanup_d3d_resources(app_state);
     return std::unexpected("Failed to create WinRT device: " + winrt_device_result.error());
@@ -339,7 +338,7 @@ auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
 }
 
 // 停止 WGC 继续产新帧，但保留 frame pool 供编码线程排空已到达的帧
-auto stop_capture_input(Core::State::AppState& app_state) -> void {
+auto stop_capture_input(core::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
   }
@@ -347,18 +346,18 @@ auto stop_capture_input(Core::State::AppState& app_state) -> void {
   auto& state = *app_state.recording;
 
   std::lock_guard frame_lock(state.frame_mutex);
-  Utils::Graphics::Capture::stop_capture_session(state.capture_session);
+  utils::graphics::capture::stop_capture_session(state.capture_session);
 }
 
 // 完全清理 WGC 捕获会话（释放所有关联资源）
-auto cleanup_capture_session(Core::State::AppState& app_state) -> void {
+auto cleanup_capture_session(core::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
   }
 
   auto& state = *app_state.recording;
 
-  Utils::Graphics::Capture::cleanup_capture_session(state.capture_session);
+  utils::graphics::capture::cleanup_capture_session(state.capture_session);
 }
 
-}  // namespace Features::Recording::Session
+}  // namespace features::recording::session

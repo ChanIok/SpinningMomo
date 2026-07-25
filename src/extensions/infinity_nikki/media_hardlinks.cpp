@@ -1,18 +1,17 @@
-module;
+#include "extensions/infinity_nikki/media_hardlinks.hpp"
 
-module Extensions.InfinityNikki.MediaHardlinks;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Features.Gallery.Types;
-import Features.Gallery.Watcher;
-import Features.Settings.State;
-import Extensions.InfinityNikki.Types;
-import Utils.Logger;
-import Utils.String;
-import Utils.System;
+#include "core/state/app_state.hpp"
+#include "extensions/infinity_nikki/types.hpp"
+#include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "features/settings/state.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
-namespace Extensions::InfinityNikki::MediaHardlinks {
+namespace extensions::infinity_nikki::media_hardlinks {
 
 // 设计目标：
 // 1) 把 GamePlayPhotos 下的照片/录像投影到 X6Game/ScreenShot 与 X6Game/Video；
@@ -118,7 +117,7 @@ auto make_path_compare_key(const std::filesystem::path& path) -> std::string {
   auto normalized = normalize_existing_path(path).generic_wstring();
   std::transform(normalized.begin(), normalized.end(), normalized.begin(),
                  [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
-  return Utils::String::ToUtf8(normalized);
+  return utils::string::ToUtf8(normalized);
 }
 
 // 判断路径片段是否为纯数字（用于 UID 目录判定）。
@@ -131,7 +130,7 @@ auto is_numeric_path_part(const std::filesystem::path& part) -> bool {
 // 判断是否为受支持的图片扩展名。
 auto is_supported_image_extension(const std::filesystem::path& file_path) -> bool {
   // 扩展名比较统一小写，避免 .JPG / .Png 之类大小写差异漏判。
-  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
+  auto extension = utils::string::ToLowerAscii(file_path.extension().string());
   return std::ranges::any_of(kSupportedImageExtensions, [&extension](std::string_view candidate) {
     return extension == candidate;
   });
@@ -139,12 +138,11 @@ auto is_supported_image_extension(const std::filesystem::path& file_path) -> boo
 
 // 判断是否为受管视频扩展名（当前仅 .mp4）。
 auto is_supported_managed_video_extension(const std::filesystem::path& file_path) -> bool {
-  return Utils::String::ToLowerAscii(file_path.extension().string()) == kManagedVideoExtension;
+  return utils::string::ToLowerAscii(file_path.extension().string()) == kManagedVideoExtension;
 }
 
 // 从设置解析并校验 Infinity Nikki 源目录与硬链接投影目录。
-auto resolve_managed_paths(Core::State::AppState& app_state)
-    -> std::expected<ManagedPaths, std::string> {
+auto resolve_managed_paths(core::AppState& app_state) -> std::expected<ManagedPaths, std::string> {
   // 这一步只做“路径解析与存在性校验”，不做任何写盘动作。
   if (!app_state.settings) {
     return std::unexpected("Settings state is not initialized");
@@ -155,7 +153,7 @@ auto resolve_managed_paths(Core::State::AppState& app_state)
     return std::unexpected("Infinity Nikki game directory is empty");
   }
 
-  auto game_dir = std::filesystem::path(Utils::String::FromUtf8(game_dir_utf8));
+  auto game_dir = std::filesystem::path(utils::string::FromUtf8(game_dir_utf8));
   if (game_dir.empty()) {
     return std::unexpected("Failed to resolve Infinity Nikki game directory");
   }
@@ -235,7 +233,7 @@ auto try_make_photo_source(const ManagedPaths& paths, const std::filesystem::pat
       .kind = ManagedSourceKind::kPhoto,
       .target_path = normalized_target,
       .link_path = make_photo_link_path(paths, normalized_target),
-      .original_filename = Utils::String::ToUtf8(normalized_target.filename().wstring()),
+      .original_filename = utils::string::ToUtf8(normalized_target.filename().wstring()),
       .session_directory = std::nullopt,
   };
 }
@@ -276,10 +274,10 @@ auto try_make_video_source(const ManagedPaths& paths, const std::filesystem::pat
     return std::nullopt;
   }
 
-  auto session_name = Utils::String::ToUtf8(parts[2].wstring());
+  auto session_name = utils::string::ToUtf8(parts[2].wstring());
   auto expected_filename =
-      Utils::String::ToLowerAscii(session_name + std::string(kManagedVideoExtension));
-  auto actual_filename = Utils::String::ToLowerAscii(parts[3].string());
+      utils::string::ToLowerAscii(session_name + std::string(kManagedVideoExtension));
+  auto actual_filename = utils::string::ToLowerAscii(parts[3].string());
   if (actual_filename != expected_filename) {
     return std::nullopt;
   }
@@ -289,7 +287,7 @@ auto try_make_video_source(const ManagedPaths& paths, const std::filesystem::pat
       .kind = ManagedSourceKind::kVideo,
       .target_path = normalized_target,
       .link_path = make_video_link_path(paths, normalized_target),
-      .original_filename = Utils::String::ToUtf8(normalized_target.filename().wstring()),
+      .original_filename = utils::string::ToUtf8(normalized_target.filename().wstring()),
       .session_directory = normalized_target.parent_path(),
   };
 }
@@ -354,9 +352,9 @@ auto collect_source_assets(
     auto link_key = make_path_compare_key(source->link_path);
     if (auto it = link_targets.find(link_key); it != link_targets.end()) {
       return std::unexpected("Duplicate Infinity Nikki managed link target detected: '" +
-                             Utils::String::ToUtf8(source->link_path.wstring()) + "' from '" +
-                             Utils::String::ToUtf8(it->second.wstring()) + "' and '" +
-                             Utils::String::ToUtf8(source->target_path.wstring()) + "'");
+                             utils::string::ToUtf8(source->link_path.wstring()) + "' from '" +
+                             utils::string::ToUtf8(it->second.wstring()) + "' and '" +
+                             utils::string::ToUtf8(source->target_path.wstring()) + "'");
     }
 
     link_targets.emplace(link_key, source->target_path);
@@ -382,7 +380,7 @@ auto ensure_directory_exists(const std::filesystem::path& path)
   std::error_code ec;
   std::filesystem::create_directories(path, ec);
   if (ec) {
-    return std::unexpected("Failed to create directory '" + Utils::String::ToUtf8(path.wstring()) +
+    return std::unexpected("Failed to create directory '" + utils::string::ToUtf8(path.wstring()) +
                            "': " + ec.message());
   }
   return {};
@@ -404,7 +402,7 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
   // 保护：禁止把链接写回自身路径（等价路径也不允许）。
   if (make_path_compare_key(link_path) == make_path_compare_key(target_path)) {
     return std::unexpected("Managed hard link path must be different from target path: '" +
-                           Utils::String::ToUtf8(link_path.wstring()) + "'");
+                           utils::string::ToUtf8(link_path.wstring()) + "'");
   }
 
   auto ensure_result = ensure_directory_exists(link_path.parent_path());
@@ -416,7 +414,7 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
   auto link_exists = std::filesystem::exists(link_path, ec);
   if (ec) {
     return std::unexpected("Failed to inspect managed link entry '" +
-                           Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+                           utils::string::ToUtf8(link_path.wstring()) + "': " + ec.message());
   }
 
   if (link_exists && are_equivalent_entries(link_path, target_path)) {
@@ -430,7 +428,7 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
     std::filesystem::remove_all(link_path, ec);
     if (ec) {
       return std::unexpected("Failed to replace existing managed link entry '" +
-                             Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+                             utils::string::ToUtf8(link_path.wstring()) + "': " + ec.message());
     }
   }
 
@@ -442,8 +440,8 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
     }
 
     return std::unexpected("Failed to create hard link '" +
-                           Utils::String::ToUtf8(link_path.wstring()) + "' -> '" +
-                           Utils::String::ToUtf8(target_path.wstring()) + "': " + detail);
+                           utils::string::ToUtf8(link_path.wstring()) + "' -> '" +
+                           utils::string::ToUtf8(target_path.wstring()) + "': " + detail);
   }
 
   return action;
@@ -459,7 +457,7 @@ auto remove_managed_link(const std::filesystem::path& link_path)
   if (!std::filesystem::exists(link_path, ec)) {
     if (ec) {
       return std::unexpected("Failed to inspect managed link entry '" +
-                             Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+                             utils::string::ToUtf8(link_path.wstring()) + "': " + ec.message());
     }
     return false;
   }
@@ -467,14 +465,14 @@ auto remove_managed_link(const std::filesystem::path& link_path)
   std::filesystem::remove_all(link_path, ec);
   if (ec) {
     return std::unexpected("Failed to remove managed link entry '" +
-                           Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+                           utils::string::ToUtf8(link_path.wstring()) + "': " + ec.message());
   }
 
   return true;
 }
 
 // 回收录像 session 目录，并与 watcher 协作避免误触发扫描事件。
-auto remove_video_session_directory(Core::State::AppState& app_state,
+auto remove_video_session_directory(core::AppState& app_state,
                                     const std::filesystem::path& session_directory)
     -> std::expected<bool, std::string> {
   // 这里是“附加清理”：
@@ -484,7 +482,7 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
   if (!std::filesystem::exists(session_directory, ec)) {
     if (ec) {
       return std::unexpected("Failed to inspect video session directory '" +
-                             Utils::String::ToUtf8(session_directory.wstring()) +
+                             utils::string::ToUtf8(session_directory.wstring()) +
                              "': " + ec.message());
     }
     return false;
@@ -493,19 +491,19 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
   if (!std::filesystem::is_directory(session_directory, ec)) {
     if (ec) {
       return std::unexpected("Failed to inspect video session directory '" +
-                             Utils::String::ToUtf8(session_directory.wstring()) +
+                             utils::string::ToUtf8(session_directory.wstring()) +
                              "': " + ec.message());
     }
     return false;
   }
 
   // 删除录像 session 目录前后都要与 watcher 协作，避免把我们主动清理当成外部文件事件。
-  auto begin_ignore_result = Features::Gallery::Watcher::begin_manual_file_system_ignore(
+  auto begin_ignore_result = features::gallery::watcher::begin_manual_file_system_ignore(
       app_state, session_directory, session_directory);
   bool ignore_registered = begin_ignore_result.has_value();
   if (!begin_ignore_result) {
     return std::unexpected("Failed to register watcher ignore for video session cleanup '" +
-                           Utils::String::ToUtf8(session_directory.wstring()) +
+                           utils::string::ToUtf8(session_directory.wstring()) +
                            "': " + begin_ignore_result.error());
   }
 
@@ -515,11 +513,11 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
       return {};
     }
 
-    auto complete_ignore_result = Features::Gallery::Watcher::complete_manual_file_system_ignore(
+    auto complete_ignore_result = features::gallery::watcher::complete_manual_file_system_ignore(
         app_state, session_directory, session_directory);
     if (!complete_ignore_result) {
       return std::unexpected("Failed to complete watcher ignore for video session cleanup '" +
-                             Utils::String::ToUtf8(session_directory.wstring()) +
+                             utils::string::ToUtf8(session_directory.wstring()) +
                              "': " + complete_ignore_result.error());
     }
 
@@ -527,7 +525,7 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
     return {};
   };
 
-  auto recycle_result = Utils::System::move_files_to_recycle_bin({session_directory});
+  auto recycle_result = utils::system::move_files_to_recycle_bin({session_directory});
   auto complete_ignore_result = complete_ignore();
   if (!complete_ignore_result) {
     return std::unexpected(complete_ignore_result.error());
@@ -535,18 +533,18 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
 
   if (!recycle_result) {
     return std::unexpected("Failed to move video session directory to recycle bin '" +
-                           Utils::String::ToUtf8(session_directory.wstring()) +
+                           utils::string::ToUtf8(session_directory.wstring()) +
                            "': " + recycle_result.error());
   }
 
   Logger().info("InfinityNikki removed video session directory: {}",
-                Utils::String::ToUtf8(session_directory.wstring()));
+                utils::string::ToUtf8(session_directory.wstring()));
   return true;
 }
 
 // 全量同步主流程：收集受管源并逐条创建/更新硬链接。
 auto sync_hardlinks_internal(
-    Core::State::AppState& app_state,
+    core::AppState& app_state,
     const std::function<void(const InfinityNikkiInitializeMediaHardlinksProgress&)>&
         progress_callback)
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
@@ -619,8 +617,8 @@ auto sync_hardlinks_internal(
 }
 
 // 增量同步主流程：消费 Gallery changes 并增量维护硬链接。
-auto apply_runtime_changes(Core::State::AppState& app_state,
-                           const std::vector<Features::Gallery::Types::ScanChange>& changes)
+auto apply_runtime_changes(core::AppState& app_state,
+                           const std::vector<features::gallery::ScanChange>& changes)
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
   // 增量同步主流程（由 Gallery watcher 的变化集触发）：
   // - UPSERT：确保对应硬链接存在且指向最新文件
@@ -641,30 +639,30 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
     auto changed_path = normalize_existing_path(std::filesystem::path(change.path));
     auto source = try_make_managed_source(paths, changed_path, false);
     if (!source.has_value()) {
-      if (change.action == Features::Gallery::Types::ScanChangeAction::REMOVE) {
+      if (change.action == features::gallery::ScanChangeAction::REMOVE) {
         Logger().debug(
             "InfinityNikki ignored REMOVE change because path is not a managed media source: {}",
-            Utils::String::ToUtf8(changed_path.wstring()));
+            utils::string::ToUtf8(changed_path.wstring()));
       } else {
         Logger().debug(
             "InfinityNikki ignored change because path is not a managed media source: {}",
-            Utils::String::ToUtf8(changed_path.wstring()));
+            utils::string::ToUtf8(changed_path.wstring()));
       }
       result.ignored_count++;
       continue;
     }
 
     switch (change.action) {
-      case Features::Gallery::Types::ScanChangeAction::UPSERT: {
+      case features::gallery::ScanChangeAction::UPSERT: {
         Logger().debug("InfinityNikki processing UPSERT: kind={}, source='{}', link='{}'",
                        source->kind == ManagedSourceKind::kVideo ? "video" : "photo",
-                       Utils::String::ToUtf8(changed_path.wstring()),
-                       Utils::String::ToUtf8(source->link_path.wstring()));
+                       utils::string::ToUtf8(changed_path.wstring()),
+                       utils::string::ToUtf8(source->link_path.wstring()));
         std::error_code ec;
         if (!std::filesystem::is_regular_file(changed_path, ec) || ec) {
           if (ec) {
             add_error(result.errors, "Failed to inspect runtime source '" +
-                                         Utils::String::ToUtf8(changed_path.wstring()) +
+                                         utils::string::ToUtf8(changed_path.wstring()) +
                                          "': " + ec.message());
           } else {
             result.ignored_count++;
@@ -691,11 +689,11 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
         }
         break;
       }
-      case Features::Gallery::Types::ScanChangeAction::REMOVE: {
+      case features::gallery::ScanChangeAction::REMOVE: {
         Logger().info("InfinityNikki processing REMOVE: kind={}, source='{}', link='{}'",
                       source->kind == ManagedSourceKind::kVideo ? "video" : "photo",
-                      Utils::String::ToUtf8(changed_path.wstring()),
-                      Utils::String::ToUtf8(source->link_path.wstring()));
+                      utils::string::ToUtf8(changed_path.wstring()),
+                      utils::string::ToUtf8(source->link_path.wstring()));
         // 录像删除时除了删除投影硬链接，还会尝试回收对应 session 目录。
         auto remove_result = remove_managed_link(source->link_path);
         if (!remove_result) {
@@ -706,10 +704,10 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
         if (remove_result.value()) {
           result.removed_count++;
           Logger().info("InfinityNikki removed managed hardlink: {}",
-                        Utils::String::ToUtf8(source->link_path.wstring()));
+                        utils::string::ToUtf8(source->link_path.wstring()));
         } else {
           Logger().info("InfinityNikki managed hardlink already absent: {}",
-                        Utils::String::ToUtf8(source->link_path.wstring()));
+                        utils::string::ToUtf8(source->link_path.wstring()));
         }
 
         if (source->kind == ManagedSourceKind::kVideo && source->session_directory.has_value()) {
@@ -719,7 +717,7 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
             add_error(result.errors, cleanup_result.error());
           } else if (!cleanup_result.value()) {
             Logger().info("InfinityNikki video session directory already absent: {}",
-                          Utils::String::ToUtf8(source->session_directory->wstring()));
+                          utils::string::ToUtf8(source->session_directory->wstring()));
           }
         }
         break;
@@ -734,8 +732,7 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
 }
 
 // 统一消费一次 Gallery 扫描结果，收口“增量 / no-op / 全量回退”的决策。
-auto apply_scan_result(Core::State::AppState& app_state,
-                       const Features::Gallery::Types::ScanResult& result)
+auto apply_scan_result(core::AppState& app_state, const features::gallery::ScanResult& result)
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
   // 最优路径：Gallery 已明确给出逐文件变化，直接走增量同步。
   if (!result.changes.empty()) {
@@ -762,7 +759,7 @@ auto apply_scan_result(Core::State::AppState& app_state,
 }
 
 // 对外全量初始化入口（带进度回调）。
-auto initialize(Core::State::AppState& app_state,
+auto initialize(core::AppState& app_state,
                 const std::function<void(const InfinityNikkiInitializeMediaHardlinksProgress&)>&
                     progress_callback)
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
@@ -771,16 +768,16 @@ auto initialize(Core::State::AppState& app_state,
 }
 
 // 对外静默全量同步入口（不回调进度）。
-auto sync(Core::State::AppState& app_state)
+auto sync(core::AppState& app_state)
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
   // sync 是“静默”全量入口，通常给后台自动修正调用。
   return sync_hardlinks_internal(app_state, nullptr);
 }
 
 // 返回应被 watcher 监听的根目录（GamePlayPhotos）。
-auto resolve_watch_directory(Core::State::AppState& app_state)
+auto resolve_watch_directory(core::AppState& app_state)
     -> std::expected<std::filesystem::path, std::string> {
-  // PhotoService 监听这个目录；产生 changes 后再交给 apply_runtime_changes。
+  // photo_service 监听这个目录；产生 changes 后再交给 apply_runtime_changes。
   auto paths_result = resolve_managed_paths(app_state);
   if (!paths_result) {
     return std::unexpected(paths_result.error());
@@ -788,4 +785,4 @@ auto resolve_watch_directory(Core::State::AppState& app_state)
   return paths_result->gameplay_photos_dir;
 }
 
-}  // namespace Extensions::InfinityNikki::MediaHardlinks
+}  // namespace extensions::infinity_nikki::media_hardlinks

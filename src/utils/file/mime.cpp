@@ -1,11 +1,10 @@
-module;
+#include "utils/file/mime.hpp"
 
-module Utils.File.Mime;
+#include "vendor/std.hpp"
 
-import std;
-import Utils.String;
+#include "utils/string/string.hpp"
 
-namespace Utils::File::Mime {
+namespace utils::file::mime {
 
 // MIME类型映射表
 const std::unordered_map<std::string, std::string> mime_map = {
@@ -78,7 +77,7 @@ const std::unordered_map<std::string, std::string> mime_map = {
     {".iso", "application/octet-stream"}};
 
 auto get_mime_type_by_extension(const std::string& extension) -> std::string {
-  auto lowercase_ext = Utils::String::ToLowerAscii(extension);
+  auto lowercase_ext = utils::string::ToLowerAscii(extension);
 
   auto it = mime_map.find(lowercase_ext);
   if (it != mime_map.end()) {
@@ -99,4 +98,4 @@ auto get_mime_type(const std::string& file_path) -> std::string {
   return get_mime_type(fs_path);
 }
 
-}  // namespace Utils::File::Mime
+}  // namespace utils::file::mime

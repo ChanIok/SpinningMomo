@@ -1,0 +1,91 @@
+#pragma once
+
+#include "vendor/std.hpp"
+
+#include "vendor/wil.hpp"
+#include "vendor/windows.hpp"
+#include "vendor/windows/d3d11.hpp"
+
+#include "utils/graphics/capture.hpp"
+#include "utils/graphics/d3d.hpp"
+
+namespace features::overlay {
+
+// 消息常量
+constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
+constexpr UINT WM_WINDOW_EVENT = WM_USER + 2;
+constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 3;
+constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 4;
+constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 5;
+constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 6;
+constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 7;
+
+constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
+
+// 顶点结构体
+struct Vertex {
+  float x, y;
+  float u, v;
+};
+
+// 窗口状态
+struct WindowState {
+  HWND overlay_hwnd = nullptr;
+  HWND target_window = nullptr;
+  HWND timer_window = nullptr;
+
+  int screen_left = 0;
+  int screen_top = 0;
+  int screen_width = 0;
+  int screen_height = 0;
+  int window_width = 0;
+  int window_height = 0;
+  int cached_game_width = 0;
+  int cached_game_height = 0;
+  RECT game_window_rect{};
+
+  bool use_letterbox_mode = false;
+
+  bool overlay_window_shown = false;
+};
+
+// 渲染状态
+struct RenderingState {
+  utils::graphics::d3d::D3DContext d3d_context;
+  utils::graphics::d3d::ShaderResources shader_resources;
+  wil::com_ptr<ID3D11Texture2D> frame_texture;
+  wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
+  HANDLE frame_latency_object = nullptr;
+  std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
+
+  bool d3d_initialized = false;
+  bool create_new_srv = true;
+};
+
+// 捕获状态
+struct CaptureState {
+  utils::graphics::capture::CaptureSession session;
+  std::atomic<int> last_frame_width = 0;
+  std::atomic<int> last_frame_height = 0;
+};
+
+// 交互状态
+struct InteractionState {
+  HWINEVENTHOOK foreground_event_hook = nullptr;
+  HWINEVENTHOOK target_window_event_hook = nullptr;
+  std::optional<POINT> last_game_window_pos;
+  DWORD game_process_id = 0;
+  bool is_game_focused = false;            // 前台窗口是否是游戏/overlay
+  bool taskbar_redraw_suppressed = false;  // 任务栏重绘是否已禁用
+};
+
+// 线程状态
+struct ThreadState {
+  std::jthread hook_thread;
+  std::jthread window_manager_thread;
+
+  DWORD hook_thread_id = 0;
+  DWORD window_manager_thread_id = 0;
+};
+
+}  // namespace features::overlay

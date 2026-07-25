@@ -1,31 +1,30 @@
-module;
+#include "features/screenshot/usecase.hpp"
 
-module Features.Screenshot.UseCase;
+#include "vendor/std.hpp"
 
-import std;
-import Core.State;
-import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
-import UI.FloatingWindow.Events;
-import Features.Screenshot;
-import Features.Photography.State;
-import Features.Settings.State;
-import Features.WindowControl;
-import Utils.Image;
-import Utils.Logger;
-import Utils.Path;
-import Utils.String;
-import Utils.System;
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "features/photography/state.hpp"
+#include "features/screenshot/screenshot.hpp"
+#include "features/settings/state.hpp"
+#include "features/window_control/window_control.hpp"
+#include "ui/floating_window/events.hpp"
+#include "utils/image/image.hpp"
+#include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
-namespace Features::Screenshot::UseCase {
+namespace features::screenshot {
 
-auto handle_saved_file_view_action(Core::State::AppState& state, const std::filesystem::path& path,
+auto handle_saved_file_view_action(core::AppState& state, const std::filesystem::path& path,
                                    std::string_view file_kind) -> void {
   const auto& action = state.settings->raw.features.saved_file_view_action;
   auto action_result = action == "reveal_in_explorer"
-                           ? Utils::System::reveal_file_in_explorer(path)
-                           : Utils::System::open_file_with_default_app(path);
+                           ? utils::system::reveal_file_in_explorer(path)
+                           : utils::system::open_file_with_default_app(path);
   if (!action_result) {
     Logger().warn("Failed to handle {} view action '{}': {}", file_kind, action,
                   action_result.error());
@@ -33,28 +32,28 @@ auto handle_saved_file_view_action(Core::State::AppState& state, const std::file
 }
 
 // 截图
-auto capture(Core::State::AppState& state) -> void {
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
-  auto target_window = Features::WindowControl::find_target_window(window_title);
+auto capture(core::AppState& state) -> void {
+  std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
+  auto target_window = features::window_control::find_target_window(window_title);
   if (!target_window) {
-    Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                            state.i18n->texts["message.window_not_found"]);
     return;
   }
 
   std::optional<std::filesystem::path> output_dir_override;
   if (state.settings->raw.features.organize_output_by_window_title) {
-    auto actual_title = Features::WindowControl::get_window_title(*target_window);
+    auto actual_title = features::window_control::get_window_title(*target_window);
     if (!actual_title) {
       Logger().warn("Failed to read current screenshot target title, using configured title: {}",
                     actual_title.error());
     }
 
     const auto title = actual_title.value_or(window_title);
-    auto output_dir_result = Utils::Path::GetOutputDirectoryForWindowTitle(
+    auto output_dir_result = utils::path::GetOutputDirectoryForWindowTitle(
         state.settings->raw.features.output_dir_path, title);
     if (!output_dir_result) {
-      Core::Notifications::show_notification(
+      core::notifications::show_notification(
           state, state.i18n->texts["label.app_name"],
           state.i18n->texts["message.screenshot_failed"] + ": " + output_dir_result.error());
       Logger().error("Failed to resolve screenshot output directory: {}",
@@ -68,36 +67,36 @@ auto capture(Core::State::AppState& state) -> void {
   auto completion_callback = [&state](bool success, const std::wstring& path) {
     if (success) {
       const std::filesystem::path screenshot_path(path);
-      const auto path_str = Utils::String::ToUtf8(path);
+      const auto path_str = utils::string::ToUtf8(path);
 
-      Core::Notifications::Types::NotificationOptions options;
-      options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+      core::notifications::NotificationOptions options;
+      options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
       options.message =
-          Utils::String::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
+          utils::string::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
 
-      Core::Notifications::Types::NotificationAction view_action;
-      view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
-      view_action.callback = [screenshot_path](Core::State::AppState& app_state) {
+      core::notifications::NotificationAction view_action;
+      view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
+      view_action.callback = [screenshot_path](core::AppState& app_state) {
         handle_saved_file_view_action(app_state, screenshot_path, "screenshot");
       };
       options.action = std::move(view_action);
 
-      Core::Notifications::post_notification_request(state, std::move(options));
+      core::notifications::post_notification_request(state, std::move(options));
       Logger().info("Screenshot saved successfully: {}", path_str);
     } else {
-      Core::Notifications::Types::NotificationOptions fail_options;
-      fail_options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+      core::notifications::NotificationOptions fail_options;
+      fail_options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
       fail_options.message =
-          Utils::String::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
-      Core::Notifications::post_notification_request(state, std::move(fail_options));
+          utils::string::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
+      core::notifications::post_notification_request(state, std::move(fail_options));
       Logger().error("Screenshot capture failed");
     }
   };
 
-  Utils::Image::ImageFormat image_format = Utils::Image::ImageFormat::PNG;
+  utils::image::ImageFormat image_format = utils::image::ImageFormat::PNG;
   const auto& fmt = state.settings->raw.features.screenshot.file_format;
   if (fmt == "jpeg" || fmt == "jpg") {
-    image_format = Utils::Image::ImageFormat::JPEG;
+    image_format = utils::image::ImageFormat::JPEG;
   }
   float jpeg_quality = 1.0f;
 
@@ -109,11 +108,11 @@ auto capture(Core::State::AppState& state) -> void {
 
   const auto capture_client_area = state.settings->raw.features.screenshot.capture_client_area;
 
-  auto result = Features::Screenshot::take_screenshot(
+  auto result = features::screenshot::take_screenshot(
       state, *target_window, std::move(completion_callback), image_format, jpeg_quality,
       output_dir_override, shutter_frames, capture_client_area);
   if (!result) {
-    Core::Notifications::show_notification(
+    core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.screenshot_failed"] + ": " + result.error());
     Logger().error("Failed to start screenshot: {}", result.error());
@@ -123,10 +122,10 @@ auto capture(Core::State::AppState& state) -> void {
 }
 
 // 处理截图事件（Event版本，用于热键系统）
-auto handle_capture_event(Core::State::AppState& state,
-                          const UI::FloatingWindow::Events::CaptureEvent& event) -> void {
+auto handle_capture_event(core::AppState& state,
+                          const ui::floating_window::events::CaptureEvent& event) -> void {
   static_cast<void>(event);
   capture(state);
 }
 
-}  // namespace Features::Screenshot::UseCase
+}  // namespace features::screenshot

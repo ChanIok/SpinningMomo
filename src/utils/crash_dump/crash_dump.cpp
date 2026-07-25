@@ -1,15 +1,13 @@
-module;
+#include "utils/crash_dump/crash_dump.hpp"
 
-#include <windows.h>
+#include "vendor/std.hpp"
 
-#include <DbgHelp.h>
+#include "vendor/windows.hpp"
+#include "vendor/windows/dbghelp.hpp"
 
-module Utils.CrashDump;
+#include "utils/path/path.hpp"
 
-import std;
-import Utils.Path;
-
-namespace Utils::CrashDump::Detail {
+namespace utils::crash_dump::detail {
 
 std::atomic_bool g_installed{false};
 std::atomic_flag g_dump_writing{};
@@ -42,13 +40,13 @@ auto sanitize_reason(std::string_view reason) -> std::string {
 }
 
 auto make_dump_dir() -> std::expected<std::filesystem::path, std::string> {
-  auto logs_dir_result = Utils::Path::GetAppDataSubdirectory("logs");
+  auto logs_dir_result = utils::path::GetAppDataSubdirectory("logs");
   if (!logs_dir_result) {
     return std::unexpected("Failed to get logs directory: " + logs_dir_result.error());
   }
 
   const auto dump_dir = logs_dir_result.value() / "dumps";
-  if (auto ensure_result = Utils::Path::EnsureDirectoryExists(dump_dir); !ensure_result) {
+  if (auto ensure_result = utils::path::EnsureDirectoryExists(dump_dir); !ensure_result) {
     return std::unexpected("Failed to create dump directory: " + ensure_result.error());
   }
 
@@ -134,22 +132,22 @@ auto __stdcall unhandled_exception_filter(EXCEPTION_POINTERS* exception_pointers
   std::abort();
 }
 
-}  // namespace Utils::CrashDump::Detail
+}  // namespace utils::crash_dump::detail
 
-namespace Utils::CrashDump {
+namespace utils::crash_dump {
 
 auto install() -> void {
-  if (Detail::g_installed.exchange(true, std::memory_order_acq_rel)) {
+  if (detail::g_installed.exchange(true, std::memory_order_acq_rel)) {
     return;
   }
 
-  SetUnhandledExceptionFilter(Detail::unhandled_exception_filter);
-  std::set_terminate(Detail::terminate_handler);
+  SetUnhandledExceptionFilter(detail::unhandled_exception_filter);
+  std::set_terminate(detail::terminate_handler);
 }
 
 auto write_dump(void* exception_pointers, std::string_view reason)
     -> std::expected<std::filesystem::path, std::string> {
-  return Detail::write_dump_internal(exception_pointers, reason);
+  return detail::write_dump_internal(exception_pointers, reason);
 }
 
-}  // namespace Utils::CrashDump
+}  // namespace utils::crash_dump

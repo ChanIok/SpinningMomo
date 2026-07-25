@@ -1,34 +1,36 @@
-module Core.RPC.Endpoints.Tasks;
+#include "core/rpc/endpoints/tasks/tasks.hpp"
 
-import std;
-import Core.State;
-import Core.RPC;
-import Core.RPC.State;
-import Core.RPC.Types;
-import Core.Tasks;
-import <asio.hpp>;
+#include "vendor/std.hpp"
 
-namespace Core::RPC::Endpoints::Tasks {
+#include "vendor/asio.hpp"
+
+#include "core/rpc/rpc.hpp"
+#include "core/rpc/state.hpp"
+#include "core/rpc/types.hpp"
+#include "core/state/app_state.hpp"
+#include "core/tasks/tasks.hpp"
+
+namespace core::rpc::endpoints::tasks {
 
 struct ClearFinishedTasksResult {
   std::int32_t cleared_count = 0;
 };
 
-auto handle_list_tasks(Core::State::AppState& app_state, [[maybe_unused]] const EmptyParams& params)
-    -> RpcAwaitable<std::vector<Core::Tasks::TaskSnapshot>> {
-  co_return Core::Tasks::list_tasks(app_state);
+auto handle_list_tasks(core::AppState& app_state, [[maybe_unused]] const EmptyParams& params)
+    -> RpcAwaitable<std::vector<core::tasks::TaskSnapshot>> {
+  co_return core::tasks::list_tasks(app_state);
 }
 
-auto handle_clear_finished_tasks(Core::State::AppState& app_state,
+auto handle_clear_finished_tasks(core::AppState& app_state,
                                  [[maybe_unused]] const EmptyParams& params)
     -> RpcAwaitable<ClearFinishedTasksResult> {
   co_return ClearFinishedTasksResult{
-      .cleared_count = static_cast<std::int32_t>(Core::Tasks::clear_finished_tasks(app_state)),
+      .cleared_count = static_cast<std::int32_t>(core::tasks::clear_finished_tasks(app_state)),
   };
 }
 
-auto register_all(Core::State::AppState& app_state) -> void {
-  register_method<EmptyParams, std::vector<Core::Tasks::TaskSnapshot>>(
+auto register_all(core::AppState& app_state) -> void {
+  register_method<EmptyParams, std::vector<core::tasks::TaskSnapshot>>(
       app_state, app_state.rpc->registry, "task.list", handle_list_tasks,
       "List recent background tasks");
 
@@ -37,4 +39,4 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Clear finished background tasks");
 }
 
-}  // namespace Core::RPC::Endpoints::Tasks
+}  // namespace core::rpc::endpoints::tasks

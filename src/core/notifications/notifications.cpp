@@ -1,34 +1,32 @@
-module;
+#include "core/notifications/notifications.hpp"
 
-module Core.Notifications;
+#include "vendor/std.hpp"
 
-import std;
-import Core.Events;
-import Core.State;
-import Core.Notifications.Events;
-import Core.Notifications.Types;
-import UI.NotificationWindow;
-import UI.FloatingWindow.State;
-import Utils.String;
+#include "core/events/events.hpp"
+#include "core/notifications/events.hpp"
+#include "core/notifications/types.hpp"
+#include "core/state/app_state.hpp"
+#include "ui/floating_window/state.hpp"
+#include "ui/notification_window/notification_window.hpp"
+#include "utils/string/string.hpp"
 
-namespace Core::Notifications {
+namespace core::notifications {
 
-auto show_notification(Core::State::AppState& state, Types::NotificationOptions options) -> void {
-  UI::NotificationWindow::show_notification(state, std::move(options));
+auto show_notification(core::AppState& state, NotificationOptions options) -> void {
+  ui::notification_window::show_notification(state, std::move(options));
 }
 
-auto post_notification_request(Core::State::AppState& state, Types::NotificationOptions options)
-    -> void {
-  Core::Events::post(state, Events::NotificationRequestEvent{.options = std::move(options)});
+auto post_notification_request(core::AppState& state, NotificationOptions options) -> void {
+  core::events::post(state, events::NotificationRequestEvent{.options = std::move(options)});
 }
 
 // UI 线程、无 action：直接显示，不经过事件队列。
-auto show_notification(Core::State::AppState& state, const std::string& title,
-                       const std::string& message) -> void {
-  Types::NotificationOptions options;
-  options.title = Utils::String::FromUtf8(title);
-  options.message = Utils::String::FromUtf8(message);
+auto show_notification(core::AppState& state, const std::string& title, const std::string& message)
+    -> void {
+  NotificationOptions options;
+  options.title = utils::string::FromUtf8(title);
+  options.message = utils::string::FromUtf8(message);
   show_notification(state, std::move(options));
 }
 
-}  // namespace Core::Notifications
+}  // namespace core::notifications
