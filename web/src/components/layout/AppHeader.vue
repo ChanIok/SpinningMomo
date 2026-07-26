@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useGalleryLayout } from '@/features/gallery/composables'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  ChevronLeft,
   CircleAlert,
   CircleCheck,
   ChevronDown,
@@ -30,13 +31,26 @@ import {
   Trash2,
   X,
 } from 'lucide-vue-next'
+import { backWithViewTransition } from '@/router/viewTransition'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
 const showWindowControls = isWebView()
 const isGalleryPage = computed(() => route.name === 'gallery')
+const pageTitleKey = computed(() => {
+  const titleKeys: Record<string, string> = {
+    gallery: 'app.navigation.gallery',
+    map: 'app.navigation.map',
+    settings: 'app.navigation.settings',
+    about: 'app.navigation.about',
+  }
+  return typeof route.name === 'string' ? titleKeys[route.name] : undefined
+})
+const pageTitle = computed(() => (pageTitleKey.value ? t(pageTitleKey.value) : ''))
+const showPageNavigation = computed(() => Boolean(pageTitleKey.value))
 const displayTasks = computed(() => taskStore.tasks)
 const activeTaskCount = computed(() => taskStore.activeTasks.length)
 const finishedTaskCount = computed(
@@ -82,6 +96,19 @@ const handleClose = () => {
   call('webview.close').catch((err) => {
     console.error('Failed to close window:', err)
   })
+}
+
+const handleBack = () => {
+  void backWithViewTransition(router, { name: 'home' })
+}
+
+const handleNavigationKeydown = (event: KeyboardEvent) => {
+  if (!showPageNavigation.value || event.repeat || !event.altKey || event.key !== 'ArrowLeft') {
+    return
+  }
+
+  event.preventDefault()
+  handleBack()
 }
 
 const handleToggleSidebar = () => {
@@ -267,10 +294,35 @@ watch(
   },
   { deep: true }
 )
+
+onMounted(() => {
+  window.addEventListener('keydown', handleNavigationKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleNavigationKeydown)
+})
 </script>
 
 <template>
-  <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-4">
+  <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-1">
+    <!-- 页面返回与标题 -->
+    <div v-if="showPageNavigation" class="flex shrink-0 items-center gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-8 max-w-48 gap-1.5 rounded-sm px-2.5 text-foreground/75 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
+        :title="t('app.navigation.back')"
+        :aria-label="t('app.navigation.back')"
+        @click="handleBack"
+      >
+        <ChevronLeft class="h-4 w-4 shrink-0" />
+        <span class="truncate text-xs font-medium">
+          {{ pageTitle }}
+        </span>
+      </Button>
+    </div>
+
     <!-- 可拖动区域 -->
     <div class="mt-1.5 h-full flex-1">
       <div class="drag-region h-full" />

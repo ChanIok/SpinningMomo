@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 import { CalendarDate } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
@@ -31,6 +33,7 @@ import {
   Images,
   LayoutGrid,
   List,
+  Map,
   Palette,
   Rows3,
   Search,
@@ -42,6 +45,8 @@ import {
   X,
 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
+import { useSettingsStore } from '@/features/settings/store'
+import { pushWithViewTransition } from '@/router/viewTransition'
 import { useGalleryView } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type {
@@ -61,8 +66,16 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const router = useRouter()
+const settingsStore = useSettingsStore()
 const store = useGalleryStore()
 const galleryView = useGalleryView()
+
+const showMapEntry = computed(() => settingsStore.appSettings.extensions.infinityNikki.enable)
+
+const handleOpenMap = () => {
+  void pushWithViewTransition(router, '/map')
+}
 
 const viewMode = computed(() => galleryView.viewMode.value)
 const sortBy = computed(() => galleryView.sortBy.value)
@@ -529,113 +542,147 @@ function onViewSizeSliderChange(value: number[] | undefined) {
         </div>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2">
-        <div
-          v-if="isWide"
-          class="mr-2 flex w-28 items-center"
-          :title="t('gallery.toolbar.thumbnailSize.label')"
-        >
-          <Slider
-            :model-value="[currentSliderPosition]"
-            @update:model-value="onViewSizeSliderChange"
-            :min="0"
-            :max="100"
-            :step="1"
-            class="w-full"
-          />
+      <TooltipProvider :delay-duration="300">
+        <div class="flex shrink-0 items-center gap-2">
+          <div
+            v-if="isWide"
+            class="mr-2 flex w-28 items-center"
+            :title="t('gallery.toolbar.thumbnailSize.label')"
+          >
+            <Slider
+              :model-value="[currentSliderPosition]"
+              @update:model-value="onViewSizeSliderChange"
+              :min="0"
+              :max="100"
+              :step="1"
+              class="w-full"
+            />
+          </div>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="inline-flex">
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="sidebarGhost" size="icon-sm">
+                      <ArrowUpDown class="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" class="w-48">
+                    <DropdownMenuLabel>{{ t('gallery.toolbar.sort.label') }}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      :model-value="sortBy"
+                      @update:model-value="onSortByChange"
+                    >
+                      <DropdownMenuRadioItem value="createdAt">
+                        <CalendarClock class="mr-2 h-4 w-4" />
+                        {{ t('gallery.toolbar.sort.createdAt') }}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="name">
+                        <Type class="mr-2 h-4 w-4" />
+                        {{ t('gallery.toolbar.sort.name') }}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="resolution">
+                        <span class="pl-8">{{ t('gallery.toolbar.sort.resolution') }}</span>
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="size">
+                        <span class="pl-8">{{ t('gallery.toolbar.sort.size') }}</span>
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="toggleSortOrder">
+                      <ArrowUpDown class="mr-2 h-4 w-4" />
+                      {{ sortOrderLabel }}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('gallery.toolbar.sort.label') }}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="inline-flex">
+                <Popover>
+                  <PopoverTrigger as-child>
+                    <Button variant="sidebarGhost" size="icon-sm">
+                      <component :is="currentViewModeIcon" class="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" class="w-72">
+                    <div class="space-y-6">
+                      <div class="space-y-3">
+                        <p class="text-sm font-medium">{{ t('gallery.toolbar.viewMode.label') }}</p>
+                        <div class="grid grid-cols-4 gap-2">
+                          <Button
+                            v-for="mode in viewModes"
+                            :key="mode.value"
+                            :variant="viewMode === mode.value ? 'default' : 'outline'"
+                            size="sm"
+                            class="flex h-auto flex-col items-center gap-1.5 py-3"
+                            @click="setViewMode(mode.value)"
+                          >
+                            <component :is="mode.icon" class="h-5 w-5" />
+                            <span class="text-xs">{{ t(mode.i18nKey) }}</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div v-if="!isWide" class="border-t" />
+
+                      <div v-if="!isWide" class="space-y-3">
+                        <p class="text-sm font-medium">
+                          {{ t('gallery.toolbar.thumbnailSize.label') }}
+                        </p>
+                        <Slider
+                          :model-value="[currentSliderPosition]"
+                          @update:model-value="onViewSizeSliderChange"
+                          :min="0"
+                          :max="100"
+                          :step="1"
+                          class="w-full"
+                        />
+                        <div class="flex justify-between text-xs">
+                          <span>{{ t('gallery.toolbar.thumbnailSize.fine') }}</span>
+                          <span>{{ t('gallery.toolbar.thumbnailSize.showcase') }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('gallery.toolbar.viewSettings.tooltip') }}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip v-if="showMapEntry">
+            <TooltipTrigger as-child>
+              <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenMap">
+                <Map class="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('app.navigation.map') }}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="sidebarGhost" size="icon-sm" @click="emit('open-preferences')">
+                <Settings class="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('gallery.preferences.open') }}
+            </TooltipContent>
+          </Tooltip>
         </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="sidebarGhost" size="icon-sm" :title="t('gallery.toolbar.sort.label')">
-              <ArrowUpDown class="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-48">
-            <DropdownMenuLabel>{{ t('gallery.toolbar.sort.label') }}</DropdownMenuLabel>
-            <DropdownMenuRadioGroup :model-value="sortBy" @update:model-value="onSortByChange">
-              <DropdownMenuRadioItem value="createdAt">
-                <CalendarClock class="mr-2 h-4 w-4" />
-                {{ t('gallery.toolbar.sort.createdAt') }}
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="name">
-                <Type class="mr-2 h-4 w-4" />
-                {{ t('gallery.toolbar.sort.name') }}
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="resolution">
-                <span class="pl-8">{{ t('gallery.toolbar.sort.resolution') }}</span>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="size">
-                <span class="pl-8">{{ t('gallery.toolbar.sort.size') }}</span>
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @click="toggleSortOrder">
-              <ArrowUpDown class="mr-2 h-4 w-4" />
-              {{ sortOrderLabel }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Popover>
-          <PopoverTrigger as-child>
-            <Button
-              variant="sidebarGhost"
-              size="icon-sm"
-              :title="t('gallery.toolbar.viewSettings.tooltip')"
-            >
-              <component :is="currentViewModeIcon" class="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" class="w-72">
-            <div class="space-y-6">
-              <div class="space-y-3">
-                <p class="text-sm font-medium">{{ t('gallery.toolbar.viewMode.label') }}</p>
-                <div class="grid grid-cols-4 gap-2">
-                  <Button
-                    v-for="mode in viewModes"
-                    :key="mode.value"
-                    :variant="viewMode === mode.value ? 'default' : 'outline'"
-                    size="sm"
-                    class="flex h-auto flex-col items-center gap-1.5 py-3"
-                    @click="setViewMode(mode.value)"
-                  >
-                    <component :is="mode.icon" class="h-5 w-5" />
-                    <span class="text-xs">{{ t(mode.i18nKey) }}</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div v-if="!isWide" class="border-t" />
-
-              <div v-if="!isWide" class="space-y-3">
-                <p class="text-sm font-medium">{{ t('gallery.toolbar.thumbnailSize.label') }}</p>
-                <Slider
-                  :model-value="[currentSliderPosition]"
-                  @update:model-value="onViewSizeSliderChange"
-                  :min="0"
-                  :max="100"
-                  :step="1"
-                  class="w-full"
-                />
-                <div class="flex justify-between text-xs">
-                  <span>{{ t('gallery.toolbar.thumbnailSize.fine') }}</span>
-                  <span>{{ t('gallery.toolbar.thumbnailSize.showcase') }}</span>
-                </div>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Button
-          variant="sidebarGhost"
-          size="icon-sm"
-          :title="t('gallery.preferences.open')"
-          @click="emit('open-preferences')"
-        >
-          <Settings class="h-4 w-4" />
-        </Button>
-      </div>
+      </TooltipProvider>
     </div>
 
     <div class="flex min-h-10 items-center gap-1.5 overflow-x-hidden px-2 pb-1.5">

@@ -35,10 +35,10 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       v-bind="{ ...forwarded, ...$attrs }"
       :class="
         cn(
-          'pointer-events-none z-50 w-fit animate-in rounded-md px-3 py-1.5 text-xs text-balance fade-in-0 select-none zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+          'z-50 w-fit animate-in rounded-md px-3 py-1.5 text-xs text-balance fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           props.variant === 'sidebar'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'bg-primary text-primary-foreground',
+            ? 'bg-background text-foreground dark:bg-foreground dark:text-background'
+            : 'bg-foreground text-background',
           props.class
         )
       "
@@ -46,8 +46,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       <slot />
 
       <TooltipArrow
-        class="z-50"
-        :class="props.variant === 'sidebar' ? 'fill-background' : 'fill-primary'"
+        class="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-xs"
+        :class="
+          props.variant === 'sidebar'
+            ? 'bg-background fill-background dark:bg-foreground dark:fill-foreground'
+            : 'bg-foreground fill-foreground'
+        "
       />
     </TooltipContent>
   </TooltipPortal>

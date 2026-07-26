@@ -248,10 +248,6 @@
   transition: opacity 220ms ease;
 }
 
-.app-background-overlay-home-clip {
-  clip-path: inset(0 calc(100% - 3.5rem) 0 0);
-}
-
 .route-scene {
   view-transition-name: route-scene;
 }

@@ -9,6 +9,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
@@ -53,7 +54,13 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     @click="assetActions.copySelectedAssetTags"
   >
     {{ t('gallery.contextMenu.copyTags.label') }}
-    <DropdownMenuShortcut>Ctrl+Shift+C</DropdownMenuShortcut>
+    <DropdownMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>Shift</Kbd>
+        <Kbd>C</Kbd>
+      </KbdGroup>
+    </DropdownMenuShortcut>
   </DropdownMenuItem>
   <DropdownMenuItem
     inset
@@ -61,7 +68,13 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     @click="assetActions.pasteCopiedTagsToSelection"
   >
     {{ t('gallery.contextMenu.pasteTags.label') }}
-    <DropdownMenuShortcut>Ctrl+Shift+V</DropdownMenuShortcut>
+    <DropdownMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>Shift</Kbd>
+        <Kbd>V</Kbd>
+      </KbdGroup>
+    </DropdownMenuShortcut>
   </DropdownMenuItem>
   <DropdownMenuSeparator />
   <DropdownMenuSub>
@@ -77,13 +90,17 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
         <span class="flex items-center gap-0.5 text-muted-foreground">
           <Star v-for="index in rating" :key="`${rating}-${index}`" class="fill-current" />
         </span>
-        <DropdownMenuShortcut>{{ rating }}</DropdownMenuShortcut>
+        <DropdownMenuShortcut>
+          <Kbd>{{ rating }}</Kbd>
+        </DropdownMenuShortcut>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="assetActions.clearSelectedAssetsRating">
         <Eraser />
         {{ t('gallery.contextMenu.review.rating.clear') }}
-        <DropdownMenuShortcut>0</DropdownMenuShortcut>
+        <DropdownMenuShortcut>
+          <Kbd>0</Kbd>
+        </DropdownMenuShortcut>
       </DropdownMenuItem>
     </DropdownMenuSubContent>
   </DropdownMenuSub>
@@ -95,7 +112,9 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
       <DropdownMenuItem @click="assetActions.setSelectedAssetsRejected()">
         <X />
         {{ t('gallery.review.flag.rejected') }}
-        <DropdownMenuShortcut>X</DropdownMenuShortcut>
+        <DropdownMenuShortcut>
+          <Kbd>X</Kbd>
+        </DropdownMenuShortcut>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="assetActions.clearSelectedAssetsRejected">

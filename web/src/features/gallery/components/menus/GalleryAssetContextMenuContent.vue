@@ -9,6 +9,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from '@/components/ui/context-menu'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
@@ -53,7 +54,13 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     @click="assetActions.copySelectedAssetTags"
   >
     {{ t('gallery.contextMenu.copyTags.label') }}
-    <ContextMenuShortcut>Ctrl+Shift+C</ContextMenuShortcut>
+    <ContextMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>Shift</Kbd>
+        <Kbd>C</Kbd>
+      </KbdGroup>
+    </ContextMenuShortcut>
   </ContextMenuItem>
   <ContextMenuItem
     inset
@@ -61,7 +68,13 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
     @click="assetActions.pasteCopiedTagsToSelection"
   >
     {{ t('gallery.contextMenu.pasteTags.label') }}
-    <ContextMenuShortcut>Ctrl+Shift+V</ContextMenuShortcut>
+    <ContextMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>Shift</Kbd>
+        <Kbd>V</Kbd>
+      </KbdGroup>
+    </ContextMenuShortcut>
   </ContextMenuItem>
   <ContextMenuSeparator />
   <ContextMenuSub>
@@ -77,13 +90,17 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
         <span class="flex items-center gap-0.5">
           <Star v-for="index in rating" :key="`${rating}-${index}`" class="fill-current" />
         </span>
-        <ContextMenuShortcut>{{ rating }}</ContextMenuShortcut>
+        <ContextMenuShortcut>
+          <Kbd>{{ rating }}</Kbd>
+        </ContextMenuShortcut>
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem @click="assetActions.clearSelectedAssetsRating">
         <Eraser />
         {{ t('gallery.contextMenu.review.rating.clear') }}
-        <ContextMenuShortcut>0</ContextMenuShortcut>
+        <ContextMenuShortcut>
+          <Kbd>0</Kbd>
+        </ContextMenuShortcut>
       </ContextMenuItem>
     </ContextMenuSubContent>
   </ContextMenuSub>
@@ -95,7 +112,9 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
       <ContextMenuItem @click="assetActions.setSelectedAssetsRejected()">
         <X />
         {{ t('gallery.review.flag.rejected') }}
-        <ContextMenuShortcut>X</ContextMenuShortcut>
+        <ContextMenuShortcut>
+          <Kbd>X</Kbd>
+        </ContextMenuShortcut>
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem @click="assetActions.clearSelectedAssetsRejected">

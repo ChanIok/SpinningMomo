@@ -698,9 +698,10 @@ defineExpose({
   <div class="relative h-full w-full">
     <button
       v-if="canGoToPrevious"
-      class="surface-top absolute top-1/2 left-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-all"
+      class="surface-top absolute top-1/2 left-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
+      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
       @click="handlePrevious"
-      :title="t('gallery.lightbox.image.previousTitle')"
+      :aria-label="t('gallery.lightbox.image.previousTitle')"
     >
       <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -769,9 +770,10 @@ defineExpose({
 
     <button
       v-if="canGoToNext"
-      class="surface-top absolute top-1/2 right-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-all"
+      class="surface-top absolute top-1/2 right-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
+      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
       @click="handleNext"
-      :title="t('gallery.lightbox.image.nextTitle')"
+      :aria-label="t('gallery.lightbox.image.nextTitle')"
     >
       <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

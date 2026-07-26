@@ -41,3 +41,43 @@ export function pushWithViewTransition(router: Router, to: RouteLocationRaw) {
     await transition.finished.catch(() => undefined)
   })
 }
+
+function hasBackEntry(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const state = window.history.state as { back?: unknown } | null
+  return typeof state?.back === 'string'
+}
+
+function navigateBack(router: Router, fallback: RouteLocationRaw): Promise<void> {
+  if (!hasBackEntry()) {
+    return router.push(fallback).then(() => undefined)
+  }
+
+  return new Promise<void>((resolve) => {
+    const removeAfterEach = router.afterEach(() => {
+      removeAfterEach()
+      resolve()
+    })
+    router.back()
+  })
+}
+
+export function backWithViewTransition(router: Router, fallback: RouteLocationRaw) {
+  return enqueueTransition(async () => {
+    const doc =
+      typeof document !== 'undefined' ? (document as DocumentWithViewTransition) : undefined
+    if (!doc?.startViewTransition) {
+      await navigateBack(router, fallback)
+      return
+    }
+
+    const transition = doc.startViewTransition(async () => {
+      await navigateBack(router, fallback)
+    })
+
+    await transition.finished.catch(() => undefined)
+  })
+}

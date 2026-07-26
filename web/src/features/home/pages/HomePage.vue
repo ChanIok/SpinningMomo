@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { FolderOpen } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Images, Info, Settings } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { useI18n } from '@/composables/useI18n'
-import { useToast } from '@/composables/useToast'
 import { galleryApi } from '@/features/gallery/api'
 import type { HomeStats } from '@/features/gallery/types'
 import { formatFileSize } from '@/lib/utils'
-import { featuresApi } from '@/features/settings/featuresApi'
 import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
+import { pushWithViewTransition } from '@/router/viewTransition'
 import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
 
 const { t, locale } = useI18n()
-const { toast } = useToast()
+const router = useRouter()
 const settingsStore = useSettingsStore()
 
 const showMomoOutline = computed(
@@ -22,7 +23,6 @@ const showMomoOutline = computed(
 
 const HOME_STATS_REFRESH_DEBOUNCE_MS = 400
 
-const isOpening = ref(false)
 const hasLoadedHomeStats = ref(false)
 const homeStats = ref<HomeStats>({
   totalCount: 0,
@@ -98,19 +98,30 @@ const galleryChangedHandler = () => {
   scheduleHomeStatsRefresh()
 }
 
-const handleOpenOutputDirectory = async () => {
-  if (isOpening.value) return
-
-  isOpening.value = true
-  try {
-    await featuresApi.invoke('output.open_folder')
-  } catch (error) {
-    console.error('Failed to open output directory:', error)
-    toast.error(t('home.outputDir.openFailed'))
-  } finally {
-    isOpening.value = false
-  }
+const handleOpenPage = (name: 'gallery' | 'settings' | 'about') => {
+  void pushWithViewTransition(router, { name })
 }
+
+const navActions = computed(() => [
+  {
+    key: 'gallery',
+    label: t('app.navigation.gallery'),
+    icon: Images,
+    action: () => handleOpenPage('gallery'),
+  },
+  {
+    key: 'settings',
+    label: t('app.navigation.settings'),
+    icon: Settings,
+    action: () => handleOpenPage('settings'),
+  },
+  {
+    key: 'about',
+    label: t('app.navigation.about'),
+    icon: Info,
+    action: () => handleOpenPage('about'),
+  },
+])
 
 onMounted(() => {
   void refreshHomeStats()
@@ -125,7 +136,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full overflow-hidden">
+  <div class="relative h-full w-full overflow-hidden select-none">
+    <!-- 大喵插画背景 -->
     <div
       v-if="showMomoOutline"
       class="pointer-events-none absolute top-10 right-10 bottom-6 z-0 w-auto max-w-full text-white select-none dark:text-white/50"
@@ -137,114 +149,108 @@ onUnmounted(() => {
       ></div>
     </div>
 
-    <div
-      v-if="hasLoadedHomeStats"
-      class="pointer-events-none absolute bottom-8 left-8 z-20 animate-in duration-600 fade-in-0"
-    >
+    <!-- 1. 左上角：品牌 Header 水印 + 垂直导航工具栏 -->
+    <div class="absolute top-8 left-8 z-20 flex flex-col items-start gap-14">
+      <div class="pointer-events-none flex flex-col">
+        <h1 class="text-sm font-medium tracking-[0.3em] text-foreground/90 uppercase">
+          Spinning Momo
+        </h1>
+        <p class="mt-1 text-[0.7rem] font-light tracking-[0.22em] text-foreground/50 uppercase">
+          Infinity Record
+        </p>
+      </div>
+
+      <TooltipProvider>
+        <div class="flex flex-col items-start gap-3">
+          <Tooltip v-for="item in navActions" :key="item.key">
+            <TooltipTrigger as-child>
+              <div class="relative shrink-0 overflow-hidden rounded-md backdrop-blur-md">
+                <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
+                <div
+                  class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"
+                ></div>
+
+                <button
+                  type="button"
+                  class="relative z-10 flex h-12 w-12 items-center justify-center text-foreground/75 transition-colors hover:bg-black/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10"
+                  :disabled="item.disabled"
+                  @click="item.action"
+                >
+                  <component
+                    :is="item.icon"
+                    class="h-5 w-5"
+                    :class="item.animate ? 'animate-pulse' : ''"
+                    :stroke-width="1.7"
+                  />
+                </button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" variant="sidebar">
+              {{ item.label }}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+    </div>
+
+    <!-- 2. 左下角：数据概览卡片 (HUD Corner Widget) -->
+    <div class="absolute bottom-8 left-8 z-20 animate-in duration-300 fade-in-0">
       <div class="relative overflow-hidden rounded-md backdrop-blur-md">
-        <!-- Base Backgrounds -->
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
 
-        <div class="relative z-20 flex min-w-[240px] flex-col p-6">
-          <!-- Brand Header -->
-          <div class="mb-4 flex flex-col">
-            <h2 class="text-xs font-medium tracking-[0.3em] text-foreground/90 uppercase">
-              Spinning Momo
-            </h2>
-            <p class="mt-1 text-[0.65rem] font-light tracking-[0.2em] text-foreground/50 uppercase">
-              Infinity Record
-            </p>
-          </div>
-
-          <!-- Divider -->
-          <div class="mb-5 h-[1px] w-full bg-foreground/10"></div>
-
-          <!-- Stats Grid -->
-          <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+        <div class="relative z-10 p-5">
+          <div class="flex items-center gap-6">
             <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
-                >Photos</span
-              >
-              <span class="text-sm font-medium tracking-wider text-foreground/90">{{
-                formattedPhotoCount
-              }}</span>
+              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+                Photos
+              </span>
+              <span class="text-sm font-medium tracking-wider text-foreground/90">
+                {{ hasLoadedHomeStats ? formattedPhotoCount : '—' }}
+              </span>
             </div>
 
-            <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
-                >Storage</span
-              >
-              <span class="text-sm font-medium tracking-wider text-foreground/90">{{
-                formattedTotalSize
-              }}</span>
-            </div>
+            <template v-if="videoCount > 0">
+              <div class="h-6 w-px bg-foreground/10"></div>
+              <div class="flex flex-col gap-0.5">
+                <span
+                  class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
+                >
+                  Videos
+                </span>
+                <span class="text-sm font-medium tracking-wider text-foreground/90">
+                  {{ hasLoadedHomeStats ? formattedVideoCount : '—' }}
+                </span>
+              </div>
+            </template>
 
-            <div v-if="videoCount > 0" class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
-                >Videos</span
-              >
-              <span class="text-sm font-medium tracking-wider text-foreground/90">{{
-                formattedVideoCount
-              }}</span>
-            </div>
+            <div class="h-6 w-px bg-foreground/10"></div>
 
             <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
-                >Today</span
-              >
+              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+                Storage
+              </span>
+              <span class="text-sm font-medium tracking-wider text-foreground/90">
+                {{ hasLoadedHomeStats ? formattedTotalSize : '—' }}
+              </span>
+            </div>
+
+            <div class="h-6 w-px bg-foreground/10"></div>
+
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+                Today
+              </span>
               <span
                 class="text-sm font-medium tracking-wider"
                 :class="homeStats.todayAddedCount > 0 ? 'text-primary/90' : 'text-foreground/90'"
               >
-                {{ formattedTodayAdded }}
+                {{ hasLoadedHomeStats ? formattedTodayAdded : '—' }}
               </span>
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="group absolute right-8 bottom-8 z-20 flex flex-col items-end gap-3">
-      <!-- Tooltip Label -->
-      <div
-        class="pointer-events-none rounded-md px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:-translate-y-1 group-hover:opacity-100"
-      >
-        <div
-          class="app-background-overlay pointer-events-none absolute inset-0 z-0 rounded-md"
-        ></div>
-        <div
-          class="surface-middle pointer-events-none absolute inset-0 z-0 rounded-md opacity-90"
-        ></div>
-        <span
-          class="relative z-10 text-[0.65rem] font-medium tracking-widest text-foreground/80 uppercase"
-        >
-          Open Folder
-        </span>
-      </div>
-
-      <!-- Square Shutter Button -->
-      <button
-        class="relative flex h-[52px] w-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-md backdrop-blur-md transition-all duration-300 focus:outline-none"
-        :disabled="isOpening"
-        @click="handleOpenOutputDirectory"
-      >
-        <!-- Base Backgrounds -->
-        <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
-        <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
-
-        <!-- Hover Overlay -->
-        <div
-          class="pointer-events-none absolute inset-0 z-10 bg-foreground/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        ></div>
-
-        <!-- Icon -->
-        <FolderOpen
-          class="relative z-20 h-5 w-5 text-foreground/70 transition-all duration-300 group-hover:text-foreground"
-          :class="isOpening ? 'animate-pulse' : ''"
-          stroke-width="1.5"
-        />
-      </button>
     </div>
   </div>
 </template>

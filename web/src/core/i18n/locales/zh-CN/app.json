@@ -25,5 +25,11 @@
   "app.header.tasks.type.infinityNikkiInitialScan": "暖暖相册首次扫描",
   "app.header.tasks.type.infinityNikkiInitMediaHardlinks": "Infinity Nikki 媒体硬链接初始化",
   "app.header.tasks.type.updateDownload": "应用更新下载",
-  "app.name": "旋转吧大喵"
+  "app.name": "旋转吧大喵",
+  "app.navigation.about": "关于",
+  "app.navigation.back": "返回上一页",
+  "app.navigation.gallery": "图库",
+  "app.navigation.homeDock": "主要功能",
+  "app.navigation.map": "地图",
+  "app.navigation.settings": "设置"
 }
