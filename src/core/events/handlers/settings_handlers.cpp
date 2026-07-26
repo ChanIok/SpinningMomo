@@ -128,9 +128,6 @@ auto handle_settings_changed(core::AppState& state,
   try {
     Logger().info("Settings changed: {}", event.data.change_description);
 
-    auto output_directory_changed = event.data.old_settings.features.output_dir_path !=
-                                    event.data.new_settings.features.output_dir_path;
-
     if (has_language_changes(event.data.old_settings, event.data.new_settings)) {
       apply_runtime_language_from_settings(state, event.data.new_settings);
     }
@@ -150,9 +147,6 @@ auto handle_settings_changed(core::AppState& state,
           state, event.data.new_settings.features.output_dir_path);
       ui::floating_window::show_window(state);
       auto _ = ui::webview_window::close_window(state);
-    } else if (output_directory_changed) {
-      features::gallery::ensure_output_directory_media_source(
-          state, event.data.new_settings.features.output_dir_path);
     }
 
     if (has_hotkey_changes(event.data.old_settings, event.data.new_settings)) {

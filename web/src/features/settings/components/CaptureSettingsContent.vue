@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Item,
   ItemContent,
   ItemTitle,
@@ -27,6 +37,7 @@ import { useToast } from '@/composables/useToast'
 import { TriangleAlert, RotateCcw } from 'lucide-vue-next'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
+import { galleryApi } from '@/features/gallery/api'
 
 const store = useSettingsStore()
 const { appSettings, runtimeCapabilities, error, isInitialized } = storeToRefs(store)
@@ -85,6 +96,9 @@ const isPathWithinBase = (target: string, base: string): boolean => {
 }
 
 const isSelectingOutputDir = ref(false)
+const isAddingOutputDirToGallery = ref(false)
+const isOutputDirGalleryDialogOpen = ref(false)
+const pendingOutputDir = ref('')
 const isSelectingGameAlbumDir = ref(false)
 const inputBitrateMbps = ref(
   (appSettings.value?.features?.recording?.bitrate || 80000000) / 1000000
@@ -150,6 +164,8 @@ const handleSelectOutputDir = async () => {
     }
 
     await updateOutputDir(result.path)
+    pendingOutputDir.value = result.path
+    isOutputDirGalleryDialogOpen.value = true
   } catch (error) {
     console.error('Failed to select output directory:', error)
     toast.error(t('settings.function.error.title'), {
@@ -159,6 +175,33 @@ const handleSelectOutputDir = async () => {
     clearError()
   } finally {
     isSelectingOutputDir.value = false
+  }
+}
+
+const handleAddOutputDirToGallery = async (event: Event) => {
+  event.preventDefault()
+  const outputDir = pendingOutputDir.value
+  if (!outputDir) return
+
+  isAddingOutputDirToGallery.value = true
+  try {
+    await galleryApi.startScanAssets({ directory: outputDir })
+    isOutputDirGalleryDialogOpen.value = false
+    pendingOutputDir.value = ''
+  } catch (error) {
+    toast.error(t('settings.function.outputDir.galleryDialog.addFailedTitle'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
+  } finally {
+    isAddingOutputDirToGallery.value = false
+  }
+}
+
+const handleOutputDirGalleryDialogOpenChange = (open: boolean) => {
+  if (isAddingOutputDirToGallery.value) return
+  isOutputDirGalleryDialogOpen.value = open
+  if (!open) {
+    pendingOutputDir.value = ''
   }
 }
 
@@ -237,6 +280,33 @@ const handleResetSettings = async () => {
   </div>
 
   <div v-else class="w-full">
+    <AlertDialog
+      :open="isOutputDirGalleryDialogOpen"
+      @update:open="handleOutputDirGalleryDialogOpenChange"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{ t('settings.function.outputDir.galleryDialog.title') }}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('settings.function.outputDir.galleryDialog.description') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isAddingOutputDirToGallery">
+            {{ t('settings.function.outputDir.galleryDialog.cancel') }}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            :disabled="isAddingOutputDirToGallery"
+            @click="handleAddOutputDirToGallery"
+          >
+            {{ t('settings.function.outputDir.galleryDialog.add') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <div class="space-y-8">
       <div class="space-y-4">
         <div>
