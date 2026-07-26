@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 import { CalendarDate } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
@@ -111,6 +112,16 @@ const draftDateRange = shallowRef<DateRange>({ start: undefined, end: undefined 
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
 const isWide = computed(() => toolbarWidth.value >= 720)
+const isFilterCompact = computed(() => toolbarWidth.value > 0 && toolbarWidth.value < 480)
+
+const filterScrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
+
+function handleFilterWheel(event: WheelEvent) {
+  const el = filterScrollAreaRef.value?.viewportElement
+  if (el && el.scrollWidth > el.clientWidth) {
+    el.scrollLeft += event.deltaY
+  }
+}
 
 const hasAttributeFilters = computed(
   () =>
@@ -692,342 +703,459 @@ function onViewSizeSliderChange(value: number[] | undefined) {
       </TooltipProvider>
     </div>
 
-    <div class="flex min-h-10 items-center gap-1.5 overflow-x-hidden px-2 pb-1.5">
-      <Popover>
-        <PopoverTrigger as-child>
-          <Button
-            :variant="searchQuery ? 'toolbarFilterActive' : 'toolbarFilter'"
-            size="filter-sm"
-            class="has-[>svg]:!pl-2"
-          >
-            <Search class="h-4 w-4" />
-            <span class="min-w-0 truncate">
-              {{ searchQuery || t('gallery.toolbar.filters.keyword') }}
-            </span>
-            <span
-              v-if="searchQuery"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearSearchFromTrigger"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" class="w-72 p-3">
-          <div class="space-y-2">
-            <p class="text-xs font-medium">{{ t('gallery.toolbar.filters.keyword') }}</p>
-            <div class="relative">
-              <Search class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
-              <Input
-                :model-value="searchQuery"
-                @update:model-value="updateSearchQuery"
-                :placeholder="t('gallery.toolbar.search.placeholder')"
-                class="h-8 pr-8 pl-9"
-              />
-              <Button
-                v-if="searchQuery"
-                type="button"
-                variant="sidebarGhost"
-                size="icon-xs"
-                class="absolute top-1/2 right-1.5 -translate-y-1/2"
-                @click="clearSearch"
-              >
-                <X class="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <Popover v-model:open="datePopoverOpen">
-        <PopoverTrigger as-child>
-          <Button
-            :variant="hasDisplayDateRange ? 'toolbarFilterActive' : 'toolbarFilter'"
-            size="filter-sm"
-          >
-            <CalendarClock class="h-4 w-4" />
-            <span class="min-w-0 truncate">{{ displayDateFilterLabel }}</span>
-            <span
-              v-if="hasDisplayDateRange"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearDateFilter"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          class="w-auto p-3"
-          @focus-outside="keepDatePopoverForCalendarSelect"
-          @interact-outside="keepDatePopoverForCalendarSelect"
-        >
-          <div class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <div class="min-w-0">
-                <p class="text-xs font-medium">{{ t('gallery.toolbar.dateFilter.title') }}</p>
-                <p class="truncate text-[11px] text-muted-foreground">
-                  {{ displayDateFilterLabel }}
-                </p>
-              </div>
-            </div>
-
-            <RangeCalendar
-              :model-value="draftDateRange"
-              @update:model-value="onDateRangeChange"
-              :locale="locale"
-              initial-focus
-              class="p-0"
-            />
-
-            <div class="flex justify-end gap-2">
-              <Button variant="outline" size="sm" class="h-7 px-3 text-xs" @click="clearDateFilter">
-                {{ t('gallery.toolbar.dateFilter.clear') }}
-              </Button>
-              <Button size="sm" class="h-7 px-3 text-xs" @click="applyDateFilter">
-                {{ t('gallery.toolbar.dateFilter.apply') }}
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <Popover v-model:open="colorPopoverOpen">
-        <PopoverTrigger as-child>
-          <Button
-            :variant="activeColorHex ? 'toolbarFilterActive' : 'toolbarFilter'"
-            size="filter-sm"
-          >
-            <Palette class="h-4 w-4" />
-            <span
-              v-if="activeColorHex"
-              class="h-3.5 w-3.5 shrink-0 rounded-full border border-foreground/50"
-              :style="{ backgroundColor: activeColorHex }"
-            />
-            <span class="min-w-0 truncate">
-              {{ activeColorHex || t('gallery.toolbar.filters.color') }}
-            </span>
-            <span
-              v-if="activeColorHex"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearColorFilter"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" class="w-auto p-3">
-          <div class="w-[220px] space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex min-w-0 items-center gap-2">
-                <div
-                  class="h-5 w-5 shrink-0 rounded border border-border/80"
-                  :style="{ backgroundColor: activeColorHex || draftColorHex }"
-                />
-                <div class="min-w-0">
-                  <p class="text-xs font-medium">{{ t('gallery.toolbar.colorFilter.title') }}</p>
-                  <p class="truncate font-mono text-[11px]">
-                    {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
-                  </p>
-                </div>
-              </div>
-              <Button
-                v-if="activeColorHex"
-                variant="sidebarGhost"
-                size="sm"
-                class="h-7 px-2 text-xs"
-                @click="clearColorFilter"
-              >
-                {{ t('gallery.toolbar.colorFilter.clear') }}
-              </Button>
-            </div>
-
-            <ColorPicker
-              :model-value="draftColorHex"
-              @update:model-value="(color) => (draftColorHex = color)"
-            />
-
-            <div class="space-y-1">
-              <p class="text-xs font-medium">
-                {{ t('gallery.toolbar.colorFilter.distance.label') }}
-              </p>
-              <div class="flex justify-end">
-                <span class="font-mono text-[11px]">
-                  {{ draftColorDistance }}
+    <div class="flex min-h-10 items-center justify-between gap-1.5 px-2 pb-1.5">
+      <ScrollArea ref="filterScrollAreaRef" class="min-w-0 flex-1" @wheel="handleFilterWheel">
+        <TooltipProvider :delay-duration="300">
+          <div class="flex items-center gap-1.5 py-0.5 pr-2">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <Popover>
+                    <PopoverTrigger as-child>
+                      <Button
+                        :variant="searchQuery ? 'toolbarFilterActive' : 'toolbarFilter'"
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                        :class="{ 'has-[>svg]:!pl-2': !isFilterCompact }"
+                      >
+                        <Search class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">
+                            {{ searchQuery || t('gallery.toolbar.filters.keyword') }}
+                          </span>
+                          <span
+                            v-if="searchQuery"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearSearchFromTrigger"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-72 p-3">
+                      <div class="space-y-2">
+                        <p class="text-xs font-medium">
+                          {{ t('gallery.toolbar.filters.keyword') }}
+                        </p>
+                        <div class="relative">
+                          <Search class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+                          <Input
+                            :model-value="searchQuery"
+                            @update:model-value="updateSearchQuery"
+                            :placeholder="t('gallery.toolbar.search.placeholder')"
+                            class="h-8 pr-8 pl-9"
+                          />
+                          <Button
+                            v-if="searchQuery"
+                            type="button"
+                            variant="sidebarGhost"
+                            size="icon-xs"
+                            class="absolute top-1/2 right-1.5 -translate-y-1/2"
+                            @click="clearSearch"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </span>
-              </div>
-              <Slider
-                :model-value="[draftColorDistance]"
-                @update:model-value="onColorDistanceChange"
-                :min="COLOR_DISTANCE_MIN"
-                :max="COLOR_DISTANCE_MAX"
-                :step="1"
-                class="w-full"
-              />
-            </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  searchQuery
+                    ? `${t('gallery.toolbar.filters.keyword')}: ${searchQuery}`
+                    : t('gallery.toolbar.filters.keyword')
+                }}
+              </TooltipContent>
+            </Tooltip>
 
-            <div class="flex justify-end">
-              <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
-                {{ t('gallery.toolbar.colorFilter.apply') }}
-              </Button>
-            </div>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <Popover v-model:open="datePopoverOpen">
+                    <PopoverTrigger as-child>
+                      <Button
+                        :variant="hasDisplayDateRange ? 'toolbarFilterActive' : 'toolbarFilter'"
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <CalendarClock class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">{{ displayDateFilterLabel }}</span>
+                          <span
+                            v-if="hasDisplayDateRange"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearDateFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      class="w-auto p-3"
+                      @focus-outside="keepDatePopoverForCalendarSelect"
+                      @interact-outside="keepDatePopoverForCalendarSelect"
+                    >
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="text-xs font-medium">
+                              {{ t('gallery.toolbar.dateFilter.title') }}
+                            </p>
+                            <p class="truncate text-[11px] text-muted-foreground">
+                              {{ displayDateFilterLabel }}
+                            </p>
+                          </div>
+                        </div>
+
+                        <RangeCalendar
+                          :model-value="draftDateRange"
+                          @update:model-value="onDateRangeChange"
+                          :locale="locale"
+                          initial-focus
+                          class="p-0"
+                        />
+
+                        <div class="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-7 px-3 text-xs"
+                            @click="clearDateFilter"
+                          >
+                            {{ t('gallery.toolbar.dateFilter.clear') }}
+                          </Button>
+                          <Button size="sm" class="h-7 px-3 text-xs" @click="applyDateFilter">
+                            {{ t('gallery.toolbar.dateFilter.apply') }}
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  hasDisplayDateRange
+                    ? `${t('gallery.toolbar.filters.date')}: ${displayDateFilterLabel}`
+                    : t('gallery.toolbar.filters.date')
+                }}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <Popover v-model:open="colorPopoverOpen">
+                    <PopoverTrigger as-child>
+                      <Button
+                        :variant="activeColorHex ? 'toolbarFilterActive' : 'toolbarFilter'"
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <Palette class="h-4 w-4" />
+                        <span
+                          v-if="activeColorHex"
+                          class="h-3.5 w-3.5 shrink-0 rounded-full border border-foreground/50"
+                          :style="{ backgroundColor: activeColorHex }"
+                        />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">
+                            {{ activeColorHex || t('gallery.toolbar.filters.color') }}
+                          </span>
+                          <span
+                            v-if="activeColorHex"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearColorFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-auto p-3">
+                      <div class="w-[220px] space-y-3">
+                        <div class="flex items-center justify-between gap-3">
+                          <div class="flex min-w-0 items-center gap-2">
+                            <div
+                              class="h-5 w-5 shrink-0 rounded border border-border/80"
+                              :style="{ backgroundColor: activeColorHex || draftColorHex }"
+                            />
+                            <div class="min-w-0">
+                              <p class="text-xs font-medium">
+                                {{ t('gallery.toolbar.colorFilter.title') }}
+                              </p>
+                              <p class="truncate font-mono text-[11px]">
+                                {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            v-if="activeColorHex"
+                            variant="sidebarGhost"
+                            size="sm"
+                            class="h-7 px-2 text-xs"
+                            @click="clearColorFilter"
+                          >
+                            {{ t('gallery.toolbar.colorFilter.clear') }}
+                          </Button>
+                        </div>
+
+                        <ColorPicker
+                          :model-value="draftColorHex"
+                          @update:model-value="(color) => (draftColorHex = color)"
+                        />
+
+                        <div class="space-y-1">
+                          <p class="text-xs font-medium">
+                            {{ t('gallery.toolbar.colorFilter.distance.label') }}
+                          </p>
+                          <div class="flex justify-end">
+                            <span class="font-mono text-[11px]">
+                              {{ draftColorDistance }}
+                            </span>
+                          </div>
+                          <Slider
+                            :model-value="[draftColorDistance]"
+                            @update:model-value="onColorDistanceChange"
+                            :min="COLOR_DISTANCE_MIN"
+                            :max="COLOR_DISTANCE_MAX"
+                            :step="1"
+                            class="w-full"
+                          />
+                        </div>
+
+                        <div class="flex justify-end">
+                          <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
+                            {{ t('gallery.toolbar.colorFilter.apply') }}
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  activeColorHex
+                    ? `${t('gallery.toolbar.filters.color')}: ${activeColorHex}`
+                    : t('gallery.toolbar.filters.color')
+                }}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button
+                        :variant="filter.type ? 'toolbarFilterActive' : 'toolbarFilter'"
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <Video v-if="filter.type === 'video'" class="h-4 w-4" />
+                        <Image v-else class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">{{ typeFilterLabel }}</span>
+                          <span
+                            v-if="filter.type"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearTypeFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" class="w-48">
+                      <DropdownMenuRadioGroup
+                        :model-value="filter.type || 'all'"
+                        @update:model-value="onTypeFilterChange"
+                      >
+                        <DropdownMenuRadioItem value="all">
+                          {{ t('gallery.toolbar.filter.type.all') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="photo">
+                          <Image class="mr-2 h-4 w-4" />
+                          {{ t('gallery.toolbar.filter.type.photo') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="video">
+                          <Video class="mr-2 h-4 w-4" />
+                          {{ t('gallery.toolbar.filter.type.video') }}
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  filter.type
+                    ? `${t('gallery.toolbar.filters.fileType')}: ${typeFilterLabel}`
+                    : t('gallery.toolbar.filters.fileType')
+                }}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <Popover>
+                    <PopoverTrigger as-child>
+                      <Button
+                        :variant="
+                          selectedRatings.length > 0 ? 'toolbarFilterActive' : 'toolbarFilter'
+                        "
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <Star class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">{{ ratingFilterLabel }}</span>
+                          <span
+                            v-if="selectedRatings.length > 0"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearRatingFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-48 p-2">
+                      <div class="space-y-1">
+                        <button
+                          v-for="rating in [5, 4, 3, 2, 1, 0]"
+                          :key="rating"
+                          type="button"
+                          role="checkbox"
+                          :aria-checked="isRatingSelected(rating)"
+                          class="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
+                          @click="toggleRatingFilter(rating)"
+                        >
+                          <Checkbox
+                            as="span"
+                            :model-value="isRatingSelected(rating)"
+                            class="pointer-events-none"
+                          />
+                          <span class="flex min-w-0 items-center gap-0.5">
+                            <Star
+                              v-for="s in STARS"
+                              :key="s"
+                              class="h-3.5 w-3.5 transition-colors"
+                              :class="
+                                rating > 0 && s <= rating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-foreground/40'
+                              "
+                            />
+                          </span>
+                        </button>
+
+                        <div v-if="selectedRatings.length > 0" class="border-t pt-1">
+                          <button
+                            type="button"
+                            class="relative flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
+                            @click="clearRatingFilter"
+                          >
+                            {{ t('gallery.toolbar.filter.rating.clear') }}
+                          </button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  selectedRatings.length > 0
+                    ? `${t('gallery.toolbar.filters.rating')}: ${ratingFilterLabel}`
+                    : t('gallery.toolbar.filters.rating')
+                }}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button
+                        :variant="
+                          filter.reviewFlag !== undefined ? 'toolbarFilterActive' : 'toolbarFilter'
+                        "
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <Flag class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">{{ reviewFlagFilterLabel }}</span>
+                          <span
+                            v-if="filter.reviewFlag !== undefined"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearReviewFlagFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" class="w-44">
+                      <DropdownMenuRadioGroup
+                        :model-value="filter.reviewFlag || 'all'"
+                        @update:model-value="onReviewFlagChange"
+                      >
+                        <DropdownMenuRadioItem value="all">
+                          {{ t('gallery.toolbar.filter.flag.all') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="rejected">
+                          <X class="mr-2 h-4 w-4" />
+                          {{ t('gallery.toolbar.filter.flag.rejected') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="none">
+                          <Flag class="mr-2 h-4 w-4" />
+                          {{ t('gallery.toolbar.filter.flag.none') }}
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{
+                  filter.reviewFlag !== undefined
+                    ? `${t('gallery.toolbar.filters.reviewFlag')}: ${reviewFlagFilterLabel}`
+                    : t('gallery.toolbar.filters.reviewFlag')
+                }}
+              </TooltipContent>
+            </Tooltip>
           </div>
-        </PopoverContent>
-      </Popover>
+        </TooltipProvider>
+        <ScrollBar orientation="horizontal" class="h-1.5" />
+      </ScrollArea>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button :variant="filter.type ? 'toolbarFilterActive' : 'toolbarFilter'" size="filter-sm">
-            <Image class="h-4 w-4" />
-            <span class="min-w-0 truncate">{{ typeFilterLabel }}</span>
-            <span
-              v-if="filter.type"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearTypeFilter"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" class="w-48">
-          <DropdownMenuRadioGroup
-            :model-value="filter.type || 'all'"
-            @update:model-value="onTypeFilterChange"
-          >
-            <DropdownMenuRadioItem value="all">
-              {{ t('gallery.toolbar.filter.type.all') }}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="photo">
-              <Image class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.type.photo') }}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="video">
-              <Video class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.type.video') }}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Popover>
-        <PopoverTrigger as-child>
-          <Button
-            :variant="selectedRatings.length > 0 ? 'toolbarFilterActive' : 'toolbarFilter'"
-            size="filter-sm"
-          >
-            <Star class="h-4 w-4" />
-            <span class="min-w-0 truncate">{{ ratingFilterLabel }}</span>
-            <span
-              v-if="selectedRatings.length > 0"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearRatingFilter"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" class="w-48 p-2">
-          <div class="space-y-1">
-            <button
-              v-for="rating in [5, 4, 3, 2, 1, 0]"
-              :key="rating"
-              type="button"
-              role="checkbox"
-              :aria-checked="isRatingSelected(rating)"
-              class="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
-              @click="toggleRatingFilter(rating)"
-            >
-              <Checkbox
-                as="span"
-                :model-value="isRatingSelected(rating)"
-                class="pointer-events-none"
-              />
-              <span class="flex min-w-0 items-center gap-0.5">
-                <Star
-                  v-for="s in STARS"
-                  :key="s"
-                  class="h-3.5 w-3.5 transition-colors"
-                  :class="
-                    rating > 0 && s <= rating
-                      ? 'fill-amber-400 text-amber-400'
-                      : 'text-foreground/40'
-                  "
-                />
-              </span>
-            </button>
-
-            <div v-if="selectedRatings.length > 0" class="border-t pt-1">
-              <button
-                type="button"
-                class="relative flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
-                @click="clearRatingFilter"
-              >
-                {{ t('gallery.toolbar.filter.rating.clear') }}
-              </button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button
-            :variant="filter.reviewFlag !== undefined ? 'toolbarFilterActive' : 'toolbarFilter'"
-            size="filter-sm"
-          >
-            <Flag class="h-4 w-4" />
-            <span class="min-w-0 truncate">{{ reviewFlagFilterLabel }}</span>
-            <span
-              v-if="filter.reviewFlag !== undefined"
-              class="-mr-1 rounded p-0.5 hover:text-foreground"
-              @pointerdown.stop.prevent
-              @click="clearReviewFlagFilter"
-            >
-              <X class="h-3.5 w-3.5" />
-            </span>
-            <ChevronDown v-else class="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" class="w-44">
-          <DropdownMenuRadioGroup
-            :model-value="filter.reviewFlag || 'all'"
-            @update:model-value="onReviewFlagChange"
-          >
-            <DropdownMenuRadioItem value="all">
-              {{ t('gallery.toolbar.filter.flag.all') }}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="rejected">
-              <X class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.flag.rejected') }}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="none">
-              <Flag class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.flag.none') }}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Button
-        v-if="hasAttributeFilters"
-        variant="default"
-        size="sm"
-        class="ml-auto h-8 shrink-0 px-2.5 text-xs"
-        @click="clearAttributeFilters"
-      >
-        <X class="h-4 w-4" />
-        {{ t('gallery.toolbar.filters.clear') }}
-      </Button>
+      <div v-if="hasAttributeFilters" class="ml-2 shrink-0">
+        <Button
+          variant="default"
+          size="sm"
+          class="h-8 shrink-0 px-2.5 text-xs"
+          @click="clearAttributeFilters"
+        >
+          <X class="h-4 w-4" />
+          {{ t('gallery.toolbar.filters.clear') }}
+        </Button>
+      </div>
     </div>
   </div>
 </template>

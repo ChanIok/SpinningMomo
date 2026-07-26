@@ -336,6 +336,8 @@ export function useGallerySidebar() {
     // UI 交互操作
     selectFolder,
     clearFolderFilter,
+    collapseAllFolders: () => store.collapseAllFolders(),
+    collapseAllTags: () => store.collapseAllTags(),
     createFolder,
     updateFolderDisplayName,
     openFolderInExplorer,

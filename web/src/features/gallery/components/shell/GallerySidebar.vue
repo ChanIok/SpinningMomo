@@ -6,7 +6,8 @@ import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Split } from '@/components/ui/split'
-import { Images, Plus } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ListChevronsDownUp, Images, Plus } from 'lucide-vue-next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,8 @@ const {
   tagsError,
   selectedFolder,
   selectedTag,
+  collapseAllFolders,
+  collapseAllTags,
   selectFolder,
   clearFolderFilter,
   createFolder,
@@ -462,9 +465,30 @@ onMounted(() => {
               >
                 {{ t('gallery.sidebar.folders.title') }}
               </div>
-              <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
-                <Plus class="h-3 w-3" />
-              </Button>
+              <TooltipProvider :delay-duration="300">
+                <div class="flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button variant="sidebarGhost" size="icon-xs" @click="collapseAllFolders">
+                        <ListChevronsDownUp class="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {{ t('gallery.sidebar.folders.collapseAll') }}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
+                        <Plus class="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {{ t('gallery.sidebar.folders.add') }}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             </div>
             <!-- 加载状态 -->
             <div v-if="foldersLoading" class="px-6 text-xs text-muted-foreground">
@@ -509,9 +533,30 @@ onMounted(() => {
               >
                 {{ t('gallery.sidebar.tags.title') }}
               </div>
-              <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
-                <Plus class="h-3 w-3" />
-              </Button>
+              <TooltipProvider :delay-duration="300">
+                <div class="flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button variant="sidebarGhost" size="icon-xs" @click="collapseAllTags">
+                        <ListChevronsDownUp class="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {{ t('gallery.sidebar.tags.collapseAll') }}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
+                        <Plus class="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {{ t('gallery.sidebar.tags.add') }}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             </div>
             <!-- 加载状态 -->
             <div v-if="tagsLoading" class="px-6 text-xs text-muted-foreground">

@@ -98,6 +98,14 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     return expandedTagIdSet.value.has(tagId)
   }
 
+  function collapseAllFolders() {
+    settings.value.navigation.expandedFolderIds = []
+  }
+
+  function collapseAllTags() {
+    settings.value.navigation.expandedTagIds = []
+  }
+
   function setFolders(newFolders: FolderTreeNode[]) {
     folders.value = newFolders
 
@@ -202,6 +210,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     setTagExpanded,
     toggleTagExpanded,
     isTagExpanded,
+    collapseAllFolders,
+    collapseAllTags,
     setFolders,
     setFoldersLoading,
     setFoldersError,
