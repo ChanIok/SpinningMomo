@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
       <Button
         variant="ghost"
         size="sm"
-        class="h-8 max-w-48 gap-1.5 rounded-sm px-2.5 text-foreground/75 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
+        class="h-8 max-w-48 gap-1.5 rounded-sm text-foreground/75 hover:bg-black/10 hover:text-foreground has-[>svg]:pr-6 has-[>svg]:pl-4 dark:hover:bg-white/10"
         :title="t('app.navigation.back')"
         :aria-label="t('app.navigation.back')"
         @click="handleBack"
@@ -490,11 +490,11 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 窗口控制按钮 -->
-    <div v-if="showWindowControls" class="flex gap-2">
+    <div v-if="showWindowControls" class="flex">
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMinimize"
         title="Minimize"
       >
@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+        class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMaximizeToggle"
         title="Maximize / Restore"
       >
@@ -514,7 +514,7 @@ onBeforeUnmount(() => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 rounded-sm text-foreground hover:!bg-[#e01b2d] hover:!text-white dark:hover:!bg-[#c42b1c]"
+        class="h-8 w-10 rounded-sm text-foreground hover:!bg-[#e01b2d] hover:!text-white dark:hover:!bg-[#c42b1c]"
         @click="handleClose"
         title="Close"
       >

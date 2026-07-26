@@ -73,8 +73,15 @@ const galleryView = useGalleryView()
 
 const showMapEntry = computed(() => settingsStore.appSettings.extensions.infinityNikki.enable)
 
+const isPreferencesTooltipAllowed = ref(true)
+
 const handleOpenMap = () => {
   void pushWithViewTransition(router, '/map')
+}
+
+const handleOpenPreferences = () => {
+  isPreferencesTooltipAllowed.value = false
+  emit('open-preferences')
 }
 
 const viewMode = computed(() => galleryView.viewMode.value)
@@ -672,12 +679,12 @@ function onViewSizeSliderChange(value: number[] | undefined) {
           </Tooltip>
 
           <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="sidebarGhost" size="icon-sm" @click="emit('open-preferences')">
+            <TooltipTrigger as-child @mouseenter="isPreferencesTooltipAllowed = true">
+              <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenPreferences">
                 <Settings class="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
+            <TooltipContent v-if="isPreferencesTooltipAllowed" side="bottom">
               {{ t('gallery.preferences.open') }}
             </TooltipContent>
           </Tooltip>

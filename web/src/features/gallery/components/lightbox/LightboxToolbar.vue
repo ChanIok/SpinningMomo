@@ -182,7 +182,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 "
                 @click="emit('actual')"
               >
-                100%
+                {{ t('gallery.lightbox.toolbar.actual') }}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" class="flex items-center gap-2">
