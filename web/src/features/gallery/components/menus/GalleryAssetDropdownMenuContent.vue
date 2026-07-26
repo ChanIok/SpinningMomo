@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { useGalleryAssetActions } from '../../composables'
+import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
@@ -39,7 +40,14 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
   >
     <Copy />
     {{ t('gallery.contextMenu.copyFiles.label') }}
+    <DropdownMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>C</Kbd>
+      </KbdGroup>
+    </DropdownMenuShortcut>
   </DropdownMenuItem>
+  <GalleryPasteDropdownMenuItem />
   <DropdownMenuItem
     inset
     :disabled="!assetActions.hasSelection"

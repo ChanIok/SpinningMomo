@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
 import {
   useGalleryAssetActions,
+  useGalleryContextMenu,
   useGalleryData,
   useGalleryFolderActions,
   useGallerySelection,
@@ -24,6 +25,7 @@ import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
+const galleryContextMenu = useGalleryContextMenu()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const galleryView = useGalleryView()
@@ -315,6 +317,17 @@ function handleKeydown(event: KeyboardEvent) {
     }
   }
 
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === 'c' &&
+    store.selection.selectedIds.size > 0
+  ) {
+    event.preventDefault()
+    void assetActions.handleCopyAssetsToClipboard()
+    return
+  }
+
   // 普通 Ctrl+V 只导入到当前明确选中的文件夹，不占用标签粘贴快捷键。
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
     event.preventDefault()
@@ -384,7 +397,9 @@ function handleContentContextMenu(event: MouseEvent) {
     return
   }
 
-  event.preventDefault()
+  // 背景右键切换到当前文件夹上下文，与素材右键的选区动作明确分离。
+  gallerySelection.clearSelection()
+  galleryContextMenu.openForBackground(event)
 }
 
 function handleViewerDragOver(event: DragEvent) {

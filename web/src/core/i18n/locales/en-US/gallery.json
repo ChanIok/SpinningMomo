@@ -25,6 +25,7 @@
   "gallery.contextMenu.delete.successTitle": "Files Deleted",
   "gallery.contextMenu.openDefaultApp.failedTitle": "Failed to open file",
   "gallery.contextMenu.openDefaultApp.label": "Open With Default App",
+  "gallery.contextMenu.pasteFiles.label": "Paste",
   "gallery.contextMenu.pasteTags.emptyDescription": "Copy tags from another asset first",
   "gallery.contextMenu.pasteTags.emptyTitle": "No tags available to paste",
   "gallery.contextMenu.pasteTags.failedTitle": "Failed to paste tags",

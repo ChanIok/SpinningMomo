@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Images, Info, Settings } from 'lucide-vue-next'
@@ -12,6 +13,15 @@ import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
 import { pushWithViewTransition } from '@/router/viewTransition'
 import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
+
+interface NavAction {
+  key: string
+  label: string
+  icon: Component
+  action: () => void
+  disabled?: boolean
+  animate?: boolean
+}
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -102,7 +112,7 @@ const handleOpenPage = (name: 'gallery' | 'settings' | 'about') => {
   void pushWithViewTransition(router, { name })
 }
 
-const navActions = computed(() => [
+const navActions = computed<NavAction[]>(() => [
   {
     key: 'gallery',
     label: t('app.navigation.gallery'),

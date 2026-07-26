@@ -39,6 +39,12 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
   >
     <Copy />
     {{ t('gallery.contextMenu.copyFiles.label') }}
+    <ContextMenuShortcut>
+      <KbdGroup>
+        <Kbd>Ctrl</Kbd>
+        <Kbd>C</Kbd>
+      </KbdGroup>
+    </ContextMenuShortcut>
   </ContextMenuItem>
   <ContextMenuItem
     inset

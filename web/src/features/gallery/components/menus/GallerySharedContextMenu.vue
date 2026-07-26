@@ -2,6 +2,7 @@
 import { nextTick, watch } from 'vue'
 import { useGalleryContextMenu } from '../../composables/useGalleryContextMenu'
 import GalleryAssetDropdownMenuContent from './GalleryAssetDropdownMenuContent.vue'
+import GalleryBackgroundDropdownMenuContent from './GalleryBackgroundDropdownMenuContent.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,8 @@ watch(
         @escape-key-down="contextMenu.setOpen(false)"
         @pointer-down-outside="contextMenu.setOpen(false)"
       >
-        <GalleryAssetDropdownMenuContent />
+        <GalleryAssetDropdownMenuContent v-if="contextMenu.state.target === 'asset'" />
+        <GalleryBackgroundDropdownMenuContent v-else />
       </DropdownMenuContent>
     </DropdownMenu>
   </div>

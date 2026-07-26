@@ -25,6 +25,7 @@
   "gallery.contextMenu.delete.successTitle": "文件已删除",
   "gallery.contextMenu.openDefaultApp.failedTitle": "打开文件失败",
   "gallery.contextMenu.openDefaultApp.label": "默认应用打开",
+  "gallery.contextMenu.pasteFiles.label": "粘贴",
   "gallery.contextMenu.pasteTags.emptyDescription": "请先从其他素材复制标签",
   "gallery.contextMenu.pasteTags.emptyTitle": "没有可粘贴的标签",
   "gallery.contextMenu.pasteTags.failedTitle": "粘贴标签失败",

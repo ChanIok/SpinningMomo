@@ -243,6 +243,17 @@ function handleKeydown(event: KeyboardEvent) {
     }
   }
 
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === 'c' &&
+    store.selection.selectedIds.size > 0
+  ) {
+    event.preventDefault()
+    void assetActions.handleCopyAssetsToClipboard()
+    return
+  }
+
   switch (event.key) {
     case 'ArrowLeft':
       event.preventDefault()

@@ -76,6 +76,9 @@ function handleDoubleClick(event: MouseEvent) {
 }
 
 function handleContextMenu(event: MouseEvent) {
+  // 素材菜单需要等待选区准备完成；先同步截断冒泡，避免内容区背景菜单抢先打开。
+  event.preventDefault()
+  event.stopPropagation()
   emit('context-menu', props.asset, event)
 }
 
