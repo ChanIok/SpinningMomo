@@ -21,7 +21,6 @@ import {
   LIGHT_FLOATING_WINDOW_COLORS,
   type AppSettings,
   type FloatingWindowThemeMode,
-  type WebThemeMode,
 } from '@/features/settings/types'
 import { applyAppearanceToDocument, DEFAULT_PRIMARY_COLOR } from '@/features/settings/appearance'
 import { OVERLAY_PALETTE_PRESETS } from '@/features/settings/overlayPalette'
@@ -41,12 +40,12 @@ const direction = ref<'forward' | 'backward'>('forward')
 const isSubmitting = ref(false)
 
 const language = ref<string>(store.appSettings.app.language.current)
-const normalizeOnboardingTheme = (mode: WebThemeMode): 'light' | 'dark' =>
-  mode === 'dark' ? 'dark' : 'light'
+const getSystemTheme = (): 'light' | 'dark' =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
 
-const themeMode = ref<'light' | 'dark'>(
-  normalizeOnboardingTheme(store.appSettings.ui.webTheme.mode)
-)
+const themeMode = ref<'light' | 'dark'>(getSystemTheme())
 const targetTitle = ref<string>(store.appSettings.window.targetTitle || '')
 const configuredInfinityNikkiGameDir = ref<string>(
   store.appSettings.extensions.infinityNikki.gameDir

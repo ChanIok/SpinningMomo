@@ -389,8 +389,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     floatingWindowColors: DARK_FLOATING_WINDOW_COLORS,
     floatingWindowThemeMode: 'dark',
     webviewWindow: {
-      width: 1200,
-      height: 800,
+      width: 1080,
+      height: 720,
       x: -1,
       y: -1,
       enableTransparentBackground: false,
