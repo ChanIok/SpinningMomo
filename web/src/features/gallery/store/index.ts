@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { computed } from 'vue'
-import { createDefaultGallerySettings, GALLERY_SETTINGS_STORAGE_KEY } from './persistence'
+import {
+  applySettingsDefaults,
+  createDefaultGallerySettings,
+  GALLERY_SETTINGS_STORAGE_KEY,
+} from './persistence'
 import { createQuerySlice } from './querySlice'
 import { createNavigationSlice } from './navigationSlice'
 import { createInteractionSlice } from './interactionSlice'
@@ -25,7 +29,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     GALLERY_SETTINGS_STORAGE_KEY,
     createDefaultGallerySettings(),
     localStorage,
-    { mergeDefaults: true }
+    { mergeDefaults: (stored, defaults) => applySettingsDefaults(stored, defaults) }
   )
 
   // 查询与缓存层：负责结果集、分页、时间线、并发刷新版本。

@@ -8,6 +8,7 @@ import {
   useGalleryFolderActions,
   useGallerySelection,
   useGalleryView,
+  useVisibleAssetTags,
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
@@ -36,6 +37,8 @@ const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
 const preferencesOpen = ref(false)
+
+useVisibleAssetTags()
 
 const galleryColumnClass = computed(() => {
   const hidden = store.lightbox.isOpen && !store.lightbox.isClosing

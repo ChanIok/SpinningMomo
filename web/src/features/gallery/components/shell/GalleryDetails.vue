@@ -317,11 +317,13 @@ async function handleRemoveTag(tagId: number) {
   if (!activeAsset.value) return
 
   try {
+    const assetId = activeAsset.value.id
     await removeTagsFromAsset({
-      assetId: activeAsset.value.id,
+      assetId,
       tagIds: [tagId],
     })
 
+    await assetActions.refreshTagViewsAfterMutation([assetId])
     await reloadActiveAssetTags()
   } catch (error) {
     console.error('Failed to remove tag:', error)
@@ -332,21 +334,23 @@ async function handleRemoveTag(tagId: number) {
 async function handleToggleTag(tagId: number) {
   if (!activeAsset.value) return
 
+  const assetId = activeAsset.value.id
   const hasTag = assetTags.value.some((tag) => tag.id === tagId)
 
   try {
     if (hasTag) {
       await removeTagsFromAsset({
-        assetId: activeAsset.value.id,
+        assetId,
         tagIds: [tagId],
       })
     } else {
       await addTagsToAsset({
-        assetId: activeAsset.value.id,
+        assetId,
         tagIds: [tagId],
       })
     }
 
+    await assetActions.refreshTagViewsAfterMutation([assetId])
     await reloadActiveAssetTags()
   } catch (error) {
     console.error('Failed to toggle tag:', error)

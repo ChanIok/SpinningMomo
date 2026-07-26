@@ -156,7 +156,9 @@ export function useGalleryAssetActions() {
     return selectedAssetIds.value[0]
   }
 
-  async function refreshTagViewsAfterMutation() {
+  async function refreshTagViewsAfterMutation(assetIds?: number[]) {
+    store.invalidateAssetTags(assetIds)
+
     try {
       // 标签变更会同时影响左侧标签树计数、当前结果集命中、以及右侧详情标签区。
       await Promise.all([
@@ -515,7 +517,7 @@ export function useGalleryAssetActions() {
           throw new Error(result.message)
         }
 
-        await refreshTagViewsAfterMutation()
+        await refreshTagViewsAfterMutation(assetIds)
         toast.success(t('gallery.contextMenu.pasteTags.successTitle'), {
           description: t('gallery.contextMenu.pasteTags.successDescription', {
             assetCount: assetIds.length,
@@ -545,7 +547,7 @@ export function useGalleryAssetActions() {
         unchangedRelations += result.unchangedCount ?? 0
       }
 
-      await refreshTagViewsAfterMutation()
+      await refreshTagViewsAfterMutation(assetIds)
 
       if (failedRelations === 0 && unchangedRelations === 0) {
         toast.success(t('gallery.contextMenu.pasteTags.successTitle'), {
@@ -671,7 +673,7 @@ export function useGalleryAssetActions() {
       throw new Error(result.message)
     }
 
-    await refreshTagViewsAfterMutation()
+    await refreshTagViewsAfterMutation(assetIds)
   }
 
   async function removeTagFromSelectedAssets(tagId: number) {
@@ -689,7 +691,7 @@ export function useGalleryAssetActions() {
       throw new Error(result.message)
     }
 
-    await refreshTagViewsAfterMutation()
+    await refreshTagViewsAfterMutation(assetIds)
   }
 
   return {
@@ -698,6 +700,7 @@ export function useGalleryAssetActions() {
     isSingleSelection,
     canCopyTags,
     canPasteTags,
+    refreshTagViewsAfterMutation,
     copiedTagCount,
     selectedAssetId,
     deleteMenuLabel,

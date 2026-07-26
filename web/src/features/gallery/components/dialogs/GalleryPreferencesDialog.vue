@@ -44,6 +44,13 @@ const showDyeCodeBadge = computed({
   },
 })
 
+const showTagBadges = computed({
+  get: () => store.gallerySettings.view.showTagBadges,
+  set: (value: boolean) => {
+    store.gallerySettings.view.showTagBadges = value
+  },
+})
+
 const deleteMode = computed({
   get: () => store.gallerySettings.deletion.mode,
   set: (value: GalleryDeleteMode) => {
@@ -163,6 +170,20 @@ watch(
                 </span>
               </div>
               <Switch v-model="showDyeCodeBadge" />
+            </label>
+
+            <label
+              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
+            >
+              <div class="space-y-0.5">
+                <span class="block text-sm font-medium text-foreground">
+                  {{ t('gallery.preferences.view.tags.title') }}
+                </span>
+                <span class="block text-xs text-muted-foreground">
+                  {{ t('gallery.preferences.view.tags.description') }}
+                </span>
+              </div>
+              <Switch v-model="showTagBadges" />
             </label>
           </div>
         </div>

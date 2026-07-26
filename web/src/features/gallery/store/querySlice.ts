@@ -1,5 +1,5 @@
 import { ref, reactive } from 'vue'
-import type { Asset, TimelineBucket } from '../types'
+import type { Asset, Tag, TimelineBucket } from '../types'
 
 /**
  * Query Slice
@@ -19,6 +19,9 @@ export function createQuerySlice() {
   const isRefreshing = ref(false)
   const queryVersion = ref(0)
   const dyeCodeAssetIds = ref<Set<number>>(new Set())
+  const assetTagsById = ref<Map<number, Tag[]>>(new Map())
+  const loadedAssetTagIds = ref<Set<number>>(new Set())
+  const assetTagsEpoch = ref(0)
 
   // ============= 分页缓存状态（普通模式使用） =============
   // paginatedAssets: 只缓存已加载页，避免一次性加载全量资产。
@@ -122,6 +125,39 @@ export function createQuerySlice() {
     dyeCodeAssetIds.value = new Set()
   }
 
+  function setAssetTagsForAssets(assetIds: number[], tagsByAssetId: Record<number, Tag[]>) {
+    const nextTagsById = new Map(assetTagsById.value)
+    const nextLoadedIds = new Set(loadedAssetTagIds.value)
+
+    for (const assetId of assetIds) {
+      nextTagsById.set(assetId, tagsByAssetId[assetId] ?? [])
+      nextLoadedIds.add(assetId)
+    }
+
+    assetTagsById.value = nextTagsById
+    loadedAssetTagIds.value = nextLoadedIds
+  }
+
+  function invalidateAssetTags(assetIds?: number[]) {
+    if (assetIds === undefined) {
+      assetTagsById.value = new Map()
+      loadedAssetTagIds.value = new Set()
+      assetTagsEpoch.value += 1
+      return
+    }
+
+    const nextTagsById = new Map(assetTagsById.value)
+    const nextLoadedIds = new Set(loadedAssetTagIds.value)
+    for (const assetId of assetIds) {
+      nextTagsById.delete(assetId)
+      nextLoadedIds.delete(assetId)
+    }
+
+    assetTagsById.value = nextTagsById
+    loadedAssetTagIds.value = nextLoadedIds
+    assetTagsEpoch.value += 1
+  }
+
   function replacePaginatedAssets(pages: Map<number, Asset[]>) {
     paginatedAssets.value = new Map(pages)
     clearDyeCodeStatuses()
@@ -166,6 +202,7 @@ export function createQuerySlice() {
     clearTimelineData()
     clearPaginatedAssets()
     clearDyeCodeStatuses()
+    invalidateAssetTags()
     setVisibleRange(undefined, undefined)
   }
 
@@ -179,6 +216,9 @@ export function createQuerySlice() {
     isRefreshing,
     queryVersion,
     dyeCodeAssetIds,
+    assetTagsById,
+    loadedAssetTagIds,
+    assetTagsEpoch,
     paginatedAssets,
     paginatedAssetsVersion,
     perPage,
@@ -198,6 +238,8 @@ export function createQuerySlice() {
     setPageAssets,
     setDyeCodeStatuses,
     clearDyeCodeStatuses,
+    setAssetTagsForAssets,
+    invalidateAssetTags,
     replacePaginatedAssets,
     clearPaginatedAssets,
     setVisibleRange,

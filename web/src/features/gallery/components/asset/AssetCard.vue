@@ -37,8 +37,12 @@ const imageError = ref(false)
 const { getAssetThumbnailUrl } = useGalleryData()
 const store = useGalleryStore()
 const showRatingBadge = computed(() => store.gallerySettings.view.showRatingBadge)
+const showTagBadges = computed(() => store.gallerySettings.view.showTagBadges)
 const showDyeCodeBadge = computed(
   () => store.gallerySettings.view.showDyeCodeBadge && store.dyeCodeAssetIds.has(props.asset.id)
+)
+const assetTags = computed(() =>
+  showTagBadges.value ? (store.assetTagsById.get(props.asset.id) ?? []) : []
 )
 
 // 缩略图URL - 从useGalleryData中获取
@@ -222,6 +226,8 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         :review-flag="asset.reviewFlag"
         :show-rating="showRatingBadge"
         :has-dye-code="showDyeCodeBadge"
+        :show-tags="showTagBadges"
+        :tags="assetTags"
       />
 
       <!-- 选择指示器 -->

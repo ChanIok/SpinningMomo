@@ -332,7 +332,7 @@ async function handleDropAssetsToTag(tagId: number, assetIds: number[]) {
       )
     }
 
-    await Promise.all([loadTagTree(), galleryData.refreshCurrentQuery()])
+    await assetActions.refreshTagViewsAfterMutation(uniqueIds)
     galleryStore.clearSelection()
 
     if (result.success && failedCount === 0 && unchangedCount === 0) {

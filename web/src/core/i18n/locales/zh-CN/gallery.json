@@ -414,6 +414,8 @@
   "gallery.preferences.view.rating.description": "在卡片上显示星级评分。弃置标记不受此开关影响。",
   "gallery.preferences.view.dyeCode.title": "染色码标记",
   "gallery.preferences.view.dyeCode.description": "包含无限暖暖染色码时显示染色标记。",
+  "gallery.preferences.view.tags.title": "标签标记",
+  "gallery.preferences.view.tags.description": "在卡片上显示素材已有的标签名称。",
   "gallery.preferences.badges.dyeCodeTooltip": "包含染色码",
   "gallery.preferences.maintenance.summary": "找到 {count} 个失效文件",
   "gallery.preferences.maintenance.title": "数据维护",

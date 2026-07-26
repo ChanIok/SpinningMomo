@@ -8,6 +8,7 @@ export interface GallerySettings {
     mode: ViewMode
     showRatingBadge: boolean
     showDyeCodeBadge: boolean
+    showTagBadges: boolean
   }
   navigation: {
     expandedFolderIds: number[]
@@ -37,6 +38,7 @@ export function createDefaultGallerySettings(): GallerySettings {
       mode: 'grid' satisfies ViewMode,
       showRatingBadge: true,
       showDyeCodeBadge: true,
+      showTagBadges: true,
     },
     navigation: {
       expandedFolderIds: [],
@@ -56,6 +58,24 @@ export function createDefaultGallerySettings(): GallerySettings {
       sidebarFolderSplitSize: 0.5,
     },
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function applySettingsDefaults<T>(stored: unknown, defaults: T): T {
+  if (!isRecord(defaults)) {
+    return stored === undefined ? defaults : (stored as T)
+  }
+
+  const source = isRecord(stored) ? stored : {}
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, defaultValue]) => [
+      key,
+      applySettingsDefaults(source[key], defaultValue),
+    ])
+  ) as T
 }
 
 export const LIGHTBOX_MIN_ZOOM = 0.05

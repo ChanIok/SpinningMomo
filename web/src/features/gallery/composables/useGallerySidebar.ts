@@ -281,6 +281,9 @@ export function useGallerySidebar() {
         name,
       })
 
+      // 标签名称参与卡片胶囊展示，重命名后统一失效可见区缓存。
+      store.invalidateAssetTags()
+
       // 重新加载标签树
       await loadTagTree()
 
@@ -299,6 +302,9 @@ export function useGallerySidebar() {
       console.log('🗑️ 删除标签:', id)
 
       await galleryApi.deleteTag(id)
+
+      // 删除标签会影响任意资产的胶囊内容，无法按资产精确失效。
+      store.invalidateAssetTags()
 
       // 重新加载标签树
       await loadTagTree()

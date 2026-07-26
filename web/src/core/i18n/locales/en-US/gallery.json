@@ -414,6 +414,8 @@
   "gallery.preferences.view.rating.description": "Show star ratings on cards. Rejected markers remain visible.",
   "gallery.preferences.view.dyeCode.title": "Dye Code Marker",
   "gallery.preferences.view.dyeCode.description": "Show a droplet marker when an asset contains an Infinity Nikki dye code.",
+  "gallery.preferences.view.tags.title": "Tag Labels",
+  "gallery.preferences.view.tags.description": "Show existing tag names on gallery cards.",
   "gallery.preferences.badges.dyeCodeTooltip": "Contains a dye code",
   "gallery.preferences.maintenance.summary": "{count} unavailable assets found",
   "gallery.preferences.maintenance.title": "Data Maintenance",
