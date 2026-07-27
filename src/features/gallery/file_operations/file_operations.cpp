@@ -15,65 +15,6 @@
 
 namespace features::gallery::file_operations {
 
-// ============= 资产项管理 =============
-
-// 按用户意图删除资产索引，并可选删除对应的物理文件。
-auto delete_asset(core::AppState& app_state, const DeleteParams& params)
-    -> std::expected<OperationResult, std::string> {
-  try {
-    // 获取要删除的资产项
-    auto asset_result = asset::repository::get_asset_by_id(app_state, params.id);
-    if (!asset_result) {
-      return std::unexpected("Failed to get asset item: " + asset_result.error());
-    }
-
-    if (!asset_result->has_value()) {
-      OperationResult result;
-      result.success = false;
-      result.message = "Asset item not found";
-      result.affected_count = 0;
-      return result;
-    }
-
-    auto asset = asset_result->value();
-
-    // 删除物理文件（如果请求）
-    if (params.delete_file.value_or(false)) {
-      std::filesystem::path file_path(asset.path);
-      if (std::filesystem::exists(file_path)) {
-        std::error_code ec;
-        std::filesystem::remove(file_path, ec);
-        if (ec) {
-          Logger().warn("Failed to delete physical file {}: {}", asset.path, ec.message());
-        } else {
-          Logger().info("Deleted physical file: {}", asset.path);
-        }
-      }
-    }
-
-    // 仅删除资产索引；按 hash 共享的缩略图由缓存对账确认无引用后统一回收。
-    auto delete_result = asset::repository::delete_asset(app_state, params.id);
-
-    OperationResult result;
-    if (delete_result) {
-      result.success = true;
-      result.message = params.delete_file.value_or(false)
-                           ? "Asset item and file deleted successfully"
-                           : "Asset item removed from library successfully";
-      result.affected_count = 1;
-    } else {
-      result.success = false;
-      result.message = "Failed to delete asset item: " + delete_result.error();
-      result.affected_count = 0;
-    }
-
-    return result;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in delete_asset: " + std::string(e.what()));
-  }
-}
-
 // 使用系统默认应用打开指定资产文件。
 auto open_asset_with_default_app(core::AppState& app_state, std::int64_t id)
     -> std::expected<OperationResult, std::string> {
@@ -213,6 +154,7 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
     });
   }
 
+  std::unordered_set<std::int64_t> failed_file_ids;
   std::vector<std::filesystem::path> recycle_paths;
   recycle_paths.reserve(candidates.size());
   for (auto& candidate : candidates) {
@@ -223,18 +165,18 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
     auto begin_ignore_result = watcher::begin_manual_file_system_ignore(
         app_state, candidate.file_path, candidate.file_path);
     if (!begin_ignore_result) {
-      Logger().warn("Failed to register watcher ignore for asset deletion '{}': {}",
-                    candidate.file_path.string(), begin_ignore_result.error());
-    } else {
-      candidate.manual_ignore_registered = true;
+      failed_file_ids.insert(candidate.asset.id);
+      errors.push_back("Failed to register watcher ignore for asset deletion '" +
+                       candidate.file_path.string() + "': " + begin_ignore_result.error());
+      continue;
     }
+    candidate.manual_ignore_registered = true;
 
     if (!candidate.permanent) {
       recycle_paths.push_back(candidate.file_path);
     }
   }
 
-  std::unordered_set<std::int64_t> failed_file_ids;
   if (!recycle_paths.empty()) {
     auto recycle_result = utils::system::move_files_to_recycle_bin(recycle_paths);
     if (!recycle_result) {
@@ -249,7 +191,8 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
   }
 
   for (const auto& candidate : candidates) {
-    if (!candidate.permanent || !candidate.file_exists) {
+    if (!candidate.permanent || !candidate.file_exists ||
+        failed_file_ids.contains(candidate.asset.id)) {
       continue;
     }
     auto delete_file_result = utils::system::delete_file_permanently(candidate.file_path);
@@ -291,16 +234,6 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
       }
       append_manual_change(candidate.file_path, ScanChangeAction::REMOVE);
     }
-
-    if (!manual_changes.empty()) {
-      Logger().info("Gallery delete_assets: dispatching {} manual scan change(s)",
-                    manual_changes.size());
-      auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
-      if (!dispatch_result) {
-        Logger().warn("Failed to dispatch manual scan changes after asset deletion: {}",
-                      dispatch_result.error());
-      }
-    }
   }
 
   for (auto& candidate : candidates) {
@@ -312,6 +245,16 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
         !complete_ignore_result) {
       Logger().warn("Failed to complete watcher ignore for asset deletion '{}': {}",
                     candidate.file_path.string(), complete_ignore_result.error());
+    }
+  }
+
+  if (!manual_changes.empty()) {
+    Logger().info("Gallery delete_assets: dispatching {} manual scan change(s)",
+                  manual_changes.size());
+    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+    if (!dispatch_result) {
+      Logger().warn("Failed to dispatch manual scan changes after asset deletion: {}",
+                    dispatch_result.error());
     }
   }
 
@@ -449,29 +392,22 @@ auto move_assets_to_folder(core::AppState& app_state, const MoveAssetsToFolderPa
       continue;
     }
 
-    bool manual_ignore_registered = false;
     // 先注册 watcher ignore，再执行 move，避免 watcher 抢先对同一路径做重复分析。
-    if (auto begin_ignore_result = watcher::begin_manual_file_system_ignore(
-            app_state, source_path, normalized_destination_path);
-        begin_ignore_result) {
-      manual_ignore_registered = true;
-    } else {
-      Logger().warn("Failed to register watcher ignore for manual move '{}': {}",
-                    source_path.string(), begin_ignore_result.error());
+    auto begin_ignore_result = watcher::begin_manual_file_system_ignore(
+        app_state, source_path, normalized_destination_path);
+    if (!begin_ignore_result) {
+      errors.push_back("Failed to register watcher ignore for manual move '" +
+                       source_path.string() + "': " + begin_ignore_result.error());
+      continue;
     }
 
     auto complete_manual_ignore = [&]() {
-      if (!manual_ignore_registered) {
-        return;
-      }
-      // 无论成功还是失败都尝试完成 ignore，防止 in-flight 计数泄漏。
       if (auto complete_ignore_result = watcher::complete_manual_file_system_ignore(
               app_state, source_path, normalized_destination_path);
           !complete_ignore_result) {
         Logger().warn("Failed to complete watcher ignore for manual move '{}': {}",
                       source_path.string(), complete_ignore_result.error());
       }
-      manual_ignore_registered = false;
     };
 
     auto move_result =

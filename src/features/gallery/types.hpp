@@ -281,11 +281,6 @@ struct MoveAssetsToFolderParams {
   std::int64_t target_folder_id = 0;
 };
 
-struct DeleteParams {
-  std::int64_t id;
-  std::optional<bool> delete_file = false;
-};
-
 struct GetStatsParams {};
 
 struct ListAssetsParams {

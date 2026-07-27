@@ -500,35 +500,19 @@ auto remove_video_session_directory(core::AppState& app_state,
   // 删除录像 session 目录前后都要与 watcher 协作，避免把我们主动清理当成外部文件事件。
   auto begin_ignore_result = features::gallery::watcher::begin_manual_file_system_ignore(
       app_state, session_directory, session_directory);
-  bool ignore_registered = begin_ignore_result.has_value();
   if (!begin_ignore_result) {
     return std::unexpected("Failed to register watcher ignore for video session cleanup '" +
                            utils::string::ToUtf8(session_directory.wstring()) +
                            "': " + begin_ignore_result.error());
   }
 
-  auto complete_ignore = [&]() -> std::expected<void, std::string> {
-    // 对 begin/complete 成对调用，避免 watcher ignore 状态泄漏。
-    if (!ignore_registered) {
-      return {};
-    }
-
-    auto complete_ignore_result = features::gallery::watcher::complete_manual_file_system_ignore(
-        app_state, session_directory, session_directory);
-    if (!complete_ignore_result) {
-      return std::unexpected("Failed to complete watcher ignore for video session cleanup '" +
-                             utils::string::ToUtf8(session_directory.wstring()) +
-                             "': " + complete_ignore_result.error());
-    }
-
-    ignore_registered = false;
-    return {};
-  };
-
   auto recycle_result = utils::system::move_files_to_recycle_bin({session_directory});
-  auto complete_ignore_result = complete_ignore();
+  auto complete_ignore_result = features::gallery::watcher::complete_manual_file_system_ignore(
+      app_state, session_directory, session_directory);
   if (!complete_ignore_result) {
-    return std::unexpected(complete_ignore_result.error());
+    Logger().warn("Failed to complete watcher ignore for video session cleanup '{}': {}",
+                  utils::string::ToUtf8(session_directory.wstring()),
+                  complete_ignore_result.error());
   }
 
   if (!recycle_result) {

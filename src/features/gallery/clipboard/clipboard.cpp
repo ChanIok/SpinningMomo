@@ -68,7 +68,8 @@ auto make_unique_clipboard_destination(const std::filesystem::path& target_folde
 }
 
 // 将完整临时文件原子提交到首个空闲名称，绝不覆盖目标目录中的现有文件。
-auto commit_clipboard_temp_file(const std::filesystem::path& temporary_path,
+auto commit_clipboard_temp_file(core::AppState& app_state,
+                                const std::filesystem::path& temporary_path,
                                 const std::filesystem::path& target_folder,
                                 const std::filesystem::path& requested_name)
     -> std::expected<std::filesystem::path, std::string> {
@@ -88,11 +89,26 @@ auto commit_clipboard_temp_file(const std::filesystem::path& temporary_path,
       return std::unexpected("Failed to inspect clipboard destination: " + exists_error.message());
     }
 
+    // 最终媒体路径出现前先登记忽略；成功提交后由 paste_to_folder 在主动入库与分发完成后解除。
+    auto begin_ignore_result =
+        watcher::begin_manual_file_system_ignore(app_state, destination, destination);
+    if (!begin_ignore_result) {
+      return std::unexpected("Failed to register watcher ignore for clipboard destination '" +
+                             destination.string() + "': " + begin_ignore_result.error());
+    }
+
     // rename 在同一目录内提交完整文件；并发创建同名目标时继续尝试下一个名称。
     std::error_code rename_error;
     std::filesystem::rename(temporary_path, destination, rename_error);
     if (!rename_error) {
       return destination;
+    }
+
+    auto complete_result =
+        watcher::complete_manual_file_system_ignore(app_state, destination, destination);
+    if (!complete_result) {
+      Logger().warn("Failed to complete watcher ignore for clipboard destination '{}': {}",
+                    destination.string(), complete_result.error());
     }
 
     std::error_code collision_error;
@@ -301,16 +317,43 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
     };
   }
 
-  std::vector<std::filesystem::path> created_paths;
   std::vector<ScanChange> indexed_changes;
   std::int64_t not_found_count = 0;
   std::int64_t unchanged_count = 0;
   std::int64_t indexed_count = 0;
   std::vector<std::string> errors;
 
+  auto index_created_path = [&](const std::filesystem::path& created_path) {
+    auto index_result = scanner::upsert_created_file(app_state, folder_id, created_path);
+    if (!index_result) {
+      errors.push_back("Failed to index pasted file '" + created_path.string() +
+                       "': " + index_result.error());
+    } else {
+      auto asset_result = asset::repository::get_asset_by_path(app_state, created_path.string());
+      if (!asset_result) {
+        errors.push_back("Failed to verify pasted file index '" + created_path.string() +
+                         "': " + asset_result.error());
+      } else if (!asset_result->has_value()) {
+        unchanged_count++;
+      } else {
+        indexed_count++;
+        indexed_changes.insert(indexed_changes.end(),
+                               std::make_move_iterator(index_result->changes.begin()),
+                               std::make_move_iterator(index_result->changes.end()));
+      }
+    }
+
+    // 本文件的磁盘与索引操作都已结束，立即退出 in-flight；延迟通知仍由 grace 吸收。
+    auto complete_result =
+        watcher::complete_manual_file_system_ignore(app_state, created_path, created_path);
+    if (!complete_result) {
+      Logger().warn("Failed to complete watcher ignore for pasted file '{}': {}",
+                    created_path.string(), complete_result.error());
+    }
+  };
+
   // 文件列表逐项复制，单个失败不阻断同一批次中的其他媒体。
   if (clipboard.kind == utils::system::ClipboardMediaKind::Files) {
-    created_paths.reserve(clipboard.file_paths.size());
     for (const auto& source : clipboard.file_paths) {
       auto normalized_source_result = utils::path::NormalizePath(source);
       if (!normalized_source_result) {
@@ -366,14 +409,14 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
         continue;
       }
 
-      auto commit_result =
-          commit_clipboard_temp_file(temporary_path, target_folder, normalized_source.filename());
+      auto commit_result = commit_clipboard_temp_file(app_state, temporary_path, target_folder,
+                                                      normalized_source.filename());
       if (!commit_result) {
         cleanup_clipboard_temp_file(temporary_path);
         errors.push_back(commit_result.error());
         continue;
       }
-      created_paths.push_back(std::move(commit_result.value()));
+      index_created_path(commit_result.value());
     }
   } else {
     // 位图剪贴板只产生一个无损 PNG，并沿用截图文件名格式。
@@ -409,38 +452,13 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
 
     auto requested_name = std::filesystem::path(
         utils::string::FromUtf8(utils::string::FormatTimestamp(std::chrono::system_clock::now())));
-    auto commit_result = commit_clipboard_temp_file(temporary_path, target_folder, requested_name);
+    auto commit_result =
+        commit_clipboard_temp_file(app_state, temporary_path, target_folder, requested_name);
     if (!commit_result) {
       cleanup_clipboard_temp_file(temporary_path);
       return std::unexpected(commit_result.error());
     }
-    created_paths.push_back(std::move(commit_result.value()));
-  }
-
-  // 主动创建由 Gallery 同步建立索引，watcher 只负责随后可能到达的外部文件通知。
-  for (const auto& created_path : created_paths) {
-    auto index_result = scanner::upsert_created_file(app_state, folder_id, created_path);
-    if (!index_result) {
-      errors.push_back("Failed to index pasted file '" + created_path.string() +
-                       "': " + index_result.error());
-      continue;
-    }
-
-    auto asset_result = asset::repository::get_asset_by_path(app_state, created_path.string());
-    if (!asset_result) {
-      errors.push_back("Failed to verify pasted file index '" + created_path.string() +
-                       "': " + asset_result.error());
-      continue;
-    }
-    if (!asset_result->has_value()) {
-      unchanged_count++;
-      continue;
-    }
-
-    indexed_count++;
-    indexed_changes.insert(indexed_changes.end(),
-                           std::make_move_iterator(index_result->changes.begin()),
-                           std::make_move_iterator(index_result->changes.end()));
+    index_created_path(commit_result.value());
   }
 
   // 索引已经落库后再把真实 UPSERT 分发给扩展消费者。

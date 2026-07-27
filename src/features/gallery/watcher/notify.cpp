@@ -12,6 +12,7 @@
 #include "features/gallery/state.hpp"
 #include "features/gallery/types.hpp"
 #include "features/gallery/watcher/sync.hpp"
+#include "features/gallery/watcher/watcher.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
@@ -39,43 +40,6 @@ struct WatchReadResult {
   DWORD error = 0;
   DirectoryWatchBackend backend = DirectoryWatchBackend::Extended;
 };
-
-auto build_ignore_key(const std::filesystem::path& path)
-    -> std::expected<std::wstring, std::string> {
-  auto normalized_result = utils::path::NormalizePath(path);
-  if (!normalized_result) {
-    return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
-  }
-  return utils::path::NormalizeForComparison(normalized_result.value());
-}
-
-// 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
-auto cleanup_expired_manual_file_system_ignores(core::AppState& app_state) -> void {
-  auto now = std::chrono::steady_clock::now();
-  std::erase_if(app_state.gallery->manual_file_system_ignore_paths, [now](const auto& pair) {
-    const auto& entry = pair.second;
-    return entry.in_flight_count <= 0 && entry.ignore_until <= now;
-  });
-}
-
-// 判断路径是否在应用主动文件系统操作的忽略窗口内。
-auto is_path_in_manual_file_system_ignore(core::AppState& app_state,
-                                          const std::filesystem::path& path) -> bool {
-  auto key_result = build_ignore_key(path);
-  if (!key_result) {
-    return false;
-  }
-
-  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
-  cleanup_expired_manual_file_system_ignores(app_state);
-  auto it = app_state.gallery->manual_file_system_ignore_paths.find(key_result.value());
-  if (it == app_state.gallery->manual_file_system_ignore_paths.end()) {
-    return false;
-  }
-
-  const auto now = std::chrono::steady_clock::now();
-  return it->second.in_flight_count > 0 || it->second.ignore_until > now;
-}
 
 // 在 Basic 通知无法识别已消失路径类型时，用目录索引与资产前缀判断是否需要全量对账。
 auto unknown_removed_path_requires_full_rescan(core::AppState& app_state,
@@ -280,7 +244,8 @@ auto process_watch_notifications(core::AppState& app_state, FolderWatcherState& 
   effective_notifications.reserve(notifications.size());
 
   for (const auto& notification : notifications) {
-    if (is_path_in_manual_file_system_ignore(app_state, notification.path)) {
+    if (features::gallery::watcher::is_path_in_manual_file_system_ignore(app_state,
+                                                                         notification.path)) {
       Logger().debug("Watcher ignored notification for manual file-system path '{}', action={}",
                      notification.path.string(), notification.action);
       continue;

@@ -380,18 +380,6 @@ auto purge_expired_missing_assets(core::AppState& app_state, std::int64_t cutoff
   return static_cast<std::int64_t>(result->size());
 }
 
-auto delete_asset(core::AppState& app_state, int64_t id) -> std::expected<void, std::string> {
-  std::string sql = "DELETE FROM assets WHERE id = ?";
-  std::vector<core::database::DbParam> params = {id};
-
-  auto result = core::database::execute(app_state, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to delete asset item: " + result.error());
-  }
-
-  return {};
-}
-
 auto batch_delete_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string> {
   if (ids.empty()) {

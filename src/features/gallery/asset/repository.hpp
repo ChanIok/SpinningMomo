@@ -51,7 +51,6 @@ auto restore_asset_by_id(core::AppState& app_state, std::int64_t id)
 auto purge_expired_missing_assets(core::AppState& app_state, std::int64_t cutoff_millis)
     -> std::expected<std::int64_t, std::string>;
 
-auto delete_asset(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string>;
 auto batch_delete_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string>;
 

@@ -7,10 +7,6 @@
 
 namespace features::gallery::file_operations {
 
-// 按用户意图删除资产索引，并可选删除对应的物理文件。
-auto delete_asset(core::AppState& app_state, const DeleteParams& params)
-    -> std::expected<OperationResult, std::string>;
-
 // 使用系统默认应用打开指定资产文件。
 auto open_asset_with_default_app(core::AppState& app_state, std::int64_t id)
     -> std::expected<OperationResult, std::string>;

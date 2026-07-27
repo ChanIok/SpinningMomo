@@ -2,7 +2,6 @@
 
 #include "vendor/std.hpp"
 
-#include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 
 #include "core/database/database.hpp"
@@ -364,18 +363,19 @@ auto create_child_folder(core::AppState& app_state, std::int64_t parent_folder_i
   if (!ignore_result) {
     return std::unexpected("Failed to register watcher ignore: " + ignore_result.error());
   }
-  auto complete_ignore = wil::scope_exit([&app_state, &target_path]() {
+  auto complete_ignore = [&app_state, &target_path]() {
     auto result = features::gallery::watcher::complete_manual_file_system_ignore(
         app_state, target_path, target_path);
     if (!result) {
       Logger().warn("Failed to complete watcher ignore for created folder '{}': {}",
                     target_path.string(), result.error());
     }
-  });
+  };
 
   // 磁盘是目录存在性的事实来源，只有创建成功后才写入索引。
   std::error_code create_error;
   if (!std::filesystem::create_directory(target_path, create_error)) {
+    complete_ignore();
     auto message = create_error ? create_error.message() : "target already exists";
     return std::unexpected("Failed to create folder on disk: " + message);
   }
@@ -396,9 +396,11 @@ auto create_child_folder(core::AppState& app_state, std::int64_t parent_folder_i
           rollback_error ? rollback_error.message() : "directory is no longer empty";
       message += "; failed to roll back empty directory: " + rollback_message;
     }
+    complete_ignore();
     return std::unexpected(message);
   }
 
+  complete_ignore();
   return OperationResult{
       .success = true,
       .message = "Folder created",

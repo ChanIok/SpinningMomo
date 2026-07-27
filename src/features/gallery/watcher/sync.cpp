@@ -16,6 +16,7 @@
 #include "features/gallery/scanner/scanner.hpp"
 #include "features/gallery/state.hpp"
 #include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 #include "utils/time.hpp"
@@ -451,6 +452,10 @@ auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watch
     }
 
     auto candidate_path = std::filesystem::path(path);
+    if (features::gallery::watcher::is_path_in_manual_file_system_ignore(app_state,
+                                                                         candidate_path)) {
+      continue;
+    }
     if (!scanner::common::is_supported_file(candidate_path, supported_extensions)) {
       continue;
     }
@@ -486,6 +491,11 @@ auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watch
       continue;
     }
 
+    if (features::gallery::watcher::is_path_in_manual_file_system_ignore(
+            app_state, std::filesystem::path(path))) {
+      continue;
+    }
+
     auto remove_result =
         scanner::asset_pipeline::mark_asset_missing_at_path(app_state, std::filesystem::path(path));
     if (!remove_result) {
@@ -511,6 +521,11 @@ auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watch
     }
 
     if (action != PendingFileChangeAction::UPSERT) {
+      continue;
+    }
+
+    if (features::gallery::watcher::is_path_in_manual_file_system_ignore(
+            app_state, std::filesystem::path(path))) {
       continue;
     }
 

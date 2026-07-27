@@ -27,13 +27,36 @@ auto is_shutdown_requested(const core::AppState& app_state) -> bool {
   return app_state.gallery && app_state.gallery->shutdown_requested.load(std::memory_order_acquire);
 }
 
-auto build_ignore_key(const std::filesystem::path& path)
-    -> std::expected<std::wstring, std::string> {
-  auto normalized_result = utils::path::NormalizePath(path);
-  if (!normalized_result) {
-    return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
+struct ManualFileSystemIgnorePath {
+  std::filesystem::path normalized_path;
+  std::wstring comparison_key;
+};
+
+// begin/complete 必须使用同一组规范路径；源和目标相同时只登记一次。
+auto normalize_manual_file_system_ignore_paths(const std::filesystem::path& source_path,
+                                               const std::filesystem::path& destination_path)
+    -> std::expected<std::vector<ManualFileSystemIgnorePath>, std::string> {
+  std::vector<ManualFileSystemIgnorePath> paths;
+  paths.reserve(2);
+  std::unordered_set<std::wstring> seen_keys;
+  seen_keys.reserve(2);
+
+  for (const auto& path : {source_path, destination_path}) {
+    auto normalized_result = utils::path::NormalizePath(path);
+    if (!normalized_result) {
+      return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
+    }
+
+    auto comparison_key = utils::path::NormalizeForComparison(normalized_result.value());
+    if (!seen_keys.insert(comparison_key).second) {
+      continue;
+    }
+    paths.push_back(ManualFileSystemIgnorePath{
+        .normalized_path = std::move(normalized_result.value()),
+        .comparison_key = std::move(comparison_key),
+    });
   }
-  return utils::path::NormalizeForComparison(normalized_result.value());
+  return paths;
 }
 
 // 清理已经离开 in-flight 且超过缓冲期的手动操作路径。
@@ -586,30 +609,36 @@ auto begin_manual_file_system_ignore(core::AppState& app_state,
                                      const std::filesystem::path& source_path,
                                      const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
-  auto source_key_result = build_ignore_key(source_path);
-  if (!source_key_result) {
-    return std::unexpected(source_key_result.error());
+  auto paths_result = normalize_manual_file_system_ignore_paths(source_path, destination_path);
+  if (!paths_result) {
+    return std::unexpected(paths_result.error());
   }
-  auto destination_key_result = build_ignore_key(destination_path);
-  if (!destination_key_result) {
-    return std::unexpected(destination_key_result.error());
-  }
+  auto paths = std::move(paths_result.value());
 
-  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
-  cleanup_expired_manual_file_system_ignores(app_state);
-  const auto now = std::chrono::steady_clock::now();
-
-  auto touch = [&](const std::wstring& key) {
-    // in_flight_count 允许多个并发操作命中同一路径，避免互相提前解除忽略。
-    auto& entry = app_state.gallery->manual_file_system_ignore_paths[key];
-    entry.in_flight_count += 1;
-    if (entry.ignore_until < now + kManualFileSystemIgnoreGracePeriod) {
-      entry.ignore_until = now + kManualFileSystemIgnoreGracePeriod;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
+    cleanup_expired_manual_file_system_ignores(app_state);
+    const auto now = std::chrono::steady_clock::now();
+    for (const auto& path : paths) {
+      // in_flight_count 允许多个并发操作命中同一路径，避免互相提前解除忽略。
+      auto& entry = app_state.gallery->manual_file_system_ignore_paths[path.comparison_key];
+      entry.in_flight_count += 1;
+      if (entry.ignore_until < now + kManualFileSystemIgnoreGracePeriod) {
+        entry.ignore_until = now + kManualFileSystemIgnoreGracePeriod;
+      }
     }
-  };
+  }
 
-  touch(source_key_result.value());
-  touch(destination_key_result.value());
+  // ignore 已经生效后再清除旧队列；清理期间到达的新通知会在入口被过滤。
+  std::lock_guard<std::mutex> watcher_lock(app_state.gallery->folder_watchers_mutex);
+  for (auto& [_, watcher] : app_state.gallery->folder_watchers) {
+    std::lock_guard<std::mutex> pending_lock(watcher.pending_mutex);
+    for (const auto& path : paths) {
+      const auto normalized_path = path.normalized_path.string();
+      watcher.pending_file_changes.erase(normalized_path);
+      watcher.pending_stable_file_changes.erase(normalized_path);
+    }
+  }
   return {};
 }
 
@@ -618,34 +647,46 @@ auto complete_manual_file_system_ignore(core::AppState& app_state,
                                         const std::filesystem::path& source_path,
                                         const std::filesystem::path& destination_path)
     -> std::expected<void, std::string> {
-  auto source_key_result = build_ignore_key(source_path);
-  if (!source_key_result) {
-    return std::unexpected(source_key_result.error());
-  }
-  auto destination_key_result = build_ignore_key(destination_path);
-  if (!destination_key_result) {
-    return std::unexpected(destination_key_result.error());
+  auto paths_result = normalize_manual_file_system_ignore_paths(source_path, destination_path);
+  if (!paths_result) {
+    return std::unexpected(paths_result.error());
   }
 
   std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
   cleanup_expired_manual_file_system_ignores(app_state);
   const auto now = std::chrono::steady_clock::now();
 
-  auto touch = [&](const std::wstring& key) {
-    auto it = app_state.gallery->manual_file_system_ignore_paths.find(key);
+  for (const auto& path : paths_result.value()) {
+    auto it = app_state.gallery->manual_file_system_ignore_paths.find(path.comparison_key);
     if (it == app_state.gallery->manual_file_system_ignore_paths.end()) {
-      return;
+      continue;
     }
 
     // 操作完成后并不立刻解除，保留短暂 grace 窗口来过滤延迟事件。
     it->second.in_flight_count = std::max(0, it->second.in_flight_count - 1);
     it->second.ignore_until = now + kManualFileSystemIgnoreGracePeriod;
-  };
-
-  touch(source_key_result.value());
-  touch(destination_key_result.value());
+  }
   cleanup_expired_manual_file_system_ignores(app_state);
   return {};
+}
+
+auto is_path_in_manual_file_system_ignore(core::AppState& app_state,
+                                          const std::filesystem::path& path) -> bool {
+  auto paths_result = normalize_manual_file_system_ignore_paths(path, path);
+  if (!paths_result || paths_result->empty()) {
+    return false;
+  }
+
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_file_system_ignore_mutex);
+  cleanup_expired_manual_file_system_ignores(app_state);
+  auto it =
+      app_state.gallery->manual_file_system_ignore_paths.find(paths_result->front().comparison_key);
+  if (it == app_state.gallery->manual_file_system_ignore_paths.end()) {
+    return false;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  return it->second.in_flight_count > 0 || it->second.ignore_until > now;
 }
 
 auto dispatch_manual_scan_changes(core::AppState& app_state, const std::vector<ScanChange>& changes)
