@@ -18,12 +18,10 @@ export function useGallerySidebar() {
 
   // 从 store 读取文件夹树数据
   const folders = computed(() => store.folders)
-  const foldersLoading = computed(() => store.foldersLoading)
   const foldersError = computed(() => store.foldersError)
 
   // 从 store 读取标签树数据
   const tags = computed(() => store.tags)
-  const tagsLoading = computed(() => store.tagsLoading)
   const tagsError = computed(() => store.tagsError)
 
   const selectedFolder = computed(() => {
@@ -232,7 +230,6 @@ export function useGallerySidebar() {
    */
   async function loadTagTree() {
     try {
-      store.setTagsLoading(true)
       store.setTagsError(null)
 
       const tagTree = await galleryApi.getTagTree()
@@ -241,8 +238,6 @@ export function useGallerySidebar() {
       console.error('Failed to load tag tree:', error)
       store.setTagsError('加载标签树失败')
       throw error
-    } finally {
-      store.setTagsLoading(false)
     }
   }
 
@@ -325,10 +320,8 @@ export function useGallerySidebar() {
   return {
     // 状态（从 store 读取）
     folders,
-    foldersLoading,
     foldersError,
     tags,
-    tagsLoading,
     tagsError,
     selectedFolder,
     selectedTag,

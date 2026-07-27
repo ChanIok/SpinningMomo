@@ -245,7 +245,7 @@ async function refreshGalleryFromNotification() {
   do {
     refreshQueued = false
     try {
-      await galleryData.loadFolderTree({ silent: true })
+      await galleryData.loadFolderTree()
       await galleryData.refreshCurrentQuery()
     } catch (error) {
       console.error('Failed to refresh gallery after notification:', error)

@@ -431,51 +431,30 @@ export function useGalleryData() {
   /**
    * 加载文件夹树
    */
-  async function loadFolderTree(options: { silent?: boolean } = {}) {
-    const { silent = false } = options
-
+  async function loadFolderTree() {
     try {
-      if (!silent) {
-        store.setFoldersLoading(true)
-        store.setFoldersError(null)
-      }
-
+      store.setFoldersError(null)
       const folderTree = await galleryApi.getFolderTree()
       store.setFolders(folderTree)
     } catch (error) {
       console.error('Failed to load folder tree:', error)
-      if (!silent) {
-        store.setFoldersError('加载文件夹树失败')
-      }
+      store.setFoldersError('加载文件夹树失败')
       throw error
-    } finally {
-      if (!silent) {
-        store.setFoldersLoading(false)
-      }
     }
   }
 
-  async function loadTagTree(options: { silent?: boolean } = {}) {
-    const { silent = false } = options
-
+  /**
+   * 加载标签树
+   */
+  async function loadTagTree() {
     try {
-      if (!silent) {
-        store.setTagsLoading(true)
-        store.setTagsError(null)
-      }
-
+      store.setTagsError(null)
       const tagTree = await galleryApi.getTagTree()
       store.setTags(tagTree)
     } catch (error) {
       console.error('Failed to load tag tree:', error)
-      if (!silent) {
-        store.setTagsError('加载标签树失败')
-      }
+      store.setTagsError('加载标签树失败')
       throw error
-    } finally {
-      if (!silent) {
-        store.setTagsLoading(false)
-      }
     }
   }
 

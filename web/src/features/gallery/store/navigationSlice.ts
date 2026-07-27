@@ -27,11 +27,9 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
   // 导航数据树（由 useGalleryData/useGallerySidebar 驱动加载）。
   const folders = ref<FolderTreeNode[]>([])
-  const foldersLoading = ref(false)
   const foldersError = ref<string | null>(null)
 
   const tags = ref<TagTreeNode[]>([])
-  const tagsLoading = ref(false)
   const tagsError = ref<string | null>(null)
 
   const viewConfig = ref<ViewConfig>({
@@ -115,10 +113,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
       settings.value.navigation.expandedFolderIds.filter((id) => validFolderIds.has(id))
   }
 
-  function setFoldersLoading(loading: boolean) {
-    foldersLoading.value = loading
-  }
-
   function setFoldersError(errorMessage: string | null) {
     foldersError.value = errorMessage
   }
@@ -131,10 +125,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     settings.value.navigation.expandedTagIds = settings.value.navigation.expandedTagIds.filter(
       (id) => validTagIds.has(id)
     )
-  }
-
-  function setTagsLoading(loading: boolean) {
-    tagsLoading.value = loading
   }
 
   function setTagsError(errorMessage: string | null) {
@@ -171,11 +161,9 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
     // 只重置导航/筛选域，不触碰查询缓存与交互态。
     folders.value = []
-    foldersLoading.value = false
     foldersError.value = null
 
     tags.value = []
-    tagsLoading.value = false
     tagsError.value = null
 
     settings.value.navigation.expandedFolderIds = []
@@ -191,10 +179,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
   return {
     folders,
-    foldersLoading,
     foldersError,
     tags,
-    tagsLoading,
     tagsError,
     viewConfig,
     filter,
@@ -213,10 +199,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     collapseAllFolders,
     collapseAllTags,
     setFolders,
-    setFoldersLoading,
     setFoldersError,
     setTags,
-    setTagsLoading,
     setTagsError,
     setViewConfig,
     setFilter,

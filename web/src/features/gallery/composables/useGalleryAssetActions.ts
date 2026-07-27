@@ -161,10 +161,7 @@ export function useGalleryAssetActions() {
 
     try {
       // 标签变更会同时影响左侧标签树计数、当前结果集命中、以及右侧详情标签区。
-      await Promise.all([
-        galleryData.loadTagTree({ silent: true }),
-        galleryData.refreshCurrentQuery(),
-      ])
+      await Promise.all([galleryData.loadTagTree(), galleryData.refreshCurrentQuery()])
     } catch (error) {
       console.error('Failed to refresh gallery after tag mutation:', error)
     } finally {
@@ -267,10 +264,7 @@ export function useGalleryAssetActions() {
         )
       }
 
-      await Promise.all([
-        galleryData.loadFolderTree({ silent: true }),
-        galleryData.refreshCurrentQuery(),
-      ])
+      await Promise.all([galleryData.loadFolderTree(), galleryData.refreshCurrentQuery()])
       store.clearSelection()
 
       if (result.success) {

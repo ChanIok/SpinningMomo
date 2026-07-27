@@ -50,10 +50,8 @@ const { t } = useI18n()
 
 const {
   folders,
-  foldersLoading,
   foldersError,
   tags,
-  tagsLoading,
   tagsError,
   selectedFolder,
   selectedTag,
@@ -204,7 +202,7 @@ function folderExistsById(nodes: FolderTreeNode[], folderId: number): boolean {
 async function handleCreateChildFolder(parentFolderId: number, name: string) {
   try {
     await createFolder(parentFolderId, name)
-    await galleryData.loadFolderTree({ silent: true })
+    await galleryData.loadFolderTree()
     galleryStore.setFolderExpanded(parentFolderId, true)
     toast.success(t('gallery.sidebar.folders.create.successTitle'), {
       description: t('gallery.sidebar.folders.create.successDescription', { name }),
@@ -490,17 +488,13 @@ onMounted(() => {
                 </div>
               </TooltipProvider>
             </div>
-            <!-- 加载状态 -->
-            <div v-if="foldersLoading" class="px-6 text-xs text-muted-foreground">
-              {{ t('gallery.sidebar.common.loading') }}
-            </div>
             <!-- 错误状态 -->
-            <div v-else-if="foldersError" class="px-6 text-xs text-destructive">
+            <div v-if="foldersError" class="px-6 text-xs text-destructive">
               {{ foldersError }}
             </div>
             <!-- 文件夹树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
             <ScrollArea v-else class="min-h-0 flex-1">
-              <div class="space-y-1 pr-3 pb-1 pl-4">
+              <div class="space-y-1 pt-1.5 pr-3 pb-1 pl-4">
                 <FolderTreeItem
                   v-for="folder in folders"
                   :key="folder.id"
@@ -558,19 +552,15 @@ onMounted(() => {
                 </div>
               </TooltipProvider>
             </div>
-            <!-- 加载状态 -->
-            <div v-if="tagsLoading" class="px-6 text-xs text-muted-foreground">
-              {{ t('gallery.sidebar.common.loading') }}
-            </div>
             <!-- 错误状态 -->
-            <div v-else-if="tagsError" class="px-6 text-xs text-destructive">
+            <div v-if="tagsError" class="px-6 text-xs text-destructive">
               {{ tagsError }}
             </div>
             <!-- 标签树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
             <ScrollArea v-else class="min-h-0 flex-1">
-              <div class="space-y-1 pr-3 pb-1 pl-4">
+              <div class="space-y-1 pt-1.5 pr-3 pb-1 pl-4">
                 <!-- 快速创建标签 -->
-                <div v-if="isCreatingTag" class="px-2">
+                <div v-if="isCreatingTag">
                   <TagInlineEditor
                     :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
                     @confirm="handleCreateTag"

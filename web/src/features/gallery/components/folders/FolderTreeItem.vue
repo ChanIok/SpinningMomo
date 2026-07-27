@@ -232,10 +232,11 @@ function handleDrop(event: DragEvent) {
       </AlertDialogContent>
     </AlertDialog>
 
-    <div v-if="isEditingDisplayName" class="px-2" :style="{ paddingLeft: `${depth * 12}px` }">
+    <div v-if="isEditingDisplayName">
       <TagInlineEditor
         :initial-value="folder.displayName || folder.name"
-        :placeholder="t('gallery.sidebar.folders.rename.placeholder')"
+        :depth="depth"
+        icon-type="folder"
         @confirm="handleRenameConfirm"
         @cancel="handleRenameCancel"
       />
@@ -331,9 +332,11 @@ function handleDrop(event: DragEvent) {
     </ContextMenu>
 
     <!-- 新子目录的输入行固定出现在父节点下方，不依赖已有 children。 -->
-    <div v-if="isCreatingChild" class="px-2" :style="{ paddingLeft: `${(depth + 1) * 12}px` }">
+    <div v-if="isCreatingChild">
       <TagInlineEditor
         :placeholder="t('gallery.sidebar.folders.create.placeholder')"
+        :depth="depth + 1"
+        icon-type="folder"
         @confirm="handleCreateChildConfirm"
         @cancel="handleCreateChildCancel"
       />

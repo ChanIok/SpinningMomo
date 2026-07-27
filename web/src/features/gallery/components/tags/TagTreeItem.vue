@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useI18n } from '@/composables/useI18n'
 import TagInlineEditor from './TagInlineEditor.vue'
 import { useGalleryStore } from '../../store'
 import type { TagTreeNode } from '../../types'
@@ -44,6 +45,7 @@ const emit = defineEmits<{
   dropAssetsToTag: [tagId: number, assetIds: number[]]
 }>()
 
+const { t } = useI18n()
 const galleryStore = useGalleryStore()
 // 与文件夹树保持一致：展开状态统一走 store，而不是递归组件各自记一份局部状态。
 const isExpanded = computed(() => galleryStore.isTagExpanded(props.tag.id))
@@ -183,10 +185,10 @@ function handleDrop(event: DragEvent) {
     </AlertDialog>
 
     <!-- 标签 item -->
-    <div v-if="isEditing" class="px-2" :style="{ paddingLeft: `${depth * 12}px` }">
+    <div v-if="isEditing">
       <TagInlineEditor
         :initial-value="tag.name"
-        placeholder="输入标签名..."
+        :depth="depth"
         @confirm="handleRenameConfirm"
         @cancel="handleRenameCancel"
       />
@@ -334,9 +336,10 @@ function handleDrop(event: DragEvent) {
     <!-- 递归渲染子标签 -->
     <div v-if="isExpanded" class="space-y-1">
       <!-- 创建子标签 -->
-      <div v-if="isCreatingChild" class="px-2" :style="{ paddingLeft: `${(depth + 1) * 12}px` }">
+      <div v-if="isCreatingChild">
         <TagInlineEditor
-          placeholder="输入子标签名..."
+          :depth="depth + 1"
+          :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
           @confirm="handleCreateChildConfirm"
           @cancel="handleCreateChildCancel"
         />
