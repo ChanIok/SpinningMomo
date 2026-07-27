@@ -125,16 +125,7 @@ struct MenuItem {
 
   static auto resolution_item(const features::settings::menu::ResolutionPreset& resolution,
                               size_t index, bool selected = false) -> MenuItem {
-    std::wstring display_text;
-    if (resolution.base_width == 0 && resolution.base_height == 0) {
-      display_text = resolution.name;
-    } else {
-      const auto total_area =
-          static_cast<std::uint64_t>(resolution.base_width) * resolution.base_height;
-      const double megaPixels = total_area / 1000000.0;
-      display_text = std::format(L"{} ({:.1f}M)", resolution.name, megaPixels);
-    }
-    return MenuItem(display_text, MenuAction::resolution_selection(index, resolution.name),
+    return MenuItem(resolution.name, MenuAction::resolution_selection(index, resolution.name),
                     selected);
   }
 
