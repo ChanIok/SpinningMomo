@@ -44,6 +44,11 @@ auto prepare_media_asset(core::AppState& app_state, const std::filesystem::path&
 auto mark_asset_missing_at_path(core::AppState& app_state, const std::filesystem::path& path)
     -> std::expected<bool, std::string>;
 
+// 批量标记首次消失的资产，并返回实际进入 missing 状态的规范路径。
+auto mark_assets_missing_at_paths(core::AppState& app_state,
+                                  const std::vector<std::string>& normalized_paths)
+    -> std::expected<std::vector<std::string>, std::string>;
+
 // 增量路径：过滤 → 粗判 → 指纹 → 媒体 → 单条写库
 auto upsert_asset_at_path(core::AppState& app_state, const std::filesystem::path& root_path,
                           const ScanOptions& options, const std::vector<IgnoreRule>& ignore_rules,

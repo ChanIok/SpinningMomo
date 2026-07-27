@@ -42,6 +42,10 @@ auto update_asset_file_state(core::AppState& app_state, std::int64_t asset_id, s
 auto mark_asset_missing_by_path(core::AppState& app_state, const std::string& path)
     -> std::expected<bool, std::string>;
 
+// 在一个事务中标记一批首次消失的资产，并返回实际发生状态变化的路径。
+auto mark_assets_missing_by_paths(core::AppState& app_state, const std::vector<std::string>& paths)
+    -> std::expected<std::vector<std::string>, std::string>;
+
 auto restore_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string>;
 

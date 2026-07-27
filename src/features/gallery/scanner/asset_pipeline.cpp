@@ -163,6 +163,13 @@ auto mark_asset_missing_at_path(core::AppState& app_state, const std::filesystem
   return asset::repository::mark_asset_missing_by_path(app_state, normalized_result->string());
 }
 
+// 批量标记首次消失的资产，调用方负责传入 Gallery 内部规范路径。
+auto mark_assets_missing_at_paths(core::AppState& app_state,
+                                  const std::vector<std::string>& normalized_paths)
+    -> std::expected<std::vector<std::string>, std::string> {
+  return asset::repository::mark_assets_missing_by_paths(app_state, normalized_paths);
+}
+
 // 在一个事务中写入单个资产及颜色，避免指纹已提交但颜色仍停留在旧状态。
 auto persist_prepared_asset(core::AppState& app_state, PreparedAsset& prepared)
     -> std::expected<PathSyncOutcome, std::string> {

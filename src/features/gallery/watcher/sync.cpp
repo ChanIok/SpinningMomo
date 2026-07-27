@@ -485,31 +485,31 @@ auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watch
     }
   }
 
+  std::vector<std::string> remove_paths;
+  remove_paths.reserve(snapshot.file_changes.size());
   for (const auto& [path, action] : snapshot.file_changes) {
-    if (stop_token.stop_requested()) {
-      return std::unexpected("Gallery scan cancelled");
-    }
-
-    if (action != PendingFileChangeAction::REMOVE) {
-      continue;
-    }
-
-    if (features::gallery::watcher::is_path_in_manual_file_system_ignore(
+    if (action == PendingFileChangeAction::REMOVE &&
+        !features::gallery::watcher::is_path_in_manual_file_system_ignore(
             app_state, std::filesystem::path(path))) {
-      continue;
+      remove_paths.push_back(path);
     }
+  }
 
-    auto remove_result =
-        scanner::asset_pipeline::mark_asset_missing_at_path(app_state, std::filesystem::path(path));
-    if (!remove_result) {
-      // 路径级失败：本轮尽量继续，不升级全量。
-      result.errors.push_back(std::format("{}: {}", path, remove_result.error()));
-      continue;
-    }
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
-    if (remove_result.value()) {
-      result.missing_items++;
-    }
+  // 同一轮 watcher 删除事实共享一次数据库事务，避免大量 REMOVE 逐条提交。
+  auto remove_result =
+      scanner::asset_pipeline::mark_assets_missing_at_paths(app_state, remove_paths);
+  if (!remove_result) {
+    result.errors.push_back("Failed to batch mark removed assets missing: " +
+                            remove_result.error());
+  } else {
+    result.missing_items = static_cast<int>(remove_result->size());
+  }
+
+  for (const auto& path : remove_paths) {
     // 无论索引里是否仍有该行（例如 RPC 已先行删库），都把 REMOVE 写入 changes：
     // ScanChange 表示监视根下的路径已从磁盘消失，供扩展做派生同步（如硬链接撤销）。
     result.changes.push_back(ScanChange{

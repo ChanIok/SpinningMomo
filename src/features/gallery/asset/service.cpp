@@ -784,17 +784,37 @@ auto purge_missing_assets(core::AppState& app_state, const PurgeMissingAssetsPar
   };
 }
 
+struct AssetCacheRow {
+  std::int64_t id;
+  std::string path;
+  std::optional<std::int64_t> size;
+  std::optional<std::int64_t> file_modified_at;
+  std::optional<std::string> hash;
+  std::optional<std::int64_t> missing_at;
+};
+
+// 把数据库缓存行转换成扫描阶段按路径查找的轻量元数据映射。
+auto build_asset_cache(std::vector<AssetCacheRow> assets)
+    -> std::unordered_map<std::string, Metadata> {
+  std::unordered_map<std::string, Metadata> cache;
+  cache.reserve(assets.size());
+  for (auto& asset : assets) {
+    auto path = asset.path;
+    cache.emplace(path, Metadata{
+                            .id = asset.id,
+                            .path = std::move(asset.path),
+                            .size = asset.size.value_or(0),
+                            .file_modified_at = asset.file_modified_at.value_or(0),
+                            .hash = asset.hash.value_or(""),
+                            .missing_at = asset.missing_at,
+                        });
+  }
+  return cache;
+}
+
+// 加载全库资产缓存，供确实需要跨扫描根对账的维护流程使用。
 auto load_asset_cache(core::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Metadata>, std::string> {
-  struct AssetCacheRow {
-    std::int64_t id;
-    std::string path;
-    std::optional<std::int64_t> size;
-    std::optional<std::int64_t> file_modified_at;
-    std::optional<std::string> hash;
-    std::optional<std::int64_t> missing_at;
-  };
-
   std::string sql = R"(
     SELECT id, path, size, file_modified_at, hash, missing_at
     FROM assets
@@ -805,20 +825,35 @@ auto load_asset_cache(core::AppState& app_state)
     return std::unexpected("Failed to load asset cache: " + result.error());
   }
 
-  auto assets = std::move(result.value());
-  std::unordered_map<std::string, Metadata> cache;
-  cache.reserve(assets.size());
-  for (const auto& asset : assets) {
-    Metadata metadata{.id = asset.id,
-                      .path = asset.path,
-                      .size = asset.size.value_or(0),
-                      .file_modified_at = asset.file_modified_at.value_or(0),
-                      .hash = asset.hash.value_or(""),
-                      .missing_at = asset.missing_at};
-
-    cache.emplace(asset.path, std::move(metadata));
-  }
+  auto cache = build_asset_cache(std::move(result.value()));
   Logger().info("Loaded {} assets into memory cache", cache.size());
+  return cache;
+}
+
+// 只加载指定扫描根下的资产缓存，供全量扫描在局部库存上完成分析与清理。
+auto load_asset_cache_under_root(core::AppState& app_state, const std::string& root_path)
+    -> std::expected<std::unordered_map<std::string, Metadata>, std::string> {
+  auto descendant_begin = root_path;
+  if (!descendant_begin.ends_with('/')) {
+    descendant_begin.push_back('/');
+  }
+  // 内部路径统一使用正斜杠；把末尾 '/' 推进为 '0'，形成可走 path 索引的精确前缀区间。
+  auto descendant_end = descendant_begin;
+  descendant_end.back() = static_cast<char>(descendant_end.back() + 1);
+
+  auto result = core::database::query<AssetCacheRow>(app_state,
+                                                     R"(
+        SELECT id, path, size, file_modified_at, hash, missing_at
+        FROM assets
+        WHERE path >= ? AND path < ?
+      )",
+                                                     {descendant_begin, descendant_end});
+  if (!result) {
+    return std::unexpected("Failed to load asset cache under root: " + result.error());
+  }
+
+  auto cache = build_asset_cache(std::move(result.value()));
+  Logger().info("Loaded {} assets under '{}' into scan cache", cache.size(), root_path);
   return cache;
 }
 

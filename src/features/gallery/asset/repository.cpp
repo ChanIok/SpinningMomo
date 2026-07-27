@@ -337,6 +337,43 @@ auto mark_asset_missing_by_path(core::AppState& app_state, const std::string& pa
   return result->has_value();
 }
 
+// 在一个事务中标记一批首次消失的资产，并返回实际发生状态变化的路径。
+auto mark_assets_missing_by_paths(core::AppState& app_state, const std::vector<std::string>& paths)
+    -> std::expected<std::vector<std::string>, std::string> {
+  if (paths.empty()) {
+    return std::vector<std::string>{};
+  }
+
+  std::unordered_set<std::string> unique_paths(paths.begin(), paths.end());
+  return core::database::execute_transaction(
+      app_state,
+      [&unique_paths](
+          core::AppState& txn_app_state) -> std::expected<std::vector<std::string>, std::string> {
+        std::vector<std::string> updated_paths;
+        updated_paths.reserve(unique_paths.size());
+
+        // 事务内复用同一个数据库连接，消除逐路径任务入队和提交成本。
+        for (const auto& path : unique_paths) {
+          auto result = core::database::query_scalar<std::string>(txn_app_state,
+                                                                  R"(
+                UPDATE assets
+                SET missing_at = unixepoch('subsec') * 1000
+                WHERE path = ? AND missing_at IS NULL
+                RETURNING path
+              )",
+                                                                  {path});
+          if (!result) {
+            return std::unexpected("Failed to mark asset missing at '" + path +
+                                   "': " + result.error());
+          }
+          if (result->has_value()) {
+            updated_paths.push_back(std::move(result->value()));
+          }
+        }
+        return updated_paths;
+      });
+}
+
 auto restore_assets_by_ids(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<void, std::string> {
   if (ids.empty()) {

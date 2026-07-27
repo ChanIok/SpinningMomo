@@ -26,6 +26,12 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
                                     const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<BatchCreateFoldersResult, std::string>;
 
+// 复用调用方已经加载的局部目录库存，在一个事务中物化缺失目录。
+auto batch_create_folders_for_paths(core::AppState& app_state,
+                                    const std::vector<std::filesystem::path>& folder_paths,
+                                    const std::vector<Folder>& folder_inventory)
+    -> std::expected<BatchCreateFoldersResult, std::string>;
+
 // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
 auto ensure_all_root_folder_webview_mappings(core::AppState& app_state)
     -> std::expected<void, std::string>;

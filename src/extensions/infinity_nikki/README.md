@@ -21,7 +21,7 @@
 - 设置驱动注册 watcher -> `PhotoService` 绑定 `post_scan_callback`。
 - callback 收到 `ScanResult.changes` -> `media_hardlinks::apply_runtime_changes`（增量）。
 - 在线照片元数据已授权时，callback 从 `ScanResult.created_folders` 筛选直属 UID 新目录
-  -> 请求角色昵称 -> 补全该目录的 `display_name`。
+  -> 按请求间隔顺序补全昵称 -> 整批结束后最多发送一次 `gallery.changed`。
 - 变更集不可用或初始化场景 -> `media_hardlinks::sync/initialize`（全量）。
 - 重操作统一通过 `task_service` 进入任务系统，便于前端观测进度。
 
@@ -42,7 +42,8 @@
   - 检查回调是否仍绑定在正确 watcher root。
 - 改角色昵称同步：
   - 检查只消费当前 `GamePlayPhotos` 的直属数字 UID 新目录，并发创建按 UID 去重。
-  - 检查数据库仍以条件更新保护用户手动名称，成功更新后发送 `gallery.changed`。
+  - 检查数据库仍以条件更新保护用户手动名称，同一扫描批次成功更新后只发送一次
+    `gallery.changed`。
 - 改任务流程：
   - 检查 task type、进度字段与失败摘要文案是否仍兼容前端任务面板。
 

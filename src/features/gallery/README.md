@@ -10,6 +10,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 - Gallery 通过 `ScanChange` 向扩展报告文件路径变化，但不包含 Infinity Nikki 等扩展业务。
 - Gallery 通过同一个 per-root `post_scan_callback` 分发 `ScanResult`；其中 `changes`
   表示文件变化，`created_folders` 表示本轮真正新增的目录。
+- 全量扫描只加载当前 root 下的资产与目录库存；发现、物化和清理阶段必须复用这份局部快照。
 - 前端沿用 `component -> composable -> store/api -> RPC` 数据流，
   `web/src/features/gallery/store/index.ts` 是 Gallery UI 状态入口。
 
@@ -124,6 +125,7 @@ begin 精确路径屏蔽
 
 - Scanner 只能更新文件系统或媒体派生字段，不能覆盖资产用户数据。
 - 全量扫描与 watcher 必须复用 `features::gallery::scanner::asset_pipeline` 的路径处理语义。
+- 目录创建、目录清理和批量 missing 标记必须在各自的单次数据库事务中完成，不能退回逐项提交。
 - 目录库存变化可以刷新 Gallery UI，但不能伪造文件级 `ScanChange`。
 - 文件与目录变化共用 per-root 扫描完成回调，但必须分别使用 `changes` 和
   `created_folders` 表达，不能混淆语义。

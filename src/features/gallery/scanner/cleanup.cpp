@@ -65,17 +65,14 @@ auto cleanup_removed_assets(core::AppState& app_state,
     result.removed_paths.push_back(metadata.path);
   }
 
-  for (const auto& metadata : removed_assets) {
-    auto missing_result = asset_pipeline::mark_asset_missing_at_path(app_state, metadata.path);
-    if (!missing_result) {
-      Logger().warn("Failed to mark removed asset {} missing: {}", metadata.id,
-                    missing_result.error());
-      continue;
-    }
-    if (missing_result.value()) {
-      result.missing_count++;
-    }
+  // 一次事务完成本轮 missing 状态变更，避免每个路径独立排队和提交。
+  auto missing_result =
+      asset_pipeline::mark_assets_missing_at_paths(app_state, result.removed_paths);
+  if (!missing_result) {
+    Logger().warn("Failed to batch mark removed assets missing: {}", missing_result.error());
+    return result;
   }
+  result.missing_count = static_cast<int>(missing_result->size());
 
   if (result.missing_count > 0) {
     Logger().info("Marked {} removed assets missing under '{}'", result.missing_count, root_str);
@@ -101,13 +98,8 @@ auto build_expected_folder_paths(const std::vector<std::filesystem::path>& folde
 // 删除扫描根下不在真实目录库存中的 folder 记录（先深后浅）。
 auto cleanup_missing_folders(core::AppState& app_state,
                              const std::filesystem::path& normalized_scan_root,
-                             const std::vector<std::filesystem::path>& folder_paths) -> int {
-  auto all_folders_result = folder::repository::list_all_folders(app_state);
-  if (!all_folders_result) {
-    Logger().warn("Failed to list folders for cleanup: {}", all_folders_result.error());
-    return 0;
-  }
-
+                             const std::vector<std::filesystem::path>& folder_paths,
+                             const std::vector<Folder>& folder_inventory) -> int {
   auto root_str = normalized_scan_root.string();
   auto expected_paths = build_expected_folder_paths(folder_paths, normalized_scan_root);
 
@@ -117,7 +109,7 @@ auto cleanup_missing_folders(core::AppState& app_state,
   };
 
   std::vector<MissingFolder> missing_folders;
-  for (const auto& folder : all_folders_result.value()) {
+  for (const auto& folder : folder_inventory) {
     if (folder.path == root_str) {
       continue;
     }
@@ -136,17 +128,22 @@ auto cleanup_missing_folders(core::AppState& app_state,
     return a.path.size() > b.path.size();
   });
 
-  int deleted_folders = 0;
+  std::vector<std::int64_t> missing_folder_ids;
+  missing_folder_ids.reserve(missing_folders.size());
   for (const auto& folder : missing_folders) {
-    auto delete_result = folder::repository::delete_folder(app_state, folder.id);
-    if (!delete_result) {
-      Logger().debug("Skip folder cleanup for '{}' (id={}): {}", folder.path, folder.id,
-                     delete_result.error());
-      continue;
-    }
-    deleted_folders++;
+    missing_folder_ids.push_back(folder.id);
   }
 
+  // 子目录到父目录的顺序由上面的排序固定，整批删除共享一个事务。
+  auto delete_result =
+      folder::repository::batch_delete_folders_by_ids(app_state, missing_folder_ids);
+  if (!delete_result) {
+    Logger().warn("Failed to batch delete stale folders under '{}': {}", root_str,
+                  delete_result.error());
+    return 0;
+  }
+
+  auto deleted_folders = static_cast<int>(missing_folder_ids.size());
   if (deleted_folders > 0) {
     Logger().info("Deleted {} stale folders under '{}'", deleted_folders, root_str);
   }
@@ -159,6 +156,7 @@ auto run_cleanup_phase(core::AppState& app_state, const std::filesystem::path& n
                        const std::vector<FileSystemInfo>& file_infos,
                        const std::vector<std::filesystem::path>& folder_paths,
                        const std::unordered_map<std::string, Metadata>& asset_cache,
+                       const std::vector<Folder>& folder_inventory,
                        const std::function<void(const ScanProgress&)>& progress_callback)
     -> CleanupPhaseResult {
   progress::report_scan_progress(progress_callback, "cleanup", 0, 1, progress::kCleanupPercent,
@@ -167,7 +165,7 @@ auto run_cleanup_phase(core::AppState& app_state, const std::filesystem::path& n
   auto removed_assets_result =
       cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
   [[maybe_unused]] int deleted_folders =
-      cleanup_missing_folders(app_state, normalized_scan_root, folder_paths);
+      cleanup_missing_folders(app_state, normalized_scan_root, folder_paths, folder_inventory);
   return CleanupPhaseResult{
       .missing_items = removed_assets_result.missing_count,
       .removed_paths = std::move(removed_assets_result.removed_paths),

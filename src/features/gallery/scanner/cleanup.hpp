@@ -17,6 +17,7 @@ auto run_cleanup_phase(core::AppState& app_state, const std::filesystem::path& n
                        const std::vector<FileSystemInfo>& file_infos,
                        const std::vector<std::filesystem::path>& folder_paths,
                        const std::unordered_map<std::string, Metadata>& asset_cache,
+                       const std::vector<Folder>& folder_inventory,
                        const std::function<void(const ScanProgress&)>& progress_callback)
     -> CleanupPhaseResult;
 

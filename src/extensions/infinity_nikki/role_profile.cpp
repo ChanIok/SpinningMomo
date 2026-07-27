@@ -24,7 +24,7 @@ constexpr std::string_view kRoleApiBaseUrl = "https://nuan5.pro/api/role/";
 constexpr std::int32_t kRoleApiConnectTimeoutMs = 3000;
 constexpr std::int32_t kRoleApiReceiveTimeoutMs = 5000;
 constexpr std::size_t kMaxNicknameBytes = 128;
-constexpr auto kRoleApiMinRequestInterval = std::chrono::milliseconds(500);
+constexpr auto kRoleApiMinRequestInterval = std::chrono::seconds(2);
 
 struct RoleResponse {
   std::optional<std::string> nickname;
@@ -80,7 +80,7 @@ auto parse_role_nickname(const std::string& response_body)
   return nickname;
 }
 
-// 等待全局请求间隔，避免首次扫描多个账号时瞬间并发冲击角色接口。
+// 等待全局一秒请求间隔，确保并发批次合计也不会超过接口频率限制。
 auto acquire_role_api_send_slot() -> asio::awaitable<void> {
   static std::mutex gate_mutex;
   static auto next_allowed_at = std::chrono::steady_clock::time_point::min();
@@ -177,60 +177,78 @@ auto release_pending_uid(const std::string& uid) -> void {
   state.pending_uids.erase(uid);
 }
 
-// 在新建目录是直属 UID 文件夹时异步补全其角色昵称。
-auto schedule_nickname_sync(core::AppState& app_state,
-                            const std::filesystem::path& game_play_photos_root,
-                            const features::gallery::Folder& folder) -> void {
+// 从本轮新建目录中批量补全直属 UID 文件夹昵称，并在整批结束后合并通知。
+auto schedule_nickname_sync_for_created_folders(
+    core::AppState& app_state, const std::filesystem::path& game_play_photos_root,
+    const std::vector<features::gallery::Folder>& created_folders) -> void {
   if (!app_state.async || !app_state.settings ||
       !app_state.settings->raw.extensions.infinity_nikki.allow_online_photo_metadata_extract) {
     return;
   }
-  if (!is_direct_uid_folder(folder, game_play_photos_root)) {
-    return;
-  }
 
-  // 在投递协程前占住 UID，避免并行扫描重复建档时发出相同请求。
+  std::vector<features::gallery::Folder> pending_folders;
+  pending_folders.reserve(created_folders.size());
+
+  // 在投递协程前一次筛选并占住 UID，避免相邻扫描重复查询同一账号。
   auto& sync_state = nickname_sync_state();
   {
     std::lock_guard<std::mutex> lock(sync_state.mutex);
-    if (!sync_state.pending_uids.insert(folder.name).second) {
-      return;
+    for (const auto& folder : created_folders) {
+      if (is_direct_uid_folder(folder, game_play_photos_root) &&
+          sync_state.pending_uids.insert(folder.name).second) {
+        pending_folders.push_back(folder);
+      }
     }
+  }
+  if (pending_folders.empty()) {
+    return;
   }
 
   auto* io_context = core::async::get_io_context(app_state);
   if (!io_context) {
-    release_pending_uid(folder.name);
+    for (const auto& folder : pending_folders) {
+      release_pending_uid(folder.name);
+    }
     Logger().warn("Skip InfinityNikki role nickname sync: async runtime is unavailable");
     return;
   }
 
   asio::co_spawn(
       *io_context,
-      [&app_state, folder]() -> asio::awaitable<void> {
+      [&app_state, pending_folders = std::move(pending_folders)]() -> asio::awaitable<void> {
         co_await asio::post(asio::use_awaitable);
 
-        try {
-          // 设置在排队期间被关闭时停止对外请求，但仍释放请求占位。
+        bool updated_any = false;
+        for (const auto& folder : pending_folders) {
+          // 设置在批次排队期间被关闭时停止剩余请求。
           if (!app_state.settings || !app_state.settings->raw.extensions.infinity_nikki
                                           .allow_online_photo_metadata_extract) {
-            release_pending_uid(folder.name);
-            co_return;
+            break;
           }
 
-          auto sync_result = co_await sync_nickname_for_folder(app_state, folder);
-          if (!sync_result) {
-            Logger().warn("InfinityNikki role nickname sync failed for UID {}: {}", folder.name,
-                          sync_result.error());
-          } else if (sync_result.value()) {
-            Logger().info("InfinityNikki role nickname synced for UID {}", folder.name);
-            core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
+          try {
+            auto sync_result = co_await sync_nickname_for_folder(app_state, folder);
+            if (!sync_result) {
+              Logger().warn("InfinityNikki role nickname sync failed for UID {}: {}", folder.name,
+                            sync_result.error());
+            } else if (sync_result.value()) {
+              updated_any = true;
+              Logger().info("InfinityNikki role nickname synced for UID {}", folder.name);
+            }
+          } catch (const std::exception& error) {
+            // 单个账号异常只结束本项，批次继续处理其他账号。
+            Logger().warn("InfinityNikki role nickname sync threw for UID {}: {}", folder.name,
+                          error.what());
           }
-        } catch (const std::exception& error) {
-          Logger().warn("InfinityNikki role nickname sync threw for UID {}: {}", folder.name,
-                        error.what());
         }
-        release_pending_uid(folder.name);
+
+        // 无论批次是否中途停用设置，都释放本轮全部 UID 占位。
+        for (const auto& folder : pending_folders) {
+          release_pending_uid(folder.name);
+        }
+        if (updated_any) {
+          core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
+        }
       },
       asio::detached_t{});
 }

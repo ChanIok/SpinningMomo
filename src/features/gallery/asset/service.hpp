@@ -50,4 +50,8 @@ auto purge_missing_assets(core::AppState& app_state, const PurgeMissingAssetsPar
 auto load_asset_cache(core::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Metadata>, std::string>;
 
+// 只加载指定扫描根下的资产缓存，避免单根扫描读取整个图库。
+auto load_asset_cache_under_root(core::AppState& app_state, const std::string& root_path)
+    -> std::expected<std::unordered_map<std::string, Metadata>, std::string>;
+
 }  // namespace features::gallery::asset::service

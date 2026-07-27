@@ -138,12 +138,9 @@ auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
   return result;
 }
 
-// 按父先优先顺序物化目录，并同时返回完整路径映射和本轮新增目录。
-auto batch_create_folders_for_paths(core::AppState& app_state,
-                                    const std::vector<std::filesystem::path>& folder_paths)
-    -> std::expected<BatchCreateFoldersResult, std::string> {
-  BatchCreateFoldersResult result;
-
+// 规范化目录集合并按父先子后排序，保证事务内可以直接解析 parent_id。
+auto normalize_and_sort_folder_paths(const std::vector<std::filesystem::path>& folder_paths)
+    -> std::expected<std::vector<std::filesystem::path>, std::string> {
   std::vector<std::filesystem::path> normalized_paths;
   normalized_paths.reserve(folder_paths.size());
   std::unordered_set<std::string> normalized_path_keys;
@@ -162,85 +159,164 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
     }
   }
 
-  // 按路径深度排序，确保父目录先创建
-  auto sorted_paths = normalized_paths;
-  std::ranges::sort(sorted_paths, [](const auto& a, const auto& b) {
-    // 按路径字符串长度排序（通常深度较浅的路径更短）
+  // 路径较短的父目录优先；同长度时固定字典序，保持扫描结果稳定。
+  std::ranges::sort(normalized_paths, [](const auto& a, const auto& b) {
     auto a_str = a.string();
     auto b_str = b.string();
     if (a_str.length() != b_str.length()) {
       return a_str.length() < b_str.length();
     }
-    return a_str < b_str;  // 相同长度时按字典序
+    return a_str < b_str;
   });
+  return normalized_paths;
+}
 
-  for (const auto& folder_path : sorted_paths) {
-    auto path_str = folder_path.string();
+// 复用局部目录库存，在一个事务中按父先子后物化缺失目录。
+auto batch_create_folders_for_paths(core::AppState& app_state,
+                                    const std::vector<std::filesystem::path>& folder_paths,
+                                    const std::vector<Folder>& folder_inventory)
+    -> std::expected<BatchCreateFoldersResult, std::string> {
+  auto sorted_paths_result = normalize_and_sort_folder_paths(folder_paths);
+  if (!sorted_paths_result) {
+    return std::unexpected(sorted_paths_result.error());
+  }
+  auto sorted_paths = std::move(sorted_paths_result.value());
 
-    // 如果已经处理过，跳过
-    if (result.folder_ids_by_path.contains(path_str)) {
-      continue;
-    }
-
-    // 首先检查数据库中是否已存在
-    auto existing_folder_result = repository::get_folder_by_path(app_state, path_str);
-    if (!existing_folder_result) {
-      return std::unexpected("Failed to query folder for path '" + path_str +
-                             "': " + existing_folder_result.error());
-    }
-
-    if (existing_folder_result->has_value()) {
-      // 文件夹已存在，直接使用
-      auto folder = existing_folder_result->value();
-      auto folder_id = folder.id;
-      result.folder_ids_by_path[path_str] = folder_id;
-      ensure_root_folder_webview_mapping(app_state, folder);
-      Logger().debug("Found existing folder '{}' with ID {}", path_str, folder_id);
-      continue;
-    }
-
-    // 文件夹不存在，需要创建
-    // 计算父路径和 parent_id
-    std::optional<std::int64_t> parent_id;
-    auto parent_path = folder_path.parent_path();
-
-    if (!parent_path.empty() && parent_path != folder_path.root_path()) {
-      std::string parent_path_str = parent_path.string();
-
-      // 输入外的父目录表示当前路径是一个扫描根；输入内的父目录必须已物化。
-      if (normalized_path_keys.contains(parent_path_str)) {
-        if (auto it = result.folder_ids_by_path.find(parent_path_str);
-            it != result.folder_ids_by_path.end()) {
-          parent_id = it->second;
-        } else {
-          return std::unexpected("Parent folder '" + parent_path_str + "' is missing for child '" +
-                                 path_str + "'");
-        }
-      }
-    }
-
-    // 创建新文件夹
-    std::string folder_name = folder_path.filename().string();
-    Folder new_folder{.path = path_str, .parent_id = parent_id, .name = folder_name};
-
-    auto create_result = repository::create_folder(app_state, new_folder);
-    if (!create_result) {
-      return std::unexpected("Failed to create folder for path '" + path_str +
-                             "': " + create_result.error());
-    }
-
-    auto folder_id = create_result.value();
-    result.folder_ids_by_path[path_str] = folder_id;
-    auto created_folder =
-        Folder{.id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name};
-    ensure_root_folder_webview_mapping(app_state, created_folder);
-    // 只把本次实际 INSERT 的目录写入结果，已有目录仅进入路径映射。
-    result.created_folders.push_back(std::move(created_folder));
-    Logger().debug("Created folder '{}' with ID {} (parent_id: {})", path_str, folder_id,
-                   parent_id.has_value() ? std::to_string(parent_id.value()) : "NULL");
+  std::unordered_set<std::string> normalized_path_keys;
+  normalized_path_keys.reserve(sorted_paths.size());
+  for (const auto& path : sorted_paths) {
+    normalized_path_keys.insert(path.string());
   }
 
+  std::unordered_map<std::string, Folder> existing_folders_by_path;
+  existing_folders_by_path.reserve(folder_inventory.size());
+  for (const auto& folder : folder_inventory) {
+    if (normalized_path_keys.contains(folder.path)) {
+      existing_folders_by_path.emplace(folder.path, folder);
+    }
+  }
+
+  auto sync_result = core::database::execute_transaction(
+      app_state,
+      [&sorted_paths, &normalized_path_keys, &existing_folders_by_path](
+          core::AppState& txn_app_state) -> std::expected<BatchCreateFoldersResult, std::string> {
+        BatchCreateFoldersResult result;
+        result.folder_ids_by_path.reserve(sorted_paths.size());
+        result.created_folders.reserve(sorted_paths.size());
+
+        for (const auto& folder_path : sorted_paths) {
+          auto path_str = folder_path.string();
+
+          // 已有目录直接进入本轮完整路径映射，不再逐路径查询数据库。
+          if (auto existing = existing_folders_by_path.find(path_str);
+              existing != existing_folders_by_path.end()) {
+            result.folder_ids_by_path.emplace(path_str, existing->second.id);
+            continue;
+          }
+
+          std::optional<std::int64_t> parent_id;
+          auto parent_path = folder_path.parent_path();
+          if (!parent_path.empty() && parent_path != folder_path.root_path()) {
+            auto parent_path_str = parent_path.string();
+
+            // 输入内的父目录必须已在本事务前序步骤中物化。
+            if (normalized_path_keys.contains(parent_path_str)) {
+              auto parent = result.folder_ids_by_path.find(parent_path_str);
+              if (parent == result.folder_ids_by_path.end()) {
+                return std::unexpected("Parent folder '" + parent_path_str +
+                                       "' is missing for child '" + path_str + "'");
+              }
+              parent_id = parent->second;
+            }
+          }
+
+          auto folder_name = folder_path.filename().string();
+          Folder new_folder{.path = path_str, .parent_id = parent_id, .name = folder_name};
+          auto create_result = repository::create_folder(txn_app_state, new_folder);
+          if (!create_result) {
+            return std::unexpected("Failed to create folder for path '" + path_str +
+                                   "': " + create_result.error());
+          }
+
+          auto created_folder = Folder{
+              .id = create_result.value(),
+              .path = path_str,
+              .parent_id = parent_id,
+              .name = folder_name,
+          };
+          result.folder_ids_by_path.emplace(path_str, created_folder.id);
+          result.created_folders.push_back(std::move(created_folder));
+        }
+        return result;
+      });
+  if (!sync_result) {
+    return std::unexpected(sync_result.error());
+  }
+
+  auto result = std::move(sync_result.value());
+  // 数据库事务提交后再更新 WebView 映射，避免事务失败留下不存在的根目录映射。
+  for (const auto& folder : folder_inventory) {
+    if (result.folder_ids_by_path.contains(folder.path)) {
+      ensure_root_folder_webview_mapping(app_state, folder);
+    }
+  }
+  for (const auto& folder : result.created_folders) {
+    ensure_root_folder_webview_mapping(app_state, folder);
+  }
+  Logger().debug("Synchronized {} folders in one transaction (created={})",
+                 result.folder_ids_by_path.size(), result.created_folders.size());
   return result;
+}
+
+// 为通用调用方按顶层输入路径加载局部库存，再复用事务化目录物化逻辑。
+auto batch_create_folders_for_paths(core::AppState& app_state,
+                                    const std::vector<std::filesystem::path>& folder_paths)
+    -> std::expected<BatchCreateFoldersResult, std::string> {
+  auto sorted_paths_result = normalize_and_sort_folder_paths(folder_paths);
+  if (!sorted_paths_result) {
+    return std::unexpected(sorted_paths_result.error());
+  }
+  const auto& sorted_paths = sorted_paths_result.value();
+
+  // 单目录调用只做精确查询，避免“确保扫描根存在”时预先读取整棵目录树。
+  if (sorted_paths.size() == 1) {
+    std::vector<Folder> folder_inventory;
+    auto existing_result = repository::get_folder_by_path(app_state, sorted_paths.front().string());
+    if (!existing_result) {
+      return std::unexpected(existing_result.error());
+    }
+    if (existing_result->has_value()) {
+      folder_inventory.push_back(std::move(existing_result->value()));
+    }
+    return batch_create_folders_for_paths(app_state, sorted_paths, folder_inventory);
+  }
+
+  std::unordered_set<std::string> path_keys;
+  path_keys.reserve(sorted_paths.size());
+  for (const auto& path : sorted_paths) {
+    path_keys.insert(path.string());
+  }
+
+  std::vector<Folder> folder_inventory;
+  std::unordered_set<std::int64_t> seen_folder_ids;
+  // 输入集合中没有父项的路径就是本次局部库存查询根。
+  for (const auto& path : sorted_paths) {
+    if (path_keys.contains(path.parent_path().string())) {
+      continue;
+    }
+
+    auto inventory_result = repository::list_folders_under_root(app_state, path.string());
+    if (!inventory_result) {
+      return std::unexpected(inventory_result.error());
+    }
+    for (auto& folder : inventory_result.value()) {
+      if (seen_folder_ids.insert(folder.id).second) {
+        folder_inventory.push_back(std::move(folder));
+      }
+    }
+  }
+
+  return batch_create_folders_for_paths(app_state, sorted_paths, folder_inventory);
 }
 
 // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。

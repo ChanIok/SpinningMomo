@@ -26,6 +26,15 @@ auto update_folder_display_name_if_empty(core::AppState& app_state, std::int64_t
 
 auto delete_folder(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string>;
 
+// 一次读取指定扫描根及其全部子目录，供扫描阶段建立局部目录库存。
+auto list_folders_under_root(core::AppState& app_state, const std::string& root_path)
+    -> std::expected<std::vector<Folder>, std::string>;
+
+// 在一个事务中按调用方给出的顺序删除目录。
+auto batch_delete_folders_by_ids(core::AppState& app_state,
+                                 const std::vector<std::int64_t>& folder_ids)
+    -> std::expected<void, std::string>;
+
 auto list_all_folders(core::AppState& app_state) -> std::expected<std::vector<Folder>, std::string>;
 
 auto get_child_folders(core::AppState& app_state, std::optional<std::int64_t> parent_id)

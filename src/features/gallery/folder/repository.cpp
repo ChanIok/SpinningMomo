@@ -158,6 +158,55 @@ auto delete_folder(core::AppState& app_state, std::int64_t id) -> std::expected<
   return {};
 }
 
+// 一次读取指定扫描根及其全部子目录，避免全量扫描反复查询单个路径。
+auto list_folders_under_root(core::AppState& app_state, const std::string& root_path)
+    -> std::expected<std::vector<Folder>, std::string> {
+  auto descendant_begin = root_path;
+  if (!descendant_begin.ends_with('/')) {
+    descendant_begin.push_back('/');
+  }
+  // 内部路径统一使用正斜杠；把末尾 '/' 推进为 '0'，形成可走 path 索引的精确前缀区间。
+  auto descendant_end = descendant_begin;
+  descendant_end.back() = static_cast<char>(descendant_end.back() + 1);
+
+  auto result = core::database::query<Folder>(app_state,
+                                              R"(
+        SELECT id, path, parent_id, name, display_name,
+               cover_asset_id, sort_order, is_hidden,
+               created_at, updated_at
+        FROM folders
+        WHERE path = ? OR (path >= ? AND path < ?)
+        ORDER BY path
+      )",
+                                              {root_path, descendant_begin, descendant_end});
+  if (!result) {
+    return std::unexpected("Failed to list folders under root: " + result.error());
+  }
+  return result.value();
+}
+
+// 在一个事务中按调用方给出的子先父后顺序删除目录。
+auto batch_delete_folders_by_ids(core::AppState& app_state,
+                                 const std::vector<std::int64_t>& folder_ids)
+    -> std::expected<void, std::string> {
+  if (folder_ids.empty()) {
+    return {};
+  }
+
+  return core::database::execute_transaction(
+      app_state, [&folder_ids](core::AppState& txn_app_state) -> std::expected<void, std::string> {
+        for (const auto folder_id : folder_ids) {
+          auto delete_result = core::database::execute(
+              txn_app_state, "DELETE FROM folders WHERE id = ?", {folder_id});
+          if (!delete_result) {
+            return std::unexpected("Failed to delete folder (id=" + std::to_string(folder_id) +
+                                   "): " + delete_result.error());
+          }
+        }
+        return {};
+      });
+}
+
 auto list_all_folders(core::AppState& app_state)
     -> std::expected<std::vector<Folder>, std::string> {
   std::string sql = R"(

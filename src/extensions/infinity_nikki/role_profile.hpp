@@ -7,9 +7,9 @@
 
 namespace extensions::infinity_nikki::role_profile {
 
-// 在新建目录是直属 UID 文件夹时异步补全其角色昵称。
-auto schedule_nickname_sync(core::AppState& app_state,
-                            const std::filesystem::path& game_play_photos_root,
-                            const features::gallery::Folder& folder) -> void;
+// 从本轮新建目录中批量补全直属 UID 文件夹昵称，并在整批结束后合并通知。
+auto schedule_nickname_sync_for_created_folders(
+    core::AppState& app_state, const std::filesystem::path& game_play_photos_root,
+    const std::vector<features::gallery::Folder>& created_folders) -> void;
 
 }  // namespace extensions::infinity_nikki::role_profile

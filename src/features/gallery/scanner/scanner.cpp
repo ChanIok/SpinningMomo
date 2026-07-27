@@ -28,10 +28,11 @@ struct ScanPreparationContext {
   std::filesystem::path directory;
   std::int64_t folder_id = 0;
   std::vector<Folder> created_folders;
+  std::vector<Folder> folder_inventory;
   std::unordered_map<std::string, Metadata> asset_cache;
 };
 
-// 准备扫描上下文：规范化根路径 → 建 root folder → 可选持久化 ignore → 加载 asset cache
+// 准备扫描上下文：规范化根路径 → 建 root folder → 写 ignore → 加载当前根的目录与资产库存。
 auto prepare_scan_context(core::AppState& app_state, const ScanOptions& options)
     -> std::expected<ScanPreparationContext, std::string> {
   auto normalized_scan_root_result = utils::path::ResolvePath(options.directory);
@@ -71,7 +72,16 @@ auto prepare_scan_context(core::AppState& app_state, const ScanOptions& options)
                    normalized_scan_root.string());
   }
 
-  auto asset_cache_result = asset::service::load_asset_cache(app_state);
+  // 后续目录物化和清理共享同一份根内目录库存，不再重复读取全表。
+  auto folder_inventory_result =
+      folder::repository::list_folders_under_root(app_state, normalized_scan_root.string());
+  if (!folder_inventory_result) {
+    return std::unexpected("Failed to load folder inventory: " + folder_inventory_result.error());
+  }
+
+  // 资产分析与 missing 对账只需要当前扫描根下的缓存。
+  auto asset_cache_result =
+      asset::service::load_asset_cache_under_root(app_state, normalized_scan_root.string());
   if (!asset_cache_result) {
     return std::unexpected("Failed to load asset cache: " + asset_cache_result.error());
   }
@@ -81,6 +91,7 @@ auto prepare_scan_context(core::AppState& app_state, const ScanOptions& options)
       .directory = normalized_scan_root,
       .folder_id = folder_id,
       .created_folders = std::move(root_folder_sync.created_folders),
+      .folder_inventory = std::move(folder_inventory_result.value()),
       .asset_cache = std::move(asset_cache_result.value()),
   };
 }
@@ -99,7 +110,7 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
   progress::report_scan_progress(progress_callback, "preparing", 0, 1, progress::kPreparingPercent,
                                  "Preparing gallery scan context");
 
-  // 1. 准备：规范化根路径、写 ignore、加载 asset cache
+  // 1. 准备：规范化根路径、写 ignore、加载当前根的目录与资产库存。
   auto context_result = prepare_scan_context(app_state, options);
   if (!context_result) {
     return std::unexpected(context_result.error());
@@ -144,8 +155,8 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
   }
 
   // 3. 目录：先物化本次有效目录库存，空目录也能立即进入文件夹树。
-  auto folder_mapping_result =
-      folder::service::batch_create_folders_for_paths(app_state, discovery.folder_paths);
+  auto folder_mapping_result = folder::service::batch_create_folders_for_paths(
+      app_state, discovery.folder_paths, context.folder_inventory);
   if (!folder_mapping_result) {
     return std::unexpected("Failed to synchronize folder inventory: " +
                            folder_mapping_result.error());
@@ -175,9 +186,9 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
   }
 
   // 6. 清理：文件与目录分别以本次盘点库存删除过期索引。
-  auto cleanup_phase =
-      cleanup::run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
-                                 discovery.folder_paths, context.asset_cache, progress_callback);
+  auto cleanup_phase = cleanup::run_cleanup_phase(
+      app_state, context.normalized_scan_root, file_infos, discovery.folder_paths,
+      context.asset_cache, context.folder_inventory, progress_callback);
 
   // 7. 文件变化组装为 ScanChange，目录新增已独立保存在 created_folders。
   std::unordered_set<std::string> processed_updated_paths;

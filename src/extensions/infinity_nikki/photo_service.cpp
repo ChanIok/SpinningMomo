@@ -155,11 +155,9 @@ auto on_gallery_scan_complete(core::AppState& app_state,
   const auto& config = app_state.settings->raw.extensions.infinity_nikki;
 
   if (config.allow_online_photo_metadata_extract) {
-    // 新目录事实与文件 changes 共用当前 root 的扫描完成回调，但保持各自独立语义。
-    for (const auto& folder : result.created_folders) {
-      extensions::infinity_nikki::role_profile::schedule_nickname_sync(
-          app_state, game_play_photos_root, folder);
-    }
+    // 一轮扫描只投递一个 UID 批次，多个昵称写入完成后合并为一次图库刷新。
+    extensions::infinity_nikki::role_profile::schedule_nickname_sync_for_created_folders(
+        app_state, game_play_photos_root, result.created_folders);
   }
 
   if (config.manage_media_hardlinks) {
