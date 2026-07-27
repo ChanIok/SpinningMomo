@@ -12,6 +12,9 @@
 #define IDI_ICON1 101
 IDI_ICON1 ICON "icon.ico"
 
+// 直接嵌入应用清单，确保不同资源编译器生成一致的可执行文件
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+
 // 版本信息资源
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     APP_VERSION_NUM

@@ -53,7 +53,7 @@ target("SpinningMomo")
     -- 添加源文件
     add_files("src/main.cpp")
     add_files("src/**.cpp")
-    add_files("resources/*.rc", "resources/*.manifest")
+    add_files("resources/*.rc")
     
     -- 链接vcpkg包
     add_packages("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
