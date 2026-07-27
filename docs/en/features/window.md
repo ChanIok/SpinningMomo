@@ -5,11 +5,11 @@
 ::: info Supported games
 The tool defaults to *Infinity Nikki* but works with most modern games running in windowed mode — for example:
 - *Final Fantasy XIV*
+- *The Sims 4*
 - *Naraka: Bladepoint*
 - *Wuthering Waves*
 - *Where Winds Meet*
 - *Arknights: Endfield*
-- *Honor of Kings: World*
 - *Neverness to Everness*
 
 To switch to a different window, **right-click the floating window or tray icon** and pick a window from the menu. **The game must be set to windowed mode.**
@@ -49,7 +49,7 @@ Higher resolutions consume more VRAM, RAM, and virtual memory. On an RTX 3060 12
 
 ## Assistive Features
 
-**Preview Window**: When the game window extends beyond your screen, this floating preview (like Photoshop's Navigator) gives you a real-time view with scroll-to-zoom and drag-to-pan.
+**Preview**: When the game window extends beyond your screen, this floating preview (like Photoshop's Navigator) gives you a real-time view with scroll-to-zoom and drag-to-pan.
 
 **Overlay**: Renders the oversized window scaled down into a fullscreen overlay, keeping mouse interactions normal at ultra-high resolutions. Adds CPU overhead — turn it off if you're already seeing lag.
 

@@ -163,6 +163,7 @@ export default defineConfig({
                 { text: "Window & Resolution", link: "/en/features/window" },
                 { text: "Screenshots", link: "/en/features/screenshot" },
                 { text: "Video Recording", link: "/en/features/recording" },
+                { text: "Gallery", link: "/en/features/gallery" },
               ],
             },
             {
@@ -232,6 +233,7 @@ export default defineConfig({
             { text: "比例与分辨率调整", link: "/features/window" },
             { text: "超清截图", link: "/features/screenshot" },
             { text: "视频录制", link: "/features/recording" },
+            { text: "图库", link: "/features/gallery" },
           ],
         },
         {

@@ -6,13 +6,18 @@ Download the latest version from [GitHub Releases](https://github.com/ChanIok/Sp
 
 Two package types are available:
 - **Installer (.exe)** — recommended for most users, comes with proper install/uninstall
-- **Portable (.zip)** — no installation needed, just extract and run
+- **Portable (.zip)** — no installation needed
+
+::: warning Portable Version Usage Note
+Right-click the zip file → **Extract All** to extract all contents into a separate folder, then run `SpinningMomo.exe` inside it.
+
+Do not launch `SpinningMomo.exe` directly inside the zip archive, and do not extract only the exe file, as missing supporting assets will cause errors.
+:::
 
 ### System Requirements
 
 ::: warning
 - **OS**: Windows 10 1903 (Build 18362) or later, 64-bit
-- **GPU driver**: DirectX 11 support, keep it up to date
 - **WebView2**: Requires [Microsoft WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) **≥ 123.0.2420.47** (modern Windows has it built-in)
 :::
 
@@ -44,11 +49,9 @@ Before you start shooting, open *Infinity Nikki* and set:
 
 1. Open the in-game camera and frame your shot
 2. On the floating window, pick ratio **9:16** and resolution **8K** (try 4K or 6K if your system struggles)
-3. The game window will expand beyond your screen — **that's normal**
+3. The game window expanding beyond your screen is normal — turn on **Overlay** or **Preview** to assist framing
+4. Press **Space** to take the photo, then click **Reset** on the floating window to restore the window size
 
-::: tip Window overflowing?
-Turn on the **Overlay** or **Preview Window** from the toolbar to see the full frame within your screen.
+::: tip "Target window not found"?
+**Right-click the floating window** (or tray icon) and re-select your target window from the menu.
 :::
-
-4. Press **Space** to take the photo
-5. After shooting, click **Reset** on the floating window to restore the game window
