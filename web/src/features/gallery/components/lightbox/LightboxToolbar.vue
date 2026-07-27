@@ -106,11 +106,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="300">
-    <div
-      class="@container flex items-center justify-between px-2 py-2"
-      @contextmenu="handleToolbarContextMenu"
-    >
+  <div
+    class="@container flex items-center justify-between px-2 py-2"
+    @contextmenu="handleToolbarContextMenu"
+  >
+    <TooltipProvider :delay-duration="300">
       <div class="flex min-w-0 items-center gap-3 text-foreground">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -411,6 +411,6 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
       </div>
-    </div>
-  </TooltipProvider>
+    </TooltipProvider>
+  </div>
 </template>

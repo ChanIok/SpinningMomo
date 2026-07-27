@@ -8,7 +8,7 @@ import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
 
 // 全局前置守卫
 export function setupRouterGuards(router: Router) {
-  router.beforeEach((to, _from, next) => {
+  router.beforeEach((to) => {
     const settingsStore = useSettingsStore()
     if (settingsStore.isInitialized) {
       const onboarding = settingsStore.appSettings.app.onboarding
@@ -16,13 +16,11 @@ export function setupRouterGuards(router: Router) {
         !onboarding.completed || onboarding.flowVersion < CURRENT_ONBOARDING_FLOW_VERSION
 
       if (needsOnboarding && to.name !== 'welcome') {
-        next({ name: 'welcome', replace: true })
-        return
+        return { name: 'welcome', replace: true }
       }
 
       if (!needsOnboarding && to.name === 'welcome') {
-        next({ name: 'home', replace: true })
-        return
+        return { name: 'home', replace: true }
       }
     }
 
@@ -36,11 +34,8 @@ export function setupRouterGuards(router: Router) {
     // 这里可以添加权限验证、登录状态检查等逻辑
     // 例如：
     // if (to.meta.requiresAuth && !isAuthenticated()) {
-    //   next('/login')
-    //   return
+    //   return '/login'
     // }
-
-    next()
   })
 
   router.afterEach((to, from) => {
