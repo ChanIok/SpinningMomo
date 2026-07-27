@@ -475,7 +475,10 @@ auto apply_incremental_sync(core::AppState& app_state, FolderWatcherState& watch
     auto mapping_result =
         features::gallery::folder::service::batch_create_folders_for_paths(app_state, folder_paths);
     if (mapping_result) {
-      folder_mapping = std::move(mapping_result.value());
+      auto folder_sync = std::move(mapping_result.value());
+      folder_mapping = std::move(folder_sync.folder_ids_by_path);
+      // 增量路径也报告本轮新建目录，让 per-root 回调与全量扫描获得同一语义。
+      result.created_folders = std::move(folder_sync.created_folders);
     } else {
       Logger().warn("Failed to pre-create folders for incremental sync '{}': {}",
                     watcher.root_path.string(), mapping_result.error());
@@ -640,9 +643,9 @@ auto dispatch_scan_result(core::AppState& app_state, FolderWatcherState& watcher
   // 这样启动恢复与运行时增量可以共用同一套“扫描完成后处理”。
   Logger().info(
       "Gallery sync finished for '{}'. mode={}, total={}, new={}, updated={}, missing={}, "
-      "errors={}",
+      "created_folders={}, errors={}",
       watcher.root_path.string(), mode, result.total_files, result.new_items, result.updated_items,
-      result.missing_items, result.errors.size());
+      result.missing_items, result.created_folders.size(), result.errors.size());
 
   // 路径级 partial fail 不改变 Healthy/Faulted；汇总一条 warn 便于排查。
   if (!result.errors.empty()) {
@@ -651,13 +654,14 @@ auto dispatch_scan_result(core::AppState& app_state, FolderWatcherState& watcher
   }
 
   if (force_gallery_changed || result.new_items > 0 || result.updated_items > 0 ||
-      result.missing_items > 0 || !result.changes.empty()) {
+      result.missing_items > 0 || !result.created_folders.empty() || !result.changes.empty()) {
     core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   auto post_scan_callback = get_post_scan_callback(watcher);
-  if (post_scan_callback && (result.new_items > 0 || result.updated_items > 0 ||
-                             result.missing_items > 0 || !result.changes.empty())) {
+  if (post_scan_callback &&
+      (result.new_items > 0 || result.updated_items > 0 || result.missing_items > 0 ||
+       !result.created_folders.empty() || !result.changes.empty())) {
     post_scan_callback(result);
   }
 }

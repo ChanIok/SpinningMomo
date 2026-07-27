@@ -7,6 +7,7 @@
 #include "core/tasks/tasks.hpp"
 #include "core/worker_pool/worker_pool.hpp"
 #include "extensions/infinity_nikki/media_hardlinks.hpp"
+#include "extensions/infinity_nikki/role_profile.hpp"
 #include "extensions/infinity_nikki/task_service.hpp"
 #include "extensions/infinity_nikki/types.hpp"
 #include "features/gallery/asset/repository.hpp"
@@ -128,8 +129,8 @@ auto ensure_watch_root_ignore_rules(core::AppState& app_state,
   }
 
   auto root_key = normalized_watch_root.string();
-  auto root_it = folder_mapping_result->find(root_key);
-  if (root_it == folder_mapping_result->end()) {
+  auto root_it = folder_mapping_result->folder_ids_by_path.find(root_key);
+  if (root_it == folder_mapping_result->folder_ids_by_path.end()) {
     return std::unexpected("Failed to resolve GamePlayPhotos root folder id");
   }
 
@@ -143,14 +144,23 @@ auto ensure_watch_root_ignore_rules(core::AppState& app_state,
   return {};
 }
 
-// 每次画廊扫描完毕后触发的回调处理，包含同步受管硬链接（照片/录像）和提取照片参数
+// 每次暖暖目录扫描完成后统一处理新 UID、受管硬链接和照片参数。
 auto on_gallery_scan_complete(core::AppState& app_state,
+                              const std::filesystem::path& game_play_photos_root,
                               const features::gallery::ScanResult& result) -> void {
   if (!app_state.settings) {
     return;
   }
 
   const auto& config = app_state.settings->raw.extensions.infinity_nikki;
+
+  if (config.allow_online_photo_metadata_extract) {
+    // 新目录事实与文件 changes 共用当前 root 的扫描完成回调，但保持各自独立语义。
+    for (const auto& folder : result.created_folders) {
+      extensions::infinity_nikki::role_profile::schedule_nickname_sync(
+          app_state, game_play_photos_root, folder);
+    }
+  }
 
   if (config.manage_media_hardlinks) {
     if (core::tasks::has_active_task_of_type(app_state,
@@ -326,8 +336,9 @@ auto register_impl(core::AppState& app_state, bool start_immediately) -> void {
     return;
   }
 
-  auto callback = [&app_state](const features::gallery::ScanResult& result) {
-    on_gallery_scan_complete(app_state, result);
+  auto callback = [&app_state, game_play_photos_root =
+                                   new_watch_path](const features::gallery::ScanResult& result) {
+    on_gallery_scan_complete(app_state, game_play_photos_root, result);
   };
 
   auto register_result =
@@ -350,9 +361,10 @@ auto register_impl(core::AppState& app_state, bool start_immediately) -> void {
     if (requires_initial_scan) {
       auto task_result = extensions::infinity_nikki::task_service::start_initial_scan_task(
           app_state, make_initial_scan_options(new_watch_path),
-          [&app_state](const features::gallery::ScanResult& result) {
-            // 通用后处理（硬链接同步 + 基于 changes 的静默增量提取）
-            on_gallery_scan_complete(app_state, result);
+          [&app_state,
+           game_play_photos_root = new_watch_path](const features::gallery::ScanResult& result) {
+            // 通用后处理（新 UID 昵称 + 硬链接同步 + 基于 changes 的静默增量提取）
+            on_gallery_scan_complete(app_state, game_play_photos_root, result);
             // 首次全量补偿：显式全量元数据提取
             maybe_start_full_extract_after_initial_scan(app_state);
           });

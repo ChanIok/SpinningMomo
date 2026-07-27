@@ -199,7 +199,7 @@
   "gallery.guide.infinityNikki.hardlinksTitle": "优化无限暖暖照片、视频文件为硬链接",
   "gallery.guide.infinityNikki.header.subtitle": "首次启动配置",
   "gallery.guide.infinityNikki.header.title": "无限暖暖图库",
-  "gallery.guide.infinityNikki.metadataDescription": "自动获取并解析照片隐藏的拍摄参数（包含焦距、滤镜、光照及动作等），在图库中展示更丰富的信息。（需联网）",
+  "gallery.guide.infinityNikki.metadataDescription": "自动获取角色昵称，并解析照片隐藏的拍摄参数（包含焦距、滤镜、光照及动作等），在图库中展示更丰富的信息。角色 UID 和照片数据会发送至 NUAN5.PRO。（需联网）",
   "gallery.guide.infinityNikki.metadataTaskStartedDescription": "你可以在右上角的后台任务中查看进度。",
   "gallery.guide.infinityNikki.metadataTaskStartedTitle": "已开始解析照片元数据",
   "gallery.guide.infinityNikki.metadataTitle": "开启照片数据解析",

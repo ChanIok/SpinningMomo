@@ -199,7 +199,7 @@
   "gallery.guide.infinityNikki.hardlinksTitle": "Optimize Infinity Nikki photo/video files as hardlinks",
   "gallery.guide.infinityNikki.header.subtitle": "First-time setup",
   "gallery.guide.infinityNikki.header.title": "Infinity Nikki Gallery",
-  "gallery.guide.infinityNikki.metadataDescription": "Automatically extract hidden shooting parameters from photos (including focal length, filters, lighting, and poses) to display richer details in the gallery. (Requires internet connection)",
+  "gallery.guide.infinityNikki.metadataDescription": "Automatically fetch role nicknames and extract hidden shooting parameters from photos (including focal length, filters, lighting, and poses). Role UIDs and photo data are sent to NUAN5.PRO. (Requires internet connection)",
   "gallery.guide.infinityNikki.metadataTaskStartedDescription": "You can track progress from the task menu in the top-right corner.",
   "gallery.guide.infinityNikki.metadataTaskStartedTitle": "Metadata extraction started",
   "gallery.guide.infinityNikki.metadataTitle": "Enable photo metadata extraction",

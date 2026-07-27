@@ -138,11 +138,11 @@ auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
   return result;
 }
 
-// 按父先优先顺序严格物化一批目录路径，并返回完整路径映射。
+// 按父先优先顺序物化目录，并同时返回完整路径映射和本轮新增目录。
 auto batch_create_folders_for_paths(core::AppState& app_state,
                                     const std::vector<std::filesystem::path>& folder_paths)
-    -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string> {
-  std::unordered_map<std::string, std::int64_t> path_to_id_map;
+    -> std::expected<BatchCreateFoldersResult, std::string> {
+  BatchCreateFoldersResult result;
 
   std::vector<std::filesystem::path> normalized_paths;
   normalized_paths.reserve(folder_paths.size());
@@ -178,7 +178,7 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
     auto path_str = folder_path.string();
 
     // 如果已经处理过，跳过
-    if (path_to_id_map.contains(path_str)) {
+    if (result.folder_ids_by_path.contains(path_str)) {
       continue;
     }
 
@@ -193,7 +193,7 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
       // 文件夹已存在，直接使用
       auto folder = existing_folder_result->value();
       auto folder_id = folder.id;
-      path_to_id_map[path_str] = folder_id;
+      result.folder_ids_by_path[path_str] = folder_id;
       ensure_root_folder_webview_mapping(app_state, folder);
       Logger().debug("Found existing folder '{}' with ID {}", path_str, folder_id);
       continue;
@@ -209,7 +209,8 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
 
       // 输入外的父目录表示当前路径是一个扫描根；输入内的父目录必须已物化。
       if (normalized_path_keys.contains(parent_path_str)) {
-        if (auto it = path_to_id_map.find(parent_path_str); it != path_to_id_map.end()) {
+        if (auto it = result.folder_ids_by_path.find(parent_path_str);
+            it != result.folder_ids_by_path.end()) {
           parent_id = it->second;
         } else {
           return std::unexpected("Parent folder '" + parent_path_str + "' is missing for child '" +
@@ -229,15 +230,17 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
     }
 
     auto folder_id = create_result.value();
-    path_to_id_map[path_str] = folder_id;
-    ensure_root_folder_webview_mapping(
-        app_state,
-        Folder{.id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name});
+    result.folder_ids_by_path[path_str] = folder_id;
+    auto created_folder =
+        Folder{.id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name};
+    ensure_root_folder_webview_mapping(app_state, created_folder);
+    // 只把本次实际 INSERT 的目录写入结果，已有目录仅进入路径映射。
+    result.created_folders.push_back(std::move(created_folder));
     Logger().debug("Created folder '{}' with ID {} (parent_id: {})", path_str, folder_id,
                    parent_id.has_value() ? std::to_string(parent_id.value()) : "NULL");
   }
 
-  return path_to_id_map;
+  return result;
 }
 
 // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
@@ -492,6 +495,20 @@ auto update_folder_display_name(core::AppState& app_state, std::int64_t folder_i
                                                  : "Folder display name reset",
       .affected_count = 1,
   };
+}
+
+// 规范化自动名称后做条件写入，确保已有名称始终拥有更高优先级。
+auto update_folder_display_name_if_empty(core::AppState& app_state, std::int64_t folder_id,
+                                         const std::string& display_name)
+    -> std::expected<bool, std::string> {
+  auto normalized_display_name = normalize_display_name(display_name);
+  if (!normalized_display_name.has_value()) {
+    return std::unexpected("Folder display name cannot be empty");
+  }
+
+  // Repository 用单条条件 UPDATE 消除网络返回与用户手动改名之间的竞争窗口。
+  return repository::update_folder_display_name_if_empty(app_state, folder_id,
+                                                         normalized_display_name.value());
 }
 
 // 在系统资源管理器中打开指定 ID 的文件夹路径

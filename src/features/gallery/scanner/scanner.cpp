@@ -27,6 +27,7 @@ struct ScanPreparationContext {
   std::filesystem::path normalized_scan_root;
   std::filesystem::path directory;
   std::int64_t folder_id = 0;
+  std::vector<Folder> created_folders;
   std::unordered_map<std::string, Metadata> asset_cache;
 };
 
@@ -53,8 +54,8 @@ auto prepare_scan_context(core::AppState& app_state, const ScanOptions& options)
                            root_folder_mapping_result.error());
   }
 
-  auto root_folder_map = std::move(root_folder_mapping_result.value());
-  std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
+  auto root_folder_sync = std::move(root_folder_mapping_result.value());
+  std::int64_t folder_id = root_folder_sync.folder_ids_by_path.at(normalized_scan_root.string());
 
   // 有传入 ignore 则整表替换；未传则保留库中已有规则
   if (options.ignore_rules.has_value()) {
@@ -79,11 +80,12 @@ auto prepare_scan_context(core::AppState& app_state, const ScanOptions& options)
       .normalized_scan_root = normalized_scan_root,
       .directory = normalized_scan_root,
       .folder_id = folder_id,
+      .created_folders = std::move(root_folder_sync.created_folders),
       .asset_cache = std::move(asset_cache_result.value()),
   };
 }
 
-// 全量同步一个目录：准备 → 盘点文件/目录 → 同步目录库存 → 处理资产 → 清理 → 组装 ScanChange。
+// 全量同步一个目录：准备 → 盘点 → 同步目录库存 → 处理资产 → 清理 → 组装扫描事实。
 auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
                           std::function<void(const ScanProgress&)> progress_callback)
     -> std::expected<ScanResult, std::string> {
@@ -148,7 +150,8 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
     return std::unexpected("Failed to synchronize folder inventory: " +
                            folder_mapping_result.error());
   }
-  auto folder_mapping = std::move(folder_mapping_result.value());
+  auto folder_sync = std::move(folder_mapping_result.value());
+  auto folder_mapping = std::move(folder_sync.folder_ids_by_path);
 
   // 4. 指纹：粗判变更，为候选文件算 hash，得到 NEW/MODIFIED 列表。
   auto files_to_process_result = analysis::run_hash_analysis_phase(
@@ -176,7 +179,7 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
       cleanup::run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
                                  discovery.folder_paths, context.asset_cache, progress_callback);
 
-  // 7. 只为媒体资产组装 ScanChange，目录库存变化不泄漏给扩展消费者。
+  // 7. 文件变化组装为 ScanChange，目录新增已独立保存在 created_folders。
   std::unordered_set<std::string> processed_updated_paths;
   for (const auto& entry : processing_phase.batch_result.updated_assets) {
     processed_updated_paths.insert(entry.asset.path);
@@ -194,6 +197,11 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
       .missing_items = cleanup_phase.missing_items,
       .errors = std::move(processing_phase.batch_result.errors),
   };
+  // 合并准备阶段的扫描根和发现阶段的子目录，完整报告本轮新增目录。
+  result.created_folders = std::move(context.created_folders);
+  result.created_folders.insert(result.created_folders.end(),
+                                std::make_move_iterator(folder_sync.created_folders.begin()),
+                                std::make_move_iterator(folder_sync.created_folders.end()));
 
   std::unordered_set<std::string> emitted_change_keys;
   emitted_change_keys.reserve(result.new_items + result.updated_items +
@@ -232,10 +240,10 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
   result.scan_duration = std::format("{}ms", duration.count());
 
   Logger().info(
-      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Missing: {}, Errors: "
-      "{}, Duration: {}",
+      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Missing: {}, "
+      "Created folders: {}, Errors: {}, Duration: {}",
       result.total_files, result.new_items, result.updated_items, result.missing_items,
-      result.errors.size(), result.scan_duration);
+      result.created_folders.size(), result.errors.size(), result.scan_duration);
 
   progress::report_scan_progress(
       progress_callback, "completed", static_cast<std::int64_t>(result.total_files),

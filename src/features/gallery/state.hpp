@@ -78,7 +78,7 @@ struct FolderWatcherState {
   std::optional<std::vector<IgnoreRule>> cached_ignore_rules;
   std::uint64_t cached_ignore_rules_version = 0;
 
-  // 扫描完成后的回调（可选），由注册方注入，扫描有变化时触发
+  // 当前 root 扫描完成后的唯一扩展回调，文件与目录事实都通过 ScanResult 传递。
   std::function<void(const ScanResult&)> post_scan_callback;
 };
 

@@ -217,6 +217,8 @@ struct ScanResult {
   int missing_items = 0;
   std::vector<std::string> errors = {};
   std::string scan_duration = "";
+  // created_folders 只报告本轮真正写入索引的目录，不把目录事实伪装成文件 ScanChange。
+  std::vector<Folder> created_folders = {};
   // changes 供运行时增量消费者消费；
   // watcher 增量同步与 full scan 都可以填充，后者通常由扫描前后状态对账推导出来。
   std::vector<ScanChange> changes = {};

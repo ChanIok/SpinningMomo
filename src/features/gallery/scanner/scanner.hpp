@@ -7,7 +7,7 @@
 
 namespace features::gallery::scanner {
 
-// 全量同步一个目录：准备 → 盘点文件/目录 → 同步目录库存 → 处理资产 → 清理 → 组装 ScanChange。
+// 全量同步一个目录：准备 → 盘点 → 同步目录库存 → 处理资产 → 清理 → 组装扫描事实。
 auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
                           std::function<void(const ScanProgress&)> progress_callback = nullptr)
     -> std::expected<ScanResult, std::string>;

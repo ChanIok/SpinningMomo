@@ -124,6 +124,27 @@ auto update_folder(core::AppState& app_state, const Folder& folder)
   return {};
 }
 
+// 仅为空名称执行条件更新，避免异步自动命名覆盖用户刚保存的名称。
+auto update_folder_display_name_if_empty(core::AppState& app_state, std::int64_t folder_id,
+                                         const std::string& display_name)
+    -> std::expected<bool, std::string> {
+  auto result = core::database::query_scalar<std::int64_t>(app_state,
+                                                           R"(
+        UPDATE folders
+        SET display_name = ?
+        WHERE id = ?
+          AND (display_name IS NULL OR TRIM(display_name) = '')
+        RETURNING id
+      )",
+                                                           {display_name, folder_id});
+  if (!result) {
+    return std::unexpected("Failed to conditionally update folder display name: " + result.error());
+  }
+
+  // RETURNING 有结果才表示名称在本次调用中由空值变为自动名称。
+  return result->has_value();
+}
+
 auto delete_folder(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string> {
   // 暂时实现硬删除，实际项目中可能需要考虑级联删除等问题
   std::string sql = "DELETE FROM folders WHERE id = ?";

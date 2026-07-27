@@ -19,6 +19,11 @@ auto get_folder_by_id(core::AppState& app_state, std::int64_t id)
 auto update_folder(core::AppState& app_state, const Folder& folder)
     -> std::expected<void, std::string>;
 
+// 仅在文件夹尚无显示名称时写入名称，并返回本次是否实际更新。
+auto update_folder_display_name_if_empty(core::AppState& app_state, std::int64_t folder_id,
+                                         const std::string& display_name)
+    -> std::expected<bool, std::string>;
+
 auto delete_folder(core::AppState& app_state, std::int64_t id) -> std::expected<void, std::string>;
 
 auto list_all_folders(core::AppState& app_state) -> std::expected<std::vector<Folder>, std::string>;
