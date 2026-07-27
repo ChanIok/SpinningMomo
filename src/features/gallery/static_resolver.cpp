@@ -228,7 +228,7 @@ auto register_webview_resolvers(core::AppState& state) -> void {
     core::webview::register_virtual_host_folder_mapping(
         state, state.webview->config.thumbnail_host_name,
         state.gallery->thumbnails_directory.wstring(),
-        core::webview::VirtualHostResourceAccessKind::allow);
+        core::webview::VirtualHostResourceAccessKind::deny_cors);
 
     Logger().info("Registered WebView thumbnail host mapping: {} -> {}",
                   utils::string::ToUtf8(state.webview->config.thumbnail_host_name),

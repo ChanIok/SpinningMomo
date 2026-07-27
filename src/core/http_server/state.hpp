@@ -21,7 +21,7 @@ struct HttpServerState {
   std::mutex sse_connections_mutex;
   std::atomic<bool> is_running{false};
 
-  // 服务器配置
+  // 服务器配置；启动成功后更新为实际监听端口
   int port{51206};
 
   // 路径解析器注册表

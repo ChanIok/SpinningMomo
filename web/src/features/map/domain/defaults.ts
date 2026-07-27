@@ -1,3 +1,4 @@
+import { getThumbnailBaseUrl } from '@/core/env'
 import type { MapRenderOptions, MapRuntimeOptions } from '@/features/map/store'
 
 export function createDefaultMapRenderOptions(): MapRenderOptions {
@@ -26,7 +27,7 @@ export function createDefaultMapRuntimeOptions(
     clusterRadius: 44,
     hoverCardEnabled: true,
     markersVisible: true,
-    thumbnailBaseUrl: 'http://127.0.0.1:51206',
+    thumbnailBaseUrl: getThumbnailBaseUrl(),
     clusterTitleTemplate,
     filterCountCardVisible: true,
     filterCountCardLoading: false,

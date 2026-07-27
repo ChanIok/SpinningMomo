@@ -124,6 +124,11 @@ auto register_routes(core::AppState& state, uWS::App& app) -> void {
 
   // 注册SSE端点
   app.get("/sse", [&state](auto* res, auto* req) {
+    if (!state.http_server || !state.http_server->is_running) {
+      res->close();
+      return;
+    }
+
     auto origin = get_origin_header(req);
     if (!is_origin_allowed(origin, state.http_server->port)) {
       Logger().warn("Rejected SSE request due to disallowed origin: {}",

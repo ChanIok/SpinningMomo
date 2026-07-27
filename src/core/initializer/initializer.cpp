@@ -113,10 +113,6 @@ auto initialize_application(core::AppState& state) -> std::expected<void, std::s
 
     core::rpc::registry::register_all_endpoints(state);
 
-    if (auto result = core::http_server::initialize(state); !result) {
-      return std::unexpected("Failed to initialize HTTP server: " + result.error());
-    }
-
     if (auto db_result = core::initializer::database::initialize_database(state); !db_result) {
       return std::unexpected("Failed to initialize database: " + db_result.error());
     }
@@ -166,6 +162,18 @@ auto initialize_application(core::AppState& state) -> std::expected<void, std::s
 
     if (auto result = ui::notification_window::initialize(state); !result) {
       return std::unexpected("Failed to initialize notification window: " + result.error());
+    }
+
+    if (auto result = core::http_server::initialize(state); !result) {
+      Logger().error("Failed to initialize HTTP server: {}", result.error());
+
+      auto message_it = state.i18n->texts.find("message.http_server_start_failed");
+      if (message_it != state.i18n->texts.end()) {
+        core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               message_it->second);
+      } else {
+        Logger().warn("Skip HTTP server failure notification: i18n text is missing");
+      }
     }
 
     // 到这里为止，悬浮窗首绘所需的配置、文案、命令和原生 UI 资源都已就绪。

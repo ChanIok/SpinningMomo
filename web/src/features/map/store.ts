@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { getThumbnailBaseUrl } from '@/core/env'
 
 export interface MapMarker {
   assetId?: number
@@ -65,7 +66,7 @@ export const useMapStore = defineStore('map', () => {
     clusterRadius: 44,
     hoverCardEnabled: true,
     markersVisible: true,
-    thumbnailBaseUrl: 'http://127.0.0.1:51206',
+    thumbnailBaseUrl: getThumbnailBaseUrl(),
   })
   const pendingFocusRequest = ref<PendingMapFocusRequest | null>(null)
 

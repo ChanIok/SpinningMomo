@@ -4,6 +4,7 @@
 
 #include "vendor/uwebsockets.hpp"
 
+#include "core/build_config.hpp"
 #include "core/http_server/routes.hpp"
 #include "core/http_server/sse_manager.hpp"
 #include "core/http_server/state.hpp"
@@ -12,39 +13,115 @@
 
 namespace core::http_server {
 
+namespace {
+
+constexpr std::array kReleaseCandidatePorts{51206, 61206, 11206, 21206, 31206, 41206};
+
+auto get_candidate_ports() -> std::span<const int> {
+  if (core::build_config::is_debug_build()) {
+    return {kReleaseCandidatePorts.data(), 1};
+  }
+  return {kReleaseCandidatePorts.data(), kReleaseCandidatePorts.size()};
+}
+
+auto format_candidate_ports(std::span<const int> ports) -> std::string {
+  std::string result;
+  for (const auto port : ports) {
+    if (!result.empty()) {
+      result += ", ";
+    }
+    result += std::to_string(port);
+  }
+  return result;
+}
+
+}  // namespace
+
 auto initialize(core::AppState& state) -> std::expected<void, std::string> {
   try {
-    Logger().info("Initializing HTTP server on port {}", state.http_server->port);
+    if (!state.http_server) {
+      return std::unexpected("HTTP server state is not allocated");
+    }
 
-    state.http_server->server_thread = std::jthread([&state]() {
-      Logger().info("Starting HTTP server thread");
+    const auto candidate_ports = get_candidate_ports();
+    Logger().info("Initializing HTTP server with candidate ports: {}",
+                  format_candidate_ports(candidate_ports));
 
-      // 在线程中创建uWS::App实例，生命周期由线程管理
-      uWS::App app;
+    std::promise<std::expected<void, std::string>> startup_promise;
+    auto startup_future = startup_promise.get_future();
 
-      core::http_server::routes::register_routes(state, app);
+    state.http_server->server_thread = std::jthread(
+        [&state, candidate_ports, startup_promise = std::move(startup_promise)]() mutable {
+          Logger().info("Starting HTTP server thread");
+          bool startup_reported = false;
 
-      // 仅监听本机回环地址，避免暴露到局域网
-      app.listen("127.0.0.1", state.http_server->port, [&state](auto* socket) {
-        if (socket) {
-          state.http_server->listen_socket = socket;
-          state.http_server->is_running = true;
-          Logger().info("HTTP server listening on 127.0.0.1:{}", state.http_server->port);
-        } else {
-          Logger().error("Failed to start HTTP server on 127.0.0.1:{}", state.http_server->port);
-          state.http_server->is_running = false;
-        }
-      });
+          try {
+            // 在线程中创建uWS::App实例，生命周期由线程管理
+            uWS::App app;
 
-      // 运行事件循环
-      if (state.http_server->is_running) {
-        state.http_server->loop = uWS::Loop::get();
-        app.run();
-        state.http_server->loop->free();
-        state.http_server->loop = nullptr;
+            core::http_server::routes::register_routes(state, app);
+
+            int selected_port = 0;
+            us_listen_socket_t* selected_socket = nullptr;
+
+            // 直接尝试绑定，避免“预检查成功后端口又被抢占”的竞态。
+            for (const auto port : candidate_ports) {
+              Logger().info("Trying HTTP server port {}", port);
+              app.listen("127.0.0.1", port, [port, &selected_port, &selected_socket](auto* socket) {
+                if (!socket) {
+                  Logger().warn("Failed to listen on 127.0.0.1:{}", port);
+                  return;
+                }
+
+                selected_port = port;
+                selected_socket = socket;
+              });
+
+              if (selected_socket) {
+                break;
+              }
+            }
+
+            if (!selected_socket) {
+              auto error = std::format("Failed to listen on candidate ports: {}",
+                                       format_candidate_ports(candidate_ports));
+              Logger().error(error);
+              startup_promise.set_value(std::unexpected(error));
+              startup_reported = true;
+              Logger().info("HTTP server thread finished");
+              return;
+            }
+
+            state.http_server->port = selected_port;
+            state.http_server->listen_socket = selected_socket;
+            state.http_server->is_running = true;
+            state.http_server->loop = uWS::Loop::get();
+
+            Logger().info("HTTP server listening on 127.0.0.1:{}", selected_port);
+            startup_promise.set_value({});
+            startup_reported = true;
+
+            app.run();
+            state.http_server->loop->free();
+            state.http_server->loop = nullptr;
+            Logger().info("HTTP server thread finished");
+          } catch (const std::exception& e) {
+            state.http_server->is_running = false;
+            auto error = std::string("HTTP server thread failed: ") + e.what();
+            Logger().error(error);
+            if (!startup_reported) {
+              startup_promise.set_value(std::unexpected(error));
+            }
+          }
+        });
+
+    auto startup_result = startup_future.get();
+    if (!startup_result) {
+      if (state.http_server->server_thread.joinable()) {
+        state.http_server->server_thread.join();
       }
-      Logger().info("HTTP server thread finished");
-    });
+      return std::unexpected(startup_result.error());
+    }
 
     return {};
   } catch (const std::exception& e) {

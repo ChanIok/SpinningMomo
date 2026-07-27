@@ -108,7 +108,9 @@ auto close_all_connections(core::AppState& state) -> void {
     if (!conn || !conn->response) {
       continue;
     }
-    conn->response->end();
+    // end() 只结束当前 SSE 响应，浏览器仍可复用 keep-alive 连接发起重连。
+    // shutdown 必须关闭底层连接，否则 uWS 事件循环不会退出，server_thread::join 会永久等待。
+    conn->response->close();
     ++closed_count;
   }
 

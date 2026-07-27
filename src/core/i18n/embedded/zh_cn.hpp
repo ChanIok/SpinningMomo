@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded Chinese JSON content as string_view
-// Size: 4033 bytes
+// Size: 4150 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -68,6 +68,7 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.recording_overload": "编码过载，建议降低分辨率或帧率。",
   "message.recording_stop_failed": "录制停止失败: ",
   "message.gallery_folder_sync_failed": "此文件夹的图库自动同步已暂停。请解决问题后点击重试。",
+  "message.http_server_start_failed": "本地服务启动失败，部分功能可能不可用，请查看日志。",
 
   "notification.action.view": "查看",
   "notification.action.retry": "重试",
