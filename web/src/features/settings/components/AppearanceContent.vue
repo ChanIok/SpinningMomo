@@ -266,6 +266,9 @@ const handleClearError = () => {
           <h3 class="text-lg font-semibold text-foreground">
             {{ t('settings.appearance.quickSetup.title') }}
           </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.appearance.quickSetup.description') }}
+          </p>
         </div>
 
         <ItemGroup>

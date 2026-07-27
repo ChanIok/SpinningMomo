@@ -108,7 +108,7 @@ const handleConfirmRestore = async () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Button variant="outline" :disabled="isExporting" @click="handleExport">
+              <Button variant="outline" size="sm" :disabled="isExporting" @click="handleExport">
                 <LoaderCircle v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
                 <Download v-else class="mr-2 h-4 w-4" />
                 {{
@@ -128,7 +128,12 @@ const handleConfirmRestore = async () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Button variant="destructive" :disabled="isExporting" @click="handleSelectRestore">
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="isExporting"
+                @click="handleSelectRestore"
+              >
                 <Upload class="mr-2 h-4 w-4" />
                 {{ t('settings.backup.restore.action') }}
               </Button>

@@ -763,7 +763,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </Popover>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   searchQuery
                     ? `${t('gallery.toolbar.filters.keyword')}: ${searchQuery}`
@@ -840,7 +840,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </Popover>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   hasDisplayDateRange
                     ? `${t('gallery.toolbar.filters.date')}: ${displayDateFilterLabel}`
@@ -942,7 +942,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </Popover>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   activeColorHex
                     ? `${t('gallery.toolbar.filters.color')}: ${activeColorHex}`
@@ -997,7 +997,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </DropdownMenu>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   filter.type
                     ? `${t('gallery.toolbar.filters.fileType')}: ${typeFilterLabel}`
@@ -1076,7 +1076,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </Popover>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   selectedRatings.length > 0
                     ? `${t('gallery.toolbar.filters.rating')}: ${ratingFilterLabel}`
@@ -1132,7 +1132,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   </DropdownMenu>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent v-if="isFilterCompact" side="bottom">
                 {{
                   filter.reviewFlag !== undefined
                     ? `${t('gallery.toolbar.filters.reviewFlag')}: ${reviewFlagFilterLabel}`

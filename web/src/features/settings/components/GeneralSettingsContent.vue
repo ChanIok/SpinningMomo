@@ -145,20 +145,20 @@ const handleReset = async () => {
 
       <!-- Update -->
       <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.general.update.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.general.update.descriptionPrefix') }}
-            <RouterLink
-              :to="{ name: 'about' }"
-              class="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-            >
-              {{ t('settings.general.update.descriptionLink') }}
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-foreground">
+              {{ t('settings.general.update.title') }}
+            </h3>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {{ t('settings.general.update.description') }}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" class="shrink-0 self-start sm:self-end" as-child>
+            <RouterLink :to="{ name: 'about' }">
+              {{ t('settings.general.update.checkInAbout') }}
             </RouterLink>
-            {{ t('settings.general.update.descriptionSuffix') }}
-          </p>
+          </Button>
         </div>
 
         <Item variant="surface" size="sm">
