@@ -13,6 +13,7 @@
 #include "vendor/windows/wrl.hpp"
 
 #include "core/build_config.hpp"
+#include "core/rpc/types.hpp"
 #include "core/state/app_state.hpp"
 #include "core/webview/rpc_bridge.hpp"
 #include "core/webview/state.hpp"
@@ -27,6 +28,15 @@ namespace core::webview::host::detail {
 struct DirectWindowBridgeMessage {
   std::string type;
   std::optional<std::string> edge;
+};
+
+struct ImportDroppedFilesBridgeParams {
+  std::int64_t folder_id = 0;
+};
+
+struct ImportDroppedFilesRpcParams {
+  std::int64_t folder_id = 0;
+  std::vector<std::string> source_paths;
 };
 
 auto clear_host_runtime(core::webview::HostRuntime& host_runtime) -> void {
@@ -105,6 +115,69 @@ auto try_handle_direct_window_bridge_message(core::AppState& state, const std::s
 
   Logger().debug("WebView window deferred resize request from edge: {}", *bridge_message.edge);
   return true;
+}
+
+// DOM File 的绝对路径只在原生侧可见；重建参数可避免接受前端伪造的 sourcePaths。
+auto attach_dropped_file_paths(ICoreWebView2WebMessageReceivedEventArgs* args,
+                               const std::string& message) -> std::optional<std::string> {
+  // 只拦截拖拽导入方法，其他 WebView 消息保持原始 RPC 处理路径。
+  auto request_result =
+      rfl::json::read<core::rpc::JsonRpcRequest, rfl::SnakeCaseToCamelCase>(message);
+  if (!request_result || request_result->method != "gallery.importDroppedFilesToFolder") {
+    return std::nullopt;
+  }
+
+  // JSON 只提供目标文件夹，源路径必须由 AdditionalObjects 中的 File 生成。
+  auto request = std::move(request_result.value());
+  auto bridge_params_result =
+      rfl::from_generic<ImportDroppedFilesBridgeParams, rfl::SnakeCaseToCamelCase,
+                        rfl::DefaultIfMissing>(request.params.value_or(rfl::Generic::Object()));
+  if (!bridge_params_result) {
+    Logger().warn("Dropped file import request has invalid parameters: {}",
+                  bridge_params_result.error().what());
+    return std::nullopt;
+  }
+
+  ImportDroppedFilesRpcParams params{
+      .folder_id = bridge_params_result->folder_id,
+  };
+
+  // WebView2 把每个 DOM File 投影为 ICoreWebView2File，原生侧才能读取绝对路径。
+  auto args2 = wil::com_ptr<ICoreWebView2WebMessageReceivedEventArgs>(args)
+                   .try_query<ICoreWebView2WebMessageReceivedEventArgs2>();
+  if (!args2) {
+    Logger().warn("WebView2 AdditionalObjects interface is unavailable for dropped file import");
+  } else {
+    wil::com_ptr<ICoreWebView2ObjectCollectionView> objects;
+    HRESULT hr = args2->get_AdditionalObjects(objects.put());
+    if (SUCCEEDED(hr) && objects) {
+      UINT count = 0;
+      if (SUCCEEDED(objects->get_Count(&count))) {
+        params.source_paths.reserve(count);
+        for (UINT index = 0; index < count; ++index) {
+          // 非 File 附加对象与空路径不进入业务参数。
+          wil::com_ptr<IUnknown> object;
+          if (FAILED(objects->GetValueAtIndex(index, object.put())) || !object) {
+            continue;
+          }
+          auto file = object.try_query<ICoreWebView2File>();
+          if (!file) {
+            continue;
+          }
+          wil::unique_cotaskmem_string path;
+          if (SUCCEEDED(file->get_Path(path.put())) && path && path.get()[0] != L'\0') {
+            params.source_paths.push_back(utils::string::ToUtf8(path.get()));
+          }
+        }
+      }
+    } else {
+      Logger().warn("Failed to read dropped file AdditionalObjects: {}", hr);
+    }
+  }
+
+  // 用宿主解析出的路径覆盖请求参数，再交还统一 JSON-RPC 管线。
+  request.params = rfl::to_generic<rfl::SnakeCaseToCamelCase>(params);
+  return rfl::json::write<rfl::SnakeCaseToCamelCase>(request);
 }
 
 auto create_composition_host(HWND hwnd, core::webview::HostRuntime& host_runtime)
@@ -413,7 +486,8 @@ auto setup_message_handler(core::AppState* state, ICoreWebView2* webview,
               if (SUCCEEDED(hr) && message_raw) {
                 std::string message = utils::string::ToUtf8(message_raw);
                 if (!detail::try_handle_direct_window_bridge_message(*state, message)) {
-                  message_handler(message);
+                  auto enriched_message = detail::attach_dropped_file_paths(args, message);
+                  message_handler(enriched_message.value_or(std::move(message)));
                 }
                 CoTaskMemFree(message_raw);
               }

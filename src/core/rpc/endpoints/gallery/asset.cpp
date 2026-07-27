@@ -13,6 +13,7 @@
 #include "features/gallery/asset/service.hpp"
 #include "features/gallery/clipboard/clipboard.hpp"
 #include "features/gallery/file_operations/file_operations.hpp"
+#include "features/gallery/importer/importer.hpp"
 #include "features/gallery/original_locator.hpp"
 #include "features/gallery/root_availability.hpp"
 #include "features/gallery/types.hpp"
@@ -25,6 +26,11 @@ struct CheckAssetReachableParams {
 
 struct PasteClipboardToFolderParams {
   std::int64_t folder_id = 0;
+};
+
+struct ImportDroppedFilesToFolderParams {
+  std::int64_t folder_id = 0;
+  std::vector<std::string> source_paths;
 };
 
 struct CheckAssetReachableResult {
@@ -205,6 +211,31 @@ auto handle_paste_clipboard_to_folder(core::AppState& app_state,
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
   }
+  if (result->affected_count.value_or(0) > 0) {
+    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
+  }
+  co_return result.value();
+}
+
+// WebView2 拖入的文件路径在宿主侧解析后进入统一导入管线。
+auto handle_import_dropped_files_to_folder(core::AppState& app_state,
+                                           const ImportDroppedFilesToFolderParams& params)
+    -> RpcAwaitable<features::gallery::OperationResult> {
+  // RPC 使用 UTF-8 字符串，业务层统一接收 filesystem::path。
+  std::vector<std::filesystem::path> source_paths;
+  source_paths.reserve(params.source_paths.size());
+  for (const auto& path : params.source_paths) {
+    source_paths.emplace_back(path);
+  }
+
+  // 复制、索引和 watcher 协调都由 importer 维护，端点只负责协议转换。
+  auto result = features::gallery::importer::import_files_to_folder(app_state, params.folder_id,
+                                                                    source_paths);
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+  // 至少新增一个可见资产时通知所有前端刷新图库。
   if (result->affected_count.value_or(0) > 0) {
     core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
@@ -436,6 +467,11 @@ auto register_all(core::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.pasteClipboardToFolder",
       handle_paste_clipboard_to_folder,
       "Paste clipboard files or bitmap media into an indexed gallery folder");
+
+  register_method<ImportDroppedFilesToFolderParams, features::gallery::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.importDroppedFilesToFolder",
+      handle_import_dropped_files_to_folder,
+      "Import files dropped on the WebView into an indexed gallery folder");
 
   register_method<features::gallery::DeleteAssetsParams, features::gallery::DeleteAssetsResult>(
       app_state, app_state.rpc->registry, "gallery.deleteAssets", handle_delete_assets,

@@ -156,7 +156,7 @@ export function hasGalleryAssetDragIds(event: DragEvent): boolean {
 
   // dragover/dragenter 阶段很多浏览器拿不到 getData，只能靠 types 判断可放置性。
   const types = Array.from(dataTransfer.types ?? [])
-  return types.includes(GALLERY_ASSET_DRAG_MIME) || types.includes('text/plain')
+  return types.includes(GALLERY_ASSET_DRAG_MIME)
 }
 
 export function useGalleryDragPayload() {

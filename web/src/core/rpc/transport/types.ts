@@ -13,6 +13,16 @@ export interface TransportMethods {
   call: <T>(method: string, params?: unknown, timeout?: number) => Promise<T>
 
   /**
+   * 调用需要携带 WebView2 DOM 对象的远程方法
+   */
+  callWithAdditionalObjects: <T>(
+    method: string,
+    params: unknown,
+    additionalObjects: object[],
+    timeout?: number
+  ) => Promise<T>
+
+  /**
    * 监听事件通知
    */
   on: (method: string, handler: (params: unknown) => void) => void

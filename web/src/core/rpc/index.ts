@@ -25,6 +25,19 @@ export async function call<T = unknown>(
 }
 
 /**
+ * 调用携带 WebView2 DOM 对象的远程方法。
+ */
+export async function callWithAdditionalObjects<T = unknown>(
+  method: string,
+  params: unknown,
+  additionalObjects: object[],
+  timeout = 10000
+): Promise<T> {
+  const transport = getTransportMethods()
+  return transport.callWithAdditionalObjects<T>(method, params, additionalObjects, timeout)
+}
+
+/**
  * 监听事件通知
  */
 export function on(method: string, handler: (params: unknown) => void): void {

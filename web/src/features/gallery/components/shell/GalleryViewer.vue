@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
+import { LoaderCircle, Upload } from 'lucide-vue-next'
+import { useI18n } from '@/composables/useI18n'
 import {
   useGalleryAssetActions,
   useGalleryContextMenu,
@@ -12,6 +14,7 @@ import {
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
+import { isWebView } from '@/core/env'
 import {
   computeLightboxHeroRect,
   consumeHero,
@@ -30,6 +33,7 @@ const galleryContextMenu = useGalleryContextMenu()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const galleryView = useGalleryView()
+const { t } = useI18n()
 const viewerRef = ref<HTMLElement | null>(null)
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
@@ -37,6 +41,9 @@ const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
 const preferencesOpen = ref(false)
+const isExternalDragActive = ref(false)
+const isDropImporting = ref(false)
+let externalDragDepth = 0
 
 useVisibleAssetTags()
 
@@ -405,7 +412,57 @@ function handleContentContextMenu(event: MouseEvent) {
   galleryContextMenu.openForBackground(event)
 }
 
+// 区分资源管理器文件与图库内部资产拖拽，避免两套 drop 语义互相抢占。
+function isExternalFileDrag(event: DragEvent): boolean {
+  if (hasGalleryAssetDragIds(event)) {
+    return false
+  }
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+// 清空嵌套 dragenter/dragleave 计数并关闭导入覆盖层。
+function resetExternalDragState() {
+  externalDragDepth = 0
+  isExternalDragActive.value = false
+}
+
+// 只有 HWND WebView 的普通图库视图绑定了唯一文件夹时才接受外部文件。
+function canImportExternalFiles(): boolean {
+  return (
+    isWebView() &&
+    !store.lightbox.isOpen &&
+    !isDropImporting.value &&
+    folderActions.selectedFolderId.value !== undefined
+  )
+}
+
+// 外部文件进入内容区时阻止默认导航，并按当前目标状态显示复制反馈。
+function handleViewerDragEnter(event: DragEvent) {
+  if (!isExternalFileDrag(event)) {
+    return
+  }
+
+  // 即使没有明确目标也阻止 WebView 导航打开被拖入的文件。
+  event.preventDefault()
+  externalDragDepth += 1
+  isExternalDragActive.value = canImportExternalFiles()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = isExternalDragActive.value ? 'copy' : 'none'
+  }
+}
+
+// 拖拽经过内容区时分别维持外部复制和内部移动的鼠标反馈。
 function handleViewerDragOver(event: DragEvent) {
+  if (isExternalFileDrag(event)) {
+    // 文件拖拽期间持续重算目标，支持用户尚未松手时切换图库状态。
+    event.preventDefault()
+    isExternalDragActive.value = canImportExternalFiles()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = isExternalDragActive.value ? 'copy' : 'none'
+    }
+    return
+  }
+
   if (!hasGalleryAssetDragIds(event)) {
     return
   }
@@ -416,7 +473,48 @@ function handleViewerDragOver(event: DragEvent) {
   }
 }
 
-function handleViewerDrop(event: DragEvent) {
+// 外部文件完全离开内容区后关闭覆盖层，子元素间移动不会造成闪烁。
+function handleViewerDragLeave(event: DragEvent) {
+  if (!isExternalFileDrag(event)) {
+    return
+  }
+  externalDragDepth = Math.max(0, externalDragDepth - 1)
+  if (externalDragDepth === 0) {
+    isExternalDragActive.value = false
+  }
+}
+
+// 松开外部文件后锁定目标文件夹并等待整批导入完成。
+async function handleViewerDrop(event: DragEvent) {
+  if (isExternalFileDrag(event)) {
+    // drop 时先快照 File 对象和目标，随后清理拖拽态，避免异步期间继续响应悬停。
+    event.preventDefault()
+    const files = Array.from(event.dataTransfer?.files ?? [])
+    const targetFolderId = folderActions.selectedFolderId.value
+    resetExternalDragState()
+
+    // 浏览器、灯箱和重复提交都只消费 drop，不启动新的导入批次。
+    if (!isWebView() || store.lightbox.isOpen || isDropImporting.value) {
+      return
+    }
+    if (targetFolderId === undefined) {
+      folderActions.warnDropTargetRequired()
+      return
+    }
+    if (files.length === 0) {
+      return
+    }
+
+    // 导入期间保持进度覆盖层，finally 确保异常也能恢复交互。
+    isDropImporting.value = true
+    try {
+      await folderActions.importDroppedFilesToFolder(targetFolderId, files)
+    } finally {
+      isDropImporting.value = false
+    }
+    return
+  }
+
   if (!hasGalleryAssetDragIds(event)) {
     return
   }
@@ -442,20 +540,43 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 </script>
 
 <template>
-  <div
-    ref="viewerRef"
-    class="relative h-full"
-    @dragover="handleViewerDragOver"
-    @drop="handleViewerDrop"
-  >
+  <div ref="viewerRef" class="relative h-full">
     <!-- gallery 始终渲染；打开时用 opacity 隐藏以便过渡，关闭阶段 isClosing 时与 lightbox 同步淡入 -->
     <div
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
       <GalleryToolbar @open-preferences="preferencesOpen = true" />
-      <div ref="contentRef" class="flex-1 overflow-hidden" @contextmenu="handleContentContextMenu">
+      <div
+        ref="contentRef"
+        class="relative flex-1 overflow-hidden"
+        @contextmenu="handleContentContextMenu"
+        @dragenter="handleViewerDragEnter"
+        @dragover="handleViewerDragOver"
+        @dragleave="handleViewerDragLeave"
+        @drop="handleViewerDrop"
+      >
         <GalleryContent ref="galleryContentRef" />
+
+        <div
+          v-if="isExternalDragActive || isDropImporting"
+          class="pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/70 bg-background/88 shadow-2xl backdrop-blur-md"
+        >
+          <div class="flex max-w-md flex-col items-center gap-3 px-8 text-center">
+            <LoaderCircle v-if="isDropImporting" class="size-10 animate-spin text-primary" />
+            <Upload v-else class="size-10 text-primary" />
+            <div class="text-lg font-semibold">
+              {{
+                isDropImporting
+                  ? t('gallery.drop.overlayImporting')
+                  : t('gallery.drop.overlayTitle')
+              }}
+            </div>
+            <div v-if="!isDropImporting" class="text-sm text-muted-foreground">
+              {{ t('gallery.drop.overlayDescription') }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

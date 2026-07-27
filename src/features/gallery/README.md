@@ -18,7 +18,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 - `file_operations/file_operations.cpp`：删除、打开、定位、回收站和文件夹移动等主动操作。
 - `scanner/scanner.cpp`：全量扫描编排。
 - `scanner/asset_pipeline.cpp`：全量和增量共用的单路径资产处理。
-- `watcher/watcher.cpp`：watcher 注册、生命周期和启动恢复。
+- `watcher/watcher.cpp`：watcher 注册、生命周期、主动操作屏蔽和启动恢复。
 - `watcher/notify.cpp`：接收文件系统通知并写入待处理队列。
 - `watcher/sync.cpp`：防抖、增量同步、全量回退和结果分发。
 - `asset/`、`folder/`、`tag/`、`color/`：索引查询与各自的数据操作。
@@ -84,6 +84,31 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 - 缩略图修复只使用当前存在的原件；30 天回收后，无引用缩略图由同一次启动对账清理。
 - 缩略图按内容 hash 共享，单个资产状态变化不能直接删除共享文件。
 
+## 主动文件操作与 watcher
+
+粘贴、移动、删除和创建目录等应用主动操作由程序同步维护磁盘与索引，不能再让 watcher
+重复应用同一事实。统一时序为：
+
+```text
+begin 精确路径屏蔽
+→ 修改磁盘
+→ 同步修改索引
+→ complete 结束 in-flight
+→ 批量分发真实 ScanChange
+```
+
+`begin_manual_file_system_ignore` 会先登记规范化后的精确源/目标路径，再清除这些路径尚未消费的
+`pending_file_changes` 和 `pending_stable_file_changes`。通知入口与增量同步真正应用
+`REMOVE/UPSERT` 前都会检查屏蔽状态，因此 begin 之前已经形成、但尚未执行的增量变化也会跳过。
+源和目标规范化后相同时只登记一次。
+
+每个文件的磁盘与索引操作结束后应立即调用 `complete_manual_file_system_ignore`，不应把整批路径
+一直持有到函数退出。complete 会保留短暂 grace period 过滤延迟通知；失败只记录维护警告，
+不反转已经完成的业务结果。begin 失败时不得继续对应的磁盘操作。
+
+屏蔽只匹配明确登记的精确路径，不递归覆盖目录后代，也不强制取消已经进入媒体分析的任务。
+它负责消除正常主动操作与 watcher 的重复消费，不提供跨文件系统和数据库的强事务语义。
+
 ## 启动恢复与根目录状态
 
 启动顺序为：恢复 watcher 注册、注册扩展回调、逐个 root 执行 USN 恢复或全量扫描、
@@ -98,6 +123,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 - Scanner 只能更新文件系统或媒体派生字段，不能覆盖资产用户数据。
 - 全量扫描与 watcher 必须复用 `features::gallery::scanner::asset_pipeline` 的路径处理语义。
 - 目录库存变化可以刷新 Gallery UI，但不能伪造文件级 `ScanChange`。
-- 应用主动文件操作若忽略了对应 watcher 事件，必须显式补发真实的 `REMOVE/UPSERT`。
+- 应用主动文件操作必须遵循 `begin → 磁盘 → 索引 → complete → ScanChange`；
+  忽略 watcher 事件后必须显式补发真实的 `REMOVE/UPSERT`。
 - 启动恢复先接收实时通知，再应用 USN 或全量基线；checkpoint 只能推进到成功应用的边界。
 - Gallery 不得查询或修改扩展业务表；扩展通过回调和 `ScanChange` 维护自己的数据。

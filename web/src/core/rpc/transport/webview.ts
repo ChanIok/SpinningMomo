@@ -33,6 +33,21 @@ export function createWebViewTransport(): TransportMethods {
     }
   }
 
+  // 通过 WebView2 侧信道发送 DOM 对象，JSON 消息仍沿用普通 RPC 协议。
+  function postMessageWithAdditionalObjects(
+    message: JsonRpcRequest,
+    additionalObjects: object[]
+  ): void {
+    const webview = window.chrome?.webview
+    if (!webview?.postMessageWithAdditionalObjects) {
+      throw new JsonRpcError(
+        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+        'WebView2 additional objects are not available'
+      )
+    }
+    webview.postMessageWithAdditionalObjects(message, additionalObjects)
+  }
+
   function handleResponse(response: JsonRpcResponse): void {
     const pendingRequest = pendingRequests.get(response.id)
     if (!pendingRequest) return
@@ -105,53 +120,73 @@ export function createWebViewTransport(): TransportMethods {
     }
   }
 
+  // 为普通消息和附加对象消息复用同一套请求 ID、超时和 Promise 生命周期。
+  function callRequest<T>(
+    method: string,
+    params: unknown,
+    timeout: number,
+    send: (request: JsonRpcRequest) => void
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      if (!isWebViewAvailable()) {
+        reject(new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'WebView2 not available'))
+        return
+      }
+
+      const id = nextId++
+      const request: JsonRpcRequest = {
+        jsonrpc: '2.0',
+        method,
+        params,
+        id,
+      }
+
+      let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+      if (timeout > 0) {
+        timeoutHandle = setTimeout(() => {
+          pendingRequests.delete(id)
+          reject(
+            new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
+              method,
+              timeout,
+            })
+          )
+        }, timeout)
+      }
+
+      pendingRequests.set(id, {
+        resolve: (value: unknown) => resolve(value as T),
+        reject,
+        timeout: timeoutHandle,
+      })
+
+      // 先登记 pending 再发送，确保同步抛错和快速响应都能正确收敛。
+      try {
+        send(request)
+        if (isDebugMode) console.log('[WebView RPC]', 'RPC call:', method, params)
+      } catch (error) {
+        if (timeoutHandle) clearTimeout(timeoutHandle)
+        pendingRequests.delete(id)
+        reject(error)
+      }
+    })
+  }
+
   // 返回 TransportMethods 接口实现
   return {
     call: async <T>(method: string, params?: unknown, timeout = 10000): Promise<T> => {
-      return new Promise((resolve, reject) => {
-        if (!isWebViewAvailable()) {
-          reject(new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'WebView2 not available'))
-          return
-        }
+      return callRequest<T>(method, params, timeout, postMessage)
+    },
 
-        const id = nextId++
-        const request: JsonRpcRequest = {
-          jsonrpc: '2.0',
-          method,
-          params,
-          id,
-        }
-
-        // 设置超时 (timeout=0 表示永不超时)
-        let timeoutHandle: ReturnType<typeof setTimeout> | null = null
-
-        if (timeout > 0) {
-          timeoutHandle = setTimeout(() => {
-            pendingRequests.delete(id)
-            reject(
-              new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
-                method,
-                timeout,
-              })
-            )
-          }, timeout)
-        }
-
-        pendingRequests.set(id, {
-          resolve: (value: unknown) => resolve(value as T),
-          reject,
-          timeout: timeoutHandle,
-        })
-
-        try {
-          postMessage(request)
-          if (isDebugMode) console.log('[WebView RPC]', 'RPC call:', method, params)
-        } catch (error) {
-          if (timeoutHandle) clearTimeout(timeoutHandle)
-          pendingRequests.delete(id)
-          reject(error)
-        }
-      })
+    callWithAdditionalObjects: async <T>(
+      method: string,
+      params: unknown,
+      additionalObjects: object[],
+      timeout = 10000
+    ): Promise<T> => {
+      return callRequest<T>(method, params, timeout, (request) =>
+        postMessageWithAdditionalObjects(request, additionalObjects)
+      )
     },
 
     on: (method: string, handler: (params: unknown) => void): void => {

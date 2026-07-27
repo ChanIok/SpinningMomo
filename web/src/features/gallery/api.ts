@@ -1,4 +1,4 @@
-import { call } from '@/core/rpc'
+import { call, callWithAdditionalObjects } from '@/core/rpc'
 import type { FolderTreeNode, Tag, TagTreeNode } from './types'
 import { getAssetThumbnailUrl, getAssetUrl } from './api/urls'
 import type {
@@ -270,6 +270,24 @@ export async function pasteClipboardToFolder(folderId: number): Promise<Operatio
   } catch (error) {
     console.error('Failed to paste clipboard media:', error)
     throw new Error('粘贴剪贴板内容失败')
+  }
+}
+
+// 将 WebView2 DOM File 作为附加对象发送，文件内容不经过 JSON 序列化。
+export async function importDroppedFilesToFolder(
+  folderId: number,
+  files: File[]
+): Promise<OperationResult> {
+  try {
+    return await callWithAdditionalObjects<OperationResult>(
+      'gallery.importDroppedFilesToFolder',
+      { folderId },
+      files,
+      0
+    )
+  } catch (error) {
+    console.error('Failed to import dropped media:', error)
+    throw new Error('拖拽导入文件失败')
   }
 }
 
@@ -729,6 +747,7 @@ export const galleryApi = {
   revealAssetInExplorer,
   copyAssetsToClipboard,
   pasteClipboardToFolder,
+  importDroppedFilesToFolder,
   deleteAssets,
   moveAssetsToFolder,
   checkAssetReachable,

@@ -177,6 +177,13 @@ export function createHttpTransport(): TransportMethods {
       })
     },
 
+    callWithAdditionalObjects: async <T>(): Promise<T> => {
+      throw new JsonRpcError(
+        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+        'Additional WebView objects are unavailable over HTTP'
+      )
+    },
+
     on: (method: string, handler: (params: unknown) => void): void => {
       if (!eventHandlers.has(method)) {
         eventHandlers.set(method, new Set())

@@ -5,7 +5,7 @@
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/repository.hpp"
 #include "features/gallery/folder/repository.hpp"
-#include "features/gallery/scanner/common.hpp"
+#include "features/gallery/importer/importer.hpp"
 #include "features/gallery/scanner/scanner.hpp"
 #include "features/gallery/types.hpp"
 #include "features/gallery/watcher/watcher.hpp"
@@ -354,70 +354,7 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
 
   // 文件列表逐项复制，单个失败不阻断同一批次中的其他媒体。
   if (clipboard.kind == utils::system::ClipboardMediaKind::Files) {
-    for (const auto& source : clipboard.file_paths) {
-      auto normalized_source_result = utils::path::NormalizePath(source);
-      if (!normalized_source_result) {
-        errors.push_back("Failed to normalize clipboard source '" + source.string() +
-                         "': " + normalized_source_result.error());
-        continue;
-      }
-      const auto normalized_source = normalized_source_result.value();
-
-      std::error_code source_error;
-      const bool source_exists = std::filesystem::exists(normalized_source, source_error);
-      if (source_error) {
-        errors.push_back("Failed to access clipboard source '" + normalized_source.string() +
-                         "': " + source_error.message());
-        continue;
-      }
-      if (!source_exists) {
-        not_found_count++;
-        continue;
-      }
-      const bool is_regular_file =
-          std::filesystem::is_regular_file(normalized_source, source_error);
-      if (source_error) {
-        errors.push_back("Failed to inspect clipboard source '" + normalized_source.string() +
-                         "': " + source_error.message());
-        continue;
-      }
-      if (!is_regular_file) {
-        unchanged_count++;
-        continue;
-      }
-
-      const auto& supported_extensions = scanner::common::default_supported_extensions();
-      if (!scanner::common::is_supported_file(normalized_source, supported_extensions)) {
-        unchanged_count++;
-        continue;
-      }
-
-      auto temporary_result = make_clipboard_temp_path(target_folder);
-      if (!temporary_result) {
-        errors.push_back(temporary_result.error());
-        continue;
-      }
-      auto temporary_path = temporary_result.value();
-
-      std::error_code copy_error;
-      std::filesystem::copy_file(normalized_source, temporary_path,
-                                 std::filesystem::copy_options::none, copy_error);
-      if (copy_error) {
-        cleanup_clipboard_temp_file(temporary_path);
-        errors.push_back("Failed to copy clipboard file '" + normalized_source.string() +
-                         "': " + copy_error.message());
-        continue;
-      }
-
-      auto commit_result = commit_clipboard_temp_file(app_state, temporary_path, target_folder,
-                                                      normalized_source.filename());
-      if (!commit_result) {
-        cleanup_clipboard_temp_file(temporary_path);
-        errors.push_back(commit_result.error());
-        continue;
-      }
-      index_created_path(commit_result.value());
-    }
+    return importer::import_files_to_folder(app_state, folder_id, clipboard.file_paths);
   } else {
     // 位图剪贴板只产生一个无损 PNG，并沿用截图文件名格式。
     auto temporary_result = make_clipboard_temp_path(target_folder);
