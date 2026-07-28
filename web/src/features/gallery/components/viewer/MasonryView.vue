@@ -140,7 +140,7 @@ defineExpose({ scrollToIndex, getCardRect })
         >
           <div
             v-for="virtualItem in masonryVirtualizer.virtualItems.value"
-            :key="virtualItem.index"
+            :key="virtualItem.asset?.id ?? `placeholder-${virtualItem.index}`"
             :ref="measureItemElement"
             :data-index="virtualItem.index"
             :style="{
