@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { ChevronRight, Pen, Plus, Tag, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -172,14 +173,20 @@ function handleDrop(event: DragEvent) {
     <AlertDialog v-model:open="showDeleteDialog">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除标签？</AlertDialogTitle>
+          <AlertDialogTitle>
+            {{ t('gallery.sidebar.tags.delete.confirmTitle') }}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            将删除标签「{{ tag.name }}」及其所有关联。此操作不可恢复。
+            {{ t('gallery.sidebar.tags.delete.confirmDescription', { name: tag.name }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="confirmDelete">确认删除</AlertDialogAction>
+          <AlertDialogCancel>
+            {{ t('gallery.sidebar.tags.delete.cancel') }}
+          </AlertDialogCancel>
+          <AlertDialogAction @click="confirmDelete">
+            {{ t('gallery.sidebar.tags.delete.confirm') }}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -219,23 +226,7 @@ function handleDrop(event: DragEvent) {
           <!-- 左侧：图标 + 名称 -->
           <div class="flex min-w-0 items-center gap-2">
             <!-- 标签图标 -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="flex-shrink-0"
-            >
-              <path
-                d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"
-              />
-              <path d="M7 7h.01" />
-            </svg>
+            <Tag class="h-3.5 w-3.5 flex-shrink-0" />
 
             <!-- 标签名称 -->
             <span class="truncate text-sm">
@@ -250,24 +241,13 @@ function handleDrop(event: DragEvent) {
           >
             <!-- 展开/收起箭头 -->
             <span
-              class="-mr-1.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-hover"
+              class="mr-1 flex-shrink-0 rounded-sm p-1 hover:bg-sidebar-hover"
               @click.stop="toggleExpand"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="transition-transform"
+              <ChevronRight
+                class="h-4 w-4 transition-transform"
                 :class="{ 'rotate-90': isExpanded }"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
+              />
             </span>
           </div>
         </button>
@@ -275,60 +255,17 @@ function handleDrop(event: DragEvent) {
 
       <ContextMenuContent @close-auto-focus="handleContextMenuCloseAutoFocus">
         <ContextMenuItem @click="startRename">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="mr-2"
-          >
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-            <path d="m15 5 4 4" />
-          </svg>
-          重命名
+          <Pen />
+          {{ t('gallery.sidebar.tags.menu.rename') }}
         </ContextMenuItem>
         <ContextMenuItem @click="startCreateChild">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="mr-2"
-          >
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-          </svg>
-          添加子标签
+          <Plus />
+          {{ t('gallery.sidebar.tags.menu.createChild') }}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem @click="requestDelete" class="text-destructive focus:text-destructive">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="mr-2"
-          >
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-          </svg>
-          删除
+        <ContextMenuItem variant="destructive" @click="requestDelete">
+          <Trash2 />
+          {{ t('gallery.sidebar.tags.menu.delete') }}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

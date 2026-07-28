@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { Folder } from 'lucide-vue-next'
+import { Folder, Tag } from 'lucide-vue-next'
 
 interface Props {
   initialValue?: string
@@ -76,22 +76,10 @@ function handleKeydown(event: KeyboardEvent) {
       class="h-3.5 w-3.5 flex-shrink-0 text-sidebar-foreground/70"
     />
     <!-- 标签图标（与 TagTreeItem 保持一致） -->
-    <svg
+    <Tag
       v-else-if="iconType === 'tag'"
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class="flex-shrink-0 text-sidebar-foreground/70"
-    >
-      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-      <path d="M7 7h.01" />
-    </svg>
+      class="h-3.5 w-3.5 flex-shrink-0 text-sidebar-foreground/70"
+    />
 
     <!-- 输入框 -->
     <input
