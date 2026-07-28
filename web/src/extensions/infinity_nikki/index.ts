@@ -142,7 +142,10 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
         uidNodes.push({
           ...nikkiPhotosNode,
           name: uidNode.name,
-          displayName: pickFolderDisplayName(uidNode.displayName, uidNode.name),
+          displayName: pickFolderDisplayName(
+            nikkiPhotosNode.displayName || uidNode.displayName,
+            uidNode.name
+          ),
           children: [],
         })
       } else {
