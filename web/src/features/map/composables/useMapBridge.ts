@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { useGallerySelection } from '@/features/gallery/composables'
+import { useGalleryData, useGallerySelection } from '@/features/gallery/composables'
 import { useGalleryStore } from '@/features/gallery/store'
 import {
   ACTION_CLEAR_GALLERY_FILTERS,
@@ -95,6 +95,7 @@ function buildSerializableRuntimePayload(
 export function useMapBridge(options: UseMapBridgeOptions) {
   const { mapIframe, mapStore, galleryStore, router } = options
   const gallerySelection = useGallerySelection()
+  const galleryData = useGalleryData()
 
   function postRuntimeSync() {
     const contentWindow = mapIframe.value?.contentWindow
@@ -185,6 +186,7 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     if (data.action === ACTION_CLEAR_GALLERY_FILTERS) {
       galleryStore.resetFilter()
       galleryStore.setIncludeSubfolders(true)
+      void galleryData.refreshCurrentQuery()
       return
     }
 
