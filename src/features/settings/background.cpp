@@ -2,16 +2,17 @@
 
 #include "vendor/std.hpp"
 
+#include "core/build_config.hpp"
 #include "core/http_server/static.hpp"
 #include "core/http_server/types.hpp"
 #include "core/state/app_state.hpp"
 #include "core/webview/state.hpp"
-#include "core/webview/static.hpp"
-#include "core/webview/types.hpp"
+#include "core/webview/webview.hpp"
 #include "features/settings/types.hpp"
 #include "utils/image/image.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
+#include "utils/string/string.hpp"
 
 namespace features::settings::background {
 
@@ -36,7 +37,6 @@ constexpr double kLightThemeThreshold = 0.48;
 // K-Means 聚类数，用于提取区域主色
 constexpr std::size_t kRegionClusterCount = 5;
 constexpr std::string_view kBackgroundWebPrefix = "/static/backgrounds/";
-constexpr std::wstring_view kBackgroundWebPrefixW = L"/static/backgrounds/";
 constexpr std::string_view kBackgroundFileName = "background";
 
 // 将外部传入的路径统一成模块内部使用的格式：
@@ -139,11 +139,6 @@ auto extract_path_from_url(std::string_view url) -> std::optional<std::string> {
   return std::string(url.substr(path_pos));
 }
 
-// 获取应用数据目录下的 backgrounds 文件夹路径
-auto get_backgrounds_directory() -> std::expected<std::filesystem::path, std::string> {
-  return utils::path::GetAppDataSubdirectory("backgrounds");
-}
-
 // 解析托管背景文件的绝对路径，进行安全校验
 auto resolve_managed_background_file(const std::filesystem::path& file_name)
     -> std::expected<std::filesystem::path, std::string> {
@@ -152,7 +147,7 @@ auto resolve_managed_background_file(const std::filesystem::path& file_name)
     return std::unexpected("Invalid managed background file name");
   }
 
-  auto backgrounds_dir_result = get_backgrounds_directory();
+  auto backgrounds_dir_result = utils::path::GetAppDataSubdirectory("backgrounds");
   if (!backgrounds_dir_result) {
     return std::unexpected("Failed to get backgrounds directory: " +
                            backgrounds_dir_result.error());
@@ -573,7 +568,7 @@ auto import_background_image(const BackgroundImportParams& params)
       return std::unexpected("Background source file does not exist: " + source_path.string());
     }
 
-    auto backgrounds_dir_result = get_backgrounds_directory();
+    auto backgrounds_dir_result = utils::path::GetAppDataSubdirectory("backgrounds");
     if (!backgrounds_dir_result) {
       return std::unexpected("Failed to get backgrounds directory: " +
                              backgrounds_dir_result.error());
@@ -613,11 +608,9 @@ auto remove_background_image(const BackgroundRemoveParams& params)
   }
 }
 
-// 注册背景图片的静态资源解析器（HTTP 和 WebView 两条链路）
+// 注册托管背景的浏览器 HTTP 解析器和 Release WebView 目录映射。
 auto register_static_resolvers(core::AppState& app_state) -> void {
-  // 开发环境下浏览器通过 HTTP 访问 /static/backgrounds/*，
-  // 生产环境下 WebView 通过 static host 访问同一组逻辑路径。
-  // 两条链路最终都落到 app data 的背景目录，不再依赖 resources/web。
+  // Vite 和普通浏览器通过 HTTP 访问 /static/backgrounds/*。
   core::http_server::static_content::register_path_resolver(
       app_state, std::string(kBackgroundWebPrefix),
       [](std::string_view url) -> core::http_server::PathResolution {
@@ -638,42 +631,24 @@ auto register_static_resolvers(core::AppState& app_state) -> void {
         };
       });
 
-  if (!app_state.webview) {
+  if (core::build_config::is_debug_build() || !app_state.webview) {
     return;
   }
 
-  auto web_prefix = L"https://" + app_state.webview->config.static_host_name +
-                    std::wstring(kBackgroundWebPrefixW);
-  core::webview::static_content::register_web_resource_resolver(
-      app_state, web_prefix,
-      [web_prefix](std::wstring_view url) -> core::webview::WebResourceResolution {
-        auto relative_path = extract_relative_path_generic(url, std::wstring_view(web_prefix));
-        if (!relative_path) {
-          return {.success = false,
-                  .file_path = {},
-                  .error_message = "Invalid managed background URL",
-                  .content_type = std::nullopt,
-                  .status_code = 404};
-        }
+  auto backgrounds_dir_result = utils::path::GetAppDataSubdirectory("backgrounds");
+  if (!backgrounds_dir_result) {
+    Logger().error("Failed to register WebView background host mapping: {}",
+                   backgrounds_dir_result.error());
+    return;
+  }
 
-        auto background_path_result =
-            resolve_existing_managed_background_file(std::filesystem::path(*relative_path));
-        if (!background_path_result) {
-          return {.success = false,
-                  .file_path = {},
-                  .error_message = background_path_result.error(),
-                  .content_type = std::nullopt,
-                  .status_code = 404};
-        }
+  core::webview::register_virtual_host_folder_mapping(
+      app_state, app_state.webview->config.background_host_name, backgrounds_dir_result->wstring(),
+      core::webview::VirtualHostResourceAccessKind::deny_cors);
 
-        return {.success = true,
-                .file_path = background_path_result.value(),
-                .error_message = {},
-                .content_type = std::nullopt,
-                .status_code = 200};
-      });
-
-  Logger().info("Registered background static resolvers for {}", std::string(kBackgroundWebPrefix));
+  Logger().info("Registered WebView background host mapping: {} -> {}",
+                utils::string::ToUtf8(app_state.webview->config.background_host_name),
+                utils::string::ToUtf8(backgrounds_dir_result->wstring()));
 }
 
 }  // namespace features::settings::background

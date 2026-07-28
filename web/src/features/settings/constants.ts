@@ -1,5 +1,7 @@
 // 背景图片目录（Web 路径）
 export const BACKGROUND_WEB_DIR = '/static/backgrounds'
+// Release WebView2 直接从托管背景目录读取，不经过通用静态资源拦截。
+export const BACKGROUND_WEBVIEW_ORIGIN = 'https://background.test'
 
 // 界面面板不透明度范围
 export const SURFACE_OPACITY_RANGE = {
