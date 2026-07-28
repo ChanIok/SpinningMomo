@@ -23,7 +23,7 @@ const routes: RouteRecordRaw[] = [
     name: 'home',
     component: HomePage,
     meta: {
-      title: '首页',
+      titleKey: 'app.navigation.home',
     },
   },
   {
@@ -31,7 +31,7 @@ const routes: RouteRecordRaw[] = [
     name: 'welcome',
     component: OnboardingPage,
     meta: {
-      title: '欢迎',
+      titleKey: 'app.navigation.welcome',
     },
   },
   ...galleryRoutes,
@@ -40,7 +40,7 @@ const routes: RouteRecordRaw[] = [
     name: 'map',
     component: MapPage,
     meta: {
-      title: '地图',
+      titleKey: 'app.navigation.map',
     },
   },
   {
@@ -48,7 +48,7 @@ const routes: RouteRecordRaw[] = [
     name: 'settings',
     component: SettingsPage,
     meta: {
-      title: '设置',
+      titleKey: 'app.navigation.settings',
     },
   },
   {
@@ -56,7 +56,7 @@ const routes: RouteRecordRaw[] = [
     name: 'about',
     component: AboutPage,
     meta: {
-      title: '关于',
+      titleKey: 'app.navigation.about',
     },
   },
   ...playgroundRoutes,
@@ -65,7 +65,7 @@ const routes: RouteRecordRaw[] = [
     name: 'not-found',
     component: NotFoundPage,
     meta: {
-      title: '页面未找到',
+      titleKey: 'app.navigation.notFound',
     },
   },
 ]

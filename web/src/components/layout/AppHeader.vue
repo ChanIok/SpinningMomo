@@ -41,6 +41,12 @@ const taskStore = useTaskStore()
 const showWindowControls = isWebView()
 const isGalleryPage = computed(() => route.name === 'gallery')
 const pageTitleKey = computed(() => {
+  if (route.name === 'home' || route.name === 'welcome') {
+    return undefined
+  }
+  if (typeof route.meta?.titleKey === 'string') {
+    return route.meta.titleKey
+  }
   const titleKeys: Record<string, string> = {
     gallery: 'app.navigation.gallery',
     map: 'app.navigation.map',

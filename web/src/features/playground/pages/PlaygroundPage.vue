@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import ApiPlaygroundPage from './ApiPlaygroundPage.vue'
-
-onMounted(() => {
-  document.title = 'API 测试工具'
-})
 </script>
 
 <template>

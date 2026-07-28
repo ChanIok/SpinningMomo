@@ -7,7 +7,7 @@ export default [
     name: 'gallery',
     component: () => import('./pages/GalleryPage.vue'),
     meta: {
-      title: '图库',
+      titleKey: 'app.navigation.gallery',
       icon: 'gallery',
       requiresAuth: false,
     },

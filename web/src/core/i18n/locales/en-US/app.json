@@ -29,7 +29,11 @@
   "app.navigation.about": "About",
   "app.navigation.back": "Go back",
   "app.navigation.gallery": "Gallery",
+  "app.navigation.home": "Home",
   "app.navigation.homeDock": "Main features",
   "app.navigation.map": "Map",
-  "app.navigation.settings": "Settings"
+  "app.navigation.notFound": "Page Not Found",
+  "app.navigation.playground": "Developer Tools",
+  "app.navigation.settings": "Settings",
+  "app.navigation.welcome": "Welcome"
 }

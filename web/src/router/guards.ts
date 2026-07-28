@@ -1,10 +1,32 @@
+import { watch } from 'vue'
 import type { Router } from 'vue-router'
+import { useI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
 
 /**
- * 路由守卫配置
+ * 路由守卫与文档标题配置
  */
+
+// 响应式更新 document.title
+export function setupDocumentTitle(router: Router) {
+  const { t, locale } = useI18n()
+  watch(
+    [() => router.currentRoute.value, locale],
+    ([currentRoute]) => {
+      const titleKey = currentRoute.meta?.titleKey as string | undefined
+      const staticTitle = currentRoute.meta?.title as string | undefined
+      const pageTitle = titleKey ? t(titleKey) : staticTitle
+
+      if (pageTitle) {
+        document.title = `${pageTitle} - SpinningMomo`
+      } else {
+        document.title = 'SpinningMomo'
+      }
+    },
+    { immediate: true }
+  )
+}
 
 // 全局前置守卫
 export function setupRouterGuards(router: Router) {
@@ -23,19 +45,6 @@ export function setupRouterGuards(router: Router) {
         return { name: 'home', replace: true }
       }
     }
-
-    // 设置页面标题
-    if (to.meta?.title) {
-      document.title = `${to.meta.title} - SpinningMomo`
-    } else {
-      document.title = 'SpinningMomo'
-    }
-
-    // 这里可以添加权限验证、登录状态检查等逻辑
-    // 例如：
-    // if (to.meta.requiresAuth && !isAuthenticated()) {
-    //   return '/login'
-    // }
   })
 
   router.afterEach((to, from) => {

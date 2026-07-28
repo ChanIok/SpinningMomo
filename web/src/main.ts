@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import { watch } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
-import { setupRouterGuards } from './router/guards'
+import { setupDocumentTitle, setupRouterGuards } from './router/guards'
 import { initializeRPC } from '@/core/rpc'
 import { initI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
@@ -31,6 +31,7 @@ initializeRPC()
 ;(async () => {
   // 首先初始化 i18n（使用默认语言）
   await initI18n('zh-CN')
+  setupDocumentTitle(router)
 
   // 然后初始化 settings store，它会自动同步后端的语言设置
   const settingsStore = useSettingsStore()

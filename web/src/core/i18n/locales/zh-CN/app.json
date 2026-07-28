@@ -29,7 +29,11 @@
   "app.navigation.about": "关于",
   "app.navigation.back": "返回上一页",
   "app.navigation.gallery": "图库",
+  "app.navigation.home": "首页",
   "app.navigation.homeDock": "主要功能",
   "app.navigation.map": "地图",
-  "app.navigation.settings": "设置"
+  "app.navigation.notFound": "页面未找到",
+  "app.navigation.playground": "开发工具",
+  "app.navigation.settings": "设置",
+  "app.navigation.welcome": "欢迎"
 }

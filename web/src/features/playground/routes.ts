@@ -7,7 +7,7 @@ const routes: RouteRecordRaw[] = import.meta.env.DEV
         name: 'playground',
         component: () => import('./pages/PlaygroundPage.vue'),
         meta: {
-          title: '开发工具',
+          titleKey: 'app.navigation.playground',
         },
       },
     ]
