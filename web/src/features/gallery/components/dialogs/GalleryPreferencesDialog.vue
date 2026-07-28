@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { useSettingsStore } from '@/features/settings/store'
@@ -142,49 +143,48 @@ watch(
             </p>
           </div>
 
-          <div class="space-y-1">
-            <label
-              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
-            >
-              <div class="space-y-0.5">
-                <span class="block text-sm font-medium text-foreground">
+          <div class="space-y-2">
+            <Item variant="surface" size="sm">
+              <ItemContent>
+                <ItemTitle>
                   {{ t('gallery.preferences.view.rating.title') }}
-                </span>
-                <span class="block text-xs text-muted-foreground">
+                </ItemTitle>
+                <ItemDescription>
                   {{ t('gallery.preferences.view.rating.description') }}
-                </span>
-              </div>
-              <Switch v-model="showRatingBadge" />
-            </label>
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Switch v-model="showRatingBadge" />
+              </ItemActions>
+            </Item>
 
-            <label
-              v-if="isInfinityNikkiEnabled"
-              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
-            >
-              <div class="space-y-0.5">
-                <span class="block text-sm font-medium text-foreground">
+            <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
+              <ItemContent>
+                <ItemTitle>
                   {{ t('gallery.preferences.view.dyeCode.title') }}
-                </span>
-                <span class="block text-xs text-muted-foreground">
+                </ItemTitle>
+                <ItemDescription>
                   {{ t('gallery.preferences.view.dyeCode.description') }}
-                </span>
-              </div>
-              <Switch v-model="showDyeCodeBadge" />
-            </label>
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Switch v-model="showDyeCodeBadge" />
+              </ItemActions>
+            </Item>
 
-            <label
-              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
-            >
-              <div class="space-y-0.5">
-                <span class="block text-sm font-medium text-foreground">
+            <Item variant="surface" size="sm">
+              <ItemContent>
+                <ItemTitle>
                   {{ t('gallery.preferences.view.tags.title') }}
-                </span>
-                <span class="block text-xs text-muted-foreground">
+                </ItemTitle>
+                <ItemDescription>
                   {{ t('gallery.preferences.view.tags.description') }}
-                </span>
-              </div>
-              <Switch v-model="showTagBadges" />
-            </label>
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Switch v-model="showTagBadges" />
+              </ItemActions>
+            </Item>
           </div>
         </div>
 
@@ -198,48 +198,51 @@ watch(
             </p>
           </div>
 
-          <div class="space-y-1">
-            <div class="flex items-center justify-between gap-6 rounded-lg p-3.5">
-              <div class="space-y-0.5">
-                <span class="block text-sm font-medium text-foreground">
+          <div class="space-y-2">
+            <Item variant="surface" size="sm">
+              <ItemContent>
+                <ItemTitle>
                   {{ t('gallery.preferences.deletion.mode.title') }}
-                </span>
-                <span class="block text-xs text-muted-foreground">
+                </ItemTitle>
+                <ItemDescription>
                   {{ t('gallery.preferences.deletion.mode.description') }}
-                </span>
-              </div>
-              <Select v-model="deleteMode">
-                <SelectTrigger class="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recycleBin">
-                    {{ t('gallery.preferences.deletion.mode.recycleBin') }}
-                  </SelectItem>
-                  <SelectItem value="permanent">
-                    {{ t('gallery.preferences.deletion.mode.permanent') }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Select v-model="deleteMode">
+                  <SelectTrigger class="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recycleBin">
+                      {{ t('gallery.preferences.deletion.mode.recycleBin') }}
+                    </SelectItem>
+                    <SelectItem value="permanent">
+                      {{ t('gallery.preferences.deletion.mode.permanent') }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </ItemActions>
+            </Item>
 
-            <label
-              v-if="deleteMode === 'recycleBin'"
-              class="flex cursor-pointer items-center justify-between gap-6 rounded-lg p-3.5 transition-colors hover:bg-muted/40"
-            >
-              <div class="space-y-0.5">
-                <span class="block text-sm font-medium text-foreground">
+            <Item v-if="deleteMode === 'recycleBin'" variant="surface" size="sm">
+              <ItemContent>
+                <ItemTitle>
                   {{ t('gallery.preferences.deletion.confirm.title') }}
-                </span>
-                <span class="block text-xs text-muted-foreground">
+                </ItemTitle>
+                <ItemDescription>
                   {{ t('gallery.preferences.deletion.confirm.description') }}
-                </span>
-              </div>
-              <Switch v-model="confirmRecycleBin" />
-            </label>
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Switch v-model="confirmRecycleBin" />
+              </ItemActions>
+            </Item>
           </div>
 
-          <p class="rounded-lg bg-muted/40 px-3.5 py-3 text-xs text-muted-foreground">
+          <p
+            class="rounded-md border border-border/40 bg-muted/30 px-3.5 py-3 text-xs text-muted-foreground"
+          >
             {{ t('gallery.preferences.deletion.permanentNotice') }}
           </p>
         </div>

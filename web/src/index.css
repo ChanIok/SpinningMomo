@@ -108,7 +108,7 @@
   --sidebar-foreground: #2e2e2e;
   --sidebar-primary: #c66900;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--surface-top-mixed);
+  --sidebar-accent: rgb(0 0 0 / 0.08);
   --sidebar-accent-foreground: #000000;
   --sidebar-hover: rgb(0 0 0 / 0.04);
   --sidebar-border: #e5e5e5;
@@ -162,7 +162,7 @@
   --sidebar-foreground: #ececec;
   --sidebar-primary: #f5a623;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--surface-top-mixed);
+  --sidebar-accent: rgb(255 255 255 / 0.12);
   --sidebar-accent-foreground: #ececec;
   --sidebar-hover: rgb(255 255 255 / 0.06);
   --sidebar-border: #ffffff1a;

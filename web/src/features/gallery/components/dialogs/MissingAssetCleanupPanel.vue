@@ -212,7 +212,7 @@ onMounted(load)
           </button>
 
           <!-- 文件夹内的失效单项文件 -->
-          <div v-if="isExpanded(group.path)" class="ml-8 border-l pl-2">
+          <div v-if="isExpanded(group.path)" class="ml-4 border-l pl-2">
             <div
               v-for="item in group.items"
               :key="item.id"

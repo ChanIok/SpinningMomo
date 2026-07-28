@@ -154,7 +154,12 @@ const handleReset = async () => {
               {{ t('settings.general.update.description') }}
             </p>
           </div>
-          <Button variant="secondary" size="sm" class="shrink-0 self-start sm:self-end" as-child>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="shrink-0 cursor-default self-start sm:self-end"
+            as-child
+          >
             <RouterLink :to="{ name: 'about' }">
               {{ t('settings.general.update.checkInAbout') }}
             </RouterLink>
