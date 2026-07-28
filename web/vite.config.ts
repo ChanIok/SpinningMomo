@@ -5,8 +5,12 @@ import { analyzer } from 'vite-bundle-analyzer'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue(), tailwindcss(), analyzer({ analyzerMode: 'static', fileName: '../stats' })],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    vue(),
+    tailwindcss(),
+    ...(mode === 'analyze' ? [analyzer({ analyzerMode: 'static', fileName: '../stats' })] : []),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -32,4 +36,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

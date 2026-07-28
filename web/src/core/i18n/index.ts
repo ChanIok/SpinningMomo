@@ -1,5 +1,5 @@
 import { ref, shallowRef } from 'vue'
-import type { Locale, Messages, I18nInstance } from './types'
+import type { Locale, LocaleDomainMessages, Messages, I18nInstance } from './types'
 
 const DEFAULT_LOCALE: Locale = 'zh-CN'
 
@@ -11,33 +11,20 @@ const messages = shallowRef<Messages>({})
 // 默认语言（zh-CN）降级字典
 let fallbackMessages: Messages = {}
 
-const LOCALE_DOMAINS = [
-  'common',
-  'app',
-  'settings',
-  'gallery',
-  'about',
-  'onboarding',
-  'menu',
-  'extensions',
-  'home',
-  'map',
-] as const
+const localeLoaders = {
+  'zh-CN': () => import('./locales/zh-CN'),
+  'en-US': () => import('./locales/en-US'),
+} satisfies Record<Locale, () => Promise<{ default: readonly LocaleDomainMessages[] }>>
 
 /**
  * 加载并合并指定语言的所有 domain 字典
  */
 async function loadLocaleMessages(targetLocale: Locale): Promise<Messages> {
-  const modules = await Promise.all(
-    LOCALE_DOMAINS.map(async (domain) => {
-      const mod = await import(`./locales/${targetLocale}/${domain}.json`)
-      return { domain, dict: (mod.default || mod) as Messages }
-    })
-  )
+  const { default: domains } = await localeLoaders[targetLocale]()
 
   const merged: Messages = {}
-  for (const { domain, dict } of modules) {
-    for (const [key, value] of Object.entries(dict)) {
+  for (const { domain, messages: domainMessages } of domains) {
+    for (const [key, value] of Object.entries(domainMessages)) {
       if (key in merged) {
         console.warn(
           `[i18n] Duplicate translation key detected while loading ${targetLocale}/${domain}.json: ${key}`

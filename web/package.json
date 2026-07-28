@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "analyze": "vue-tsc -b && vite build --mode analyze",
     "preview": "vite preview"
   },
   "dependencies": {

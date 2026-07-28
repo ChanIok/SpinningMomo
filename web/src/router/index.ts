@@ -8,8 +8,7 @@ const SettingsPage = () => import('@/features/settings/pages/SettingsPage.vue')
 const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
 const MapPage = () => import('@/features/map/pages/MapPage.vue')
 
-// 导入playground路由
-import { routes as playgroundRoutes } from '@/features/playground'
+import playgroundRoutes from '@/features/playground/routes'
 import galleryRoutes from '@/features/gallery/routes'
 import NotFoundPage from '@/features/common/pages/NotFoundPage.vue'
 
@@ -60,7 +59,6 @@ const routes: RouteRecordRaw[] = [
       title: '关于',
     },
   },
-  // 添加playground路由
   ...playgroundRoutes,
   {
     path: '/:pathMatch(.*)*',
