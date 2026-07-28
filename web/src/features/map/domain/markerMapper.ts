@@ -52,7 +52,7 @@ function buildThumbnailUrl(point: PhotoMapPoint, thumbnailBaseUrl: string): stri
   const prefix2 = point.hash.slice(2, 4)
   const relativePath = `${prefix1}/${prefix2}/${point.hash}.webp`
   const normalizedBaseUrl = thumbnailBaseUrl.replace(/\/+$/, '')
-  return `${normalizedBaseUrl}/static/assets/thumbnails/${relativePath}`
+  return `${normalizedBaseUrl}/${relativePath}`
 }
 
 export function toMapMarkers(points: PhotoMapPoint[], context: MarkerMapperContext): MapMarker[] {

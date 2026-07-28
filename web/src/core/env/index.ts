@@ -58,17 +58,19 @@ export function getStaticUrl(path: string): string {
 }
 
 /**
- * 获取地图 iframe 使用的缩略图服务基址。
- * - Debug 浏览器固定访问后端开发端口
+ * 获取地图 iframe 使用的缩略图资源根 URL。
+ * - Debug 浏览器固定访问后端开发端口的缩略图路由
  * - Release WebView2 直接使用本地目录虚拟主机
- * - Release 浏览器降级使用当前页面实际来源
+ * - Release 浏览器降级使用当前页面实际来源的缩略图路由
  */
 export function getThumbnailBaseUrl(): string {
+  const httpThumbnailPath = '/static/assets/thumbnails'
+
   if (import.meta.env.DEV) {
-    return 'http://127.0.0.1:51206'
+    return `http://127.0.0.1:51206${httpThumbnailPath}`
   }
   if (isWebView()) {
     return 'https://thumbs.test'
   }
-  return typeof window !== 'undefined' ? window.location.origin : ''
+  return typeof window !== 'undefined' ? `${window.location.origin}${httpThumbnailPath}` : ''
 }
