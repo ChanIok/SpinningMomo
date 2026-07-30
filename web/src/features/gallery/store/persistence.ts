@@ -6,6 +6,7 @@ export interface GallerySettings {
   view: {
     size: number
     mode: ViewMode
+    useOriginalImagesForCards: boolean
     showRatingBadge: boolean
     showDyeCodeBadge: boolean
     showTagBadges: boolean
@@ -37,6 +38,7 @@ export function createDefaultGallerySettings(): GallerySettings {
     view: {
       size: 256,
       mode: 'grid' satisfies ViewMode,
+      useOriginalImagesForCards: false,
       showRatingBadge: true,
       showDyeCodeBadge: true,
       showTagBadges: true,

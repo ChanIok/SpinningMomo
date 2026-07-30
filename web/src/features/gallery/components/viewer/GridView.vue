@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
@@ -9,7 +9,9 @@ import {
   useGalleryLightbox,
   useGalleryContextMenu,
   useGridVirtualizer,
+  useOriginalCardScheduler,
   useTimelineRail,
+  type OriginalCardScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
@@ -36,12 +38,23 @@ const columns = computed(() => {
   const gap = 12
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
+const gridCardSize = computed(() => {
+  const gap = 12
+  const totalGap = Math.max(0, columns.value - 1) * gap
+  const availableWidth = containerWidth.value || scrollContainerRef.value?.clientWidth || 0
+
+  return Math.max(1, Math.floor((availableWidth - totalGap) / Math.max(columns.value, 1)))
+})
 
 const gridVirtualizer = useGridVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
 })
+const originalCardScheduler = useOriginalCardScheduler(
+  scrollContainerRef,
+  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+)
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   isTimelineMode,
@@ -57,10 +70,44 @@ onMounted(async () => {
   await gridVirtualizer.init()
 })
 
+// 同步滚动位置，并通知原图调度器进入滚动状态。
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
+
+  // 滚动热路径只保留缩略图，新进入视口的原图等空闲后再升级。
+  originalCardScheduler.markScrolling()
   scrollTop.value = target.scrollTop
 }
+
+// 收集当前虚拟窗口内的卡片，让 scheduler 自己过滤真实可见区域。
+function getOriginalCardScheduleItems(): OriginalCardScheduleItem[] {
+  return gridVirtualizer.virtualRows.value.flatMap((row) =>
+    row.assets.flatMap((asset) => {
+      if (!asset) {
+        return []
+      }
+
+      return [
+        {
+          assetId: asset.id,
+          start: row.start,
+          size: row.size,
+          width: gridCardSize.value,
+          height: gridCardSize.value,
+        },
+      ]
+    })
+  )
+}
+
+watch(
+  () => gridVirtualizer.virtualRows.value,
+  () => {
+    // 虚拟项变化时只提交候选列表；是否派发由 scheduler 的空闲状态决定。
+    originalCardScheduler.scheduleVisibleItems(getOriginalCardScheduleItems())
+  },
+  { immediate: true }
+)
 
 function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
   void gallerySelection.handleAssetClick(asset, event, index)
@@ -147,6 +194,7 @@ defineExpose({ scrollToIndex, getCardRect })
               <AssetCard
                 v-if="asset !== null"
                 :asset="asset"
+                :allow-original-load="originalCardScheduler.isOriginalLoadAllowed(asset.id)"
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
                 @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                 @double-click="

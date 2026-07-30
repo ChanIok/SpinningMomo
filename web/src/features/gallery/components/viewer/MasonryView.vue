@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
+import { computed, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
@@ -8,7 +8,9 @@ import {
   useGalleryLightbox,
   useGalleryContextMenu,
   useMasonryVirtualizer,
+  useOriginalCardScheduler,
   useTimelineRail,
+  type OriginalCardScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
@@ -44,6 +46,10 @@ const masonryVirtualizer = useMasonryVirtualizer({
   containerWidth,
   gap: GAP,
 })
+const originalCardScheduler = useOriginalCardScheduler(
+  scrollContainerRef,
+  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+)
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   isTimelineMode: computed(() => store.isTimelineMode),
@@ -58,10 +64,42 @@ onMounted(async () => {
   await masonryVirtualizer.init()
 })
 
+// 同步滚动位置，并通知原图调度器进入滚动状态。
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
+
+  // 滚动热路径只保留缩略图，新进入视口的原图等空闲后再升级。
+  originalCardScheduler.markScrolling()
   scrollTop.value = target.scrollTop
 }
+
+// 收集当前虚拟窗口内的卡片，让 scheduler 自己过滤真实可见区域。
+function getOriginalCardScheduleItems(): OriginalCardScheduleItem[] {
+  return masonryVirtualizer.virtualItems.value.flatMap((item) => {
+    if (!item.asset) {
+      return []
+    }
+
+    return [
+      {
+        assetId: item.asset.id,
+        start: item.start,
+        size: item.size,
+        width: masonryVirtualizer.columnWidth.value,
+        height: item.size,
+      },
+    ]
+  })
+}
+
+watch(
+  () => masonryVirtualizer.virtualItems.value,
+  () => {
+    // 虚拟项变化时只提交候选列表；是否派发由 scheduler 的空闲状态决定。
+    originalCardScheduler.scheduleVisibleItems(getOriginalCardScheduleItems())
+  },
+  { immediate: true }
+)
 
 function getAssetAspectRatio(asset: Asset | null): string {
   if (!asset || !asset.width || !asset.height || asset.width <= 0 || asset.height <= 0) {
@@ -155,6 +193,9 @@ defineExpose({ scrollToIndex, getCardRect })
               v-if="virtualItem.asset !== null"
               :asset="virtualItem.asset"
               :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
+              :allow-original-load="
+                originalCardScheduler.isOriginalLoadAllowed(virtualItem.asset.id)
+              "
               :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
               :style="{ minHeight: `${masonryVirtualizer.minItemHeight}px` }"
               @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"

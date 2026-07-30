@@ -31,6 +31,13 @@ const isInfinityNikkiEnabled = computed(
   () => settingsStore.appSettings.extensions.infinityNikki.enable
 )
 
+const useOriginalImagesForCards = computed({
+  get: () => store.gallerySettings.view.useOriginalImagesForCards,
+  set: (value: boolean) => {
+    store.gallerySettings.view.useOriginalImagesForCards = value
+  },
+})
+
 const showRatingBadge = computed({
   get: () => store.gallerySettings.view.showRatingBadge,
   set: (value: boolean) => {
@@ -143,48 +150,72 @@ watch(
             </p>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-3">
+            <h4 class="text-sm font-medium text-foreground">
+              {{ t('gallery.preferences.view.image.title') }}
+            </h4>
             <Item variant="surface" size="sm">
               <ItemContent>
                 <ItemTitle>
-                  {{ t('gallery.preferences.view.rating.title') }}
+                  {{ t('gallery.preferences.view.originalImages.title') }}
                 </ItemTitle>
                 <ItemDescription>
-                  {{ t('gallery.preferences.view.rating.description') }}
+                  {{ t('gallery.preferences.view.originalImages.description') }}
                 </ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Switch v-model="showRatingBadge" />
+                <Switch v-model="useOriginalImagesForCards" />
               </ItemActions>
             </Item>
+          </div>
 
-            <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {{ t('gallery.preferences.view.dyeCode.title') }}
-                </ItemTitle>
-                <ItemDescription>
-                  {{ t('gallery.preferences.view.dyeCode.description') }}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Switch v-model="showDyeCodeBadge" />
-              </ItemActions>
-            </Item>
+          <div class="space-y-3">
+            <h4 class="text-sm font-medium text-foreground">
+              {{ t('gallery.preferences.view.markers.title') }}
+            </h4>
+            <div class="space-y-2">
+              <Item variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.rating.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.rating.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="showRatingBadge" />
+                </ItemActions>
+              </Item>
 
-            <Item variant="surface" size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {{ t('gallery.preferences.view.tags.title') }}
-                </ItemTitle>
-                <ItemDescription>
-                  {{ t('gallery.preferences.view.tags.description') }}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Switch v-model="showTagBadges" />
-              </ItemActions>
-            </Item>
+              <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.dyeCode.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.dyeCode.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="showDyeCodeBadge" />
+                </ItemActions>
+              </Item>
+
+              <Item variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.tags.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.tags.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="showTagBadges" />
+                </ItemActions>
+              </Item>
+            </div>
           </div>
         </div>
 

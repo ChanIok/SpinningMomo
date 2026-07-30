@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
@@ -7,7 +7,9 @@ import {
   useGalleryContextMenu,
   useGallerySelection,
   useGalleryLightbox,
+  useOriginalCardScheduler,
   useTimelineRail,
+  type OriginalCardScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
@@ -34,6 +36,10 @@ const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerRef: scrollContainerRef,
   containerWidth,
 })
+const originalCardScheduler = useOriginalCardScheduler(
+  scrollContainerRef,
+  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+)
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   isTimelineMode: computed(() => store.isTimelineMode),
@@ -53,11 +59,45 @@ onMounted(async () => {
   await adaptiveVirtualizer.init()
 })
 
+// 同步滚动位置，并通知原图调度器进入滚动状态。
 function handleScroll(event: Event) {
   // 轨道指示器与 hover 映射都依赖真实 scrollTop，因此这里直接从原生容器同步。
   const target = event.target as HTMLElement
+
+  // 滚动热路径只保留缩略图，新进入视口的原图等空闲后再升级。
+  originalCardScheduler.markScrolling()
   scrollTop.value = target.scrollTop
 }
+
+// 收集当前虚拟窗口内的卡片，让 scheduler 自己过滤真实可见区域。
+function getOriginalCardScheduleItems(): OriginalCardScheduleItem[] {
+  return adaptiveVirtualizer.virtualRows.value.flatMap((row) =>
+    row.items.flatMap((item) => {
+      if (!item.asset) {
+        return []
+      }
+
+      return [
+        {
+          assetId: item.asset.id,
+          start: row.start,
+          size: row.size,
+          width: item.width,
+          height: item.height,
+        },
+      ]
+    })
+  )
+}
+
+watch(
+  () => adaptiveVirtualizer.virtualRows.value,
+  () => {
+    // 虚拟项变化时只提交候选列表；是否派发由 scheduler 的空闲状态决定。
+    originalCardScheduler.scheduleVisibleItems(getOriginalCardScheduleItems())
+  },
+  { immediate: true }
+)
 
 function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
   void gallerySelection.handleAssetClick(asset, event, index)
@@ -143,6 +183,7 @@ defineExpose({ scrollToIndex, getCardRect })
                   v-if="item.asset !== null"
                   :asset="item.asset"
                   :aspect-ratio="`${item.width} / ${item.height}`"
+                  :allow-original-load="originalCardScheduler.isOriginalLoadAllowed(item.asset.id)"
                   :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
                   @click="(asset, event) => handleAssetClick(asset, event, item.index)"
                   @double-click="(asset, event) => handleAssetDoubleClick(asset, event, item.index)"
