@@ -77,8 +77,8 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       return {
         index: virtualRow.index,
         assets: store.getAssetsInRange(startIndex, endIndex),
-        start: virtualRow.start,
-        size: virtualRow.size,
+        start: Math.round(virtualRow.start),
+        size: Math.round(virtualRow.size),
       }
     })
   }

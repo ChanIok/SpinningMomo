@@ -186,6 +186,7 @@ defineExpose({ scrollToIndex, getCardRect })
               top: 0,
               left: 0,
               width: `${masonryVirtualizer.columnWidth.value}px`,
+              height: `${virtualItem.size}px`,
               transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start}px)`,
             }"
           >
@@ -196,8 +197,14 @@ defineExpose({ scrollToIndex, getCardRect })
               :allow-original-load="
                 originalCardScheduler.isOriginalLoadAllowed(virtualItem.asset.id)
               "
+              :original-preview-short-edge="
+                Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
+              "
               :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-              :style="{ minHeight: `${masonryVirtualizer.minItemHeight}px` }"
+              :style="{
+                height: `${virtualItem.size}px`,
+                minHeight: `${masonryVirtualizer.minItemHeight}px`,
+              }"
               @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
               @double-click="
                 (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)

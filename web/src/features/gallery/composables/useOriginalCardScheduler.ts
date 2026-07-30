@@ -2,6 +2,7 @@ import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 
 const ORIGINAL_CARD_LOAD_IDLE_MS = 200
 const MIN_ORIGINAL_CARD_SHORT_EDGE_PX = 360
+const ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO = 0.5
 
 type SchedulerPriority = 'user-blocking' | 'user-visible' | 'background'
 
@@ -113,16 +114,17 @@ export function useOriginalCardScheduler(
     allowedOriginalAssetIds.value = new Set()
   }
 
-  // 判断虚拟项是否真正进入视口；overscan 只保留 DOM，不触发原图加载。
+  // 判断虚拟项是否进入原图预热区域；滚动空闲后提前半屏准备高清预览。
   function isItemVisible(item: OriginalCardScheduleItem): boolean {
     const container = containerRef.value
     if (!container) {
       return false
     }
 
-    // 只允许真实可见区域升级原图，避免看不见的 overscan 项抢解码资源。
-    const viewportStart = container.scrollTop
-    const viewportEnd = viewportStart + container.clientHeight
+    // 上下各放宽半个视口，让即将进入画面的卡片能在空闲期提前升级。
+    const preloadMargin = container.clientHeight * ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO
+    const viewportStart = container.scrollTop - preloadMargin
+    const viewportEnd = container.scrollTop + container.clientHeight + preloadMargin
     const itemEnd = item.start + item.size
     return item.start < viewportEnd && itemEnd > viewportStart
   }
@@ -138,7 +140,7 @@ export function useOriginalCardScheduler(
     return shortEdge * window.devicePixelRatio >= MIN_ORIGINAL_CARD_SHORT_EDGE_PX
   }
 
-  // 取得当前真实可见项，并按 assetId 去重。
+  // 取得当前预热区域内的项，并按 assetId 去重。
   function getVisibleItems(): OriginalCardScheduleItem[] {
     const seenAssetIds = new Set<number>()
     const visibleItems: OriginalCardScheduleItem[] = []

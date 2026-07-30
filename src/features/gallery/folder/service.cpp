@@ -35,9 +35,10 @@ auto ensure_root_folder_webview_mapping(core::AppState& app_state, const Folder&
   }
 
   auto host_name = features::gallery::original_locator::make_root_host_name(folder.id);
+  // 原图模式的前端 Worker 需要 fetch 读取图片字节，root host 必须允许跨源读取。
   core::webview::register_virtual_host_folder_mapping(
       app_state, std::move(host_name), utils::string::FromUtf8(folder.path),
-      core::webview::VirtualHostResourceAccessKind::deny_cors);
+      core::webview::VirtualHostResourceAccessKind::allow);
 }
 
 // 移除根文件夹的 WebView 原图 host mappings。

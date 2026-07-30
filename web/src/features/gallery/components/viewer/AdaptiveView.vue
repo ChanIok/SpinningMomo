@@ -184,6 +184,7 @@ defineExpose({ scrollToIndex, getCardRect })
                   :asset="item.asset"
                   :aspect-ratio="`${item.width} / ${item.height}`"
                   :allow-original-load="originalCardScheduler.isOriginalLoadAllowed(item.asset.id)"
+                  :original-preview-short-edge="Math.min(item.width, item.height)"
                   :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
                   @click="(asset, event) => handleAssetClick(asset, event, item.index)"
                   @double-click="(asset, event) => handleAssetDoubleClick(asset, event, item.index)"

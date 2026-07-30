@@ -182,9 +182,10 @@ defineExpose({ scrollToIndex, getCardRect })
           }"
         >
           <div
-            class="grid justify-items-center gap-3"
+            class="grid gap-3"
             :style="{
-              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+              gridTemplateColumns: `repeat(${columns}, ${gridCardSize}px)`,
+              justifyContent: 'start',
             }"
           >
             <template
@@ -195,6 +196,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 v-if="asset !== null"
                 :asset="asset"
                 :allow-original-load="originalCardScheduler.isOriginalLoadAllowed(asset.id)"
+                :original-preview-short-edge="gridCardSize"
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
                 @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                 @double-click="

@@ -155,7 +155,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     getScrollElement: () => containerRef.value,
     estimateSize,
     // measureElement 实测已渲染 DOM 的真实高度，修正瀑布流列布局
-    measureElement: (element) => element.getBoundingClientRect().height,
+    measureElement: (element) => Math.round(element.getBoundingClientRect().height),
     gap,
     get lanes() {
       return columns.value
@@ -223,8 +223,8 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
       return {
         index: item.index,
         asset: asset ?? null,
-        start: item.start,
-        size: item.size,
+        start: Math.round(item.start),
+        size: Math.round(item.size),
         lane: item.lane,
       }
     })

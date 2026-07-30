@@ -3,60 +3,12 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../../composables/useGalleryData'
+import { useOriginalPreviewWorker } from '../../composables/useOriginalPreviewWorker'
 import { useGalleryStore } from '../../store'
 import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../../types'
 
 const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
-const MAX_CONCURRENT_ORIGINAL_CARD_LOADS = 2
-let activeOriginalCardLoads = 0
-const pendingOriginalCardLoadStarters: Array<() => void> = []
-
-// 释放一个原图加载槽，并启动队列里仍然有效的下一项。
-function releaseOriginalCardLoadSlot() {
-  activeOriginalCardLoads = Math.max(0, activeOriginalCardLoads - 1)
-
-  // 已取消的排队项会自检失效并退出，因此这里持续推进到槽位再次占满。
-  while (
-    activeOriginalCardLoads < MAX_CONCURRENT_ORIGINAL_CARD_LOADS &&
-    pendingOriginalCardLoadStarters.length > 0
-  ) {
-    pendingOriginalCardLoadStarters.shift()?.()
-  }
-}
-
-// 申请一个共享加载槽，避免一屏原图同时进入解码和纹理上传。
-function acquireOriginalCardLoadSlot(
-  isRequestCurrent: () => boolean
-): Promise<(() => void) | null> {
-  return new Promise((resolve) => {
-    const start = () => {
-      if (!isRequestCurrent()) {
-        resolve(null)
-        return
-      }
-
-      activeOriginalCardLoads += 1
-      let released = false
-      resolve(() => {
-        if (released) {
-          return
-        }
-
-        released = true
-        releaseOriginalCardLoadSlot()
-      })
-    }
-
-    // 有空槽时立即开始；否则等待正在进行的原图加载释放槽位。
-    if (activeOriginalCardLoads < MAX_CONCURRENT_ORIGINAL_CARD_LOADS) {
-      start()
-      return
-    }
-
-    pendingOriginalCardLoadStarters.push(start)
-  })
-}
 
 // Props 定义
 interface AssetCardProps {
@@ -64,12 +16,14 @@ interface AssetCardProps {
   isSelected?: boolean
   aspectRatio?: string
   allowOriginalLoad?: boolean
+  originalPreviewShortEdge?: number
 }
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
   aspectRatio: '1 / 1',
   allowOriginalLoad: false,
+  originalPreviewShortEdge: 0,
 })
 
 // Emits 定义
@@ -86,13 +40,13 @@ const imageError = ref(false)
 const hasThumbnailRendered = ref(false)
 const failedOriginalUrl = ref('')
 const isShowingOriginal = ref(false)
+const originalPreviewUrl = ref('')
 let imageRequestVersion = 0
 let originalPreloadVersion = 0
-let originalPreloadImage: HTMLImageElement | null = null
-let originalPreloadQueued = false
-let releaseOriginalPreloadSlot: (() => void) | null = null
+let originalPreviewAbortController: AbortController | null = null
 
 const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
+const { generateOriginalPreview } = useOriginalPreviewWorker()
 const store = useGalleryStore()
 const useOriginalImagesForCards = computed(
   () => store.gallerySettings.view.useOriginalImagesForCards
@@ -118,9 +72,11 @@ const canStartOriginalUpgrade = computed(
     props.allowOriginalLoad &&
     hasThumbnailRendered.value &&
     !isShowingOriginal.value &&
+    hasOriginalPreviewShortEdge.value &&
     failedOriginalUrl.value !== originalUrl.value
 )
 const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
+const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
 const enableHoverScale = computed(() => !useOriginalImagesForCards.value)
 const isVideoAsset = computed(() => props.asset.type === 'video')
 
@@ -135,7 +91,7 @@ const placeholderColor = computed(() => {
 watch(
   [() => props.asset.id, thumbnailUrl],
   () => {
-    cancelOriginalPreload()
+    resetOriginalPreview()
 
     // 新素材或缩略图变化后回到初始路径，避免复用上一张卡片的显示状态。
     imageRequestVersion += 1
@@ -151,13 +107,21 @@ watch(
 watch(
   [supportsOriginalCardImage, originalUrl],
   () => {
-    cancelOriginalPreload()
+    resetOriginalPreview()
 
     // 原图设置或 URL 变化只重置原图层，不影响已经显示的缩略图。
     failedOriginalUrl.value = ''
     isShowingOriginal.value = false
   },
   { immediate: true }
+)
+
+watch(
+  () => props.originalPreviewShortEdge,
+  () => {
+    // 卡片短边变化后重新生成匹配当前显示尺寸的临时预览图。
+    resetOriginalPreview()
+  }
 )
 
 watch(
@@ -170,14 +134,14 @@ watch(
 
     // 滚动开始或设置关闭时，停止本次挂载里尚未完成的原图升级。
     if (!props.allowOriginalLoad || !supportsOriginalCardImage.value) {
-      cancelOriginalPreload()
+      cancelOriginalPreviewRequest()
     }
   },
   { immediate: true }
 )
 
 onBeforeUnmount(() => {
-  cancelOriginalPreload()
+  resetOriginalPreview()
 })
 
 // 事件处理
@@ -239,113 +203,153 @@ function onOriginalImageError() {
   // 记录失败 URL，避免本次挂载反复尝试同一张原图。
   failedOriginalUrl.value = originalUrl.value
   isShowingOriginal.value = false
+  revokeOriginalPreviewUrl()
 }
 
-// 取消本次挂载中尚未完成的原图预加载。
-function cancelOriginalPreload() {
+// 取消本次挂载中尚未完成的高清预览任务。
+function cancelOriginalPreviewRequest() {
   originalPreloadVersion += 1
-  originalPreloadQueued = false
-  releaseOriginalPreloadSlot?.()
-  releaseOriginalPreloadSlot = null
 
-  if (!originalPreloadImage) {
-    return
-  }
-
-  // 清掉回调和 src，让滚动开始后未完成的请求不再推动 UI 状态。
-  originalPreloadImage.onload = null
-  originalPreloadImage.onerror = null
-  originalPreloadImage.src = ''
-  originalPreloadImage = null
+  // 通过 AbortController 取消队列或 Worker 中仍可中断的阶段。
+  originalPreviewAbortController?.abort()
+  originalPreviewAbortController = null
 }
 
-// 在离屏 Image 中预加载并解码原图，完成后才允许当前卡片切换显示。
-async function startOriginalUpgrade() {
-  if (!canStartOriginalUpgrade.value || originalPreloadQueued || originalPreloadImage) {
+// 重置当前卡片的高清预览状态，并释放临时 Blob URL。
+function resetOriginalPreview() {
+  cancelOriginalPreviewRequest()
+  revokeOriginalPreviewUrl()
+  isShowingOriginal.value = false
+}
+
+// 释放当前临时预览 URL，避免虚拟滚动反复挂载后泄漏 Blob。
+function revokeOriginalPreviewUrl() {
+  if (!originalPreviewUrl.value) {
     return
   }
 
-  // 用版本号隔离滚动取消、素材切换和异步排队完成之间的竞态。
+  URL.revokeObjectURL(originalPreviewUrl.value)
+  originalPreviewUrl.value = ''
+}
+
+// 请求 Worker 生成短边高清预览，完成后才允许当前卡片切换显示。
+async function startOriginalUpgrade() {
+  if (!canStartOriginalUpgrade.value || originalPreviewAbortController) {
+    return
+  }
+
+  // 用版本号隔离滚动取消、素材切换和 Worker 结果返回之间的竞态。
   const requestVersion = ++originalPreloadVersion
   const requestUrl = originalUrl.value
-  originalPreloadQueued = true
+  const targetShortEdge = getOriginalPreviewTargetShortEdge()
+  const abortController = new AbortController()
+  originalPreviewAbortController = abortController
 
-  const releaseSlot = await acquireOriginalCardLoadSlot(
-    () =>
-      requestVersion === originalPreloadVersion &&
-      requestUrl === originalUrl.value &&
-      canStartOriginalUpgrade.value
-  )
+  try {
+    const previewBlob = await generateOriginalPreview({
+      url: requestUrl,
+      targetShortEdge,
+      sourceWidth: props.asset.width,
+      sourceHeight: props.asset.height,
+      signal: abortController.signal,
+    })
 
-  if (!releaseSlot) {
-    if (requestVersion === originalPreloadVersion) {
-      originalPreloadQueued = false
-    }
-    return
-  }
-
-  if (
-    requestVersion !== originalPreloadVersion ||
-    requestUrl !== originalUrl.value ||
-    !canStartOriginalUpgrade.value
-  ) {
-    originalPreloadQueued = false
-    releaseSlot()
-    return
-  }
-
-  const preloadImage = new Image()
-  originalPreloadQueued = false
-  releaseOriginalPreloadSlot = releaseSlot
-  originalPreloadImage = preloadImage
-
-  preloadImage.decoding = 'async'
-  preloadImage.onload = () => {
-    void finishOriginalUpgrade(preloadImage, requestUrl, requestVersion)
-  }
-  preloadImage.onerror = () => {
-    if (requestVersion !== originalPreloadVersion) {
+    if (!isOriginalPreviewRequestCurrent(requestVersion, requestUrl)) {
       return
     }
 
-    // 失败只记录当前原图 URL，不影响缩略图继续显示。
-    releaseOriginalPreloadSlot?.()
-    releaseOriginalPreloadSlot = null
-    failedOriginalUrl.value = requestUrl
-    originalPreloadImage = null
+    const previewUrl = URL.createObjectURL(previewBlob)
+    try {
+      await preloadPreviewUrl(previewUrl, abortController.signal)
+
+      if (!isOriginalPreviewRequestCurrent(requestVersion, requestUrl)) {
+        URL.revokeObjectURL(previewUrl)
+        return
+      }
+
+      // 新预览图确认可绘制后，再替换旧 URL 并显示覆盖层。
+      revokeOriginalPreviewUrl()
+      originalPreviewUrl.value = previewUrl
+      imageError.value = false
+      isShowingOriginal.value = true
+    } catch (error) {
+      URL.revokeObjectURL(previewUrl)
+      throw error
+    }
+  } catch (error) {
+    if (!isAbortError(error) && requestVersion === originalPreloadVersion) {
+      // 失败只记录当前原图 URL，不影响缩略图继续显示。
+      failedOriginalUrl.value = requestUrl
+    }
+  } finally {
+    if (originalPreviewAbortController === abortController) {
+      originalPreviewAbortController = null
+    }
   }
-  preloadImage.src = requestUrl
 }
 
-// 完成原图升级：等待解码结束，再把本次挂载的显示源切到原图。
-async function finishOriginalUpgrade(
-  preloadImage: HTMLImageElement,
-  requestUrl: string,
-  requestVersion: number
-) {
+// 计算 Worker 输出预览图的目标短边物理像素。
+function getOriginalPreviewTargetShortEdge() {
+  const pixelRatio = window.devicePixelRatio || 1
+  return Math.max(1, Math.ceil(props.originalPreviewShortEdge * pixelRatio))
+}
+
+// 判断异步结果是否仍属于当前卡片和当前原图许可。
+function isOriginalPreviewRequestCurrent(requestVersion: number, requestUrl: string): boolean {
+  return (
+    requestVersion === originalPreloadVersion &&
+    requestUrl === originalUrl.value &&
+    props.allowOriginalLoad &&
+    supportsOriginalCardImage.value
+  )
+}
+
+// 预解码 Worker 输出的 Blob URL，避免覆盖层刚插入时露出空表面。
+async function preloadPreviewUrl(previewUrl: string, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    throw createAbortError()
+  }
+
+  const previewImage = new Image()
+  previewImage.decoding = 'async'
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener('abort', handleAbort)
+      previewImage.onload = null
+      previewImage.onerror = null
+    }
+    const handleAbort = () => {
+      cleanup()
+      previewImage.src = ''
+      reject(createAbortError())
+    }
+
+    previewImage.onload = () => {
+      cleanup()
+      resolve()
+    }
+    previewImage.onerror = () => {
+      cleanup()
+      reject(new Error('Failed to load generated original preview'))
+    }
+    signal.addEventListener('abort', handleAbort, { once: true })
+    previewImage.src = previewUrl
+  })
+
   try {
-    await preloadImage.decode()
+    await previewImage.decode()
   } catch {
-    // load 已成功时，decode 拒绝不应破坏缩略图路径；继续让浏览器使用已接受的图像。
+    // load 已成功时，decode 拒绝不应破坏缩略图路径；继续让浏览器使用已接受的预览图。
   }
+}
 
-  if (
-    requestVersion !== originalPreloadVersion ||
-    requestUrl !== originalUrl.value ||
-    !props.allowOriginalLoad ||
-    !supportsOriginalCardImage.value
-  ) {
-    releaseOriginalPreloadSlot?.()
-    releaseOriginalPreloadSlot = null
-    return
-  }
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
 
-  // 只有仍处于本轮滚动空闲许可内，才把可见卡片升级为原图。
-  releaseOriginalPreloadSlot?.()
-  releaseOriginalPreloadSlot = null
-  originalPreloadImage = null
-  imageError.value = false
-  isShowingOriginal.value = true
+function createAbortError(): DOMException {
+  return new DOMException('Original preview request was canceled', 'AbortError')
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -406,6 +410,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         :src="thumbnailUrl"
         :alt="asset.name"
         loading="eager"
+        decoding="async"
         class="h-full w-full object-cover"
         :class="{
           'transition-transform duration-200 group-hover:scale-105': enableHoverScale,
@@ -416,8 +421,8 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 
       <!-- 原图只作为已预加载完成后的覆盖层；加载失败时自然露出下面的缩略图。 -->
       <img
-        v-if="isShowingOriginal && supportsOriginalCardImage"
-        :src="originalUrl"
+        v-if="isShowingOriginal && supportsOriginalCardImage && originalPreviewUrl"
+        :src="originalPreviewUrl"
         :alt="asset.name"
         loading="eager"
         decoding="async"

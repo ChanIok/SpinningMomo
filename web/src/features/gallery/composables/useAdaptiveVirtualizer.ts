@@ -60,18 +60,35 @@ function buildAdaptiveRows(
       return
     }
 
+    const rowContentWidth = Math.max(1, Math.floor(contentWidth))
     const totalGap = Math.max(0, currentItems.length - 1) * gap
+    const availableItemWidth = Math.max(1, rowContentWidth - totalGap)
     const maxRowHeight = Math.max(1, targetRowHeight)
-    const fittedRowHeight = Math.max(1, (contentWidth - totalGap) / currentAspectSum)
-    const rowHeight = justify ? fittedRowHeight : Math.min(maxRowHeight, fittedRowHeight)
+    const fittedRowHeight = Math.max(1, availableItemWidth / currentAspectSum)
+    const rowHeight = Math.max(
+      1,
+      Math.round(justify ? fittedRowHeight : Math.min(maxRowHeight, fittedRowHeight))
+    )
     const rowIndex = rows.length
+    let remainingWidth = availableItemWidth
 
-    const items: AdaptiveLayoutRowItem[] = currentItems.map((item) => {
+    const items: AdaptiveLayoutRowItem[] = currentItems.map((item, itemIndex) => {
+      // 普通行用最后一张图吸收取整误差，避免 flex 布局产生半像素宽度。
+      const remainingItems = currentItems.length - itemIndex
+      let width = Math.max(1, Math.round(item.aspectRatio * rowHeight))
+      if (justify && itemIndex === currentItems.length - 1) {
+        width = Math.max(1, remainingWidth)
+      } else if (justify) {
+        const maxWidth = Math.max(1, remainingWidth - (remainingItems - 1))
+        width = Math.min(maxWidth, width)
+      }
+      remainingWidth -= width
+
       rowIndexByAssetIndex.set(item.index, rowIndex)
       return {
         index: item.index,
         id: item.id,
-        width: item.aspectRatio * rowHeight,
+        width,
         height: rowHeight,
         aspectRatio: item.aspectRatio,
       }
@@ -166,8 +183,8 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
       const row = rows[virtualItem.index]!
       return {
         index: row.index,
-        start: virtualItem.start,
-        size: virtualItem.size,
+        start: Math.round(virtualItem.start),
+        size: Math.round(virtualItem.size),
         items: row.items.map((item) => {
           const [asset] = store.getAssetsInRange(item.index, item.index)
           return {
