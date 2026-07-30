@@ -8,9 +8,9 @@ import {
   useGalleryLightbox,
   useGalleryContextMenu,
   useMasonryVirtualizer,
-  useOriginalCardScheduler,
+  useCardImageScheduler,
   useTimelineRail,
-  type OriginalCardScheduleItem,
+  type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
@@ -46,7 +46,7 @@ const masonryVirtualizer = useMasonryVirtualizer({
   containerWidth,
   gap: GAP,
 })
-const originalCardScheduler = useOriginalCardScheduler(
+const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
   computed(() => store.gallerySettings.view.useOriginalImagesForCards)
 )
@@ -64,17 +64,17 @@ onMounted(async () => {
   await masonryVirtualizer.init()
 })
 
-// 同步滚动位置，并通知原图调度器进入滚动状态。
+// 同步滚动位置，并通知图片调度器进入滚动状态。
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
 
-  // 滚动热路径只保留缩略图，新进入视口的原图等空闲后再升级。
-  originalCardScheduler.markScrolling()
+  // 滚动热路径优先小批量缩略图，原图增强等空闲后再升级。
+  cardImageScheduler.markScrolling()
   scrollTop.value = target.scrollTop
 }
 
-// 收集当前虚拟窗口内的卡片，让 scheduler 自己过滤真实可见区域。
-function getOriginalCardScheduleItems(): OriginalCardScheduleItem[] {
+// 收集当前虚拟窗口内的卡片，让调度器自己过滤真实可见区域。
+function getCardImageScheduleItems(): CardImageScheduleItem[] {
   return masonryVirtualizer.virtualItems.value.flatMap((item) => {
     if (!item.asset) {
       return []
@@ -95,8 +95,8 @@ function getOriginalCardScheduleItems(): OriginalCardScheduleItem[] {
 watch(
   () => masonryVirtualizer.virtualItems.value,
   () => {
-    // 虚拟项变化时只提交候选列表；是否派发由 scheduler 的空闲状态决定。
-    originalCardScheduler.scheduleVisibleItems(getOriginalCardScheduleItems())
+    // 虚拟项变化时只提交候选列表；缩略图和原图分别按优先级派发。
+    cardImageScheduler.scheduleVisibleItems(getCardImageScheduleItems())
   },
   { immediate: true }
 )
@@ -194,9 +194,10 @@ defineExpose({ scrollToIndex, getCardRect })
               v-if="virtualItem.asset !== null"
               :asset="virtualItem.asset"
               :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
-              :allow-original-load="
-                originalCardScheduler.isOriginalLoadAllowed(virtualItem.asset.id)
+              :allow-thumbnail-load="
+                cardImageScheduler.isThumbnailLoadAllowed(virtualItem.asset.id)
               "
+              :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(virtualItem.asset.id)"
               :original-preview-short-edge="
                 Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
               "

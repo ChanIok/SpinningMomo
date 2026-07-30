@@ -15,6 +15,7 @@ interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
   aspectRatio?: string
+  allowThumbnailLoad?: boolean
   allowOriginalLoad?: boolean
   originalPreviewShortEdge?: number
 }
@@ -22,6 +23,7 @@ interface AssetCardProps {
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
   aspectRatio: '1 / 1',
+  allowThumbnailLoad: true,
   allowOriginalLoad: false,
   originalPreviewShortEdge: 0,
 })
@@ -61,6 +63,7 @@ const assetTags = computed(() =>
 )
 
 const thumbnailUrl = computed(() => getAssetThumbnailUrl(props.asset))
+const scheduledThumbnailUrl = computed(() => (props.allowThumbnailLoad ? thumbnailUrl.value : ''))
 const originalUrl = computed(() => getAssetUrl(props.asset))
 const supportsOriginalCardImage = computed(
   () =>
@@ -75,7 +78,7 @@ const canStartOriginalUpgrade = computed(
     hasOriginalPreviewShortEdge.value &&
     failedOriginalUrl.value !== originalUrl.value
 )
-const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
+const hasThumbnail = computed(() => scheduledThumbnailUrl.value.length > 0)
 const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
 const enableHoverScale = computed(() => !useOriginalImagesForCards.value)
 const isVideoAsset = computed(() => props.asset.type === 'video')
@@ -89,17 +92,17 @@ const placeholderColor = computed(() => {
 })
 
 watch(
-  [() => props.asset.id, thumbnailUrl],
+  [() => props.asset.id, scheduledThumbnailUrl],
   () => {
     resetOriginalPreview()
 
-    // 新素材或缩略图变化后回到初始路径，避免复用上一张卡片的显示状态。
+    // 新素材、缩略图 URL 或调度许可变化后回到基础显示路径。
     imageRequestVersion += 1
     hasThumbnailRendered.value = false
     failedOriginalUrl.value = ''
     isShowingOriginal.value = false
     imageError.value = false
-    isImageLoading.value = thumbnailUrl.value.length > 0
+    isImageLoading.value = scheduledThumbnailUrl.value.length > 0 || thumbnailUrl.value.length > 0
   },
   { immediate: true }
 )
@@ -407,7 +410,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
       <!-- 缩略图是卡片的基础显示层，主色占位只服务它的首次加载。 -->
       <img
         v-if="hasThumbnail && !imageError"
-        :src="thumbnailUrl"
+        :src="scheduledThumbnailUrl"
         :alt="asset.name"
         loading="eager"
         decoding="async"
