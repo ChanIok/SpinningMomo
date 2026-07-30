@@ -16,11 +16,11 @@ export function hasActiveAssetFilter(filter: AssetFilter): boolean {
 
 export function toQueryAssetsFilters(
   filter: AssetFilter,
-  _includeSubfolders: boolean
+  includeSubfolders: boolean
 ): QueryAssetsFilters {
   return {
     folderId: filter.folderId ? Number(filter.folderId) : undefined,
-    includeSubfolders: true,
+    includeSubfolders,
     createdAtFrom: filter.createdAtFrom,
     createdAtTo: filter.createdAtTo,
     type: filter.type,

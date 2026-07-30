@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
+import { Toggle } from '@/components/ui/toggle'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -88,6 +89,7 @@ const handleOpenPreferences = () => {
 const viewMode = computed(() => galleryView.viewMode.value)
 const sortBy = computed(() => galleryView.sortBy.value)
 const sortOrder = computed(() => galleryView.sortOrder.value)
+const currentFolderOnly = computed(() => !galleryView.includeSubfolders.value)
 const filter = computed(() => galleryView.filter.value)
 const searchQuery = computed(() => filter.value.searchQuery || '')
 const activeColorHex = computed(() => filter.value.colorHex)
@@ -464,6 +466,10 @@ function toggleSortOrder() {
   galleryView.toggleSortOrder()
 }
 
+function onCurrentFolderOnlyChange(value: boolean) {
+  galleryView.setIncludeSubfolders(!value)
+}
+
 function applyColorFilter() {
   galleryView.setFilter({
     colorHex: draftColorHex.value,
@@ -576,6 +582,25 @@ function onViewSizeSliderChange(value: number[] | undefined) {
               class="w-full"
             />
           </div>
+
+          <Tooltip v-if="currentSource.type === 'folder'">
+            <TooltipTrigger as-child>
+              <div class="inline-flex">
+                <Toggle
+                  size="sm"
+                  :model-value="currentFolderOnly"
+                  :aria-label="t('gallery.toolbar.folderOptions.currentFolderOnly')"
+                  class="text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 data-[state=on]:bg-sidebar-accent data-[state=on]:text-sidebar-foreground data-[state=on]:hover:bg-sidebar-accent data-[state=on]:hover:text-sidebar-foreground"
+                  @update:model-value="onCurrentFolderOnlyChange"
+                >
+                  <Folder class="h-4 w-4" />
+                </Toggle>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('gallery.toolbar.folderOptions.currentFolderOnly') }}
+            </TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger as-child>

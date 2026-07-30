@@ -399,7 +399,7 @@
   "gallery.toolbar.filters.ratingValue": "{rating} Stars",
   "gallery.toolbar.filters.reviewFlag": "Flag",
   "gallery.toolbar.filterAndSort.tooltip": "Filter & Sort",
-  "gallery.toolbar.folderOptions.includeSubfolders": "Include Subfolders",
+  "gallery.toolbar.folderOptions.currentFolderOnly": "Only show media in the current folder",
   "gallery.toolbar.folderOptions.label": "Folder Options",
   "gallery.toolbar.search.placeholder": "Search file name...",
   "gallery.toolbar.sort.createdAt": "Created At",

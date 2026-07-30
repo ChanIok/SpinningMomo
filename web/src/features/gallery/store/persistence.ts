@@ -13,6 +13,7 @@ export interface GallerySettings {
   navigation: {
     expandedFolderIds: number[]
     expandedTagIds: number[]
+    includeSubfolders: boolean
   }
   deletion: {
     mode: GalleryDeleteMode
@@ -43,6 +44,7 @@ export function createDefaultGallerySettings(): GallerySettings {
     navigation: {
       expandedFolderIds: [],
       expandedTagIds: [],
+      includeSubfolders: true,
     },
     deletion: {
       mode: 'recycleBin',

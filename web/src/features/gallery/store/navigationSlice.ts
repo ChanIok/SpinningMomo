@@ -40,7 +40,12 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   const filter = ref<AssetFilter>({})
   const sortBy = ref<SortBy>('createdAt')
   const sortOrder = ref<SortOrder>('desc')
-  const includeSubfolders = ref(true)
+  const includeSubfolders = computed({
+    get: () => settings.value.navigation.includeSubfolders,
+    set: (include: boolean) => {
+      settings.value.navigation.includeSubfolders = include
+    },
+  })
 
   // 便于侧边栏“全部文件夹/全部标签”节点展示统计。
   const foldersAssetTotalCount = computed(() => {
@@ -168,13 +173,13 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
     settings.value.navigation.expandedFolderIds = []
     settings.value.navigation.expandedTagIds = []
+    settings.value.navigation.includeSubfolders = defaults.navigation.includeSubfolders
 
     viewConfig.value = { ...defaults.view }
     settings.value.view = { ...defaults.view }
     resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
-    includeSubfolders.value = true
   }
 
   return {

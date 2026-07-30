@@ -399,7 +399,7 @@
   "gallery.toolbar.filters.ratingValue": "{rating} 星",
   "gallery.toolbar.filters.reviewFlag": "标记",
   "gallery.toolbar.filterAndSort.tooltip": "筛选与排序",
-  "gallery.toolbar.folderOptions.includeSubfolders": "包含子文件夹",
+  "gallery.toolbar.folderOptions.currentFolderOnly": "仅显示当前文件夹中的媒体",
   "gallery.toolbar.folderOptions.label": "文件夹选项",
   "gallery.toolbar.search.placeholder": "搜索文件名称...",
   "gallery.toolbar.sort.createdAt": "创建日期",
