@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { galleryApi } from '../api'
 import { useGalleryStore } from '../store'
 import { toQueryAssetsFilters } from '../queryFilters'
@@ -10,7 +10,7 @@ import type { AssetLayoutMetaItem } from '../types'
  */
 export function useGalleryLayoutMeta(logScope: string) {
   const store = useGalleryStore()
-  const layoutMetaItems = ref<AssetLayoutMetaItem[]>([])
+  const layoutMetaItems = shallowRef<AssetLayoutMetaItem[]>([])
   // 递增请求序号：用于丢弃过期响应，避免快速切换筛选/排序时旧数据回写。
   const layoutRequestId = ref(0)
 

@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue'
+import { ref, reactive, shallowRef } from 'vue'
 import type { Asset, Tag, TimelineBucket } from '../types'
 
 /**
@@ -25,7 +25,7 @@ export function createQuerySlice() {
 
   // ============= 分页缓存状态（普通模式使用） =============
   // paginatedAssets: 只缓存已加载页，避免一次性加载全量资产。
-  const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
+  const paginatedAssets = shallowRef<Map<number, Asset[]>>(new Map()) // key: pageNumber
   // 显式 version 用于触发依赖 Map 结构变化的更新（Map 原地改动不总能被外层感知）。
   const paginatedAssetsVersion = ref(0)
   const perPage = ref(500) // 每页数量
@@ -106,7 +106,9 @@ export function createQuerySlice() {
   }
 
   function setPageAssets(pageNum: number, pageAssets: Asset[]) {
-    paginatedAssets.value.set(pageNum, pageAssets)
+    const nextPages = new Map(paginatedAssets.value)
+    nextPages.set(pageNum, pageAssets)
+    paginatedAssets.value = nextPages
     paginatedAssetsVersion.value += 1
   }
 
@@ -165,8 +167,8 @@ export function createQuerySlice() {
   }
 
   function clearPaginatedAssets() {
-    // 这里不替换 ref 对象本身，保持引用稳定；通过 version 告知外部“缓存已失效”。
-    paginatedAssets.value.clear()
+    // shallowRef 只跟踪顶层引用；清空缓存直接替换 Map，语义更明确。
+    paginatedAssets.value = new Map()
     paginatedAssetsVersion.value += 1
   }
 

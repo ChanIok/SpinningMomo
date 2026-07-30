@@ -74,8 +74,11 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
 
     const assetIdSet = new Set(assetIds)
 
-    // 审片操作是高频交互，这里直接原地 patch 当前已加载页面，避免每次按键都整页重载。
+    // 审片操作是高频交互，这里只 patch 当前已加载页面，避免每次按键都整页重载。
     // 注意：这里只保证“已加载页”即时一致，其余页由后续查询刷新补齐。
+    const nextPages = new Map(paginatedAssets.value)
+    let hasCacheChange = false
+
     paginatedAssets.value.forEach((pageAssets, pageNum) => {
       let hasPageChange = false
       const nextPageAssets = pageAssets.map((asset) => {
@@ -92,11 +95,15 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       })
 
       if (hasPageChange) {
-        paginatedAssets.value.set(pageNum, nextPageAssets)
-        // Map 原地更新后手动 bump，确保依赖 paginatedAssetsVersion 的渲染及时更新。
-        bumpPaginatedAssetsVersion()
+        nextPages.set(pageNum, nextPageAssets)
+        hasCacheChange = true
       }
     })
+
+    if (hasCacheChange) {
+      paginatedAssets.value = nextPages
+      bumpPaginatedAssetsVersion()
+    }
 
     // 详情面板若正聚焦某个被 patch 的资产，也要同步更新，避免左右视图状态分叉。
     if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
@@ -109,6 +116,9 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function patchAssetDescription(assetId: number, description?: string) {
+    const nextPages = new Map(paginatedAssets.value)
+    let hasCacheChange = false
+
     paginatedAssets.value.forEach((pageAssets, pageNum) => {
       let hasPageChange = false
       const nextPageAssets = pageAssets.map((asset) => {
@@ -124,10 +134,15 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       })
 
       if (hasPageChange) {
-        paginatedAssets.value.set(pageNum, nextPageAssets)
-        bumpPaginatedAssetsVersion()
+        nextPages.set(pageNum, nextPageAssets)
+        hasCacheChange = true
       }
     })
+
+    if (hasCacheChange) {
+      paginatedAssets.value = nextPages
+      bumpPaginatedAssetsVersion()
+    }
 
     if (detailsPanel.type === 'asset' && detailsPanel.asset.id === assetId) {
       detailsPanel.asset = {
@@ -143,6 +158,8 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     }
 
     const assetIdSet = new Set(assetIds)
+    const nextPages = new Map(paginatedAssets.value)
+    let hasCacheChange = false
 
     paginatedAssets.value.forEach((pageAssets, pageNum) => {
       let hasPageChange = false
@@ -159,10 +176,15 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       })
 
       if (hasPageChange) {
-        paginatedAssets.value.set(pageNum, nextPageAssets)
-        bumpPaginatedAssetsVersion()
+        nextPages.set(pageNum, nextPageAssets)
+        hasCacheChange = true
       }
     })
+
+    if (hasCacheChange) {
+      paginatedAssets.value = nextPages
+      bumpPaginatedAssetsVersion()
+    }
 
     if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
       detailsPanel.asset = {
