@@ -195,22 +195,15 @@ export function useGallerySidebar() {
    * 选择标签
    */
   function selectTag(tagId: number, tagName: string) {
-    // 检查是否点击了当前已选中的标签
-    if (selectedTag.value === tagId) {
-      store.setFilter({ tagIds: [], tagMatchMode: 'any' })
-      console.log('🏷️ 取消标签筛选:', tagName)
-    } else {
-      // 选中新标签
-      store.setFilter({ folderId: undefined, tagIds: [tagId], tagMatchMode: 'any' })
+    store.setFilter({ folderId: undefined, tagIds: [tagId], tagMatchMode: 'any' })
 
-      // 查找标签对象并设置详情面板
-      const tag = findTagById(store.tags, tagId)
-      if (tag) {
-        store.setDetailsFocus({ type: 'tag', tag })
-      }
-
-      console.log('🏷️ 选择标签:', tagName)
+    // 查找标签对象并设置详情面板
+    const tag = findTagById(store.tags, tagId)
+    if (tag) {
+      store.setDetailsFocus({ type: 'tag', tag })
     }
+
+    console.log('🏷️ 选择标签:', tagName)
   }
 
   /**

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Split } from '@/components/ui/split'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ListChevronsDownUp, Images, Plus } from 'lucide-vue-next'
+import { ListChevronsDownUp, Images, Plus, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +47,35 @@ const galleryStore = useGalleryStore()
 const { sidebarFolderSplitSize } = useGalleryLayout()
 const { toast } = useToast()
 const { t } = useI18n()
+
+const isFoldersCollapsed = ref(false)
+const isTagsCollapsed = ref(false)
+
+function toggleFoldersCollapse() {
+  isFoldersCollapsed.value = !isFoldersCollapsed.value
+}
+
+function toggleTagsCollapse() {
+  isTagsCollapsed.value = !isTagsCollapsed.value
+}
+
+const isSplitDisabled = computed(() => isFoldersCollapsed.value || isTagsCollapsed.value)
+
+const effectiveMin = computed(() => (isFoldersCollapsed.value ? '36px' : '100px'))
+const effectiveMax = computed(() => (isTagsCollapsed.value ? '100%' : 0.8))
+
+const effectiveSplitSize = computed<number | string>({
+  get() {
+    if (isFoldersCollapsed.value) return '36px'
+    if (isTagsCollapsed.value) return 'calc(100% - 36px)'
+    return sidebarFolderSplitSize.value
+  },
+  set(val) {
+    if (!isFoldersCollapsed.value && !isTagsCollapsed.value) {
+      sidebarFolderSplitSize.value = val
+    }
+  },
+})
 
 const {
   folders,
@@ -452,19 +481,32 @@ onMounted(() => {
 
     <!-- 导航菜单（文件夹与标签树，垂直 Split 可拖拽） -->
     <div class="min-h-0 flex-1">
-      <Split v-model:size="sidebarFolderSplitSize" direction="vertical" min="100px" :max="0.8">
+      <Split
+        v-model:size="effectiveSplitSize"
+        direction="vertical"
+        :min="effectiveMin"
+        :max="effectiveMax"
+        :disabled="isSplitDisabled"
+      >
         <!-- 文件夹区域 -->
         <template #1>
           <div class="flex h-full flex-col pt-2 pb-1">
-            <!-- 文件夹标头（不参与滚动） -->
-            <div class="flex flex-shrink-0 items-center justify-between px-4 pb-1">
+            <!-- 文件夹标头（可点击折叠/展开） -->
+            <div
+              class="group flex flex-shrink-0 cursor-pointer items-center justify-between px-3 pb-1 transition-colors select-none hover:text-foreground"
+              @click="toggleFoldersCollapse"
+            >
               <div
-                class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
+                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase transition-colors group-hover:text-foreground"
               >
-                {{ t('gallery.sidebar.folders.title') }}
+                <component
+                  :is="isFoldersCollapsed ? ChevronRight : ChevronDown"
+                  class="h-3.5 w-3.5 shrink-0 transition-transform duration-200"
+                />
+                <span>{{ t('gallery.sidebar.folders.title') }}</span>
               </div>
               <TooltipProvider :delay-duration="300">
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1" @click.stop>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <Button variant="sidebarGhost" size="icon-xs" @click="collapseAllFolders">
@@ -492,8 +534,12 @@ onMounted(() => {
             <div v-if="foldersError" class="px-6 text-xs text-destructive">
               {{ foldersError }}
             </div>
-            <!-- 文件夹树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
-            <ScrollArea v-else class="min-h-0 flex-1">
+            <!-- 文件夹树列表（可滚动，外层 Pane 承担 200ms 高度平滑过渡） -->
+            <ScrollArea
+              v-else
+              class="min-h-0 flex-1 transition-opacity duration-200"
+              :class="isFoldersCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'"
+            >
               <div class="space-y-1 pt-1.5 pr-3 pb-1 pl-4">
                 <FolderTreeItem
                   v-for="folder in folders"
@@ -520,15 +566,22 @@ onMounted(() => {
         <!-- 标签区域 -->
         <template #2>
           <div class="flex h-full flex-col pt-2 pb-1">
-            <!-- 标签标头（不参与滚动） -->
-            <div class="flex flex-shrink-0 items-center justify-between px-4 pb-1">
+            <!-- 标签标头（可点击折叠/展开） -->
+            <div
+              class="group flex flex-shrink-0 cursor-pointer items-center justify-between px-3 pb-1 transition-colors select-none hover:text-foreground"
+              @click="toggleTagsCollapse"
+            >
               <div
-                class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
+                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase transition-colors group-hover:text-foreground"
               >
-                {{ t('gallery.sidebar.tags.title') }}
+                <component
+                  :is="isTagsCollapsed ? ChevronRight : ChevronDown"
+                  class="h-3.5 w-3.5 shrink-0 transition-transform duration-200"
+                />
+                <span>{{ t('gallery.sidebar.tags.title') }}</span>
               </div>
               <TooltipProvider :delay-duration="300">
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1" @click.stop>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <Button variant="sidebarGhost" size="icon-xs" @click="collapseAllTags">
@@ -556,8 +609,12 @@ onMounted(() => {
             <div v-if="tagsError" class="px-6 text-xs text-destructive">
               {{ tagsError }}
             </div>
-            <!-- 标签树列表（可滚动，滚动条贴最右侧，Item保持右边距） -->
-            <ScrollArea v-else class="min-h-0 flex-1">
+            <!-- 标签树列表（可滚动，外层 Pane 承担 200ms 高度平滑过渡） -->
+            <ScrollArea
+              v-else
+              class="min-h-0 flex-1 transition-opacity duration-200"
+              :class="isTagsCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'"
+            >
               <div class="space-y-1 pt-1.5 pr-3 pb-1 pl-4">
                 <!-- 快速创建标签 -->
                 <div v-if="isCreatingTag">

@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useEventListener, useStorage } from '@vueuse/core'
 import { useGalleryStore } from '@/features/gallery/store'
 import { useMapStore } from '@/features/map/store'
 
 const route = useRoute()
 const galleryStore = useGalleryStore()
 const mapStore = useMapStore()
+
+const isVisible = useStorage('spinningmomo:gallery_debug_visible', false)
 const isCollapsed = ref(true)
+
+useEventListener('keydown', (e: KeyboardEvent) => {
+  if ((e.altKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault()
+    isVisible.value = !isVisible.value
+  }
+})
 
 const debugState = computed(() => {
   const loadedPages = [...galleryStore.paginatedAssets.keys()].sort((left, right) => left - right)
@@ -43,10 +53,13 @@ const debugState = computed(() => {
 
 <template>
   <div
+    v-if="isVisible"
     class="absolute bottom-2 left-2 z-[9900] max-w-[420px] rounded-md border border-white/15 bg-black/75 px-3 py-2 text-[11px] leading-4 text-white shadow-lg backdrop-blur-sm"
   >
     <div class="mb-1 flex items-center justify-between gap-2">
-      <div class="font-semibold tracking-wide text-white/90">Gallery Debug</div>
+      <div class="font-semibold tracking-wide text-white/90">
+        Gallery Debug <span class="text-[9px] font-normal opacity-60">(Alt+Shift+D)</span>
+      </div>
       <div class="flex items-center gap-1">
         <button
           type="button"
@@ -54,6 +67,14 @@ const debugState = computed(() => {
           @click="isCollapsed = !isCollapsed"
         >
           {{ isCollapsed ? '展开' : '收起' }}
+        </button>
+        <button
+          type="button"
+          class="h-5 rounded border border-white/25 px-1.5 text-[10px] leading-none text-white/85 transition hover:bg-white/15"
+          title="关闭面板 (Alt+Shift+D)"
+          @click="isVisible = false"
+        >
+          ✕
         </button>
       </div>
     </div>

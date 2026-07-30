@@ -580,23 +580,35 @@ async function handleCopyColorHex(color: AssetMainColor) {
         <div v-else>
           <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.folderInfo') }}</h4>
           <div class="space-y-2 text-xs">
-            <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{
-                t('gallery.details.folderDisplayName')
-              }}</span>
-              <span
-                class="truncate font-medium"
-                :title="currentFolder.displayName || currentFolder.name"
-              >
-                {{ currentFolder.displayName || currentFolder.name }}
-              </span>
-            </div>
-            <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
-              <span class="truncate font-mono" :title="currentFolder.name">{{
-                currentFolder.name
-              }}</span>
-            </div>
+            <template
+              v-if="currentFolder.displayName && currentFolder.displayName !== currentFolder.name"
+            >
+              <div class="flex justify-between gap-2">
+                <span class="text-muted-foreground">{{
+                  t('gallery.details.folderDisplayName')
+                }}</span>
+                <span
+                  class="truncate font-medium text-foreground"
+                  :title="currentFolder.displayName"
+                >
+                  {{ currentFolder.displayName }}
+                </span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
+                <span class="truncate text-foreground/90" :title="currentFolder.name">{{
+                  currentFolder.name
+                }}</span>
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex justify-between gap-2">
+                <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
+                <span class="truncate font-medium text-foreground" :title="currentFolder.name">{{
+                  currentFolder.name
+                }}</span>
+              </div>
+            </template>
             <div class="flex flex-col gap-1">
               <span class="text-muted-foreground">{{ t('gallery.details.fullPath') }}</span>
               <p class="rounded bg-muted/50 p-2 font-mono text-xs break-all">

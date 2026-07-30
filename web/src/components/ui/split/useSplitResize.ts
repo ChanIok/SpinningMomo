@@ -121,7 +121,7 @@ export function useSplitResize(options: UseSplitResizeOptions) {
       return { flex: '1' }
     }
 
-    if (typeof size === 'string' && size.endsWith('px')) {
+    if (typeof size === 'string') {
       return { flex: `0 0 ${size}` }
     }
 
@@ -140,7 +140,7 @@ export function useSplitResize(options: UseSplitResizeOptions) {
 
     // reverse 模式下，size 表示第二个面板的固定尺寸，
     // 适合“主区域自适应 + 右侧栏固定宽度”的布局。
-    if (typeof size === 'string' && size.endsWith('px')) {
+    if (typeof size === 'string') {
       return { flex: `0 0 ${size}` }
     }
 

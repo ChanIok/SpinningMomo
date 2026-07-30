@@ -80,7 +80,7 @@ async function handleCopyFileName() {
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="flex-1 cursor-pointer truncate text-right font-mono transition-colors hover:text-foreground/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="flex-1 cursor-pointer truncate text-right font-medium transition-colors hover:text-foreground/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 @click="handleCopyFileName"
               >
                 {{ asset.name }}

@@ -71,8 +71,19 @@ function toggleExpand() {
 function handleItemClick() {
   if (isEditing.value) return
 
-  // 移除了选中状态下点击展开子标签的逻辑
-  // 现在只会选中标签，不会自动展开
+  const isCurrentlySelected = props.selectedTag === props.tag.id
+  const hasChildren = props.tag.children && props.tag.children.length > 0
+
+  if (isCurrentlySelected) {
+    if (hasChildren) {
+      // 已选中 + 有子项 → 切换展开/折叠
+      galleryStore.toggleTagExpanded(props.tag.id)
+    }
+    // 已选中 + 无子项 → 保持选中状态
+    return
+  }
+
+  // 未选中 → 选中该标签
   emit('select', props.tag.id, props.tag.name)
 }
 

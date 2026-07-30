@@ -91,16 +91,17 @@ function handleItemClick() {
   const isCurrentlySelected = props.selectedFolder === props.folder.id
   const hasChildren = props.folder.children && props.folder.children.length > 0
 
-  if (isCurrentlySelected && hasChildren) {
-    // 已选中 + 有子项 → 切换展开
-    galleryStore.toggleFolderExpanded(props.folder.id)
-  } else if (isCurrentlySelected) {
-    // 已选中 + 无子项 → 取消选择，回到未筛选状态
-    emit('clearSelection')
-  } else {
-    // 未选中 → 选中
-    emit('select', props.folder.id, props.folder.displayName || props.folder.name)
+  if (isCurrentlySelected) {
+    if (hasChildren) {
+      // 已选中 + 有子项 → 切换展开/折叠
+      galleryStore.toggleFolderExpanded(props.folder.id)
+    }
+    // 已选中 + 无子项 → 保持选中状态
+    return
   }
+
+  // 未选中 → 选中该文件夹
+  emit('select', props.folder.id, props.folder.displayName || props.folder.name)
 }
 
 // 打开当前节点下的行内子目录编辑器，并阻止菜单关闭后抢回焦点。

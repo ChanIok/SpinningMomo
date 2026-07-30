@@ -193,6 +193,10 @@ const dividerAnchorClass = computed(() =>
 
 const hasDividerSlot = computed(() => Boolean(slots.divider))
 
+const paneTransitionClass = computed(() =>
+  isDragging.value ? 'transition-none' : 'transition-[flex,flex-basis] duration-200 ease-in-out'
+)
+
 const onMouseDown = (e: MouseEvent) => {
   if (props.disabled) return
   splitResize.handleMouseDown(e, internalSize.value)
@@ -201,7 +205,10 @@ const onMouseDown = (e: MouseEvent) => {
 
 <template>
   <div :ref="splitResize.containerRef" :class="['relative', containerClass]">
-    <div :class="['min-h-0 min-w-0 overflow-hidden', pane1Class]" :style="firstPaneStyle">
+    <div
+      :class="['min-h-0 min-w-0 overflow-hidden', paneTransitionClass, pane1Class]"
+      :style="firstPaneStyle"
+    >
       <slot name="1" :panel="1">
         <slot :panel="1" />
       </slot>
@@ -219,7 +226,10 @@ const onMouseDown = (e: MouseEvent) => {
       </div>
     </div>
 
-    <div :class="['min-h-0 min-w-0 overflow-hidden', pane2Class]" :style="secondPaneStyle">
+    <div
+      :class="['min-h-0 min-w-0 overflow-hidden', paneTransitionClass, pane2Class]"
+      :style="secondPaneStyle"
+    >
       <slot name="2" :panel="2">
         <slot :panel="2" />
       </slot>
