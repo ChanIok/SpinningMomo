@@ -1,0 +1,105 @@
+# Scenario Tests workflow
+# 构建 Release 应用与场景目标窗口，运行端到端场景测试（JSON-RPC + 真实窗口捕获）。
+# PR 触发作为普通 check；也可手动运行。失败时上传保留的测试沙箱供诊断。
+
+name: Scenario Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'xmake.lua'
+      - 'xmake-requires.lock'
+      - 'version.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一分支/PR 的新一次运行取消仍在进行的旧运行，避免并发占用固定 RPC 端口。
+concurrency:
+  group: scenario-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      XMAKE_GLOBALDIR: ${{ github.workspace }}\.xmake-global
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch third-party dependencies
+        run: node scripts/fetch-third-party.js
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
+      - name: Patch xmake #7554
+        run: node scripts/patch-xmake-7554.js
+
+      - name: Cache xmake/vcpkg dependencies
+        id: cache_xmake_vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            .xmake
+            .xmake-global
+            build/.packages/v
+          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock', 'scripts/patch-vcpkg.js') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-
+
+      - name: Ensure cache directories exist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ".xmake" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".xmake-global" | Out-Null
+          New-Item -ItemType Directory -Force -Path "build/.packages/v" | Out-Null
+
+      - name: Configure xmake release
+        run: xmake f -m release --toolchain=msvc -y
+
+      - name: Build SpinningMomo (Release)
+        run: xmake build -y
+
+      - name: Build SpinningMomoScenarioWindow (Release)
+        run: xmake build -y SpinningMomoScenarioWindow
+
+      - name: Run scenario tests
+        run: npm run test:scenarios
+
+      - name: Collect preserved scenario sandboxes
+        if: always()
+        shell: pwsh
+        run: |
+          $sandboxes = Get-ChildItem -Path $env:TEMP -Directory -Filter "spinning-momo-scenario-*" -ErrorAction SilentlyContinue
+          if ($sandboxes) {
+            New-Item -ItemType Directory -Force -Path "scenario-sandboxes" | Out-Null
+            foreach ($dir in $sandboxes) {
+              Compress-Archive -Path $dir.FullName -DestinationPath "scenario-sandboxes/$($dir.Name).zip" -Force
+            }
+            Write-Host "Collected $($sandboxes.Count) preserved sandbox(es)"
+          } else {
+            Write-Host "No preserved sandboxes found"
+          }
+
+      - name: Upload scenario sandboxes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-sandboxes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: scenario-sandboxes
+          if-no-files-found: ignore

@@ -177,6 +177,34 @@ export async function waitUntil<T>(
   throw new Error(`等待超时：${description}（${timeoutMs}ms）${errorDetail}`);
 }
 
+// Windows 上 %TEMP% 可能是 8.3 短名（如 RUNNER~1），而 C++ 端 ResolvePath
+// 会把目录展开为长名（如 runneradmin）。统一把沙箱根展开为长名，确保测试侧
+// 构造的路径与图库 DB / watcher 记录一致，避免两侧同一目录字符串不同而匹配失败。
+async function resolveLongWindowsPath(value: string): Promise<string> {
+  if (process.platform !== "win32") {
+    return value;
+  }
+
+  try {
+    const { execFileSync } = await import("node:child_process");
+    const expanded = execFileSync(
+      "powershell.exe",
+      ["-NoProfile", "-Command", `[IO.Path]::GetFullPath('${value}')`],
+      { encoding: "utf8", windowsHide: true },
+    )
+      .trim()
+      .split(/\r?\n/)
+      .pop();
+    if (expanded) {
+      return expanded;
+    }
+  } catch {
+    // 展开失败时退回原路径，保持原有行为。
+  }
+
+  return value;
+}
+
 // 创建一次性便携版目录，隔离数据库、设置、缩略图和日志。
 export async function createScenarioEnvironment(
   sourceExecutablePath: string,
@@ -197,7 +225,9 @@ export async function createScenarioEnvironment(
     );
   }
 
-  const rootDirectory = await mkdtemp(join(tmpdir(), SANDBOX_PREFIX));
+  const rootDirectory = await resolveLongWindowsPath(
+    await mkdtemp(join(tmpdir(), SANDBOX_PREFIX)),
+  );
   const appDirectory = join(rootDirectory, "app");
   const galleryDirectory = join(rootDirectory, "gallery");
   const captureDirectory = join(rootDirectory, "capture-output");
@@ -369,7 +399,8 @@ export class TargetWindowHarness {
 // 仅清理本次运行创建且仍位于系统临时目录下的沙箱。
 export async function removeScenarioEnvironment(environment: ScenarioEnvironment): Promise<void> {
   const resolvedRoot = resolve(environment.rootDirectory);
-  const expectedParent = resolve(tmpdir());
+  // 与 createScenarioEnvironment 保持一致的 8.3 短名展开，避免两侧路径形式不同。
+  const expectedParent = resolve(await resolveLongWindowsPath(resolve(tmpdir())));
   const isDirectChild = dirname(resolvedRoot) === expectedParent;
   const hasExpectedPrefix = basename(resolvedRoot).startsWith(SANDBOX_PREFIX);
 
