@@ -15,6 +15,8 @@ const SCENARIO_FILES = [
   "gallery/move_consistency.ts",
   "gallery/path_encoding.ts",
   "gallery/unreachable_root.ts",
+  "capture/screenshot.ts",
+  "capture/recording.ts",
 ];
 
 const scenarioDirectory = dirname(fileURLToPath(import.meta.url));

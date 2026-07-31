@@ -23,6 +23,14 @@ export const DEFAULT_EXECUTABLE_PATH = join(
   "debug",
   "SpinningMomo.exe",
 );
+export const DEFAULT_SCENARIO_WINDOW_EXECUTABLE_PATH = join(
+  REPOSITORY_ROOT,
+  "build",
+  "windows",
+  "x64",
+  "debug",
+  "SpinningMomoScenarioWindow.exe",
+);
 
 const RPC_URL = "http://127.0.0.1:51206/rpc";
 const RPC_PORT = 51206;
@@ -45,6 +53,7 @@ export type ScenarioEnvironment = {
   rootDirectory: string;
   appDirectory: string;
   galleryDirectory: string;
+  captureDirectory: string;
   databasePath: string;
   settingsPath: string;
   thumbnailsDirectory: string;
@@ -99,6 +108,34 @@ export function resolveExecutablePath(arguments_: string[]): string {
   }
 
   return DEFAULT_EXECUTABLE_PATH;
+}
+
+// 从命令行或环境变量解析场景专用的外部目标窗口程序。
+export function resolveScenarioWindowExecutablePath(arguments_: string[]): string {
+  const inlineArgument = arguments_.find((argument) => argument.startsWith("--target-exe="));
+  if (inlineArgument) {
+    return resolve(inlineArgument.slice("--target-exe=".length));
+  }
+
+  const argumentIndex = arguments_.indexOf("--target-exe");
+  if (argumentIndex >= 0) {
+    const value = arguments_[argumentIndex + 1];
+    if (!value || value.startsWith("--")) {
+      throw new Error("--target-exe 后必须提供 SpinningMomoScenarioWindow.exe 的路径");
+    }
+    return resolve(value);
+  }
+
+  if (process.env.SPINNING_MOMO_SCENARIO_WINDOW_EXE) {
+    return resolve(process.env.SPINNING_MOMO_SCENARIO_WINDOW_EXE);
+  }
+
+  const applicationPath = resolveExecutablePath(arguments_);
+  if (applicationPath !== DEFAULT_EXECUTABLE_PATH) {
+    return join(dirname(applicationPath), "SpinningMomoScenarioWindow.exe");
+  }
+
+  return DEFAULT_SCENARIO_WINDOW_EXECUTABLE_PATH;
 }
 
 // 轮询最终状态而不是等待固定时长，使场景不依赖机器速度。
@@ -156,6 +193,7 @@ export async function createScenarioEnvironment(
   const rootDirectory = await mkdtemp(join(tmpdir(), SANDBOX_PREFIX));
   const appDirectory = join(rootDirectory, "app");
   const galleryDirectory = join(rootDirectory, "gallery");
+  const captureDirectory = join(rootDirectory, "capture-output");
   const dataDirectory = join(appDirectory, "data");
   const sourceDirectory = dirname(sourceExecutablePath);
 
@@ -176,6 +214,7 @@ export async function createScenarioEnvironment(
 
     await mkdir(dataDirectory, { recursive: true });
     await mkdir(galleryDirectory, { recursive: true });
+    await mkdir(captureDirectory, { recursive: true });
     await writeFile(join(appDirectory, "portable"), "");
 
     const settingsPath = join(dataDirectory, "settings.json");
@@ -200,6 +239,7 @@ export async function createScenarioEnvironment(
       rootDirectory,
       appDirectory,
       galleryDirectory,
+      captureDirectory,
       databasePath: join(dataDirectory, "database.db"),
       settingsPath,
       thumbnailsDirectory: join(dataDirectory, "thumbnails"),
@@ -210,6 +250,112 @@ export async function createScenarioEnvironment(
     throw new Error(
       `创建场景环境失败：${formatError(error)}\n未完成的现场已保留：${rootDirectory}`,
     );
+  }
+}
+
+// 管理场景专用的外部目标窗口；截图和录制的生产代码会排除主程序自身窗口。
+export class TargetWindowHarness {
+  readonly environment: ScenarioEnvironment;
+  readonly executablePath: string;
+  readonly title: string;
+  readonly readyPath: string;
+  readonly clientWidth: number;
+  readonly clientHeight: number;
+  private child: ChildProcess | undefined;
+  private spawnError: Error | undefined;
+
+  constructor(
+    environment: ScenarioEnvironment,
+    options: { clientWidth?: number; clientHeight?: number } = {},
+  ) {
+    const arguments_ = process.argv.slice(2);
+    this.environment = environment;
+    this.executablePath = resolveScenarioWindowExecutablePath(arguments_);
+    this.title = `SpinningMomoScenarioTarget-${process.pid}-${Date.now()}`;
+    this.readyPath = join(environment.rootDirectory, "target-window.ready");
+    this.clientWidth = options.clientWidth ?? 640;
+    this.clientHeight = options.clientHeight ?? 360;
+  }
+
+  async start(): Promise<void> {
+    if (this.child) {
+      throw new Error("场景目标窗口已经启动");
+    }
+
+    await access(this.executablePath).catch(() => {
+      throw new Error(
+        `找不到场景目标窗口程序：${this.executablePath}\n` +
+          "请先自行构建 SpinningMomoScenarioWindow，场景脚本不会自动运行 Xmake。",
+      );
+    });
+
+    await rm(this.readyPath, { force: true });
+    this.child = spawn(
+      this.executablePath,
+      [
+        "--title",
+        this.title,
+        "--width",
+        String(this.clientWidth),
+        "--height",
+        String(this.clientHeight),
+        "--ready",
+        this.readyPath,
+      ],
+      {
+        cwd: dirname(this.executablePath),
+        stdio: "ignore",
+        // 生产代码通过 IsWindowVisible 枚举目标窗口，不能让 GUI 窗口保持隐藏。
+        windowsHide: false,
+      },
+    );
+    this.child.once("error", (error) => {
+      this.spawnError = error;
+    });
+
+    await waitUntil(
+      "场景目标窗口完成创建",
+      async () => {
+        this.throwIfExited();
+        try {
+          await access(this.readyPath);
+          return true;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            return undefined;
+          }
+          throw error;
+        }
+      },
+      { timeoutMs: 10_000, intervalMs: 100 },
+    );
+  }
+
+  async stop(): Promise<void> {
+    const child = this.child;
+    this.child = undefined;
+
+    if (child && !hasProcessExited(child)) {
+      child.kill();
+      if (!(await waitForProcessExit(child, 5_000))) {
+        throw new Error(`无法终止场景目标窗口，PID=${child.pid ?? "unknown"}`);
+      }
+    }
+
+    await rm(this.readyPath, { force: true });
+  }
+
+  private throwIfExited(): void {
+    if (this.spawnError) {
+      throw new Error(`无法启动场景目标窗口：${this.spawnError.message}`);
+    }
+    if (this.child && hasProcessExited(this.child)) {
+      const exitReason =
+        this.child.exitCode !== null
+          ? `退出码 ${this.child.exitCode}`
+          : `信号 ${this.child.signalCode ?? "unknown"}`;
+      throw new Error(`场景目标窗口在就绪前退出：${exitReason}`);
+    }
   }
 }
 

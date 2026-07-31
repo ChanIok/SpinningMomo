@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -10,6 +10,7 @@ import {
   formatError,
   removeScenarioEnvironment,
   resolveExecutablePath,
+  TargetWindowHarness,
   type ScenarioEnvironment,
   waitUntil,
 } from "./runtime.ts";
@@ -102,6 +103,12 @@ export type ScenarioAction = (
   environment: ScenarioEnvironment,
 ) => Promise<void>;
 
+export type TargetWindowScenarioAction = (
+  application: ApplicationHarness,
+  environment: ScenarioEnvironment,
+  targetWindow: TargetWindowHarness,
+) => Promise<void>;
+
 // 统一管理单个场景的真实进程和一次性便携沙箱；失败时保留现场供诊断。
 export async function runScenario(name: string, action: ScenarioAction): Promise<void> {
   const sourceExecutablePath = resolveExecutablePath(process.argv.slice(2));
@@ -136,6 +143,177 @@ export async function runScenario(name: string, action: ScenarioAction): Promise
     }
     throw error;
   }
+}
+
+// 在真实应用场景外再托管一个独立进程，提供截图/录制所需的稳定目标窗口。
+export async function runScenarioWithTargetWindow(
+  name: string,
+  action: TargetWindowScenarioAction,
+): Promise<void> {
+  await runScenario(name, async (application, environment) => {
+    const targetWindow = new TargetWindowHarness(environment);
+    try {
+      await targetWindow.start();
+      await action(application, environment, targetWindow);
+    } finally {
+      await targetWindow.stop();
+    }
+  });
+}
+
+export type InvokeCommandResult = {
+  success: boolean;
+  message: string;
+};
+
+// Command RPC 的 success 只代表 action 被派发；场景仍需等待实际文件结果。
+export async function invokeCommand(
+  application: ApplicationHarness,
+  id: string,
+): Promise<InvokeCommandResult> {
+  const result = await application.call<InvokeCommandResult>("commands.invoke", { id });
+  assert.equal(result.success, true, `调用 Command ${id} 失败：${result.message}`);
+  return result;
+}
+
+export async function listDirectoryFileNames(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export async function waitForNewFile(
+  directory: string,
+  existingNames: ReadonlySet<string>,
+  predicate: (fileName: string) => boolean,
+  description: string,
+): Promise<string> {
+  return waitUntil(
+    description,
+    async () => {
+      const fileName = (await listDirectoryFileNames(directory)).find(
+        (candidate) => !existingNames.has(candidate) && predicate(candidate),
+      );
+      return fileName ? join(directory, fileName) : undefined;
+    },
+    { timeoutMs: 20_000, intervalMs: 100, retryErrors: true },
+  );
+}
+
+// 等待文件至少经历一次增长，避免把刚创建但还没有写入帧的录制工作文件当成就绪。
+export async function waitForFileToGrow(path: string, description: string): Promise<number> {
+  let previousSize: number | undefined;
+  return waitUntil(
+    description,
+    async () => {
+      const currentSize = (await stat(path)).size;
+      const hasGrown = previousSize !== undefined && currentSize > previousSize;
+      previousSize = currentSize;
+      return hasGrown ? currentSize : undefined;
+    },
+    { timeoutMs: 20_000, intervalMs: 100, retryErrors: true },
+  );
+}
+
+// 录制至少持续一段时间，并在等待期间确认编码器的工作文件仍然存在。
+export async function waitForFileToRemainPresent(
+  path: string,
+  durationMs: number,
+  description: string,
+): Promise<number> {
+  const deadline = Date.now() + durationMs;
+  return waitUntil(
+    description,
+    async () => {
+      const currentSize = (await stat(path)).size;
+      return Date.now() >= deadline ? currentSize : undefined;
+    },
+    { timeoutMs: durationMs + 5_000, intervalMs: 100 },
+  );
+}
+
+export async function waitForFileToStabilize(path: string, description: string): Promise<number> {
+  let previousSize: number | undefined;
+  let stablePolls = 0;
+  return waitUntil(
+    description,
+    async () => {
+      const currentSize = (await stat(path)).size;
+      if (currentSize > 0 && currentSize === previousSize) {
+        stablePolls++;
+      } else {
+        stablePolls = 0;
+      }
+      previousSize = currentSize;
+      return stablePolls >= 2 ? currentSize : undefined;
+    },
+    { timeoutMs: 20_000, intervalMs: 100, retryErrors: true },
+  );
+}
+
+export async function waitForPathToDisappear(path: string, description: string): Promise<void> {
+  await waitUntil(
+    description,
+    async () => {
+      try {
+        await stat(path);
+        return undefined;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          return true;
+        }
+        throw error;
+      }
+    },
+    { timeoutMs: 20_000, intervalMs: 100, retryErrors: true },
+  );
+}
+
+export async function assertPngDimensions(
+  path: string,
+  expectedWidth: number,
+  expectedHeight: number,
+): Promise<void> {
+  const data = await readFile(path);
+  assert.ok(data.length >= 24, `PNG 文件过短：${path}`);
+  assert.deepEqual(
+    [...data.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    `PNG signature 无效：${path}`,
+  );
+  assert.equal(data.toString("ascii", 12, 16), "IHDR", `PNG 缺少 IHDR：${path}`);
+  assert.equal(data.readUInt32BE(16), expectedWidth, `PNG 宽度不符：${path}`);
+  assert.equal(data.readUInt32BE(20), expectedHeight, `PNG 高度不符：${path}`);
+}
+
+export async function assertMp4Structure(path: string): Promise<void> {
+  const data = await readFile(path);
+  const boxTypes = new Set<string>();
+  let offset = 0;
+
+  while (offset + 8 <= data.length) {
+    let boxSize = data.readUInt32BE(offset);
+    let headerSize = 8;
+    if (boxSize === 1) {
+      assert.ok(offset + 16 <= data.length, `MP4 large box header 不完整：${path}`);
+      const largeSize = data.readBigUInt64BE(offset + 8);
+      assert.ok(largeSize <= BigInt(Number.MAX_SAFE_INTEGER), `MP4 box 过大：${path}`);
+      boxSize = Number(largeSize);
+      headerSize = 16;
+    } else if (boxSize === 0) {
+      boxSize = data.length - offset;
+    }
+
+    assert.ok(boxSize >= headerSize && offset + boxSize <= data.length, `MP4 box 无效：${path}`);
+    boxTypes.add(data.toString("ascii", offset + 4, offset + 8));
+    offset += boxSize;
+  }
+
+  assert.equal(offset, data.length, `MP4 末尾存在无法解析的数据：${path}`);
+  assert.ok(boxTypes.has("ftyp"), `MP4 缺少 ftyp box：${path}`);
+  assert.ok(boxTypes.has("moov"), `MP4 缺少 moov box：${path}`);
 }
 
 export function scenarioFixturePath(): string {
