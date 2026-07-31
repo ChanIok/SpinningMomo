@@ -12,17 +12,20 @@ import {
   waitForFileToStabilize,
   waitForNewFile,
   waitForPathToDisappear,
+  type ScenarioPhase,
 } from "../support/support.ts";
+import { isMainModule } from "../support/runtime.ts";
+import type { TargetWindowHarness } from "../support/runtime.ts";
 
 type OperationResult = {
   success: boolean;
   message: string;
 };
 
-// 通过真实 recording.toggle Command 录制独立 Win32 测试窗口，并验证 finalize/publish 流程。
-await runScenarioWithTargetWindow(
-  "capture/recording",
-  async (application, environment, targetWindow) => {
+const phase: ScenarioPhase<TargetWindowHarness> = {
+  name: "recording",
+  // 通过真实 recording.toggle Command 录制共享的目标窗口，并验证 finalize/publish 流程。
+  action: async (application, environment, targetWindow) => {
     const settingsResult = await application.call<OperationResult>("settings.patch", {
       patch: {
         window: {
@@ -62,12 +65,7 @@ await runScenarioWithTargetWindow(
     );
     const workingSize = await waitForFileToGrow(workingPath, "录制工作文件开始写入视频帧");
     assert.ok(workingSize > 0, `录制工作文件为空：${workingPath}`);
-    const warmedUpSize = await waitForFileToRemainPresent(
-      workingPath,
-      2_000,
-      "录制累计足够视频帧",
-    );
-    assert.ok(warmedUpSize > 0, `录制工作文件为空：${workingPath}`);
+    await waitForFileToRemainPresent(workingPath, 2_000, "维持录制至少 2 秒");
 
     const filesBeforeStop = new Set(await listDirectoryFileNames(environment.captureDirectory));
     await invokeCommand(application, "recording.toggle");
@@ -83,4 +81,10 @@ await runScenarioWithTargetWindow(
     await assertMp4Structure(recordingPath);
     await waitForPathToDisappear(workingPath, "录制工作文件清理");
   },
-);
+};
+
+export default phase;
+
+if (isMainModule(import.meta.url)) {
+  await runScenarioWithTargetWindow("capture/recording", phase.action);
+}

@@ -9,17 +9,20 @@ import {
   runScenarioWithTargetWindow,
   waitForFileToStabilize,
   waitForNewFile,
+  type ScenarioPhase,
 } from "../support/support.ts";
+import { isMainModule } from "../support/runtime.ts";
+import type { TargetWindowHarness } from "../support/runtime.ts";
 
 type OperationResult = {
   success: boolean;
   message: string;
 };
 
-// 通过真实 screenshot.capture Command 捕获独立 Win32 测试窗口，并验证 PNG 输出尺寸。
-await runScenarioWithTargetWindow(
-  "capture/screenshot",
-  async (application, environment, targetWindow) => {
+const phase: ScenarioPhase<TargetWindowHarness> = {
+  name: "screenshot",
+  // 通过真实 screenshot.capture Command 捕获共享的目标窗口，并验证 PNG 输出尺寸。
+  action: async (application, environment, targetWindow) => {
     const settingsResult = await application.call<OperationResult>("settings.patch", {
       patch: {
         window: {
@@ -55,4 +58,10 @@ await runScenarioWithTargetWindow(
       targetWindow.clientHeight,
     );
   },
-);
+};
+
+export default phase;
+
+if (isMainModule(import.meta.url)) {
+  await runScenarioWithTargetWindow("capture/screenshot", phase.action);
+}

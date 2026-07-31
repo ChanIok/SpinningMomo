@@ -27,6 +27,8 @@ export type Asset = {
   size?: number | null;
   folderId?: number | null;
   fileModifiedAt?: number | null;
+  fileCreatedAt?: number | null;
+  createdAt?: number | null;
 };
 
 export type QueryAssetsResponse = {
@@ -71,6 +73,46 @@ export type MissingAssetsResponse = {
 export type Tag = {
   id: number;
   name: string;
+};
+
+export type TagTreeNode = {
+  id: number;
+  name: string;
+  parentId?: number | null;
+  children?: TagTreeNode[];
+};
+
+export type TagStats = {
+  tagId: number;
+  tagName: string;
+  assetCount: number;
+};
+
+export type HomeStats = {
+  totalCount: number;
+  photoCount: number;
+  videoCount: number;
+  livePhotoCount: number;
+  totalSize: number;
+  todayAddedCount: number;
+};
+
+export type BatchSelectionSummary = {
+  selectedCount: number;
+  rating?: number | null;
+  rejectedState?: boolean | null;
+  description?: string | null;
+  commonTags: Tag[];
+};
+
+export type PurgeMissingAssetsResult = {
+  success: boolean;
+  message: string;
+  deletedAssetCount: number;
+  skippedAssetCount: number;
+  deletedThumbnailCount: number;
+  releasedThumbnailBytes: number;
+  failedThumbnailCount: number;
 };
 
 export type FolderTreeNode = {
@@ -157,6 +199,47 @@ export async function runScenarioWithTargetWindow(
       await action(application, environment, targetWindow);
     } finally {
       await targetWindow.stop();
+    }
+  });
+}
+
+// 一个场景阶段：在共享生命周期内独立执行、独立报告，失败时以阶段名定位。
+export type ScenarioPhase<C = void> = {
+  name: string;
+  action: (
+    application: ApplicationHarness,
+    environment: ScenarioEnvironment,
+    context?: C,
+  ) => Promise<void>;
+};
+
+// 在同一个真实进程与沙箱生命周期内按顺序执行多个相互独立的场景阶段，
+// 减少重复的进程启动与沙箱复制开销；失败现场保留逻辑与 runScenario 一致。
+// createContext 用于需要跨阶段共享额外资源（如捕获目标窗口）的场景。
+export async function runScenarioPhases<C>(
+  suiteName: string,
+  phases: ScenarioPhase<C>[],
+  createContext?: (
+    application: ApplicationHarness,
+    environment: ScenarioEnvironment,
+  ) => Promise<{ context: C; dispose: () => Promise<void> }>,
+): Promise<void> {
+  await runScenario(suiteName, async (application, environment) => {
+    const prepared = createContext
+      ? await createContext(application, environment)
+      : { context: undefined as C, dispose: async () => {} };
+    try {
+      for (const { name: phaseName, action } of phases) {
+        console.log(`[${suiteName} :: ${phaseName}] 开始`);
+        try {
+          await action(application, environment, prepared.context);
+          console.log(`PASS ${suiteName} :: ${phaseName}`);
+        } catch (error) {
+          throw new Error(`phase ${phaseName} 失败：\n${formatError(error)}`);
+        }
+      }
+    } finally {
+      await prepared.dispose();
     }
   });
 }
@@ -316,17 +399,28 @@ export async function assertMp4Structure(path: string): Promise<void> {
   assert.ok(boxTypes.has("moov"), `MP4 缺少 moov box：${path}`);
 }
 
-export function scenarioFixturePath(): string {
-  return join(REPOSITORY_ROOT, "web", "public", "logo_192x192.png");
+// 每个 fixture 必须是内容唯一（hash 不同）的有效图片。
+// 图库按内容 hash 共享继承与缩略图，依赖 hash 语义的场景必须使用独立 fixture。
+const SCENARIO_FIXTURE_PATHS = {
+  logo: join(REPOSITORY_ROOT, "web", "public", "logo_192x192.png"),
+  blue: join(REPOSITORY_ROOT, "tests", "scenarios", "fixtures", "solid_blue.png"),
+  green: join(REPOSITORY_ROOT, "tests", "scenarios", "fixtures", "solid_green.png"),
+} as const;
+
+export type ScenarioFixtureName = keyof typeof SCENARIO_FIXTURE_PATHS;
+
+export function scenarioFixturePath(name: ScenarioFixtureName = "logo"): string {
+  return SCENARIO_FIXTURE_PATHS[name];
 }
 
 export async function copyScenarioFixture(
   environment: ScenarioEnvironment,
   relativePath: string,
+  sourceName: ScenarioFixtureName = "logo",
 ): Promise<string> {
   const destination = join(environment.galleryDirectory, relativePath);
   await mkdir(join(destination, ".."), { recursive: true });
-  await copyFile(scenarioFixturePath(), destination);
+  await copyFile(scenarioFixturePath(sourceName), destination);
   return destination;
 }
 
@@ -337,6 +431,20 @@ export async function queryVisibleAssets(
     filters: {},
   });
   return response.items;
+}
+
+export async function queryAssets(
+  application: ApplicationHarness,
+  filters: Record<string, unknown>,
+  options: { sortBy?: string; sortOrder?: string; page?: number; perPage?: number } = {},
+): Promise<QueryAssetsResponse> {
+  return application.call<QueryAssetsResponse>("gallery.queryAssets", {
+    filters,
+    sortBy: options.sortBy,
+    sortOrder: options.sortOrder,
+    page: options.page,
+    perPage: options.perPage,
+  });
 }
 
 export async function scanDirectory(
@@ -464,11 +572,28 @@ export function findFolderByPath(
   return visit(tree);
 }
 
+export function findTagInTree(
+  tree: TagTreeNode[],
+  tagId: number,
+): TagTreeNode | undefined {
+  for (const node of tree) {
+    if (node.id === tagId) {
+      return node;
+    }
+    const child = findTagInTree(node.children ?? [], tagId);
+    if (child) {
+      return child;
+    }
+  }
+  return undefined;
+}
+
 export async function createTag(
   application: ApplicationHarness,
   name: string,
+  parentId?: number,
 ): Promise<number> {
-  return application.call<number>("gallery.createTag", { name });
+  return application.call<number>("gallery.createTag", { name, parentId });
 }
 
 export async function getAssetTags(

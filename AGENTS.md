@@ -18,7 +18,7 @@ SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infi
 
 Full setup steps live in `docs/developer/architecture.md`.
 
-Build Policy: Default to Debug (xmake build). Do not run builds automatically; let the user confirm or run manually. 
+Build Policy: Do not run builds automatically; let the user confirm or run manually. 
 
 Common commands:
 ```
@@ -143,7 +143,7 @@ These must be re-run when their source files change:
 
 Test Policy: Do not run tests automatically. Let the user confirm or run tests manually.
 
-- **Scenario Tests (TypeScript)**: End-to-end scenario tests live under `tests/scenarios/` (run via `npm run test:scenarios`). They test a compiled `SpinningMomo.exe` in isolated portable sandboxes via JSON-RPC. Close any running application instance before testing.
+- **Scenario Tests (TypeScript)**: End-to-end scenario tests live under `tests/scenarios/` (run via `npm run test:scenarios`). They test a compiled `SpinningMomo.exe` in isolated portable sandboxes via JSON-RPC. Close any running application instance before testing. The default gates the Release build (`build/windows/x64/release/`); content-hash semantics only hold in Release, so run `xmake release` before testing. Point at another build (e.g. Debug) via `--exe=<path>` / `SPINNING_MOMO_EXE`.
 - **Unit Tests (C++)**: Legacy doctest unit tests live under `tests/` (run via `xmake test`).
 - **Interactive Debugging**: Interactive RPC testing tools live in `web/src/features/playground/` and root `playground/`.
 

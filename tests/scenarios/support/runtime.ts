@@ -15,12 +15,13 @@ import { fileURLToPath } from "node:url";
 
 const SCENARIO_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 export const REPOSITORY_ROOT = resolve(SCENARIO_DIRECTORY, "..", "..", "..");
+// 场景测试是回归测试，默认验证发布给用户的实际构建（Release）。
 export const DEFAULT_EXECUTABLE_PATH = join(
   REPOSITORY_ROOT,
   "build",
   "windows",
   "x64",
-  "debug",
+  "release",
   "SpinningMomo.exe",
 );
 export const DEFAULT_SCENARIO_WINDOW_EXECUTABLE_PATH = join(
@@ -28,7 +29,7 @@ export const DEFAULT_SCENARIO_WINDOW_EXECUTABLE_PATH = join(
   "build",
   "windows",
   "x64",
-  "debug",
+  "release",
   "SpinningMomoScenarioWindow.exe",
 );
 
@@ -87,7 +88,13 @@ export function canonicalizeWindowsPath(value: string): string {
   return resolve(value).replaceAll("\\", "/").toLocaleLowerCase("en-US");
 }
 
-// 从命令行或环境变量解析被测程序，未指定时使用默认 Debug 输出。
+// 模块作为入口脚本被直接执行（而非被套件导入）时返回 true，用于保留单场景直跑能力。
+export function isMainModule(metaUrl: string): boolean {
+  const entry = process.argv[1];
+  return entry !== undefined && resolve(entry) === fileURLToPath(metaUrl);
+}
+
+// 从命令行或环境变量解析被测程序，未指定时使用默认 Release 输出。
 export function resolveExecutablePath(arguments_: string[]): string {
   const inlineArgument = arguments_.find((argument) => argument.startsWith("--exe="));
   if (inlineArgument) {

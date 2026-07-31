@@ -4,19 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { REPOSITORY_ROOT } from "./support/runtime.ts";
 
+// 每个套件在同一个真实进程与沙箱生命周期内按顺序执行多个相互独立的场景阶段。
 const SCENARIO_FILES = [
-  "gallery/missing_restore.ts",
-  "gallery/hash_inheritance.ts",
-  "gallery/scanner_metadata.ts",
-  "gallery/watcher_consistency.ts",
-  "gallery/expired_missing_purge.ts",
-  "settings/persistence.ts",
-  "gallery/folder_tree.ts",
-  "gallery/move_consistency.ts",
-  "gallery/path_encoding.ts",
-  "gallery/unreachable_root.ts",
-  "capture/screenshot.ts",
-  "capture/recording.ts",
+  "gallery_core.ts",
+  "gallery_recovery.ts",
+  "capture.ts",
 ];
 
 const scenarioDirectory = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +40,38 @@ function runScenarioProcess(fileName: string, arguments_: string[]): Promise<num
 }
 
 let exitCode = 0;
-for (const scenarioFile of SCENARIO_FILES) {
+
+const cliArguments = process.argv.slice(2);
+const suiteFilters: string[] = [];
+for (let i = 0; i < cliArguments.length; i++) {
+  const argument = cliArguments[i];
+  if (argument.startsWith("--exe=") || argument.startsWith("--target-exe=")) {
+    continue;
+  }
+  if (argument === "--exe" || argument === "--target-exe") {
+    i++;
+    continue;
+  }
+  if (!argument.startsWith("-")) {
+    suiteFilters.push(argument.toLocaleLowerCase("en-US"));
+  }
+}
+
+const targetScenarioFiles =
+  suiteFilters.length > 0
+    ? SCENARIO_FILES.filter((file) =>
+        suiteFilters.some((filter) => file.toLocaleLowerCase("en-US").includes(filter)),
+      )
+    : SCENARIO_FILES;
+
+if (targetScenarioFiles.length === 0) {
+  console.error(
+    `未找到匹配的场景套件。传入筛选：${suiteFilters.join(", ")}\n可选套件列表：${SCENARIO_FILES.join(", ")}`,
+  );
+  process.exit(1);
+}
+
+for (const scenarioFile of targetScenarioFiles) {
   console.log(`\n===== 场景：${scenarioFile} =====`);
   try {
     exitCode = await runScenarioProcess(scenarioFile, process.argv.slice(2));
@@ -64,3 +87,4 @@ for (const scenarioFile of SCENARIO_FILES) {
 }
 
 process.exitCode = exitCode;
+
