@@ -13,7 +13,7 @@
     "build:installer": "node scripts/build-installer.js",
     "build:checksums": "node scripts/generate-checksums.js",
     "dev:web": "npm run dev --prefix web",
-    "test:scenario": "node tests/scenarios/gallery_missing_restore.ts",
+    "test:scenarios": "node tests/scenarios/run.ts",
     "release": "npm run build && npm run build:portable && npm run build:installer && npm run build:checksums",
     "release:version": "node scripts/release-version.js",
     "format:cpp": "node scripts/format-cpp.js",

@@ -140,12 +140,13 @@ These must be re-run when their source files change:
 - **C++ include order**: the matching header first in `.cpp`, then `vendor/std.hpp`, remaining vendor headers, and project headers.
 
 ## Testing
-Backend regression tests use doctest and are executed through Xmake:
-1. Run `xmake test -v` for the automated backend suite.
-2. Keep tests deterministic and focused on stable behavior or documented invariants; do not pursue coverage targets.
-3. Build and run the exe for Windows, hardware, and desktop integration testing.
-4. Use the `web/src/features/playground/` pages for interactive RPC endpoint testing during development.
-5. Use the root-level `playground/` scripts for backend HTTP/RPC debugging and ad-hoc experiments.
+
+Test Policy: Do not run tests automatically. Let the user confirm or run tests manually.
+
+- **Scenario Tests (TypeScript)**: End-to-end scenario tests live under `tests/scenarios/` (run via `npm run test:scenarios`). They test a compiled `SpinningMomo.exe` in isolated portable sandboxes via JSON-RPC. Close any running application instance before testing.
+- **Unit Tests (C++)**: Legacy doctest unit tests live under `tests/` (run via `xmake test`).
+- **Interactive Debugging**: Interactive RPC testing tools live in `web/src/features/playground/` and root `playground/`.
+
 
 ## Adding a New Feature
 1. Create a directory under `src/features/<name>/` with `.hpp` interfaces and `.cpp` implementations.

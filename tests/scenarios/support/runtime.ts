@@ -14,7 +14,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCENARIO_DIRECTORY = dirname(fileURLToPath(import.meta.url));
-export const REPOSITORY_ROOT = resolve(SCENARIO_DIRECTORY, "..", "..");
+export const REPOSITORY_ROOT = resolve(SCENARIO_DIRECTORY, "..", "..", "..");
 export const DEFAULT_EXECUTABLE_PATH = join(
   REPOSITORY_ROOT,
   "build",
@@ -45,6 +45,9 @@ export type ScenarioEnvironment = {
   rootDirectory: string;
   appDirectory: string;
   galleryDirectory: string;
+  databasePath: string;
+  settingsPath: string;
+  thumbnailsDirectory: string;
   executablePath: string;
   logPath: string;
 };
@@ -52,6 +55,7 @@ export type ScenarioEnvironment = {
 export type WaitOptions = {
   timeoutMs?: number;
   intervalMs?: number;
+  retryErrors?: boolean;
 };
 
 // 表示一次 JSON-RPC 调用已经到达后端，但后端返回了业务或协议错误。
@@ -105,18 +109,28 @@ export async function waitUntil<T>(
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const intervalMs = options.intervalMs ?? 100;
+  const retryErrors = options.retryErrors ?? false;
   const deadline = Date.now() + timeoutMs;
 
+  let lastError: unknown;
   while (Date.now() < deadline) {
-    const result = await probe();
-    if (result !== undefined) {
-      return result;
+    try {
+      const result = await probe();
+      if (result !== undefined) {
+        return result;
+      }
+    } catch (error) {
+      if (!retryErrors) {
+        throw error;
+      }
+      lastError = error;
     }
 
     await delay(intervalMs);
   }
 
-  throw new Error(`等待超时：${description}（${timeoutMs}ms）`);
+  const errorDetail = lastError ? `；最后异常：${formatError(lastError)}` : "";
+  throw new Error(`等待超时：${description}（${timeoutMs}ms）${errorDetail}`);
 }
 
 // 创建一次性便携版目录，隔离数据库、设置、缩略图和日志。
@@ -125,7 +139,7 @@ export async function createScenarioEnvironment(
 ): Promise<ScenarioEnvironment> {
   await access(sourceExecutablePath).catch(() => {
     throw new Error(
-      `找不到 Debug 程序：${sourceExecutablePath}\n请先自行构建，场景脚本不会自动运行 Xmake。`,
+      `找不到被测程序：${sourceExecutablePath}\n请先自行构建，场景脚本不会自动运行 Xmake。`,
     );
   });
 
@@ -142,6 +156,7 @@ export async function createScenarioEnvironment(
   const rootDirectory = await mkdtemp(join(tmpdir(), SANDBOX_PREFIX));
   const appDirectory = join(rootDirectory, "app");
   const galleryDirectory = join(rootDirectory, "gallery");
+  const dataDirectory = join(appDirectory, "data");
   const sourceDirectory = dirname(sourceExecutablePath);
 
   try {
@@ -159,13 +174,14 @@ export async function createScenarioEnvironment(
       },
     });
 
-    await mkdir(join(appDirectory, "data"), { recursive: true });
+    await mkdir(dataDirectory, { recursive: true });
     await mkdir(galleryDirectory, { recursive: true });
     await writeFile(join(appDirectory, "portable"), "");
 
+    const settingsPath = join(dataDirectory, "settings.json");
     // 禁止测试实例申请管理员权限，也避免打开首次引导窗口。
     await writeFile(
-      join(appDirectory, "data", "settings.json"),
+      settingsPath,
       JSON.stringify(
         {
           app: {
@@ -184,8 +200,11 @@ export async function createScenarioEnvironment(
       rootDirectory,
       appDirectory,
       galleryDirectory,
+      databasePath: join(dataDirectory, "database.db"),
+      settingsPath,
+      thumbnailsDirectory: join(dataDirectory, "thumbnails"),
       executablePath: join(appDirectory, basename(sourceExecutablePath)),
-      logPath: join(appDirectory, "data", "logs", "app.log"),
+      logPath: join(dataDirectory, "logs", "app.log"),
     };
   } catch (error) {
     throw new Error(
@@ -275,6 +294,14 @@ export class ApplicationHarness {
         `${formatError(error)}\n最后一次 RPC 错误：${formatError(lastRpcError)}`,
       );
     });
+  }
+
+  // 重启应用进程，用于测试配置持久化和数据库启动恢复逻辑。
+  async restart(): Promise<void> {
+    await this.stop();
+    this.child = undefined;
+    this.spawnError = undefined;
+    await this.start();
   }
 
   // 通过生产 /rpc 端点执行一次 JSON-RPC 2.0 请求。
