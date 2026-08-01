@@ -425,7 +425,7 @@ auto create_child_folder(core::AppState& app_state, std::int64_t parent_folder_i
   if (features::gallery::ignore::service::apply_ignore_rules(
           target_path,
           std::filesystem::path(utils::string::FromUtf8(root_folder_result->value().path)),
-          ignore_rules_result.value(), true)) {
+          ignore_rules_result.value())) {
     return std::unexpected("Folder name is excluded by the current ignore rules");
   }
 

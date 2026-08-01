@@ -10,15 +10,31 @@ task("release")
         
         -- 获取当前配置状态
         config.load()
-        local current_mode = config.get("mode")
-        local should_restore = (current_mode == "debug")
-        
-        -- 构建release版本
-        os.exec("xmake config -m release")
-        local ok = os.exec("xmake build")
-        
-        if ok == 0 and should_restore then
-            os.exec("xmake config -m debug")
+        local should_restore_debug = (config.get("mode") == "debug")
+        local build_failed = false
+        local build_errors
+
+        try {
+            function ()
+                os.exec("xmake config -m release")
+                os.exec("xmake build")
+            end,
+            catch {
+                function (errors)
+                    build_failed = true
+                    build_errors = errors
+                end
+            },
+            finally {
+                function ()
+                    if should_restore_debug then
+                        os.exec("xmake config -m debug")
+                    end
+                end
+            }
+        }
+
+        if build_failed then
+            raise(build_errors)
         end
-        
     end)

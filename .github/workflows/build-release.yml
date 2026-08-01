@@ -42,6 +42,7 @@ jobs:
           node-version: 24
           cache: 'npm'
           cache-dependency-path: |
+            package-lock.json
             web/package-lock.json
 
       - name: Setup xmake
@@ -158,7 +159,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           npm ci --prefix web
 
       - name: Prepare xmake release dependencies

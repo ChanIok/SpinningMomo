@@ -6,105 +6,109 @@
 
 namespace features::gallery::ignore::matcher {
 
-// ============= 路径处理辅助函数 =============
+namespace {
 
-auto normalize_path_for_matching(const std::filesystem::path& file_path,
-                                 const std::filesystem::path& base_path) -> std::string {
-  try {
-    // 计算相对路径，自动规范化，并使用统一的正斜杠格式
-    auto relative = std::filesystem::relative(file_path, base_path);
-    return relative.lexically_normal().generic_string();
-  } catch (const std::filesystem::filesystem_error&) {
-    // 如果无法计算相对路径，返回规范化的文件名
-    return file_path.filename().lexically_normal().generic_string();
+auto append_regex_literal(std::string& regex_pattern, char value) -> void {
+  constexpr std::string_view regex_special_characters = R"(\.^$|()[]{}*+?)";
+  if (regex_special_characters.contains(value)) {
+    regex_pattern.push_back('\\');
   }
+  regex_pattern.push_back(value);
 }
 
-// ============= Glob模式匹配实现 =============
+auto append_character_class(const std::string& pattern, std::size_t& index,
+                            std::string& regex_pattern) -> bool {
+  auto end = pattern.find(']', index + 1);
+  if (end == std::string::npos || end == index + 1) {
+    return false;
+  }
+
+  regex_pattern.push_back('[');
+  auto content_index = index + 1;
+  if (pattern[content_index] == '!' || pattern[content_index] == '^') {
+    regex_pattern.push_back('^');
+    ++content_index;
+  }
+  if (content_index == end) {
+    return false;
+  }
+
+  for (; content_index < end; ++content_index) {
+    auto value = pattern[content_index];
+    if (value == '\\' || value == '[') {
+      regex_pattern.push_back('\\');
+    }
+    regex_pattern.push_back(value);
+  }
+  regex_pattern.push_back(']');
+  index = end + 1;
+  return true;
+}
+
+auto make_glob_regex(const std::string& pattern) -> std::optional<std::string> {
+  std::string regex_pattern = "^";
+  regex_pattern.reserve(pattern.size() * 2 + 2);
+
+  for (std::size_t index = 0; index < pattern.size();) {
+    const auto value = pattern[index];
+
+    if (value == '*') {
+      auto run_end = index;
+      while (run_end < pattern.size() && pattern[run_end] == '*') {
+        ++run_end;
+      }
+
+      const auto is_complete_segment = (index == 0 || pattern[index - 1] == '/') &&
+                                       (run_end == pattern.size() || pattern[run_end] == '/');
+      if (run_end - index >= 2 && is_complete_segment) {
+        if (run_end < pattern.size()) {
+          // **/ 匹配零个或多个完整路径段。
+          regex_pattern += "(?:[^/]+/)*";
+          index = run_end + 1;
+        } else {
+          regex_pattern += ".*";
+          index = run_end;
+        }
+      } else {
+        // 非完整路径段中的连续星号与单个 * 语义一致。
+        regex_pattern += "[^/]*";
+        index = run_end;
+      }
+      continue;
+    }
+
+    if (value == '?') {
+      regex_pattern += "[^/]";
+      ++index;
+      continue;
+    }
+
+    if (value == '[') {
+      if (!append_character_class(pattern, index, regex_pattern)) {
+        return std::nullopt;
+      }
+      continue;
+    }
+
+    append_regex_literal(regex_pattern, value);
+    ++index;
+  }
+
+  regex_pattern.push_back('$');
+  return regex_pattern;
+}
+
+}  // namespace
 
 auto match_glob_pattern(const std::string& pattern, const std::string& path) -> bool {
-  // 简化的glob实现，支持基本的gitignore模式
-  // TODO: 这是一个基础实现，后续可以扩展支持更复杂的glob语法
-
+  auto regex_pattern = make_glob_regex(pattern);
+  if (!regex_pattern) {
+    Logger().warn("Invalid glob pattern '{}'", pattern);
+    return false;
+  }
   try {
-    // 转换glob模式为正则表达式
-    std::string regex_pattern;
-    regex_pattern.reserve(pattern.size() * 2);
-
-    bool in_bracket = false;
-
-    for (size_t i = 0; i < pattern.size(); ++i) {
-      char c = pattern[i];
-
-      switch (c) {
-        case '*':
-          if (i + 1 < pattern.size() && pattern[i + 1] == '*') {
-            // ** 匹配任何目录层级
-            regex_pattern += ".*";
-            ++i;  // 跳过第二个*
-            // 跳过后续的/
-            if (i + 1 < pattern.size() && pattern[i + 1] == '/') {
-              ++i;
-            }
-          } else {
-            // * 匹配除/外的任意字符
-            regex_pattern += "[^/]*";
-          }
-          break;
-        case '?':
-          regex_pattern += "[^/]";
-          break;
-        case '[':
-          regex_pattern += "[";
-          in_bracket = true;
-          break;
-        case ']':
-          regex_pattern += "]";
-          in_bracket = false;
-          break;
-        case '.':
-        case '+':
-        case '^':
-        case '$':
-        case '(':
-        case ')':
-        case '{':
-        case '}':
-        case '|':
-          // 转义正则表达式特殊字符
-          if (!in_bracket) {
-            regex_pattern += "\\";
-          }
-          regex_pattern += c;
-          break;
-        default:
-          regex_pattern += c;
-          break;
-      }
-    }
-
-    // 如果模式不以/开头，则匹配任何位置
-    if (!pattern.starts_with("/")) {
-      regex_pattern = "(^|.*/)" + regex_pattern;
-    } else {
-      // 移除开头的/
-      if (regex_pattern.starts_with("/")) {
-        regex_pattern = regex_pattern.substr(1);
-      }
-      regex_pattern = "^" + regex_pattern;
-    }
-
-    // 如果模式以/结尾，表示只匹配目录
-    if (pattern.ends_with("/")) {
-      regex_pattern += "$";
-    } else {
-      // 匹配文件或目录
-      regex_pattern += "(/.*)?$";
-    }
-
-    std::regex glob_regex(regex_pattern, std::regex_constants::icase);
+    std::regex glob_regex(*regex_pattern, std::regex_constants::icase);
     return std::regex_match(path, glob_regex);
-
   } catch (const std::regex_error& e) {
     Logger().warn("Invalid glob pattern '{}': {}", pattern, e.what());
     return false;

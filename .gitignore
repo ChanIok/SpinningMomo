@@ -66,7 +66,6 @@ tools/
 
 # Node.js dependencies
 node_modules/
-package-lock.json
 
 # Web App (Vite + React)
 web/node_modules/

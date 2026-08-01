@@ -118,7 +118,7 @@ function toFormIgnoreRules(rules: ScanIgnoreRule[] | undefined): FormIgnoreRule[
   return rules.map((rule, index) => ({
     id: index + 1,
     pattern: rule.pattern,
-    patternType: rule.patternType ?? 'regex',
+    patternType: rule.patternType ?? 'glob',
     ruleType: rule.ruleType ?? 'exclude',
     description: rule.description ?? '',
   }))
@@ -171,7 +171,7 @@ function addIgnoreRule() {
   ignoreRules.value.push({
     id: nextIgnoreRuleId.value++,
     pattern: '',
-    patternType: 'regex',
+    patternType: 'glob',
     ruleType: 'exclude',
     description: '',
   })
@@ -436,7 +436,13 @@ function handleExpandLeave(el: Element) {
                     >
                       <Input
                         v-model="rule.pattern"
-                        :placeholder="t('gallery.sidebar.scan.rulePatternPlaceholder')"
+                        :placeholder="
+                          t(
+                            rule.patternType === 'glob'
+                              ? 'gallery.sidebar.scan.rulePatternPlaceholderGlob'
+                              : 'gallery.sidebar.scan.rulePatternPlaceholderRegex'
+                          )
+                        "
                       />
                       <Select v-model="rule.patternType">
                         <SelectTrigger class="w-full">

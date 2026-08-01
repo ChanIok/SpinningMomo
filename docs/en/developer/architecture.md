@@ -123,7 +123,7 @@ xmake release    # automatically restores debug config after release build
 npm run build --prefix web
 
 # Assemble dist/ (exe + web resources)
-npm run build:prepare
+npm run build:dist
 ```
 
 ### Build Output Paths

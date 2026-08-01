@@ -128,7 +128,7 @@ xmake release    # 构建 release 后自动恢复 debug 配置
 npm run build --prefix web
 
 # 打包 dist/（汇总 exe + web 资源）
-npm run build:prepare
+npm run build:dist
 ```
 
 ### 构建输出路径

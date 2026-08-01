@@ -364,7 +364,7 @@ auto process_watch_notifications(core::AppState& app_state, FolderWatcherState& 
         // UPSERT 可以早过滤：被忽略的新文件本来就不应该进入图库。
         if (ignore_rules.has_value() &&
             features::gallery::ignore::service::apply_ignore_rules(
-                candidate_path, watcher.root_path, ignore_rules.value(), false)) {
+                candidate_path, watcher.root_path, ignore_rules.value())) {
           break;
         }
 

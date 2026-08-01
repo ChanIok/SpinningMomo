@@ -16,8 +16,8 @@ auto load_ignore_rules(core::AppState& app_state,
                        std::optional<std::int64_t> folder_id = std::nullopt)
     -> std::expected<std::vector<IgnoreRule>, std::string>;
 
-// 按文件或目录语义应用忽略规则，返回该路径是否应被排除。
+// 对根目录相对路径按顺序应用忽略规则，返回该路径是否应被排除。
 auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem::path& base_path,
-                        const std::vector<IgnoreRule>& rules, bool is_directory) -> bool;
+                        const std::vector<IgnoreRule>& rules) -> bool;
 
 }  // namespace features::gallery::ignore::service

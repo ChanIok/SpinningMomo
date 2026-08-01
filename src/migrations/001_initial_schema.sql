@@ -293,7 +293,7 @@ CREATE TABLE ignore_rules (
     folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
     -- 规则模式，可以是 glob 或正则表达式
     rule_pattern TEXT NOT NULL,
-    -- 规则的类型，'glob' 类似于 .gitignore, 'regex' 则是标准的正则表达式
+    -- 规则的类型，'glob' 匹配根目录相对路径，'regex' 则是标准的正则表达式
     pattern_type TEXT NOT NULL CHECK (pattern_type IN ('glob', 'regex')) DEFAULT 'glob',
     rule_type TEXT NOT NULL CHECK (rule_type IN ('exclude', 'include')) DEFAULT 'exclude',
     is_enabled BOOLEAN NOT NULL DEFAULT 1,

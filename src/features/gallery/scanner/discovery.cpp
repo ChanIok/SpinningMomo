@@ -109,8 +109,8 @@ auto scan_paths(core::AppState& app_state, const std::filesystem::path& director
 
       if (is_directory) {
         // 只把目录本身未被排除的节点加入库存，但不剪枝，以便后续 include 重新放行深层路径。
-        if (!ignore::service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
-                                                 true)) {
+        if (!ignore::service::apply_ignore_rules(normalized_path, ignore_base_path,
+                                                 combined_rules)) {
           append_folder_with_ancestors(result, normalized_path, normalized_scan_root);
         }
         continue;
@@ -121,8 +121,7 @@ auto scan_paths(core::AppState& app_state, const std::filesystem::path& director
       }
 
       // 文件继续沿用现有后规则覆盖前规则的 include/exclude 语义。
-      if (ignore::service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules,
-                                              false)) {
+      if (ignore::service::apply_ignore_rules(normalized_path, ignore_base_path, combined_rules)) {
         continue;
       }
 

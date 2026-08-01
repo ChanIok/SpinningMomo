@@ -75,6 +75,9 @@ jobs:
       - name: Build SpinningMomo (Release)
         run: xmake build -y
 
+      - name: Run C++ unit tests
+        run: xmake test -y
+
       - name: Build SpinningMomoScenarioWindow (Release)
         run: xmake build -y SpinningMomoScenarioWindow
 

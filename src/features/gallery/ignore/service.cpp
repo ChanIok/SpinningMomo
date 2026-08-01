@@ -101,7 +101,7 @@ auto load_ignore_rules(core::AppState& app_state, std::optional<std::int64_t> fo
 
 // 按规则顺序判定文件或目录是否被排除，后命中的规则覆盖先前结果。
 auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem::path& base_path,
-                        const std::vector<IgnoreRule>& rules, bool is_directory) -> bool {
+                        const std::vector<IgnoreRule>& rules) -> bool {
   if (rules.empty()) {
     return false;  // 没有规则，不忽略
   }
@@ -119,12 +119,7 @@ auto apply_ignore_rules(const std::filesystem::path& path, const std::filesystem
 
     // 根据模式类型选择匹配方法
     if (rule.pattern_type == "glob") {
-      auto glob_path = normalized_path;
-      // 仅 glob 目录语义补上末尾斜杠，不改变现有 regex 的相对路径语义。
-      if (is_directory && !glob_path.empty() && !glob_path.ends_with('/')) {
-        glob_path.push_back('/');
-      }
-      matches = matcher::match_glob_pattern(rule.rule_pattern, glob_path);
+      matches = matcher::match_glob_pattern(rule.rule_pattern, normalized_path);
     } else if (rule.pattern_type == "regex") {
       matches = matcher::match_regex_pattern(rule.rule_pattern, normalized_path);
     } else {
