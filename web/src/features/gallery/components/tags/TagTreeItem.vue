@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronRight, Pen, Plus, Tag, Trash2 } from 'lucide-vue-next'
+import { ChevronRight, Pen, Plus, Tag, Trash2 } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,

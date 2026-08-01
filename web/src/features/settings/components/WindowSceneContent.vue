@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useI18n } from '@/composables/useI18n'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()

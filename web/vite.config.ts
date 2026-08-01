@@ -5,7 +5,7 @@ import { analyzer } from 'vite-bundle-analyzer'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command, mode }) => ({
   plugins: [
     vue(),
     tailwindcss(),
@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  esbuild: command === 'build' ? { pure: ['console.log', 'console.debug'] } : undefined,
   server: {
     proxy: {
       '/rpc': {

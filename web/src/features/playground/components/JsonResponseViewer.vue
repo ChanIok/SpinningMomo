@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { CopyIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-vue-next'
+import { CopyIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import type { ApiTestResponse } from '../types'
 

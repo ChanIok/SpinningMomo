@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Download, LoaderCircle, Upload } from 'lucide-vue-next'
+import { Download, LoaderCircle, Upload } from '@lucide/vue'
 import {
   AlertDialog,
   AlertDialogAction,

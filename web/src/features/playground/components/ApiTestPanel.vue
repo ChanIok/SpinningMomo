@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import { PlayIcon } from 'lucide-vue-next'
+import { PlayIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import ParamInputPanel from './ParamInputPanel.vue'
 import JsonResponseViewer from './JsonResponseViewer.vue'

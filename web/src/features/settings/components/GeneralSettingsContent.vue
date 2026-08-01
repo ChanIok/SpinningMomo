@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 

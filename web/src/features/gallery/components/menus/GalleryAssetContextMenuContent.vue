@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
-import { Copy, Eraser, ExternalLink, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
+import { Copy, Eraser, ExternalLink, FolderOpen, Star, Trash2, X } from '@lucide/vue'
 import {
   ContextMenuItem,
   ContextMenuSeparator,

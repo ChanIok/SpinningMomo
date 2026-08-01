@@ -34,7 +34,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { TriangleAlert, RotateCcw } from 'lucide-vue-next'
+import { TriangleAlert, RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
 import { galleryApi } from '@/features/gallery/api'

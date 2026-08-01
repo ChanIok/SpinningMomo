@@ -12,7 +12,7 @@ import {
   Maximize,
   ZoomOut,
   ZoomIn,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {

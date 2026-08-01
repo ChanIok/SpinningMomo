@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronRight, Cloud, Folder } from 'lucide-vue-next'
+import { ChevronRight, Cloud, Folder } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import type { FolderTreeNode } from '../../types'
 

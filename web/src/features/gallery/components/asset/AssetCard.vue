@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { Play } from 'lucide-vue-next'
+import { Play } from '@lucide/vue'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../../composables/useGalleryData'
 import { useOriginalPreviewWorker } from '../../composables/useOriginalPreviewWorker'

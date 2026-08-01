@@ -7,7 +7,7 @@ import { storeToRefs } from 'pinia'
 import DraggableSettingsList from './DraggableSettingsList.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import { Input } from '@/components/ui/input'
 import {
   Item,

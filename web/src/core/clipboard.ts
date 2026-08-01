@@ -6,6 +6,6 @@ export async function readClipboardText(): Promise<string | null> {
     return result
   } catch (error) {
     console.error('Failed to read clipboard text:', error)
-    throw new Error('读取剪贴板失败')
+    throw new Error('Failed to read clipboard')
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowUpDown, LayoutGrid } from 'lucide-vue-next'
+import { ArrowUpDown, LayoutGrid } from '@lucide/vue'
 import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,

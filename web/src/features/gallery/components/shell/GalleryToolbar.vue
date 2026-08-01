@@ -45,7 +45,7 @@ import {
   Type,
   Video,
   X,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'

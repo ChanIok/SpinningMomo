@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { PlayIcon, SearchIcon } from 'lucide-vue-next'
+import { PlayIcon, SearchIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ApiMethod } from '../types'

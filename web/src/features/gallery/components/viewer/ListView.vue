@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
 import {
   useGallerySelection,

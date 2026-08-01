@@ -26,7 +26,7 @@ import {
   Package,
   Download,
   ChevronRight,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 interface RuntimeInfo {
   version: string

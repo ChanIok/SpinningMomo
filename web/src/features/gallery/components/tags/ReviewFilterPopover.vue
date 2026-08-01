@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Star } from 'lucide-vue-next'
+import { Star } from '@lucide/vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useI18n } from '@/composables/useI18n'
 import type { ReviewFlag } from '../../types'

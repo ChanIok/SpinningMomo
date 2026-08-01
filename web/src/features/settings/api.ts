@@ -110,8 +110,8 @@ export async function selectBackgroundImage(): Promise<string | null> {
 
     return null
   } catch (error) {
-    console.error('选择背景图片失败:', error)
-    throw new Error('选择背景图片失败')
+    console.error('Failed to select background image:', error)
+    throw error
   }
 }
 
@@ -131,8 +131,8 @@ export async function importBackgroundImage(sourcePath: string): Promise<string>
     console.log('背景图片已导入到托管目录:', result.imageFileName)
     return result.imageFileName
   } catch (error) {
-    console.error('导入背景图片失败:', error)
-    throw new Error('导入背景图片失败')
+    console.error('Failed to import background image:', error)
+    throw error
   }
 }
 
@@ -149,6 +149,6 @@ export async function removeBackgroundImageResource(imageFileName: string): Prom
       imageFileName,
     })
   } catch (error) {
-    console.warn('清理旧背景图片失败:', error)
+    console.warn('Failed to clean up old background image:', error)
   }
 }

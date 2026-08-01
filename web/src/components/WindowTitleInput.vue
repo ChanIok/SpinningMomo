@@ -2,7 +2,7 @@
 import type { CSSProperties, HTMLAttributes } from 'vue'
 import { computed, ref } from 'vue'
 import { useResizeObserver, useVModel } from '@vueuse/core'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown } from '@lucide/vue'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

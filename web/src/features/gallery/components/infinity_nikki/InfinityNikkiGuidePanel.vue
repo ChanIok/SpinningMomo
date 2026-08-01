@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { ScanText, FolderSymlink, Sparkles, ChevronRight } from 'lucide-vue-next'
+import { ScanText, FolderSymlink, Sparkles, ChevronRight } from '@lucide/vue'
 import zongziMomoSvg from '@/assets/zongzi-momo.svg?raw'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'

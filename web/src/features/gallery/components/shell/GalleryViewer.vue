@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
-import { LoaderCircle, Upload } from 'lucide-vue-next'
+import { LoaderCircle, Upload } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
 import {
   useGalleryAssetActions,

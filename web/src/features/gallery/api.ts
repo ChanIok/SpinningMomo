@@ -80,7 +80,7 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
     return transformedResult
   } catch (error) {
     console.error('Failed to get folder tree:', error)
-    throw new Error('获取文件夹树失败')
+    throw error
   }
 }
 
@@ -92,7 +92,7 @@ export async function createFolder(params: CreateFolderParams): Promise<Operatio
     return await call<OperationResult>('gallery.createFolder', params)
   } catch (error) {
     console.error('Failed to create folder:', error)
-    throw error instanceof Error ? error : new Error('创建文件夹失败')
+    throw error
   }
 }
 
@@ -107,7 +107,7 @@ export async function updateFolderDisplayName(
     return result
   } catch (error) {
     console.error('Failed to update folder display name:', error)
-    throw new Error('更新文件夹显示名称失败')
+    throw error
   }
 }
 
@@ -120,7 +120,7 @@ export async function openFolderInExplorer(folderId: number): Promise<OperationR
     return result
   } catch (error) {
     console.error('Failed to open folder in explorer:', error)
-    throw new Error('打开文件夹失败')
+    throw error
   }
 }
 
@@ -133,7 +133,7 @@ export async function removeFolderWatch(folderId: number): Promise<OperationResu
     return result
   } catch (error) {
     console.error('Failed to remove folder watch:', error)
-    throw new Error('移出监听失败')
+    throw error
   }
 }
 
@@ -156,7 +156,7 @@ export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsRe
     return result
   } catch (error) {
     console.error('Failed to scan assets:', error)
-    throw new Error('扫描资产目录失败')
+    throw error
   }
 }
 
@@ -174,7 +174,7 @@ export async function startScanAssets(params: ScanAssetsParams): Promise<StartSc
     return result
   } catch (error) {
     console.error('Failed to start scan task:', error)
-    throw new Error('提交扫描任务失败')
+    throw error
   }
 }
 
@@ -192,7 +192,7 @@ export async function cleanupThumbnails(): Promise<OperationResult> {
     return result
   } catch (error) {
     console.error('Failed to cleanup thumbnails:', error)
-    throw new Error('清理缩略图失败')
+    throw error
   }
 }
 
@@ -208,7 +208,7 @@ export async function getThumbnailStats(): Promise<string> {
     return result
   } catch (error) {
     console.error('Failed to get thumbnail stats:', error)
-    throw new Error('获取缩略图统计失败')
+    throw error
   }
 }
 
@@ -231,7 +231,7 @@ export async function openAssetDefault(assetId: number): Promise<OperationResult
     return result
   } catch (error) {
     console.error('Failed to open asset with default app:', error)
-    throw new Error('打开文件失败')
+    throw error
   }
 }
 
@@ -244,7 +244,7 @@ export async function revealAssetInExplorer(assetId: number): Promise<OperationR
     return result
   } catch (error) {
     console.error('Failed to reveal asset in explorer:', error)
-    throw new Error('在资源管理器中定位文件失败')
+    throw error
   }
 }
 
@@ -257,7 +257,7 @@ export async function copyAssetsToClipboard(assetIds: number[]): Promise<Operati
     return result
   } catch (error) {
     console.error('Failed to copy assets to clipboard:', error)
-    throw new Error('复制文件失败')
+    throw error
   }
 }
 
@@ -269,7 +269,7 @@ export async function pasteClipboardToFolder(folderId: number): Promise<Operatio
     return await call<OperationResult>('gallery.pasteClipboardToFolder', { folderId })
   } catch (error) {
     console.error('Failed to paste clipboard media:', error)
-    throw new Error('粘贴剪贴板内容失败')
+    throw error
   }
 }
 
@@ -287,7 +287,7 @@ export async function importDroppedFilesToFolder(
     )
   } catch (error) {
     console.error('Failed to import dropped media:', error)
-    throw new Error('拖拽导入文件失败')
+    throw error
   }
 }
 
@@ -300,7 +300,7 @@ export async function deleteAssets(params: DeleteAssetsParams): Promise<DeleteAs
     return result
   } catch (error) {
     console.error('Failed to delete assets:', error)
-    throw new Error('删除文件失败')
+    throw error
   }
 }
 
@@ -312,7 +312,7 @@ export async function moveAssetsToFolder(
     return result
   } catch (error) {
     console.error('Failed to move assets to folder:', error)
-    throw new Error('移动到文件夹失败')
+    throw error
   }
 }
 
@@ -322,7 +322,7 @@ export async function checkAssetReachable(assetId: number): Promise<AssetReachab
     return result
   } catch (error) {
     console.error('Failed to check asset reachability:', error)
-    throw new Error('检查资产可达性失败')
+    throw error
   }
 }
 
@@ -337,7 +337,7 @@ export async function updateAssetsReviewState(
     return result
   } catch (error) {
     console.error('Failed to update assets review state:', error)
-    throw new Error('更新审片状态失败')
+    throw error
   }
 }
 
@@ -353,7 +353,7 @@ export async function getTimelineBuckets(
     return result
   } catch (error) {
     console.error('Failed to get timeline buckets:', error)
-    throw new Error('获取时间线桶失败')
+    throw error
   }
 }
 
@@ -369,7 +369,7 @@ export async function getAssetsByMonth(
     return result
   } catch (error) {
     console.error('Failed to get assets by month:', error)
-    throw new Error('获取月份资产失败')
+    throw error
   }
 }
 
@@ -391,7 +391,7 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
     return result
   } catch (error) {
     console.error('Failed to query assets:', error)
-    throw new Error('查询资产失败')
+    throw error
   }
 }
 
@@ -413,7 +413,7 @@ export async function queryAssetLayoutMeta(
     return result
   } catch (error) {
     console.error('Failed to query asset layout meta:', error)
-    throw new Error('查询布局元数据失败')
+    throw error
   }
 }
 
@@ -429,7 +429,7 @@ export async function getAssetMainColors(assetId: number): Promise<AssetMainColo
     return result
   } catch (error) {
     console.error('Failed to get asset main colors:', error)
-    throw new Error('获取主色失败')
+    throw error
   }
 }
 
@@ -445,7 +445,7 @@ export async function getTagTree(): Promise<TagTreeNode[]> {
     return result
   } catch (error) {
     console.error('Failed to get tag tree:', error)
-    throw new Error('获取标签树失败')
+    throw error
   }
 }
 
@@ -461,7 +461,7 @@ export async function listTags(): Promise<Tag[]> {
     return result
   } catch (error) {
     console.error('Failed to list tags:', error)
-    throw new Error('获取标签列表失败')
+    throw error
   }
 }
 
@@ -479,7 +479,7 @@ export async function createTag(params: CreateTagParams): Promise<{ id: number }
     return { id: result }
   } catch (error) {
     console.error('Failed to create tag:', error)
-    throw new Error('创建标签失败')
+    throw error
   }
 }
 
@@ -497,7 +497,7 @@ export async function updateTag(params: UpdateTagParams): Promise<OperationResul
     return result
   } catch (error) {
     console.error('Failed to update tag:', error)
-    throw new Error('更新标签失败')
+    throw error
   }
 }
 
@@ -515,7 +515,7 @@ export async function deleteTag(tagId: number): Promise<OperationResult> {
     return result
   } catch (error) {
     console.error('Failed to delete tag:', error)
-    throw new Error('删除标签失败')
+    throw error
   }
 }
 
@@ -531,7 +531,7 @@ export async function getTagStats(): Promise<TagStats[]> {
     return result
   } catch (error) {
     console.error('Failed to get tag stats:', error)
-    throw new Error('获取标签统计失败')
+    throw error
   }
 }
 
@@ -545,7 +545,7 @@ export async function getHomeStats(): Promise<HomeStats> {
     return result
   } catch (error) {
     console.error('Failed to get home stats:', error)
-    throw new Error('获取首页统计失败')
+    throw error
   }
 }
 
@@ -558,7 +558,7 @@ export async function getBatchSelectionSummary(assetIds: number[]): Promise<Batc
     return result
   } catch (error) {
     console.error('Failed to get batch selection summary:', error)
-    throw new Error('获取批量选择摘要失败')
+    throw error
   }
 }
 
@@ -576,7 +576,7 @@ export async function addTagsToAsset(params: AddTagsToAssetParams): Promise<Oper
     return result
   } catch (error) {
     console.error('Failed to add tags to asset:', error)
-    throw new Error('添加标签失败')
+    throw error
   }
 }
 
@@ -594,7 +594,7 @@ export async function addTagToAssets(params: AddTagToAssetsParams): Promise<Oper
     return result
   } catch (error) {
     console.error('Failed to add tag to assets:', error)
-    throw new Error('批量添加标签失败')
+    throw error
   }
 }
 
@@ -611,7 +611,7 @@ export async function removeTagFromAssets(
     return result
   } catch (error) {
     console.error('Failed to remove tag from assets:', error)
-    throw new Error('批量移除标签失败')
+    throw error
   }
 }
 
@@ -631,7 +631,7 @@ export async function removeTagsFromAsset(
     return result
   } catch (error) {
     console.error('Failed to remove tags from asset:', error)
-    throw new Error('移除标签失败')
+    throw error
   }
 }
 
@@ -645,7 +645,7 @@ export async function getAssetTags(assetId: number): Promise<Tag[]> {
     return result
   } catch (error) {
     console.error('Failed to get asset tags:', error)
-    throw new Error('获取资产标签失败')
+    throw error
   }
 }
 
@@ -661,7 +661,7 @@ export async function updateAssetDescription(
     return result
   } catch (error) {
     console.error('Failed to update asset description:', error)
-    throw new Error('更新资产描述失败')
+    throw error
   }
 }
 
@@ -674,7 +674,7 @@ export async function updateAssetsDescription(
     return result
   } catch (error) {
     console.error('Failed to update assets description:', error)
-    throw new Error('批量更新资产描述失败')
+    throw error
   }
 }
 
@@ -688,7 +688,7 @@ export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<numb
     return result
   } catch (error) {
     console.error('Failed to get tags by asset ids:', error)
-    throw new Error('批量获取资产标签失败')
+    throw error
   }
 }
 

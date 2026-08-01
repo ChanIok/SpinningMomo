@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { Play } from 'lucide-vue-next'
+import { Play } from '@lucide/vue'
 import { galleryApi } from '../../api'
 import { useGalleryContextMenu, useGalleryData, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'

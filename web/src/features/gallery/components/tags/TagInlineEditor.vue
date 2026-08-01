@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { Folder, Tag } from 'lucide-vue-next'
+import { Folder, Tag } from '@lucide/vue'
 
 interface Props {
   initialValue?: string

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, ChevronRight } from 'lucide-vue-next'
+import { Check, ChevronRight } from '@lucide/vue'
 import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
 import zongziMomoSvg from '@/assets/zongzi-momo.svg?raw'
 import { Button } from '@/components/ui/button'

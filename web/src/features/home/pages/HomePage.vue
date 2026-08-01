@@ -2,7 +2,7 @@
 import type { Component } from 'vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Images, Info, Settings } from 'lucide-vue-next'
+import { Images, Info, Settings } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { useI18n } from '@/composables/useI18n'

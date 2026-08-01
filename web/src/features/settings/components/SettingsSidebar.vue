@@ -9,7 +9,7 @@ import {
   Menu,
   Palette,
   DatabaseBackup,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
 

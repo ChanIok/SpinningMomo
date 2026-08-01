@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Split } from '@/components/ui/split'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ListChevronsDownUp, Images, Plus, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { ListChevronsDownUp, Images, Plus, ChevronDown, ChevronRight } from '@lucide/vue'
 import {
   AlertDialog,
   AlertDialogAction,

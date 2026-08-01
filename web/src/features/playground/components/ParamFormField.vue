@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { InfoIcon } from 'lucide-vue-next'
+import { InfoIcon } from '@lucide/vue'
 import type { FormField } from '../types'
 
 interface Props {

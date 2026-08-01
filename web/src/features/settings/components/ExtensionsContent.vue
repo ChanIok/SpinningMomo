@@ -17,7 +17,7 @@ import { useToast } from '@/composables/useToast'
 import { detectInfinityNikkiGameDirectory, getFileInfo, selectDirectory } from '../api'
 import { useExtensionActions } from '../composables/useExtensionActions'
 import { useSettingsStore } from '../store'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()

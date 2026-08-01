@@ -25,7 +25,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Textarea } from '@/components/ui/textarea'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'

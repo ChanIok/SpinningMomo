@@ -30,7 +30,7 @@ import {
   Square,
   Trash2,
   X,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { backWithViewTransition } from '@/router/viewTransition'
 
 const route = useRoute()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClipboardPaste } from 'lucide-vue-next'
+import { ClipboardPaste } from '@lucide/vue'
 import { DropdownMenuItem, DropdownMenuShortcut } from '@/components/ui/dropdown-menu'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { useI18n } from '@/composables/useI18n'

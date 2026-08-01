@@ -2,7 +2,7 @@
 import type { DropdownMenuRadioItemEmits, DropdownMenuRadioItemProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
-import { Check } from 'lucide-vue-next'
+import { Check } from '@lucide/vue'
 import { DropdownMenuItemIndicator, DropdownMenuRadioItem, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ChevronDown, ChevronRight, Clipboard, Folder, Trash2 } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Clipboard, Folder, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {

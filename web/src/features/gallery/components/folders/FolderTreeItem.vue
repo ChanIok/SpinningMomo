@@ -9,7 +9,7 @@ import {
   FolderPlus,
   Pen,
   Trash2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,

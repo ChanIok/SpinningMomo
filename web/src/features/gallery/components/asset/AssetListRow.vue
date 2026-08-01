@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Play } from 'lucide-vue-next'
+import { Play } from '@lucide/vue'
 import { formatFileSize } from '@/lib/utils'
 import { useGalleryData } from '../../composables/useGalleryData'
 import type { Asset } from '../../types'

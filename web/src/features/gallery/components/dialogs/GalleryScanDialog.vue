@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronRight, Loader2, Plus, Trash2 } from 'lucide-vue-next'
+import { ChevronRight, Loader2, Plus, Trash2 } from '@lucide/vue'
 
 interface Props {
   open: boolean

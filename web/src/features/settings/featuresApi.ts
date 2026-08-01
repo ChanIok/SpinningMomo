@@ -10,7 +10,7 @@ export const featuresApi = {
   invoke: async (id: string): Promise<void> => {
     const result = await call<{ success: boolean; message: string }>('commands.invoke', { id })
     if (!result.success) {
-      throw new Error(result.message || `调用命令失败: ${id}`)
+      throw new Error(result.message || `Failed to invoke command: ${id}`)
     }
   },
 }

@@ -6,7 +6,7 @@
  * 展示星级评分、染色码标识、标签（Tag）以及弃用标记（Rejected Status）等状态角标。
  */
 import { computed } from 'vue'
-import { Paintbrush, Star, X } from 'lucide-vue-next'
+import { Paintbrush, Star, X } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
 import type { ReviewFlag, Tag } from '../../types'
 

@@ -36,7 +36,7 @@ export async function queryPhotoMapPoints(
     return result
   } catch (error) {
     console.error('Failed to query photo map points:', error)
-    throw new Error('查询地图点位失败')
+    throw error
   }
 }
 
@@ -55,7 +55,7 @@ export async function getInfinityNikkiMapConfig(): Promise<InfinityNikkiMapConfi
     })
     .catch((error) => {
       console.error('Failed to get Infinity Nikki map config:', error)
-      throw new Error('获取无限暖暖地图配置失败')
+      throw error
     })
     .finally(() => {
       mapConfigPromise = null
@@ -73,7 +73,7 @@ export async function getInfinityNikkiDetails(assetId: number): Promise<Infinity
     return result
   } catch (error) {
     console.error('Failed to get Infinity Nikki details:', error)
-    throw new Error('获取无限暖暖详情失败')
+    throw error
   }
 }
 
@@ -109,7 +109,7 @@ export async function setInfinityNikkiUserRecord(
     return result
   } catch (error) {
     console.error('Failed to set Infinity Nikki user record:', error)
-    throw new Error('更新无限暖暖玩家记录失败')
+    throw error
   }
 }
 
@@ -125,7 +125,7 @@ export async function previewInfinityNikkiSameOutfitDyeCodeFill(
     return result
   } catch (error) {
     console.error('Failed to preview Infinity Nikki same outfit and dye fill:', error)
-    throw new Error('获取无限暖暖相同穿搭与染色状态失败')
+    throw error
   }
 }
 
@@ -141,7 +141,7 @@ export async function fillInfinityNikkiSameOutfitDyeCode(
     return result
   } catch (error) {
     console.error('Failed to fill Infinity Nikki same outfit and dye records:', error)
-    throw new Error('填充无限暖暖相同穿搭与染色状态失败')
+    throw error
   }
 }
 
@@ -154,6 +154,6 @@ export async function setInfinityNikkiWorldRecord(
     return result
   } catch (error) {
     console.error('Failed to set Infinity Nikki world record:', error)
-    throw new Error('更新无限暖暖地图区域失败')
+    throw error
   }
 }

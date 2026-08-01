@@ -3,7 +3,7 @@ import { useSettingsStore } from '../store'
 import { useGeneralActions } from '../composables/useGeneralActions'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
-import { RotateCcw } from 'lucide-vue-next'
+import { RotateCcw } from '@lucide/vue'
 import {
   Item,
   ItemContent,
