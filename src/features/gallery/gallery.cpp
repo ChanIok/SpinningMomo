@@ -67,7 +67,7 @@ auto ensure_output_directory_media_source(core::AppState& app_state,
           }
         }
       },
-      asio::detached_t{});
+      core::async::log_completion("Gallery bootstrap scan"));
 }
 
 // ============= 初始化和清理 =============

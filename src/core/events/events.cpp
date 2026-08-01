@@ -6,6 +6,7 @@
 
 #include "core/events/state.hpp"
 #include "core/state/app_state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace core::events {
 
@@ -20,8 +21,10 @@ auto send_event(core::AppState& state, std::type_index key, const std::any& data
     for (const auto& handler : it->second) {
       try {
         handler(data);
-      } catch (const std::exception&) {
-        // 异常处理暂时省略，避免循环依赖
+      } catch (const std::exception& e) {
+        Logger().error("Event handler '{}' failed: {}", key.name(), e.what());
+      } catch (...) {
+        Logger().error("Event handler '{}' failed with unknown exception", key.name());
       }
     }
   }
@@ -78,8 +81,10 @@ auto process_events_executor(EventsState& bus) -> void {
       for (const auto& handler : it->second) {
         try {
           handler(event_data);
-        } catch (const std::exception&) {
-          // 异常处理暂时省略，避免循环依赖
+        } catch (const std::exception& e) {
+          Logger().error("Event handler '{}' failed: {}", type_index.name(), e.what());
+        } catch (...) {
+          Logger().error("Event handler '{}' failed with unknown exception", type_index.name());
         }
       }
     }

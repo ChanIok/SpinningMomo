@@ -588,7 +588,7 @@ auto start_download_update_task(core::AppState& app_state, bool prepare_install_
         co_await asio::post(asio::use_awaitable);
         co_await run_download_update_task(app_state, task_id, version, prepare_install_on_exit);
       },
-      asio::detached_t{});
+      core::async::log_completion("Update download task"));
 
   co_return StartDownloadUpdateResult{
       .task_id = task_id,
@@ -669,7 +669,7 @@ auto schedule_startup_auto_update_check(core::AppState& app_state) -> void {
         Logger().info("Startup auto update check completed: current version is up-to-date ({})",
                       check_result->current_version);
       },
-      asio::detached_t{});
+      core::async::log_completion("Startup update check"));
 }
 
 auto check_for_update(core::AppState& app_state)

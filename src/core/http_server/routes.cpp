@@ -113,7 +113,7 @@ auto register_routes(core::AppState& state, uWS::App& app) -> void {
                   });
                 }
               },
-              asio::detached_t{});
+              core::async::log_completion("HTTP RPC request"));
         });
       }
     });

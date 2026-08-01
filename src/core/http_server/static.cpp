@@ -612,7 +612,7 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
           });
         }
       },
-      asio::detached_t{});
+      core::async::log_completion("Static file request"));
 }
 
 // 处理静态文件请求

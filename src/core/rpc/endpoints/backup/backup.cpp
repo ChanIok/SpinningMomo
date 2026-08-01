@@ -53,7 +53,7 @@ auto handle_restore(core::AppState& app_state, const features::backup::RestorePa
           co_await timer.async_wait(asio::use_awaitable);
           core::events::post(app_state, ui::floating_window::events::ExitEvent{});
         },
-        asio::detached_t{});
+        core::async::log_completion("Backup restore exit request"));
   }
 
   co_return std::move(*result);

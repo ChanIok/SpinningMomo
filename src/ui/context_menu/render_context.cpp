@@ -11,67 +11,29 @@
 #include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
-#include "features/settings/state.hpp"
 #include "ui/context_menu/state.hpp"
 #include "ui/shared_render_resources/shared_render_resources.hpp"
 #include "ui/shared_render_resources/state.hpp"
+#include "ui/shared_theme/shared_theme.hpp"
 #include "utils/logger/logger.hpp"
 
 namespace ui::context_menu::render_context {
 
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
-auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
-  std::string color_str = hex_color;
-  if (color_str.starts_with("#")) {
-    color_str = color_str.substr(1);
-  }
-
-  float r = 0.0f;
-  float g = 0.0f;
-  float b = 0.0f;
-  float a = 1.0f;
-
-  if (color_str.length() == 8) {
-    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
-    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
-    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
-    a = std::stoi(color_str.substr(6, 2), nullptr, 16) / 255.0f;
-  } else if (color_str.length() >= 6) {
-    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
-    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
-    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
-  }
-
-  return D2D1::ColorF(r, g, b, a);
-}
-
-auto force_opaque_hex_color(std::string hex_color) -> std::string {
-  if (hex_color.empty()) {
-    return hex_color;
-  }
-
-  const bool has_hash = hex_color.starts_with("#");
-  std::string color = has_hash ? hex_color.substr(1) : hex_color;
-
-  if (color.length() >= 8) {
-    color = color.substr(0, 6) + "FF";
-  } else if (color.length() == 6) {
-    color += "FF";
-  }
-
-  return has_hash ? "#" + color : color;
-}
-
 auto shared_resources(core::AppState& state)
     -> ui::shared_render_resources::SharedRenderResourcesState& {
   return *state.shared_render_resources;
 }
 
-auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_color,
-                           wil::com_ptr<ID2D1SolidColorBrush>& brush) -> bool {
-  return target && SUCCEEDED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(hex_color),
-                                                           brush.put()));
+auto create_brush(ID2D1DeviceContext6* target, const D2D1_COLOR_F& color,
+                  wil::com_ptr<ID2D1SolidColorBrush>& brush) -> bool {
+  return target && SUCCEEDED(target->CreateSolidColorBrush(color, brush.put()));
+}
+
+auto force_opaque(D2D1_COLOR_F color) -> D2D1_COLOR_F {
+  color.a = 1.0f;
+  return color;
 }
 
 auto release_brushes(RenderResources& render_resources) -> void {
@@ -101,20 +63,17 @@ auto cleanup_surface(RenderResources& render_resources) -> void {
 }
 
 auto create_brushes_for_surface(core::AppState& state, RenderResources& render_resources) -> bool {
-  const auto& colors = state.settings->raw.ui.floating_window_colors;
-  return create_brush_from_hex(render_resources.device_context.get(),
-                               force_opaque_hex_color(colors.background),
-                               render_resources.background_brush) &&
-         create_brush_from_hex(render_resources.device_context.get(), colors.text,
-                               render_resources.text_brush) &&
-         create_brush_from_hex(render_resources.device_context.get(),
-                               force_opaque_hex_color(colors.separator),
-                               render_resources.separator_brush) &&
-         create_brush_from_hex(render_resources.device_context.get(),
-                               force_opaque_hex_color(colors.hover),
-                               render_resources.hover_brush) &&
-         create_brush_from_hex(render_resources.device_context.get(), colors.indicator,
-                               render_resources.indicator_brush);
+  const auto colors = ui::shared_theme::resolve_floating_window_theme_colors(state);
+  return create_brush(render_resources.device_context.get(), force_opaque(colors.background),
+                      render_resources.background_brush) &&
+         create_brush(render_resources.device_context.get(), colors.text,
+                      render_resources.text_brush) &&
+         create_brush(render_resources.device_context.get(), force_opaque(colors.separator),
+                      render_resources.separator_brush) &&
+         create_brush(render_resources.device_context.get(), force_opaque(colors.hover),
+                      render_resources.hover_brush) &&
+         create_brush(render_resources.device_context.get(), colors.indicator,
+                      render_resources.indicator_brush);
 }
 
 auto create_text_format(IDWriteFactory7* write_factory, float font_size)

@@ -77,7 +77,7 @@ auto launch_scan_directory_task(core::AppState& app_state,
         core::tasks::complete_task_success(app_state, task_id);
         core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
       },
-      asio::detached_t{});
+      core::async::log_completion("Gallery scan task"));
 }
 
 // ============= 扫描和索引 RPC 处理函数 =============

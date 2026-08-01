@@ -423,18 +423,23 @@ auto handle_nc_hit_test(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM 
 }
 
 auto handle_paint(core::AppState& state, HWND hwnd) -> LRESULT {
-  PAINTSTRUCT ps;
+  PAINTSTRUCT ps{};
   HDC hdc = BeginPaint(hwnd, &ps);
+  if (!hdc) {
+    return 0;
+  }
 
   // 获取窗口客户区大小
-  RECT rc;
+  RECT rc{};
   GetClientRect(hwnd, &rc);
 
   // 绘制标题栏背景
   RECT titleRect = {0, 0, rc.right, state.preview->dpi_sizes.title_height};
   HBRUSH titleBrush = CreateSolidBrush(RGB(240, 240, 240));
-  FillRect(hdc, &titleRect, titleBrush);
-  DeleteObject(titleBrush);
+  if (titleBrush) {
+    FillRect(hdc, &titleRect, titleBrush);
+    DeleteObject(titleBrush);
+  }
 
   // 绘制标题文本
   SetBkMode(hdc, TRANSPARENT);
@@ -442,20 +447,26 @@ auto handle_paint(core::AppState& state, HWND hwnd) -> LRESULT {
   HFONT hFont = CreateFont(-state.preview->dpi_sizes.font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE,
                            FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("Microsoft YaHei"));
-  HFONT oldFont = (HFONT)SelectObject(hdc, hFont);
-
   titleRect.left += state.preview->dpi_sizes.font_size;
-  DrawTextW(hdc, L"Preview", -1, &titleRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
-
-  SelectObject(hdc, oldFont);
-  DeleteObject(hFont);
+  if (hFont) {
+    auto oldFont = static_cast<HFONT>(SelectObject(hdc, hFont));
+    DrawTextW(hdc, L"Preview", -1, &titleRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+    if (oldFont) {
+      SelectObject(hdc, oldFont);
+    }
+    DeleteObject(hFont);
+  } else {
+    DrawTextW(hdc, L"Preview", -1, &titleRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+  }
 
   // 绘制分隔线
   RECT sepRect = {0, state.preview->dpi_sizes.title_height - 1, rc.right,
                   state.preview->dpi_sizes.title_height};
   HBRUSH sepBrush = CreateSolidBrush(RGB(229, 229, 229));
-  FillRect(hdc, &sepRect, sepBrush);
-  DeleteObject(sepBrush);
+  if (sepBrush) {
+    FillRect(hdc, &sepRect, sepBrush);
+    DeleteObject(sepBrush);
+  }
 
   EndPaint(hwnd, &ps);
   return 0;

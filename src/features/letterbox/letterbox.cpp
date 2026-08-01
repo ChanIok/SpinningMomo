@@ -161,9 +161,6 @@ auto initialize(core::AppState& state, HINSTANCE instance) -> std::expected<void
     return std::unexpected{"Letterbox already initialized"};
   }
 
-  // 设置全局状态指针
-  g_app_state = &state;
-
   letterbox.instance = instance;
 
   // 注册窗口类
@@ -286,9 +283,13 @@ auto event_thread_proc(core::AppState& state, std::stop_token stoken, const Lett
     GetWindowThreadProcessId(letterbox.target_window, &letterbox.target_process_id);
 
     // 设置窗口事件钩子
+    g_app_state = &state;
     letterbox.event_hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_DESTROY, NULL,
                                            win_event_proc, letterbox.target_process_id, 0,
                                            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    if (!letterbox.event_hook) {
+      g_app_state = nullptr;
+    }
   }
 
   // 消息循环
@@ -303,6 +304,7 @@ auto event_thread_proc(core::AppState& state, std::stop_token stoken, const Lett
     UnhookWinEvent(letterbox.event_hook);
     letterbox.event_hook = nullptr;
   }
+  g_app_state = nullptr;
 
   if (letterbox.message_window) {
     DestroyWindow(letterbox.message_window);
@@ -442,9 +444,6 @@ auto shutdown(core::AppState& state) -> std::expected<void, std::string> {
 
   // 注销窗口类
   UnregisterClass(L"LetterboxWindowClass", letterbox.instance);
-
-  // 清除全局状态指针
-  g_app_state = nullptr;
 
   letterbox.is_initialized = false;
 

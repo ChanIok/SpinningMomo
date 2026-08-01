@@ -113,11 +113,7 @@ auto ensure_path_exists(const std::filesystem::path& path)
 
 // 获取当前程序的完整路径
 auto utils::path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {
-  // 静态缓存，只在第一次调用时初始化
-  static std::optional<std::filesystem::path> cached_path;
-  static std::optional<std::string> cached_error;
-
-  if (!cached_path.has_value() && !cached_error.has_value()) {
+  static const auto cached_result = []() -> std::expected<std::filesystem::path, std::string> {
     try {
       std::vector<wchar_t> buffer(MAX_PATH);
 
@@ -125,32 +121,26 @@ auto utils::path::GetExecutablePath() -> std::expected<std::filesystem::path, st
         DWORD size = GetModuleFileNameW(NULL, buffer.data(), static_cast<DWORD>(buffer.size()));
 
         if (size == 0) {
-          cached_error = "Failed to get executable path, error: " + std::to_string(GetLastError());
-          break;
+          return std::unexpected("Failed to get executable path, error: " +
+                                 std::to_string(GetLastError()));
         }
 
         if (size < buffer.size()) {
-          cached_path = std::filesystem::path(buffer.data(), buffer.data() + size);
-          break;
+          return std::filesystem::path(buffer.data(), buffer.data() + size);
         }
 
         if (buffer.size() >= 32767) {
-          cached_error = "Path too long for GetModuleFileNameW";
-          break;
+          return std::unexpected("Path too long for GetModuleFileNameW");
         }
 
         buffer.resize(buffer.size() * 2);
       }
     } catch (const std::exception& e) {
-      cached_error = "Exception: " + std::string(e.what());
+      return std::unexpected("Exception: " + std::string(e.what()));
     }
-  }
+  }();
 
-  if (cached_path.has_value()) {
-    return cached_path.value();
-  } else {
-    return std::unexpected(cached_error.value());
-  }
+  return cached_result;
 }
 
 // 获取当前程序所在的目录路径

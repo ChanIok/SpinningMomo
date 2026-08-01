@@ -250,7 +250,7 @@ auto schedule_nickname_sync_for_created_folders(
           core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
         }
       },
-      asio::detached_t{});
+      core::async::log_completion("Infinity Nikki role profile sync"));
 }
 
 }  // namespace extensions::infinity_nikki::role_profile

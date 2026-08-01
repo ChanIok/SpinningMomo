@@ -4,6 +4,8 @@
 
 #include "vendor/windows.hpp"
 
+#include "core/async/async.hpp"
+
 namespace core::async {
 
 // 用于存储定时器 ID 到协程句柄的映射
@@ -59,7 +61,7 @@ struct ui_task {
     inline std::suspend_never final_suspend() noexcept { return {}; }    // 完成后不挂起
     inline void return_void() noexcept {}
     inline void unhandled_exception() noexcept {
-      // 可以在这里记录异常
+      core::async::log_exception("UI task", std::current_exception());
     }
   };
 };

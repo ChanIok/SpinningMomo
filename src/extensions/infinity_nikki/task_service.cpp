@@ -145,7 +145,7 @@ auto launch_initial_scan_task(
           post_scan_callback(result);
         }
       },
-      asio::detached_t{});
+      core::async::log_completion("Infinity Nikki gallery scan task"));
 }
 
 // 走 photo_extract::extract_photo_params；有进度回调写任务；成功发
@@ -225,7 +225,7 @@ auto launch_extract_photo_params_task(
 
         core::tasks::complete_task_success(app_state, task_id);
       },
-      asio::detached_t{});
+      core::async::log_completion("Infinity Nikki photo metadata extraction task"));
 }
 
 // 与 launch_extract_photo_params_task 共用同一套解析逻辑，但不绑定 task_id、无进度条；仅日志 +
@@ -292,7 +292,7 @@ auto schedule_silent_extract_photo_params(
 
         co_return;
       },
-      asio::detached_t{});
+      core::async::log_completion("Infinity Nikki incremental metadata extraction"));
 }
 
 // 全量建立/校正 Infinity Nikki 媒体硬链接；完成后可能把设置里 manage_media_hardlinks
@@ -393,7 +393,7 @@ auto launch_initialize_media_hardlinks_task(core::AppState& app_state, const std
 
         core::tasks::complete_task_success(app_state, task_id);
       },
-      asio::detached_t{});
+      core::async::log_completion("Infinity Nikki media hardlink initialization task"));
 }
 
 // ---------------------------------------------------------------------------

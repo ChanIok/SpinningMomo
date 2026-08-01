@@ -94,7 +94,7 @@ auto create_message_handler(core::AppState& state) -> std::function<void(const s
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },
-        asio::detached_t{});
+        core::async::log_completion("WebView RPC request"));
   };
 }
 

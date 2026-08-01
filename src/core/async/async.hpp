@@ -20,4 +20,13 @@ auto is_running(const core::AppState& state) -> bool;
 // 获取io_context用于提交任务
 auto get_io_context(core::AppState& state) -> asio::io_context*;
 
+// 记录 fire-and-forget 协程的未处理异常。
+auto log_exception(std::string_view operation, std::exception_ptr error) noexcept -> void;
+
+inline auto log_completion(std::string operation) {
+  return [operation = std::move(operation)](std::exception_ptr error) {
+    log_exception(operation, error);
+  };
+}
+
 }  // namespace core::async

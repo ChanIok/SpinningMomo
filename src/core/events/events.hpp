@@ -40,11 +40,7 @@ inline auto subscribe(core::AppState& state, std::move_only_function<void(const 
 
   subscribe_event(state, std::type_index(typeid(T)),
                   [handler = std::move(handler)](const std::any& data) {
-                    try {
-                      handler(std::any_cast<const T&>(data));
-                    } catch (const std::bad_any_cast&) {
-                      // 注册键与载荷类型不一致时忽略该处理器，避免影响同批事件
-                    }
+                    handler(std::any_cast<const T&>(data));
                   });
 }
 

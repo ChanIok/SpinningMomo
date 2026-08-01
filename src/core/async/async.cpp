@@ -10,6 +10,28 @@
 
 namespace core::async {
 
+auto log_exception(std::string_view operation, std::exception_ptr error) noexcept -> void {
+  if (!error) {
+    return;
+  }
+
+  try {
+    std::rethrow_exception(error);
+  } catch (const std::exception& e) {
+    try {
+      Logger().error("{} failed with unhandled exception: {}", operation, e.what());
+    } catch (...) {
+      // completion handler 不能再次抛出；日志系统不可用时只能放弃记录。
+    }
+  } catch (...) {
+    try {
+      Logger().error("{} failed with unknown exception", operation);
+    } catch (...) {
+      // completion handler 不能再次抛出；日志系统不可用时只能放弃记录。
+    }
+  }
+}
+
 auto start(core::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
   if (!state.async) {
     return std::unexpected("AsyncState is not initialized");
