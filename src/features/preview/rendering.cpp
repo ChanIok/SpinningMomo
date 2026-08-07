@@ -134,6 +134,16 @@ auto resize_rendering(core::AppState& state, int width, int height)
   return {};
 }
 
+auto release_capture_surface(core::AppState& state) -> void {
+  auto& resources = state.preview->rendering_resources;
+  if (auto* context = resources.d3d_context.context.get()) {
+    ID3D11ShaderResourceView* null_srv = nullptr;
+    context->PSSetShaderResources(0, 1, &null_srv);
+    context->Flush();
+  }
+  resources.capture_srv.reset();
+}
+
 auto update_capture_srv(core::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
   if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire) || !texture) {

@@ -111,11 +111,23 @@ struct RenderingResources {
   wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
 };
 
+struct CaptureExtent {
+  int width = 0;
+  int height = 0;
+
+  auto operator==(const CaptureExtent&) const -> bool = default;
+};
+
 // 捕获会话（业务层封装）
 struct CaptureState {
   utils::graphics::capture::CaptureSession session;
   std::atomic<int> last_frame_width = 0;
   std::atomic<int> last_frame_height = 0;
+  // resize_pending 表示窗口线程已拥有或即将拥有一次捕获尺寸切换事务。
+  // pending_extent 与事务权的更新由 pending_extent_mutex 串行化，避免遗漏最新尺寸。
+  std::atomic<bool> resize_pending = false;
+  std::mutex pending_extent_mutex;
+  CaptureExtent pending_extent;
 };
 
 }  // namespace features::preview

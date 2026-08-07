@@ -378,10 +378,18 @@ auto handle_size(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     return 0;
   }
 
+  if (wParam == SIZE_MINIMIZED) {
+    return 0;
+  }
+
   RECT clientRect;
   GetClientRect(hwnd, &clientRect);
   int width = clientRect.right - clientRect.left;
   int height = clientRect.bottom - clientRect.top;
+
+  if (width <= 0 || height <= 0) {
+    return 0;
+  }
 
   // 更新理想尺寸
   state.preview->size.ideal_size = std::max(width, height);
@@ -513,27 +521,68 @@ auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPAR
       Logger().info("Preview resources cleaned up");
       return {true, 1};
 
-    case features::preview::WM_APPLY_CAPTURE_SIZE:
-      if (auto recreate_result = utils::graphics::capture::recreate_frame_pool(
-              state.preview->capture_state.session, static_cast<int>(wParam),
-              static_cast<int>(lParam));
-          !recreate_result) {
-        Logger().error("{}", recreate_result.error());
-        state.preview->running.store(false, std::memory_order_release);
-        features::preview::window::hide_preview_window(state);
-        features::preview::capture::cleanup_capture(state);
-        features::preview::rendering::cleanup_rendering(state);
+    case features::preview::WM_APPLY_CAPTURE_SIZE: {
+      auto& preview_state = *state.preview;
+      auto& capture_state = preview_state.capture_state;
+
+      if (!preview_state.running.load(std::memory_order_acquire)) {
+        const std::scoped_lock lock(capture_state.pending_extent_mutex);
+        capture_state.resize_pending.store(false, std::memory_order_release);
         return {true, 0};
       }
 
-      state.preview->capture_state.last_frame_width.store(static_cast<int>(wParam),
-                                                          std::memory_order_release);
-      state.preview->capture_state.last_frame_height.store(static_cast<int>(lParam),
-                                                           std::memory_order_release);
-      state.preview->create_new_srv.store(true, std::memory_order_release);
-      features::preview::window::set_preview_window_size(state, static_cast<int>(wParam),
-                                                         static_cast<int>(lParam));
-      return {true, 0};
+      // 旧会话可能残留一条已排队消息；没有在途事务时无需触碰当前帧池。
+      if (!capture_state.resize_pending.load(std::memory_order_acquire)) {
+        return {true, 0};
+      }
+
+      for (;;) {
+        features::preview::CaptureExtent requested_extent;
+        {
+          const std::scoped_lock lock(capture_state.pending_extent_mutex);
+          requested_extent = capture_state.pending_extent;
+        }
+        const int capture_width = requested_extent.width;
+        const int capture_height = requested_extent.height;
+
+        Logger().debug("Applying preview capture resize: {}x{}", capture_width, capture_height);
+
+        // 丢弃对旧帧池 surface 的长期引用，再重建帧池。
+        features::preview::rendering::release_capture_surface(state);
+        if (auto recreate_result = utils::graphics::capture::recreate_frame_pool(
+                capture_state.session, capture_width, capture_height);
+            !recreate_result) {
+          Logger().error("{}", recreate_result.error());
+          preview_state.running.store(false, std::memory_order_release);
+          {
+            const std::scoped_lock lock(capture_state.pending_extent_mutex);
+            capture_state.resize_pending.store(false, std::memory_order_release);
+          }
+          features::preview::window::hide_preview_window(state);
+          features::preview::capture::cleanup_capture(state);
+          features::preview::rendering::cleanup_rendering(state);
+          return {true, 0};
+        }
+
+        capture_state.last_frame_width.store(capture_width, std::memory_order_release);
+        capture_state.last_frame_height.store(capture_height, std::memory_order_release);
+        preview_state.create_new_srv.store(true, std::memory_order_release);
+
+        // SetWindowPos 同步触发的 WM_SIZE 会在返回前完成交换链调整；事务标记在此期间保持。
+        features::preview::window::set_preview_window_size(state, capture_width, capture_height);
+        Logger().debug("Preview capture resize applied: {}x{}", capture_width, capture_height);
+
+        {
+          const std::scoped_lock lock(capture_state.pending_extent_mutex);
+          if (capture_state.pending_extent == requested_extent) {
+            capture_state.resize_pending.store(false, std::memory_order_release);
+            return {true, 0};
+          }
+        }
+
+        // 回调在重建期间提交了更新的尺寸，当前 UI 消息直接继续消费。
+      }
+    }
 
     case WM_PAINT:
       return {true, handle_paint(state, hwnd)};

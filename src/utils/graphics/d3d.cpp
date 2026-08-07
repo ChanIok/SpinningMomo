@@ -372,7 +372,15 @@ auto create_alpha_blend_state(ID3D11Device* device)
 
 auto resize_swap_chain(D3DContext& context, int width, int height)
     -> std::expected<void, std::string> {
-  // 释放渲染目标
+  if (width <= 0 || height <= 0) {
+    return std::unexpected(std::format("Invalid swap chain extent: {}x{}", width, height));
+  }
+
+  // ResizeBuffers 要求释放后缓冲的直接和间接引用。
+  if (context.context) {
+    context.context->ClearState();
+    context.context->Flush();
+  }
   context.render_target.reset();
 
   // 调整交换链大小
@@ -380,13 +388,23 @@ auto resize_swap_chain(D3DContext& context, int width, int height)
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to resize swap chain, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
+
+    // ResizeBuffers 失败时旧后缓冲通常仍然有效，尽力恢复 RTV，避免留下运行中但无法绘制的状态。
+    if (auto recovery_result = create_render_target(context); !recovery_result) {
+      error_msg += "; failed to restore render target: " + recovery_result.error();
+    }
+
     Logger().error(error_msg);
     return std::unexpected(error_msg);
   }
 
   if (auto color_space_result = configure_swap_chain_color_space(context); !color_space_result) {
-    Logger().error("{}", color_space_result.error());
-    return std::unexpected(color_space_result.error());
+    auto error_msg = color_space_result.error();
+    if (auto recovery_result = create_render_target(context); !recovery_result) {
+      error_msg += "; failed to restore render target: " + recovery_result.error();
+    }
+    Logger().error("{}", error_msg);
+    return std::unexpected(error_msg);
   }
 
   // 重新创建渲染目标

@@ -5,6 +5,7 @@
 #include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 #include "vendor/windows/d3d11.hpp"
+#include "vendor/windows/winrt/windows_foundation.hpp"
 
 #include "core/state/app_state.hpp"
 #include "core/state/runtime_info.hpp"
@@ -25,19 +26,47 @@ auto on_frame_arrived(core::AppState& state, utils::graphics::capture::Direct3D1
 
   // 检查帧大小是否发生变化
   auto content_size = frame.ContentSize();
-  const auto last_width =
-      state.preview->capture_state.last_frame_width.load(std::memory_order_acquire);
-  const auto last_height =
-      state.preview->capture_state.last_frame_height.load(std::memory_order_acquire);
+  auto& capture_state = state.preview->capture_state;
+
+  // 先获取事务标记，再读取 applied size。UI 线程以 release 清除标记，
+  // 这里的 acquire 保证随后能观察到同一事务写入的完整尺寸。
+  const bool resize_in_progress = capture_state.resize_pending.load(std::memory_order_acquire);
+  const auto last_width = capture_state.last_frame_width.load(std::memory_order_acquire);
+  const auto last_height = capture_state.last_frame_height.load(std::memory_order_acquire);
 
   bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
 
-  if (size_changed) {
-    // 捕获回调线程只负责发现尺寸变化；帧池重建与窗口尺寸应用统一收口到窗口线程。
-    if (!PostMessageW(state.preview->hwnd, features::preview::WM_APPLY_CAPTURE_SIZE,
-                      static_cast<WPARAM>(content_size.Width),
-                      static_cast<LPARAM>(content_size.Height))) {
+  // 捕获尺寸切换期间不再使用旧帧参与渲染。发现新尺寸时，
+  // 在同一个锁区间内更新尺寸并取得消息投递权。
+  if (resize_in_progress || size_changed) {
+    bool should_post = false;
+    if (size_changed) {
+      const std::scoped_lock lock(capture_state.pending_extent_mutex);
+      capture_state.pending_extent = {content_size.Width, content_size.Height};
+      should_post = !capture_state.resize_pending.exchange(true, std::memory_order_acq_rel);
+    }
+
+    try {
+      // Recreate 前先把这张帧归还帧池，避免 UI 线程消费消息时仍有借出帧。
+      frame.Close();
+    } catch (const winrt::hresult_error& error) {
+      Logger().warn("Failed to close preview frame before resize: {}",
+                    winrt::to_string(error.message()));
+      if (should_post) {
+        const std::scoped_lock lock(capture_state.pending_extent_mutex);
+        capture_state.resize_pending.store(false, std::memory_order_release);
+      }
+      return;
+    }
+
+    if (should_post &&
+        !PostMessageW(state.preview->hwnd, features::preview::WM_APPLY_CAPTURE_SIZE, 0, 0)) {
       Logger().warn("Failed to post preview capture size update message");
+      const std::scoped_lock lock(capture_state.pending_extent_mutex);
+      capture_state.resize_pending.store(false, std::memory_order_release);
+    } else if (should_post) {
+      Logger().debug("Preview capture resize requested: {}x{}", content_size.Width,
+                     content_size.Height);
     }
 
     return;
@@ -103,6 +132,11 @@ auto initialize_capture(core::AppState& state, HWND target_window, int width, in
   state.preview->capture_state.session = std::move(session_result.value());
   state.preview->capture_state.last_frame_width.store(width, std::memory_order_release);
   state.preview->capture_state.last_frame_height.store(height, std::memory_order_release);
+  {
+    const std::scoped_lock lock(state.preview->capture_state.pending_extent_mutex);
+    state.preview->capture_state.pending_extent = {width, height};
+    state.preview->capture_state.resize_pending.store(false, std::memory_order_release);
+  }
 
   Logger().info("Capture system initialized successfully");
   return {};
@@ -124,6 +158,10 @@ auto start_capture(core::AppState& state) -> std::expected<void, std::string> {
 auto stop_capture(core::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
+  {
+    const std::scoped_lock lock(state.preview->capture_state.pending_extent_mutex);
+    state.preview->capture_state.resize_pending.store(false, std::memory_order_release);
+  }
   utils::graphics::capture::stop_capture(session);
   Logger().debug("Capture stopped");
 }
