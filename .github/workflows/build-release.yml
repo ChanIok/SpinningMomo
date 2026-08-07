@@ -1,10 +1,9 @@
 # Build and Release workflow
-# Builds pull requests and manually builds release artifacts, optionally publishing an existing tag.
+# Manually builds release artifacts, optionally publishing an existing tag.
 
 name: Build Release
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       publish_release:

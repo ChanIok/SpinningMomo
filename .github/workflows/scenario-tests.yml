@@ -10,6 +10,11 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'scripts/**'
+      - 'web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'web/package.json'
+      - 'web/package-lock.json'
       - 'xmake.lua'
       - 'xmake-requires.lock'
       - 'version.json'
@@ -41,6 +46,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
 
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
@@ -49,6 +58,11 @@ jobs:
 
       - name: Patch xmake #7554
         run: node scripts/patch-xmake-7554.js
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix web
 
       - name: Cache xmake/vcpkg dependencies
         id: cache_xmake_vcpkg
@@ -74,6 +88,9 @@ jobs:
 
       - name: Build SpinningMomo (Release)
         run: xmake build -y
+
+      - name: Build Web frontend
+        run: npm run build:web
 
       - name: Run C++ unit tests
         run: xmake test -y
