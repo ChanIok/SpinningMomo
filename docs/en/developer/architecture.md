@@ -18,7 +18,7 @@ The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development
 | **Visual Studio 2026 / LLVM** | Includes C++ and Clang (`clang-cl`) toolchains | |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
-| **xmake** | Latest | C++ build system |
+| **xmake** | 3.1.0 | C++ build system |
 | **Node.js** | v20+ | Web frontend build and npm scripts |
 
 ### Install xmake
@@ -63,7 +63,6 @@ npm ci --prefix web
 ### 3. Initialize xmake dependencies and apply patches
 
 ```bash
-node scripts/patch-xmake-7554.js
 node scripts/patch-xmake-clang-cl-cxx23.js
 
 # Clang-cl + LLD (default)

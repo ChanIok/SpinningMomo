@@ -49,9 +49,6 @@ jobs:
         with:
           xmake-version: latest
 
-      - name: Patch xmake #7554
-        run: node scripts/patch-xmake-7554.js
-
       - name: Cache xmake/vcpkg dependencies
         id: cache_xmake_vcpkg
         uses: actions/cache@v4

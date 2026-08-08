@@ -56,9 +56,6 @@ jobs:
         with:
           xmake-version: latest
 
-      - name: Patch xmake #7554
-        run: node scripts/patch-xmake-7554.js
-
       - name: Install dependencies
         run: |
           npm ci

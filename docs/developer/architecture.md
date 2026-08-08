@@ -24,7 +24,7 @@ C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）进行日常开发，正
 | **Visual Studio 2026 / Build Tools** | 安装「使用 C++ 的桌面开发」及 C++ Clang 工具 | Visual Studio IDE 可选 |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
-| **xmake** | 3.0.9+ | C++ 构建系统 |
+| **xmake** | 3.1.0 | C++ 构建系统 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
 
 ### 安装 xmake
@@ -69,7 +69,6 @@ npm ci --prefix web
 ### 3. 初始化 xmake 依赖并应用补丁
 
 ```bash
-node scripts/patch-xmake-7554.js
 node scripts/patch-xmake-clang-cl-cxx23.js
 
 # Clang-cl + LLD（默认）
