@@ -4,6 +4,6 @@
 
 namespace core::version {
 
-inline auto get_app_version() -> std::string { return "2.1.4.0"; }
+inline auto get_app_version() -> std::string { return "2.1.5.0"; }
 
 }  // namespace core::version
