@@ -48,7 +48,7 @@ export const JsonRpcErrorCode = {
   INVALID_PARAMS: -32602,
   INTERNAL_ERROR: -32603,
   TIMEOUT: -32001,
-  WEBVIEW_NOT_AVAILABLE: -32002,
+  TRANSPORT_UNAVAILABLE: -32002,
 } as const
 
 export type JsonRpcErrorCode = (typeof JsonRpcErrorCode)[keyof typeof JsonRpcErrorCode]

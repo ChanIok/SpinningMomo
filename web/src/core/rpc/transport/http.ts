@@ -44,12 +44,6 @@ export function createHttpTransport(): TransportMethods {
 
       eventSource.onerror = (error) => {
         console.error('SSE connection error:', error)
-        // 自动重连逻辑
-        setTimeout(() => {
-          if (eventSource?.readyState === EventSource.CLOSED) {
-            connectEventSource()
-          }
-        }, 5000)
       }
 
       eventSource.onopen = () => {
@@ -92,7 +86,7 @@ export function createHttpTransport(): TransportMethods {
     call: async <T>(method: string, params?: unknown, timeout = 10000): Promise<T> => {
       return new Promise((resolve, reject) => {
         if (!isHttpAvailable()) {
-          reject(new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'HTTP not available'))
+          reject(new JsonRpcError(JsonRpcErrorCode.TRANSPORT_UNAVAILABLE, 'HTTP not available'))
           return
         }
 
@@ -156,18 +150,34 @@ export function createHttpTransport(): TransportMethods {
 
             if (isDebugMode) console.log('[HTTP RPC]', 'RPC response:', method, responseJson)
           })
-          .catch((error) => {
+          .catch((error: unknown) => {
             if (timeoutHandle) clearTimeout(timeoutHandle)
 
-            if (error.name === 'AbortError') {
+            if (error instanceof Error && error.name === 'AbortError') {
               // 超时已经处理过了，不需要再次 reject
               return
             }
 
+            if (error instanceof JsonRpcError) {
+              reject(error)
+              return
+            }
+
+            if (error instanceof SyntaxError) {
+              reject(
+                new JsonRpcError(JsonRpcErrorCode.PARSE_ERROR, 'Failed to parse RPC response', {
+                  method,
+                  originalError: error,
+                })
+              )
+              return
+            }
+
+            const errorMessage = error instanceof Error ? error.message : String(error)
             reject(
               new JsonRpcError(
-                JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
-                `Network error: ${error.message}`,
+                JsonRpcErrorCode.TRANSPORT_UNAVAILABLE,
+                `Network error: ${errorMessage}`,
                 { method, originalError: error }
               )
             )
@@ -179,7 +189,7 @@ export function createHttpTransport(): TransportMethods {
 
     callWithAdditionalObjects: async <T>(): Promise<T> => {
       throw new JsonRpcError(
-        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+        JsonRpcErrorCode.TRANSPORT_UNAVAILABLE,
         'Additional WebView objects are unavailable over HTTP'
       )
     },
@@ -214,7 +224,7 @@ export function createHttpTransport(): TransportMethods {
       }
 
       if (!isHttpAvailable()) {
-        throw new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'HTTP not available')
+        throw new JsonRpcError(JsonRpcErrorCode.TRANSPORT_UNAVAILABLE, 'HTTP not available')
       }
 
       isInitialized = true

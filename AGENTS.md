@@ -62,7 +62,8 @@ External angle-bracket includes are allowed only inside `src/vendor/`. Windows S
 The C++ backend does **NOT** use OOP class hierarchies. Instead it follows:
 - **POD Structs + Free Functions**: plain data structs with free functions operating on them.
 - **Centralized State**: all state lives in `AppState`, passed by reference.
-- **Feature Independence**: features depend on `core::*` but must NOT depend on each other.
+- **Usecase Orchestration**: `usecase.hpp/.cpp` is the top-level orchestration layer for a feature. It may coordinate calls across modules and features, including `core::*`, UI, and extensions.
+- **Workflow Ownership**: other modules may depend on and reuse public capabilities as needed, but cross-module workflow orchestration belongs in the usecase layer.
 
 ### Central AppState
 `core::AppState` is the single root state object. It owns all subsystem states as `std::unique_ptr` members. Functions are free functions that accept `AppState&`.

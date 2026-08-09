@@ -29,7 +29,7 @@ export function createWebViewTransport(): TransportMethods {
     } else if (isDebugMode) {
       console.log('[WebView RPC]', 'Mock message (WebView2 not available):', message)
     } else {
-      throw new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'WebView2 not available')
+      throw new JsonRpcError(JsonRpcErrorCode.TRANSPORT_UNAVAILABLE, 'WebView2 not available')
     }
   }
 
@@ -41,7 +41,7 @@ export function createWebViewTransport(): TransportMethods {
     const webview = window.chrome?.webview
     if (!webview?.postMessageWithAdditionalObjects) {
       throw new JsonRpcError(
-        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+        JsonRpcErrorCode.TRANSPORT_UNAVAILABLE,
         'WebView2 additional objects are not available'
       )
     }
@@ -129,7 +129,7 @@ export function createWebViewTransport(): TransportMethods {
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       if (!isWebViewAvailable()) {
-        reject(new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'WebView2 not available'))
+        reject(new JsonRpcError(JsonRpcErrorCode.TRANSPORT_UNAVAILABLE, 'WebView2 not available'))
         return
       }
 

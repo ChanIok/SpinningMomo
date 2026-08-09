@@ -78,9 +78,17 @@ auto start(core::AppState& state, size_t thread_count) -> std::expected<void, st
     return {};
 
   } catch (const std::exception& e) {
-    // 启动失败，恢复状态
-    pool.is_running = false;
+    // 部分线程可能已经启动；唤醒并等待它们退出后再恢复为空闲状态。
+    pool.shutdown_requested = true;
+    pool.condition.notify_all();
     pool.worker_threads.clear();
+    {
+      std::lock_guard<std::mutex> lock(pool.queue_mutex);
+      std::queue<std::move_only_function<void()>> empty;
+      pool.task_queue.swap(empty);
+    }
+    pool.shutdown_requested = false;
+    pool.is_running = false;
 
     auto error_msg = std::format("Failed to start WorkerPool: {}", e.what());
     Logger().error(error_msg);
@@ -100,8 +108,11 @@ auto stop(core::AppState& state) -> void {
   Logger().info("Stopping WorkerPool");
 
   try {
-    // 标记关闭请求
-    pool.shutdown_requested = true;
+    // 与任务提交使用同一把锁，确保关闭开始后不会再有任务成功入队。
+    {
+      std::lock_guard<std::mutex> lock(pool.queue_mutex);
+      pool.shutdown_requested = true;
+    }
 
     // 唤醒所有工作线程
     pool.condition.notify_all();
@@ -143,17 +154,12 @@ auto submit_task(core::AppState& state, std::move_only_function<void()> task) ->
     return false;
   }
   auto& pool = *state.worker_pool;
-  if (!pool.is_running.load()) {
-    return false;  // 线程池未运行
-  }
-
-  if (pool.shutdown_requested.load()) {
-    return false;  // 正在关闭，不接受新任务
-  }
-
   try {
     {
       std::lock_guard<std::mutex> lock(pool.queue_mutex);
+      if (!pool.is_running.load() || pool.shutdown_requested.load()) {
+        return false;
+      }
       pool.task_queue.push(std::move(task));
     }
     pool.condition.notify_one();

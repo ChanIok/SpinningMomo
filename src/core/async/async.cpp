@@ -75,10 +75,16 @@ auto start(core::AppState& state, size_t thread_count) -> std::expected<void, st
     return {};
 
   } catch (const std::exception& e) {
-    // 启动失败，恢复状态
-    runtime.is_running = false;
-    runtime.io_context.reset();
+    // 部分线程可能已经启动；先停止并等待线程退出，再销毁它们访问的 io_context。
+    runtime.shutdown_requested = true;
+    if (runtime.io_context) {
+      runtime.io_context->stop();
+    }
     runtime.worker_threads.clear();
+    runtime.io_context.reset();
+    runtime.thread_count = 0;
+    runtime.shutdown_requested = false;
+    runtime.is_running = false;
 
     auto error_msg = std::format("Failed to start AsyncRuntime: {}", e.what());
     Logger().error(error_msg);

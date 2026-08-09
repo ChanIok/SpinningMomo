@@ -17,7 +17,7 @@ auto now_millis() -> std::int64_t {
       .count();
 }
 
-auto is_task_active(const std::string& status) -> bool {
+auto is_task_active(std::string_view status) -> bool {
   return status == "queued" || status == "running";
 }
 
@@ -113,6 +113,13 @@ auto mark_task_running(core::AppState& state, const std::string& task_id) -> boo
     }
 
     auto& task = it->second;
+    if (task.status == "running") {
+      return true;
+    }
+    if (task.status != "queued") {
+      return false;
+    }
+
     task.status = "running";
     task.started_at = now_millis();
     task.finished_at.reset();
@@ -139,7 +146,7 @@ auto update_task_progress(core::AppState& state, const std::string& task_id,
     }
 
     auto& task = it->second;
-    if (task.status == "succeeded" || task.status == "failed" || task.status == "cancelled") {
+    if (!is_task_active(task.status)) {
       return false;
     }
 
@@ -170,6 +177,10 @@ auto complete_task_success(core::AppState& state, const std::string& task_id) ->
     }
 
     auto& task = it->second;
+    if (!is_task_active(task.status)) {
+      return false;
+    }
+
     task.status = "succeeded";
     if (!task.started_at.has_value()) {
       task.started_at = task.created_at;
@@ -202,6 +213,10 @@ auto complete_task_failed(core::AppState& state, const std::string& task_id,
     }
 
     auto& task = it->second;
+    if (!is_task_active(task.status)) {
+      return false;
+    }
+
     task.status = "failed";
     if (!task.started_at.has_value()) {
       task.started_at = task.created_at;
