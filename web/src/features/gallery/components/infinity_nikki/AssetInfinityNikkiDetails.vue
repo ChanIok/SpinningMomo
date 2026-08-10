@@ -561,15 +561,13 @@ watch(
 
     <div class="space-y-2 text-xs">
       <div class="flex items-center justify-between gap-2">
-        <span class="min-w-0 text-muted-foreground">{{
-          t('gallery.details.infinityNikki.codeType.dye')
-        }}</span>
+        <span class="min-w-0">{{ t('gallery.details.infinityNikki.codeType.dye') }}</span>
 
         <div class="flex max-w-42 min-w-0 flex-1 items-center gap-2">
           <Input
             v-model="codeValueDraft"
             :disabled="isSavingUserRecord"
-            class="h-6 min-w-0 flex-1 px-2 text-xs md:text-xs"
+            class="h-6 min-w-0 flex-1 rounded-sm px-2 text-xs md:text-xs"
             @blur="handleUserRecordCommit"
             @keydown.enter.prevent="handleUserRecordCommit"
             @keydown.esc.prevent="resetUserRecordDraft"
@@ -617,14 +615,14 @@ watch(
 
       <template v-if="extracted">
         <div v-if="formatGameTime(extracted)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.gameTime')
           }}</span>
           <span class="font-mono">{{ formatGameTime(extracted) }}</span>
         </div>
 
         <div v-if="extracted.cameraParams" class="flex items-center justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.cameraParams')
           }}</span>
           <Button
@@ -641,20 +639,20 @@ watch(
           v-if="formatFocalLength(extracted.cameraFocalLength)"
           class="flex justify-between gap-2"
         >
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.cameraFocalLength')
           }}</span>
           <span class="font-mono">{{ formatFocalLength(extracted.cameraFocalLength) }}</span>
         </div>
         <div v-if="formatApertureValue(extracted.apertureValue)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.apertureValue')
           }}</span>
           <span class="font-mono">{{ formatApertureValue(extracted.apertureValue) }}</span>
         </div>
 
         <div v-if="formatSignedNumber(extracted.rotation, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.rotation')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.rotation, 2) }}</span>
@@ -663,13 +661,13 @@ watch(
           v-if="formatPercentage(extracted.vignetteIntensity)"
           class="flex justify-between gap-2"
         >
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.vignetteIntensity')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.vignetteIntensity) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.bloomIntensity)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.bloomIntensity')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.bloomIntensity) }}</span>
@@ -678,55 +676,55 @@ watch(
           v-if="formatSignedNumber(extracted.bloomThreshold, 2)"
           class="flex justify-between gap-2"
         >
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.bloomThreshold')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.bloomThreshold, 2) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.brightness)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.brightness')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.brightness) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.exposure, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.exposure')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.exposure, 2) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.contrast)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.contrast')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.contrast) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.saturation, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.saturation')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.saturation, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.vibrance, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.vibrance')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.vibrance, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.highlights, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.highlights')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.highlights, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.shadow, 2)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.shadow')
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.shadow, 2) }}</span>
         </div>
         <div v-if="formatPoseId(extracted.poseId)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.poseId')
           }}</span>
           <span
@@ -738,7 +736,7 @@ watch(
           </span>
         </div>
         <div v-if="formatMetadataId(extracted.lightId)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.lightId')
           }}</span>
           <span
@@ -754,18 +752,16 @@ watch(
           </span>
         </div>
         <div v-if="formatPercentage(extracted.lightStrength)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.lightStrength')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.lightStrength) }}</span>
         </div>
 
         <div v-if="currentWorldLabel" class="flex items-center justify-between gap-2">
-          <span
-            class="shrink-0 whitespace-nowrap text-muted-foreground"
-            @click="void handleCopyNikkiLocationCoords()"
-            >{{ t('gallery.details.infinityNikki.nikkiLocation') }}</span
-          >
+          <span class="shrink-0 whitespace-nowrap" @click="void handleCopyNikkiLocationCoords()">{{
+            t('gallery.details.infinityNikki.nikkiLocation')
+          }}</span>
           <div class="flex min-w-0 items-center gap-1">
             <button
               type="button"
@@ -813,7 +809,7 @@ watch(
           </div>
         </div>
         <div v-if="formatMetadataId(extracted.filterId)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.filterId')
           }}</span>
           <span
@@ -829,19 +825,19 @@ watch(
           </span>
         </div>
         <div v-if="formatPercentage(extracted.filterStrength)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.filterStrength')
           }}</span>
           <span class="font-mono">{{ formatPercentage(extracted.filterStrength) }}</span>
         </div>
         <div v-if="extracted.nikkiHidden !== undefined" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.nikkiHidden')
           }}</span>
           <span>{{ extracted.nikkiHidden ? t('common.yes') : t('common.no') }}</span>
         </div>
         <div v-if="extracted.vertical !== undefined" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap">{{
             t('gallery.details.infinityNikki.vertical')
           }}</span>
           <span>{{ extracted.vertical ? t('common.yes') : t('common.no') }}</span>

@@ -660,7 +660,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
               v-model="assetDescriptionDraft"
               :disabled="isSavingAssetDescription"
               :placeholder="t('gallery.details.asset.descriptionPlaceholder')"
-              class="h-6 px-2 text-xs md:text-xs"
+              class="h-6 rounded-sm px-2 text-xs md:text-xs"
               @blur="handleAssetDescriptionCommit"
               @keydown.enter.prevent="handleAssetDescriptionCommit"
               @keydown.esc.prevent="resetAssetDescriptionDraft"
@@ -686,7 +686,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                   <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
                   <Popover v-model:open="showTagSelector">
                     <PopoverTrigger as-child>
-                      <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                      <Button variant="sidebarGhost" size="sm" class="h-6 gap-1 px-2 text-xs">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           width="12"
@@ -839,7 +839,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
             <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
             <Popover v-model:open="showTagSelector">
               <PopoverTrigger as-child>
-                <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                <Button variant="sidebarGhost" size="sm" class="h-6 gap-1 px-2 text-xs">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="12"
@@ -906,7 +906,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
             :model-value="batchDescriptionDraft"
             :disabled="batchDescriptionDisabled"
             :placeholder="t('gallery.details.asset.descriptionPlaceholder')"
-            class="h-6 px-2 text-xs md:text-xs"
+            class="h-6 rounded-sm px-2 text-xs md:text-xs"
             @update:model-value="updateBatchDescriptionDraft"
             @blur="handleBatchDescriptionCommit"
             @keydown.enter.prevent="handleBatchDescriptionCommit"
