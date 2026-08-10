@@ -15,6 +15,7 @@ const settingsStore = useSettingsStore()
 const isDev = import.meta.env.DEV
 const isWelcome = computed(() => route.name === 'welcome')
 const isHome = computed(() => route.name === 'home')
+const isGallery = computed(() => route.name === 'gallery')
 const hasBackgroundImage = computed(() =>
   Boolean(resolveBackgroundImageUrl(settingsStore.appSettings.ui.background))
 )
@@ -34,7 +35,7 @@ const hasBackgroundImage = computed(() =>
 
     <div
       class="relative z-10 flex h-full w-full min-w-0 flex-col rounded-lg text-foreground"
-      :class="[!isHome && !isWelcome && 'surface-middle']"
+      :class="[!isHome && !isWelcome && !isGallery && 'surface-middle']"
     >
       <!-- 窗口控制栏 -->
       <AppHeader />

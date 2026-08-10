@@ -64,7 +64,7 @@ export interface SplitProps {
   dividerClass?: string
 
   /**
-   * 分隔条视觉线自定义类名
+   * 分隔条静止状态下的视觉线自定义类名
    */
   dividerLineClass?: string
 
@@ -174,8 +174,9 @@ const dividerLineClasses = computed(() => [
   props.direction === 'horizontal'
     ? 'top-0 left-1/2 h-full -translate-x-1/2'
     : 'top-1/2 left-0 w-full -translate-y-1/2',
-  props.dividerLineClass ||
-    (isDragging.value ? 'bg-primary' : 'bg-border group-hover:bg-primary/50'),
+  isDragging.value
+    ? 'bg-primary'
+    : [props.dividerLineClass || 'bg-border', 'group-hover:bg-primary/50'],
 ])
 
 const dividerLineStyle = computed(() => {

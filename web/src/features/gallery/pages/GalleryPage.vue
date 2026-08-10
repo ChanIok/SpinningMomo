@@ -277,52 +277,59 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
-  <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
+  <div class="h-full w-full p-1 pt-0">
+    <div class="h-full w-full overflow-hidden rounded-sm">
+      <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
+      <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
 
-  <!-- 左中右三区域布局 -->
-  <div v-else class="h-full w-full overflow-hidden border-t">
-    <!-- 第一层分割：左侧 + (中右) -->
-    <Split
-      v-model:size="leftSidebarSize"
-      direction="horizontal"
-      :min="leftMinSize"
-      :max="0.3"
-      :disabled="!isSidebarOpen"
-      @drag-start="handleLeftDragStart"
-      @drag="handleLeftDrag"
-      @drag-end="handleLeftDragEnd"
-    >
-      <!-- 左侧区域 - 侧边栏 -->
-      <template #1>
-        <GallerySidebar v-if="isSidebarOpen" />
-      </template>
+      <!-- 左中右三区域布局 -->
+      <Split
+        v-else
+        v-model:size="leftSidebarSize"
+        direction="horizontal"
+        :min="leftMinSize"
+        :max="0.3"
+        :disabled="!isSidebarOpen"
+        divider-line-class="bg-transparent"
+        pane1-class="surface-middle"
+        @drag-start="handleLeftDragStart"
+        @drag="handleLeftDrag"
+        @drag-end="handleLeftDragEnd"
+      >
+        <!-- 左侧区域 - 侧边栏 -->
+        <template #1>
+          <GallerySidebar v-if="isSidebarOpen" />
+        </template>
 
-      <!-- 中右区域 -->
-      <template #2>
-        <!-- 第二层分割：中间 + 右侧 -->
-        <Split
-          v-model:size="rightDetailsSize"
-          direction="horizontal"
-          reverse
-          :min="rightMinSize"
-          :max="0.5"
-          :disabled="!isDetailsOpen"
-          @drag-start="handleRightDragStart"
-          @drag="handleRightDrag"
-          @drag-end="handleRightDragEnd"
-        >
-          <!-- 中间区域 - 主要内容 -->
-          <template #1>
-            <GalleryViewer />
-          </template>
+        <!-- 中右区域 -->
+        <template #2>
+          <!-- 第二层分割：中间 + 右侧 -->
+          <Split
+            v-model:size="rightDetailsSize"
+            direction="horizontal"
+            reverse
+            :min="rightMinSize"
+            :max="0.5"
+            :disabled="!isDetailsOpen"
+            divider-line-class="bg-transparent"
+            pane1-class="surface-middle [--surface-opacity-scale:0.56]"
+            pane2-class="surface-middle"
+            @drag-start="handleRightDragStart"
+            @drag="handleRightDrag"
+            @drag-end="handleRightDragEnd"
+          >
+            <!-- 中间区域 - 主要内容 -->
+            <template #1>
+              <GalleryViewer />
+            </template>
 
-          <!-- 右侧区域 - 详情面板 -->
-          <template #2>
-            <GalleryDetails v-if="isDetailsOpen" />
-          </template>
-        </Split>
-      </template>
-    </Split>
+            <!-- 右侧区域 - 详情面板 -->
+            <template #2>
+              <GalleryDetails v-if="isDetailsOpen" />
+            </template>
+          </Split>
+        </template>
+      </Split>
+    </div>
   </div>
 </template>

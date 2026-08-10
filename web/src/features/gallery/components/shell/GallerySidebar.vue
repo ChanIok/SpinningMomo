@@ -487,6 +487,7 @@ onMounted(() => {
         :min="effectiveMin"
         :max="effectiveMax"
         :disabled="isSplitDisabled"
+        divider-line-class="bg-transparent"
       >
         <!-- 文件夹区域 -->
         <template #1>
@@ -565,7 +566,7 @@ onMounted(() => {
 
         <!-- 标签区域 -->
         <template #2>
-          <div class="flex h-full flex-col pt-2 pb-1">
+          <div class="flex h-full flex-col pb-1">
             <!-- 标签标头（可点击折叠/展开） -->
             <div
               class="group flex flex-shrink-0 cursor-pointer items-center justify-between px-3 pb-1 transition-colors select-none hover:text-foreground"
