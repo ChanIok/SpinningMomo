@@ -51,9 +51,6 @@ const isRejected = computed(() => props.reviewFlag === 'rejected')
 const renderedTags = computed(() =>
   props.showTags && !props.compact ? props.tags.slice(0, MAX_RENDERED_CARD_TAGS) : []
 )
-const hasMoreTags = computed(
-  () => props.showTags && !props.compact && props.tags.length > MAX_RENDERED_CARD_TAGS
-)
 
 // 悬浮提示文本：拼合所有标签名称
 const tagTooltip = computed(() => props.tags.map((tag) => tag.name).join(' · '))
@@ -108,16 +105,9 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
         <div
           v-for="tag in renderedTags"
           :key="tag.id"
-          class="max-w-full min-w-0 rounded border border-white/15 bg-black/45 px-1.5 py-0.5 text-[10px] leading-3 text-white shadow-sm backdrop-blur-[1px]"
+          class="max-w-full min-w-0 rounded border border-white/15 bg-black/45 px-1.5 py-1 text-[11px] leading-3 text-white shadow-sm backdrop-blur-[1px]"
         >
           <span class="block truncate font-medium">{{ tag.name }}</span>
-        </div>
-        <!-- 超出数量上限时的省略指示 -->
-        <div
-          v-if="hasMoreTags"
-          class="rounded border border-white/15 bg-black/45 px-1.5 py-0.5 text-[10px] leading-3 text-white shadow-sm backdrop-blur-[1px]"
-        >
-          …
         </div>
       </div>
     </div>
