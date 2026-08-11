@@ -14,6 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ChevronLeft,
   CircleAlert,
@@ -22,14 +23,11 @@ import {
   ChevronUp,
   ListTodo,
   Loader2,
-  Minus,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  Square,
   Trash2,
-  X,
 } from '@lucide/vue'
 import { backWithViewTransition } from '@/router/viewTransition'
 
@@ -312,60 +310,99 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-1">
-    <!-- 页面返回与标题 -->
-    <div v-if="showPageNavigation" class="flex shrink-0 items-center gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        class="h-8 max-w-48 gap-1.5 rounded-sm text-foreground/75 hover:bg-black/10 hover:text-foreground has-[>svg]:pr-6 has-[>svg]:pl-4 dark:hover:bg-white/10"
-        :title="t('app.navigation.back')"
-        :aria-label="t('app.navigation.back')"
-        @click="handleBack"
-      >
-        <ChevronLeft class="h-4 w-4 shrink-0" />
-        <span class="truncate text-xs font-medium">
-          {{ pageTitle }}
-        </span>
-      </Button>
-    </div>
+    <!-- 导航与图库面板控制按钮 Tooltip 上下文 -->
+    <TooltipProvider>
+      <!-- 页面的返回与标题 -->
+      <div v-if="showPageNavigation" class="flex shrink-0 items-center gap-1">
+        <Tooltip :delay-duration="1500">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-8 max-w-48 gap-1.5 rounded-sm text-foreground/75 hover:bg-black/10 hover:text-foreground has-[>svg]:pr-6 has-[>svg]:pl-4 dark:hover:bg-white/10"
+              :aria-label="t('app.navigation.back')"
+              @click="handleBack"
+            >
+              <ChevronLeft class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+              <span class="truncate text-xs font-medium">
+                {{ pageTitle }}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{ t('app.navigation.back') }}
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
-    <!-- 可拖动区域 -->
-    <div class="mt-1.5 h-full flex-1">
-      <div class="drag-region h-full" />
-    </div>
+      <!-- 可拖动区域 -->
+      <div class="mt-1.5 h-full flex-1">
+        <div class="drag-region h-full" />
+      </div>
 
-    <!-- 图库布局控制 -->
-    <div v-if="isGalleryPage" class="flex gap-1">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-        :class="[!isSidebarOpen && 'text-muted-foreground']"
-        :title="
-          isSidebarOpen
-            ? t('app.header.gallery.toggleSidebar.hide')
-            : t('app.header.gallery.toggleSidebar.show')
-        "
-        @click="handleToggleSidebar"
-      >
-        <component :is="isSidebarOpen ? PanelLeftClose : PanelLeftOpen" class="h-4 w-4" />
-      </Button>
+      <!-- 图库布局控制 -->
+      <div v-if="isGalleryPage" class="flex gap-1">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
+              :class="[!isSidebarOpen && 'text-muted-foreground']"
+              :aria-label="
+                isSidebarOpen
+                  ? t('app.header.gallery.toggleSidebar.hide')
+                  : t('app.header.gallery.toggleSidebar.show')
+              "
+              @click="handleToggleSidebar"
+            >
+              <component
+                :is="isSidebarOpen ? PanelLeftClose : PanelLeftOpen"
+                class="h-4 w-4"
+                :stroke-width="1.5"
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{
+              isSidebarOpen
+                ? t('app.header.gallery.toggleSidebar.hide')
+                : t('app.header.gallery.toggleSidebar.show')
+            }}
+          </TooltipContent>
+        </Tooltip>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-        :class="[!isDetailsOpen && 'text-muted-foreground']"
-        :title="
-          isDetailsOpen
-            ? t('app.header.gallery.toggleDetails.hide')
-            : t('app.header.gallery.toggleDetails.show')
-        "
-        @click="handleToggleDetails"
-      >
-        <component :is="isDetailsOpen ? PanelRightClose : PanelRightOpen" class="h-4 w-4" />
-      </Button>
-    </div>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
+              :class="[!isDetailsOpen && 'text-muted-foreground']"
+              :aria-label="
+                isDetailsOpen
+                  ? t('app.header.gallery.toggleDetails.hide')
+                  : t('app.header.gallery.toggleDetails.show')
+              "
+              @click="handleToggleDetails"
+            >
+              <component
+                :is="isDetailsOpen ? PanelRightClose : PanelRightOpen"
+                class="h-4 w-4"
+                :stroke-width="1.5"
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{
+              isDetailsOpen
+                ? t('app.header.gallery.toggleDetails.hide')
+                : t('app.header.gallery.toggleDetails.show')
+            }}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
 
     <div v-if="hasTaskRecords" class="flex items-center">
       <DropdownMenu v-model:open="isTaskMenuOpen">
@@ -495,37 +532,93 @@ onBeforeUnmount(() => {
       </DropdownMenu>
     </div>
 
-    <!-- 窗口控制按钮 -->
+    <!-- 窗口控制按钮专属 Tooltip 上下文 -->
     <div v-if="showWindowControls" class="flex">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
-        @click="handleMinimize"
-        title="Minimize"
-      >
-        <Minus class="h-4 w-4" />
-      </Button>
+      <TooltipProvider>
+        <Tooltip :delay-duration="1000">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+              @click="handleMinimize"
+              :aria-label="t('app.header.window.minimize')"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 16 16"
+                fill="none"
+                focusable="false"
+              >
+                <rect x="3" y="7" width="10" height="1" fill="currentColor" />
+              </svg>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{ t('app.header.window.minimize') }}
+          </TooltipContent>
+        </Tooltip>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
-        @click="handleMaximizeToggle"
-        title="Maximize / Restore"
-      >
-        <Square class="h-4 w-4" />
-      </Button>
+        <Tooltip :delay-duration="1000">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-10 rounded-sm text-foreground hover:bg-black/10 dark:hover:bg-white/10"
+              @click="handleMaximizeToggle"
+              :aria-label="t('app.header.window.maximize')"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 16 16"
+                fill="none"
+                focusable="false"
+              >
+                <rect
+                  x="3.5"
+                  y="3.5"
+                  width="9"
+                  height="9"
+                  stroke="currentColor"
+                  stroke-width="1"
+                  stroke-linejoin="miter"
+                />
+              </svg>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{ t('app.header.window.maximize') }}
+          </TooltipContent>
+        </Tooltip>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-10 rounded-sm text-foreground hover:!bg-[#e01b2d] hover:!text-white dark:hover:!bg-[#c42b1c]"
-        @click="handleClose"
-        title="Close"
-      >
-        <X class="h-4 w-4" />
-      </Button>
+        <Tooltip :delay-duration="1000">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-10 rounded-sm text-foreground hover:!bg-[#e01b2d] hover:!text-white dark:hover:!bg-[#c42b1c]"
+              @click="handleClose"
+              :aria-label="t('app.header.window.close')"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 16 16"
+                fill="none"
+                focusable="false"
+              >
+                <path d="M3.08 3.92 3.92 3.08l9 9-.84.84-9-9Z" fill="currentColor" />
+                <path d="M12.92 3.92 12.08 3.08l-9 9 .84.84 9-9Z" fill="currentColor" />
+              </svg>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="0">
+            {{ t('app.header.window.close') }}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   </header>
 </template>
