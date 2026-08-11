@@ -308,6 +308,14 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     }
   )
 
+  // 查询结果替换后，索引对应的资产及其高度可能已经变化，清空 Masonry 的尺寸和列分配缓存。
+  watch(
+    () => store.paginatedAssetsVersion,
+    () => {
+      virtualizer.value.measure()
+    }
+  )
+
   // 列数或列宽变化时重新测量，避免布局错位
   watch([columns, columnWidth], () => {
     if (virtualItems.value.length > 0) virtualizer.value.measure()
