@@ -71,13 +71,13 @@ async function handleCopyFileName() {
     <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.asset.basicInfo') }}</h4>
     <div class="space-y-2 text-xs">
       <div class="flex justify-between gap-2">
-        <span>{{ t('gallery.details.asset.fileName') }}</span>
+        <span class="text-foreground/80">{{ t('gallery.details.asset.fileName') }}</span>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="flex-1 cursor-default truncate text-right font-medium transition-colors hover:text-foreground/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="flex-1 cursor-default truncate text-right transition-colors hover:text-foreground/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 @click="handleCopyFileName"
               >
                 {{ asset.name }}
@@ -90,19 +90,19 @@ async function handleCopyFileName() {
         </TooltipProvider>
       </div>
       <div class="flex justify-between gap-2">
-        <span>{{ t('gallery.details.asset.type') }}</span>
+        <span class="text-foreground/80">{{ t('gallery.details.asset.type') }}</span>
         <span class="rounded-sm bg-secondary px-2 py-0.5">{{ getAssetTypeLabel(asset.type) }}</span>
       </div>
       <div v-if="asset.width && asset.height" class="flex justify-between gap-2">
-        <span>{{ t('gallery.details.asset.resolution') }}</span>
+        <span class="text-foreground/80">{{ t('gallery.details.asset.resolution') }}</span>
         <span>{{ asset.width }} × {{ asset.height }}</span>
       </div>
       <div v-if="asset.size" class="flex justify-between gap-2">
-        <span>{{ t('gallery.details.asset.fileSize') }}</span>
+        <span class="text-foreground/80">{{ t('gallery.details.asset.fileSize') }}</span>
         <span>{{ formatFileSize(asset.size) }}</span>
       </div>
       <div class="flex items-center justify-between gap-4">
-        <span>{{ t('gallery.details.asset.description') }}</span>
+        <span class="text-foreground/80">{{ t('gallery.details.asset.description') }}</span>
         <div class="min-w-0 flex-1">
           <slot name="description">
             <p class="min-h-6 rounded-sm bg-muted/50 px-2 py-1 text-xs break-words">

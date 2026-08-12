@@ -562,13 +562,13 @@ async function handleCopyColorHex(color: AssetMainColor) {
           </h4>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{
+              <span class="text-foreground/80">{{
                 t('gallery.details.rootFolderSummary.folderCount')
               }}</span>
               <span>{{ rootFolderCount }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{
+              <span class="text-foreground/80">{{
                 t('gallery.details.rootFolderSummary.assetCount')
               }}</span>
               <span>{{ rootFolderAssetTotalCount }}</span>
@@ -584,18 +584,13 @@ async function handleCopyColorHex(color: AssetMainColor) {
               v-if="currentFolder.displayName && currentFolder.displayName !== currentFolder.name"
             >
               <div class="flex justify-between gap-2">
-                <span class="text-muted-foreground">{{
-                  t('gallery.details.folderDisplayName')
-                }}</span>
-                <span
-                  class="truncate font-medium text-foreground"
-                  :title="currentFolder.displayName"
-                >
+                <span class="text-foreground/80">{{ t('gallery.details.folderDisplayName') }}</span>
+                <span class="truncate text-foreground" :title="currentFolder.displayName">
                   {{ currentFolder.displayName }}
                 </span>
               </div>
               <div class="flex justify-between gap-2">
-                <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
+                <span class="text-foreground/80">{{ t('gallery.details.folderName') }}</span>
                 <span class="truncate text-foreground/90" :title="currentFolder.name">{{
                   currentFolder.name
                 }}</span>
@@ -603,20 +598,20 @@ async function handleCopyColorHex(color: AssetMainColor) {
             </template>
             <template v-else>
               <div class="flex justify-between gap-2">
-                <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
-                <span class="truncate font-medium text-foreground" :title="currentFolder.name">{{
+                <span class="text-foreground/80">{{ t('gallery.details.folderName') }}</span>
+                <span class="truncate text-foreground" :title="currentFolder.name">{{
                   currentFolder.name
                 }}</span>
               </div>
             </template>
             <div class="flex flex-col gap-1">
-              <span class="text-muted-foreground">{{ t('gallery.details.fullPath') }}</span>
+              <span class="text-foreground/80">{{ t('gallery.details.fullPath') }}</span>
               <p class="rounded bg-muted/50 p-2 font-mono text-xs break-all">
                 {{ currentFolder.path }}
               </p>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.assetCount') }}</span>
+              <span class="text-foreground/80">{{ t('gallery.details.assetCount') }}</span>
               <span>{{ t('gallery.details.itemCount', { count: currentFolder.assetCount }) }}</span>
             </div>
           </div>
@@ -772,13 +767,13 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.rootTagSummary.title') }}</h4>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{
+              <span class="text-foreground/80">{{
                 t('gallery.details.rootTagSummary.tagCount')
               }}</span>
               <span>{{ rootTagCount }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{
+              <span class="text-foreground/80">{{
                 t('gallery.details.rootTagSummary.assetCount')
               }}</span>
               <span>{{ rootTagAssetTotalCount }}</span>
@@ -791,21 +786,21 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.tagInfo') }}</h4>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.tagName') }}</span>
-              <span class="truncate font-medium" :title="currentTag.name">
+              <span class="text-foreground/80">{{ t('gallery.details.tagName') }}</span>
+              <span class="truncate" :title="currentTag.name">
                 {{ currentTag.name }}
               </span>
             </div>
             <div v-if="currentTag.parentId" class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.parentTagId') }}</span>
+              <span class="text-foreground/80">{{ t('gallery.details.parentTagId') }}</span>
               <span>{{ currentTag.parentId }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.assetCount') }}</span>
+              <span class="text-foreground/80">{{ t('gallery.details.assetCount') }}</span>
               <span>{{ t('gallery.details.itemCount', { count: currentTag.assetCount }) }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">{{ t('gallery.details.sortOrder') }}</span>
+              <span class="text-foreground/80">{{ t('gallery.details.sortOrder') }}</span>
               <span>{{ currentTag.sortOrder }}</span>
             </div>
           </div>

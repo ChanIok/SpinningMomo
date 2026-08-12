@@ -525,7 +525,7 @@ onMounted(() => {
               @click="toggleFoldersCollapse"
             >
               <div
-                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase transition-colors group-hover:text-foreground"
+                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-foreground/80 uppercase transition-colors group-hover:text-foreground"
               >
                 <component
                   :is="isFoldersCollapsed ? ChevronRight : ChevronDown"
@@ -601,7 +601,7 @@ onMounted(() => {
               @click="toggleTagsCollapse"
             >
               <div
-                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase transition-colors group-hover:text-foreground"
+                class="flex items-center gap-1.5 px-1 py-1 text-xs font-medium tracking-wider text-foreground/80 uppercase transition-colors group-hover:text-foreground"
               >
                 <component
                   :is="isTagsCollapsed ? ChevronRight : ChevronDown"
