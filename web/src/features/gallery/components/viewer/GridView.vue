@@ -156,7 +156,7 @@ defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
-  <div class="flex h-full">
+  <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
       class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-4"
@@ -220,6 +220,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :container-height="containerHeight"
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
+      :scroll-container="scrollContainerRef"
       :virtualizer="gridVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

@@ -97,6 +97,7 @@ onUnmounted(() => {
     :container-height="containerHeight"
     :scroll-top="scrollTop"
     :viewport-height="viewportHeight"
+    :scroll-container="props.scrollContainer"
     :virtualizer="virtualizer"
     :markers="markers"
     :labels="labels"

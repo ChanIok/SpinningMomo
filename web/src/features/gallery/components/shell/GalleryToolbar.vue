@@ -52,6 +52,7 @@ import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
 import { useGalleryView } from '../../composables'
 import { useGalleryStore } from '../../store'
+import { GALLERY_COMPACT_BREAKPOINT } from '../../constants'
 import type {
   AssetFilter,
   AssetType,
@@ -122,7 +123,9 @@ const draftDateRange = shallowRef<DateRange>({ start: undefined, end: undefined 
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
 const isWide = computed(() => toolbarWidth.value >= 720)
-const isFilterCompact = computed(() => toolbarWidth.value > 0 && toolbarWidth.value < 480)
+const isFilterCompact = computed(
+  () => toolbarWidth.value > 0 && toolbarWidth.value < GALLERY_COMPACT_BREAKPOINT
+)
 
 const filterScrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 

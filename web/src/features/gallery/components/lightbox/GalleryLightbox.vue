@@ -1,24 +1,29 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useEventListener, useThrottleFn } from '@vueuse/core'
+import { computed, ref, watch } from 'vue'
+import { useElementSize, useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
+import { GALLERY_COMPACT_BREAKPOINT } from '../../constants'
 import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../menus/GalleryAssetContextMenuContent.vue'
+import GalleryDetails from '../shell/GalleryDetails.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
-import LightboxImage from './LightboxImage.vue'
-import LightboxVideo from './LightboxVideo.vue'
+import LightboxNavigationButtons from './LightboxNavigationButtons.vue'
+import LightboxPager from './LightboxPager.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
+import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { isLocalAccess } from '@/core/access'
+import { useI18n } from '@/composables/useI18n'
+import { X } from '@lucide/vue'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
 /** 无飞回动画时，与工具栏/内容区 leave ~180ms 对齐 */
 const CLOSE_AFTER_NO_HERO_MS = 180
 
-type LightboxImageExposed = {
+type LightboxPagerExposed = {
   showFitMode: () => Promise<void>
   showActualSize: () => Promise<void>
   zoomIn: () => Promise<void>
@@ -42,8 +47,20 @@ const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const assetActions = useGalleryAssetActions()
-const lightboxImageRef = ref<LightboxImageExposed | null>(null)
+const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
+const { width: lightboxWidth } = useElementSize(lightboxRootRef)
+const mobileDetailsOpen = ref(false)
+const isCompactViewport = computed(
+  () => lightboxWidth.value > 0 && lightboxWidth.value < GALLERY_COMPACT_BREAKPOINT
+)
+const { t } = useI18n()
+
+watch(isCompactViewport, (compact) => {
+  if (!compact) {
+    mobileDetailsOpen.value = false
+  }
+})
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
@@ -57,6 +74,8 @@ const currentAsset = computed(() => {
 
   return store.getAssetsInRange(currentIndex, currentIndex)[0]
 })
+const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
+const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 // 缩放、适屏、1:1 都是静态图查看语义；视频在灯箱里保持原生播放器行为。
 const isZoomableAsset = computed(() => currentAsset.value?.type !== 'video')
 const lightboxRootClass = computed(() => {
@@ -85,13 +104,13 @@ const throttledNext = useThrottleFn(() => {
 
 const throttledZoomIn = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
-    void lightboxImageRef.value?.zoomIn()
+    void lightboxPagerRef.value?.zoomIn()
   }
 }, 60)
 
 const throttledZoomOut = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
-    void lightboxImageRef.value?.zoomOut()
+    void lightboxPagerRef.value?.zoomOut()
   }
 }, 60)
 
@@ -118,6 +137,8 @@ function exitImmersive() {
 }
 
 function handleClose() {
+  mobileDetailsOpen.value = false
+
   if (store.lightbox.isClosing) return
   store.setLightboxClosing(true)
 
@@ -135,7 +156,7 @@ function handleClose() {
           containerRect,
           asset.width ?? 1,
           asset.height ?? 1,
-          store.lightbox.showFilmstrip
+          showFilmstrip.value
         )
         prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         emit('requestReverseHero')
@@ -154,28 +175,28 @@ function handleToolbarFit() {
   if (!isZoomableAsset.value) {
     return
   }
-  void lightboxImageRef.value?.showFitMode()
+  void lightboxPagerRef.value?.showFitMode()
 }
 
 function handleToolbarActual() {
   if (!isZoomableAsset.value) {
     return
   }
-  void lightboxImageRef.value?.showActualSize()
+  void lightboxPagerRef.value?.showActualSize()
 }
 
 function handleToolbarZoomIn() {
   if (!isZoomableAsset.value) {
     return
   }
-  void lightboxImageRef.value?.zoomIn()
+  void lightboxPagerRef.value?.zoomIn()
 }
 
 function handleToolbarZoomOut() {
   if (!isZoomableAsset.value) {
     return
   }
-  void lightboxImageRef.value?.zoomOut()
+  void lightboxPagerRef.value?.zoomOut()
 }
 
 function handleToolbarRotate(deltaDegrees: number) {
@@ -187,6 +208,18 @@ function handleToolbarRotate(deltaDegrees: number) {
 
 function handleToolbarToggleFilmstrip() {
   lightbox.toggleFilmstrip()
+}
+
+function handleToolbarToggleDetails() {
+  if (!isCompactViewport.value) {
+    return
+  }
+
+  mobileDetailsOpen.value = !mobileDetailsOpen.value
+}
+
+function closeMobileDetails() {
+  mobileDetailsOpen.value = false
 }
 
 function handleToolbarToggleImmersive() {
@@ -268,6 +301,10 @@ function handleKeydown(event: KeyboardEvent) {
       return
     case 'Escape':
       event.preventDefault()
+      if (mobileDetailsOpen.value) {
+        closeMobileDetails()
+        return
+      }
       if (isImmersive.value) {
         exitImmersive()
         return
@@ -373,6 +410,7 @@ useEventListener(window, 'keydown', handleKeydown)
         >
           <LightboxToolbar
             v-if="!isClosing"
+            :details-open="mobileDetailsOpen"
             @back="handleClose"
             @fit="handleToolbarFit"
             @actual="handleToolbarActual"
@@ -380,6 +418,7 @@ useEventListener(window, 'keydown', handleKeydown)
             @zoom-out="handleToolbarZoomOut"
             @rotate="handleToolbarRotate"
             @toggle-filmstrip="handleToolbarToggleFilmstrip"
+            @toggle-details="handleToolbarToggleDetails"
             @toggle-immersive="handleToolbarToggleImmersive"
           />
         </Transition>
@@ -387,13 +426,19 @@ useEventListener(window, 'keydown', handleKeydown)
         <ContextMenu v-if="currentAsset">
           <ContextMenuTrigger as-child>
             <div
-              class="min-h-0 flex-1 transition-opacity duration-[180ms]"
+              class="relative min-h-0 flex-1 transition-opacity duration-[180ms]"
               :class="isClosing ? 'opacity-0' : 'opacity-100'"
               @contextmenu="handleImageContextMenu"
               @wheel="handleMediaWheel"
             >
-              <LightboxImage v-if="isZoomableAsset" ref="lightboxImageRef" />
-              <LightboxVideo v-else @previous="throttledPrevious" @next="throttledNext" />
+              <!-- Pager 负责媒体轨道，按钮保持在轨道外，避免随页面一起移动。 -->
+              <LightboxPager ref="lightboxPagerRef" />
+              <LightboxNavigationButtons
+                :can-previous="canGoToPrevious"
+                :can-next="canGoToNext"
+                @previous="throttledPrevious"
+                @next="throttledNext"
+              />
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent class="w-56">
@@ -405,7 +450,7 @@ useEventListener(window, 'keydown', handleKeydown)
           class="min-h-0 flex-1 transition-opacity duration-[180ms]"
           :class="isClosing ? 'opacity-0' : 'opacity-100'"
         >
-          <LightboxImage ref="lightboxImageRef" />
+          <LightboxPager ref="lightboxPagerRef" />
         </div>
 
         <Transition
@@ -419,7 +464,70 @@ useEventListener(window, 'keydown', handleKeydown)
         >
           <LightboxFilmstrip v-if="showFilmstrip && !isClosing" />
         </Transition>
+
+        <Transition name="gallery-mobile-details">
+          <div
+            v-if="isCompactViewport && mobileDetailsOpen && !isClosing"
+            class="absolute inset-0 z-20 flex items-end"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="t('gallery.details.title')"
+          >
+            <button
+              type="button"
+              class="absolute inset-0 cursor-default bg-black/55"
+              :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
+              @click="closeMobileDetails"
+            />
+
+            <section
+              class="relative z-10 flex h-[82vh] max-h-[720px] w-full flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl"
+            >
+              <div class="shrink-0 border-b px-4 pt-2 pb-3">
+                <div class="mx-auto mb-2 h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <div class="flex items-center justify-between">
+                  <h2 class="text-sm font-medium">{{ t('gallery.details.title') }}</h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-10 w-10"
+                    :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
+                    @click="closeMobileDetails"
+                  >
+                    <X class="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div class="min-h-0 flex-1">
+                <GalleryDetails />
+              </div>
+            </section>
+          </div>
+        </Transition>
       </div>
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.gallery-mobile-details-enter-active,
+.gallery-mobile-details-leave-active {
+  transition: opacity 180ms ease-out;
+}
+
+.gallery-mobile-details-enter-from,
+.gallery-mobile-details-leave-to {
+  opacity: 0;
+}
+
+.gallery-mobile-details-enter-active section,
+.gallery-mobile-details-leave-active section {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gallery-mobile-details-enter-from section,
+.gallery-mobile-details-leave-to section {
+  transform: translateY(100%);
+}
+</style>

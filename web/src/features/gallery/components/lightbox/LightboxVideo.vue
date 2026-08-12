@@ -8,15 +8,12 @@ import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
-import { heroAnimating } from '../../composables/useHeroTransition'
-
-const emit = defineEmits<{
-  previous: []
-  next: []
-}>()
 
 const store = useGalleryStore()
 const { t } = useI18n()
+const emit = defineEmits<{
+  ready: [assetId: number]
+}>()
 const videoError = ref(false)
 const autoRecovering = ref(false)
 const videoReady = ref(false)
@@ -57,8 +54,6 @@ const posterUrl = computed(() => {
   return galleryApi.getAssetThumbnailUrl(currentAsset.value)
 })
 
-const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
-const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 const mediaWidth = computed(() => currentAsset.value?.width || 0)
 const mediaHeight = computed(() => currentAsset.value?.height || 0)
 const hasMediaDimensions = computed(() => mediaWidth.value > 0 && mediaHeight.value > 0)
@@ -100,12 +95,16 @@ const stageStyle = computed(() => ({
   height: `${renderHeight.value}px`,
 }))
 
+// activeIndex 改变时重置播放器状态，并通知 Pager 视频页面已经可以接管中心位置。
 watch(
   () => currentAsset.value?.id,
-  () => {
+  (assetId) => {
     videoError.value = false
     autoRecovering.value = false
     videoReady.value = false
+    if (assetId !== undefined) {
+      emit('ready', assetId)
+    }
   },
   { immediate: true }
 )
@@ -114,6 +113,7 @@ function isRootMappedOriginalUrl(url: string): boolean {
   return /^https:\/\/r-\d+\.test\//i.test(url)
 }
 
+// 视频原片不可读时，确认文件仍存在后尝试刷新一次当前灯箱上下文。
 async function tryAutoRecoverByReload() {
   if (autoRecovering.value) {
     return
@@ -145,6 +145,7 @@ async function tryAutoRecoverByReload() {
   window.location.replace(currentUrl.toString())
 }
 
+// 记录视频错误并启动一次受控的自动恢复。
 function handleVideoError() {
   videoError.value = true
   void tryAutoRecoverByReload().catch((error) => {
@@ -152,37 +153,18 @@ function handleVideoError() {
   })
 }
 
+// video 有首帧数据后淡入，poster 在此之前继续作为稳定底图。
 function handleVideoLoadedData() {
   videoReady.value = true
-}
-
-function handlePrevious() {
-  emit('previous')
-}
-
-function handleNext() {
-  emit('next')
 }
 </script>
 
 <template>
   <div class="relative h-full w-full">
-    <button
-      v-if="canGoToPrevious"
-      class="surface-top absolute top-1/2 left-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
-      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
-      @click="handlePrevious"
-      :aria-label="t('gallery.lightbox.image.previousTitle')"
-    >
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-    </button>
-
     <div
       ref="viewportRef"
-      class="h-full w-full"
-      :style="heroAnimating ? { visibility: 'hidden' } : {}"
+      class="lightbox-video-viewport h-full w-full"
+      style="touch-action: pan-y"
     >
       <div class="flex h-full w-full items-center justify-center">
         <div
@@ -231,17 +213,5 @@ function handleNext() {
         </div>
       </div>
     </div>
-
-    <button
-      v-if="canGoToNext"
-      class="surface-top absolute top-1/2 right-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
-      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
-      @click="handleNext"
-      :aria-label="t('gallery.lightbox.image.nextTitle')"
-    >
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
   </div>
 </template>

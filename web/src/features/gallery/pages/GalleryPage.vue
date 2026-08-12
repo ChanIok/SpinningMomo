@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
+import { computed, ref, watch, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
+import { useDebounceFn, useElementSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
+import { Button } from '@/components/ui/button'
 import { Split } from '@/components/ui/split'
+import { useI18n } from '@/composables/useI18n'
+import { X } from '@lucide/vue'
 import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
 import { useSettingsStore } from '@/features/settings/store'
@@ -11,6 +14,7 @@ import GallerySidebar from '../components/shell/GallerySidebar.vue'
 import GalleryViewer from '../components/shell/GalleryViewer.vue'
 import GalleryDetails from '../components/shell/GalleryDetails.vue'
 import InfinityNikkiGuidePanel from '../components/infinity_nikki/InfinityNikkiGuidePanel.vue'
+import { GALLERY_COMPACT_BREAKPOINT } from '../constants'
 
 const LEFT_MIN_SIZE = '180px'
 const RIGHT_MIN_SIZE = '180px'
@@ -33,6 +37,12 @@ const {
 } = useGalleryLayout()
 const galleryData = useGalleryData()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
+const pageRef = ref<HTMLElement | null>(null)
+const { width: pageWidth } = useElementSize(pageRef)
+const isCompactViewport = computed(
+  () => pageWidth.value > 0 && pageWidth.value < GALLERY_COMPACT_BREAKPOINT
+)
 
 // 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
@@ -48,6 +58,8 @@ let refreshInFlight = false
 let refreshQueued = false
 
 type SplitSize = number | string
+
+const compactLayoutSnapshot = ref<{ sidebarOpen: boolean; detailsOpen: boolean } | null>(null)
 
 function parsePixelSize(size: SplitSize): number | null {
   if (typeof size !== 'string' || !size.trim().endsWith('px')) {
@@ -73,6 +85,33 @@ function isAtMinSize(size: SplitSize, minPx: number): boolean {
   }
   return px <= minPx + 0.5
 }
+
+function syncCompactLayout(compact: boolean) {
+  if (compact) {
+    if (compactLayoutSnapshot.value) {
+      return
+    }
+
+    compactLayoutSnapshot.value = {
+      sidebarOpen: isSidebarOpen.value,
+      detailsOpen: isDetailsOpen.value,
+    }
+    setSidebarOpen(false)
+    setDetailsOpen(false)
+    return
+  }
+
+  const snapshot = compactLayoutSnapshot.value
+  if (!snapshot) {
+    return
+  }
+
+  setSidebarOpen(snapshot.sidebarOpen)
+  setDetailsOpen(snapshot.detailsOpen)
+  compactLayoutSnapshot.value = null
+}
+
+watch(isCompactViewport, syncCompactLayout, { immediate: true })
 
 const leftMinSize = computed(() => (isSidebarOpen.value ? LEFT_MIN_SIZE : COLLAPSED_SIZE))
 const rightMinSize = computed(() => (isDetailsOpen.value ? RIGHT_MIN_SIZE : COLLAPSED_SIZE))
@@ -274,6 +313,10 @@ onMounted(() => {
   onRpc('gallery.changed', galleryChangedHandler)
 })
 
+onBeforeUnmount(() => {
+  syncCompactLayout(false)
+})
+
 onUnmounted(() => {
   isUnmounted = true
   offRpc('gallery.changed', galleryChangedHandler)
@@ -281,10 +324,53 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-full w-full p-1 pt-0">
-    <div class="h-full w-full overflow-hidden rounded-sm">
+  <div ref="pageRef" class="h-full w-full p-1 pt-0">
+    <div class="relative h-full w-full overflow-hidden rounded-sm">
       <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
       <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
+
+      <!-- 窄屏布局：图库保持全宽，侧栏以覆盖式抽屉打开。 -->
+      <template v-else-if="isCompactViewport">
+        <GalleryViewer />
+
+        <Transition name="gallery-mobile-drawer">
+          <div
+            v-if="isSidebarOpen"
+            class="absolute inset-0 z-50 flex"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="t('app.navigation.gallery')"
+          >
+            <button
+              type="button"
+              class="absolute inset-0 cursor-default bg-black/50"
+              :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
+              @click="setSidebarOpen(false)"
+            />
+
+            <aside
+              class="relative z-10 flex h-full w-[88vw] max-w-[360px] flex-col border-r border-border bg-background shadow-2xl"
+            >
+              <div class="flex h-12 shrink-0 items-center justify-between border-b px-3">
+                <span class="text-sm font-medium">{{ t('app.navigation.gallery') }}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-10 w-10"
+                  :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
+                  @click="setSidebarOpen(false)"
+                >
+                  <X class="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div class="min-h-0 flex-1">
+                <GallerySidebar />
+              </div>
+            </aside>
+          </div>
+        </Transition>
+      </template>
 
       <!-- 左中右三区域布局 -->
       <Split
@@ -337,3 +423,25 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.gallery-mobile-drawer-enter-active,
+.gallery-mobile-drawer-leave-active {
+  transition: opacity 180ms ease-out;
+}
+
+.gallery-mobile-drawer-enter-from,
+.gallery-mobile-drawer-leave-to {
+  opacity: 0;
+}
+
+.gallery-mobile-drawer-enter-active aside,
+.gallery-mobile-drawer-leave-active aside {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gallery-mobile-drawer-enter-from aside,
+.gallery-mobile-drawer-leave-to aside {
+  transform: translateX(-100%);
+}
+</style>

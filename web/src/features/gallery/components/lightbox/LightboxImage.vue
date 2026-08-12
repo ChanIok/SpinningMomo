@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGalleryLightbox } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
 import { useI18n } from '@/composables/useI18n'
-import { heroAnimating } from '../../composables/useHeroTransition'
 
 const VIEWPORT_PADDING = 0
 const ZOOM_STEP = 1.1
@@ -27,6 +26,10 @@ const { t } = useI18n()
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const galleryData = useGalleryData()
+const emit = defineEmits<{
+  ready: [assetId: number]
+  'pannable-change': [pannable: boolean]
+}>()
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
@@ -45,7 +48,7 @@ const dragStartScrollLeft = ref(0)
 const dragStartScrollTop = ref(0)
 const dragMoved = ref(false)
 // 拖拽结束后屏蔽紧随而来的 click 事件，防止误触切换缩放模式
-const suppressClick = ref(false)
+const suppressStageClick = ref(false)
 let suppressClickResetTimer: number | null = null
 
 const { width, height } = useElementSize(viewportRef)
@@ -57,6 +60,7 @@ const viewportInnerHeight = computed(() =>
   Math.max(availableHeight.value - VIEWPORT_PADDING * 2, 1)
 )
 
+// 从 Pinia 当前索引读取业务资产；displayAsset 负责跟随加载进度实际渲染。
 const currentAsset = computed(() => {
   const currentIdx = store.selection.activeIndex
   if (currentIdx === undefined) {
@@ -66,6 +70,7 @@ const currentAsset = computed(() => {
   return store.getAssetsInRange(currentIdx, currentIdx)[0] ?? null
 })
 
+// 在已加载页面中按 id 查找实际渲染对象，避免 displayAsset 直接依赖当前索引。
 function findLoadedAssetById(assetId: number): Asset | null {
   for (const pageAssets of store.paginatedAssets.values()) {
     const found = pageAssets.find((asset) => asset.id === assetId)
@@ -93,8 +98,6 @@ const originalUrl = computed(() => {
   return galleryData.getAssetUrl(displayAsset.value)
 })
 
-const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
-const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 const fitMode = computed(() => store.lightbox.fitMode)
 const actualZoom = computed(() => store.lightbox.zoom)
 const rotationDegrees = computed(() => store.lightbox.rotationDegrees)
@@ -170,6 +173,15 @@ const isPannable = computed(
     (renderWidth.value > viewportInnerWidth.value || renderHeight.value > viewportInnerHeight.value)
 )
 
+// 把“图片是否会抢走拖拽 pointer”同步给外层 Pager。
+watch(
+  isPannable,
+  (pannable) => {
+    emit('pannable-change', pannable)
+  },
+  { immediate: true }
+)
+
 const isDragging = computed(() => activePointerId.value !== null)
 
 const stageCursor = computed(() => {
@@ -224,6 +236,7 @@ const zoomIndicator = computed(() => {
   return `${Math.round(actualZoom.value * 100)}%`
 })
 
+// 预热目标缩略图，切换时先保证稳定的低清底图。
 function preloadThumbnailForAsset(asset: Asset): Promise<void> {
   const url = galleryApi.getAssetThumbnailUrl(asset)
   if (!url) {
@@ -231,28 +244,34 @@ function preloadThumbnailForAsset(asset: Asset): Promise<void> {
   }
 
   return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => resolve()
-    img.onerror = () => resolve()
-    img.src = url
-    if (img.complete) {
+    const image = new Image()
+    image.onload = () => resolve()
+    image.onerror = () => resolve()
+    image.src = url
+    if (image.complete) {
       resolve()
     }
   })
 }
 
+// 切换当前渲染资产，并在 DOM 更新后通知 Pager 媒体已经可接管中心位置。
 async function commitDisplayAsset(assetId: number) {
   originalOpacityTransition.value = false
   displayAssetId.value = assetId
   originalLoaded.value = false
   imageError.value = false
+  // 切图时清掉旧图的平移和 click 抑制状态，避免把上一张图的交互带过来。
   resetPointerState()
-  suppressClick.value = false
+  suppressStageClick.value = false
 
   await nextTick()
+  // 等 viewport 重新布局后再校正滚动位置。
   syncViewportPosition()
+  // Pager 用这个事件结束 pending navigation，而不是依赖固定延时。
+  emit('ready', assetId)
 }
 
+// 跟随 Pinia activeIndex 切换图片；缩略图准备好后再替换 displayAsset。
 watch(
   () => ({
     targetId: currentAsset.value?.id,
@@ -260,6 +279,7 @@ watch(
   }),
   async ({ targetId, activeIndex }) => {
     if (activeIndex === undefined) {
+      // 灯箱关闭或没有焦点时清空当前渲染对象。
       displayAssetId.value = null
       return
     }
@@ -269,6 +289,7 @@ watch(
     }
 
     if (displayAssetId.value === null) {
+      // 首次挂载无需等待旧图，直接显示当前资源。
       await commitDisplayAsset(targetId)
       return
     }
@@ -283,11 +304,13 @@ watch(
     }
 
     const token = ++displaySwapToken
+    // 先让目标缩略图进入缓存，避免 Pager 归零后出现空白帧。
     await preloadThumbnailForAsset(asset)
     if (token !== displaySwapToken) {
       return
     }
     if (currentAsset.value?.id !== targetId) {
+      // 等待期间如果用户又滑到了别的资源，丢弃这次过期切换。
       return
     }
 
@@ -299,6 +322,7 @@ watch(
 watch(
   [availableWidth, availableHeight],
   async () => {
+    // 窗口尺寸变化后重新计算适屏位置或裁剪放大后的滚动范围。
     await nextTick()
     if (fitMode.value === 'contain') {
       syncViewportPosition()
@@ -313,8 +337,9 @@ watch(
 watch(
   () => normalizedRotationDegrees.value,
   async () => {
+    // 旋转会改变画布尺寸，先清理拖拽，再按新尺寸校正位置。
     resetPointerState()
-    suppressClick.value = false
+    suppressStageClick.value = false
 
     await nextTick()
     syncViewportPosition()
@@ -330,6 +355,7 @@ function clampActualZoom(zoom: number): number {
   return clamp(zoom, MIN_ACTUAL_ZOOM, MAX_ACTUAL_ZOOM)
 }
 
+// 将 viewport 的滚动位置限制在当前画布范围内。
 function clampViewportScroll() {
   const viewport = viewportRef.value
   if (!viewport) return
@@ -346,6 +372,7 @@ function clampViewportScroll() {
   )
 }
 
+// 设置滚动位置并统一做边界裁剪。
 function setViewportScroll(left: number, top: number) {
   const viewport = viewportRef.value
   if (!viewport) return
@@ -358,16 +385,19 @@ function getCurrentScale(): number {
   return fitMode.value === 'contain' ? fitScale.value : actualZoom.value
 }
 
+// 根据当前 fitMode 把 viewport 放回适屏原点或实际大小的居中位置。
 function syncViewportPosition() {
   const viewport = viewportRef.value
   if (!viewport) return
 
   if (fitMode.value === 'contain') {
+    // 适屏模式不保留旧的放大滚动位置。
     viewport.scrollLeft = 0
     viewport.scrollTop = 0
     return
   }
 
+  // 实际大小模式把画布中心对齐到 viewport 中心。
   setViewportScroll(
     Math.max((canvasWidth.value - availableWidth.value) / 2, 0),
     Math.max((canvasHeight.value - availableHeight.value) / 2, 0)
@@ -440,12 +470,14 @@ async function restoreZoomAnchor(anchor: ZoomAnchor, scale: number) {
   )
 }
 
+// 切回适屏模式并把内部 viewport 归零。
 async function showFitMode() {
   lightbox.showFitMode()
   await nextTick()
   syncViewportPosition()
 }
 
+// 以指定屏幕坐标为锚点缩放，保证锚点下的图像内容不跳动。
 async function zoomToScaleAtPoint(
   targetScale: number,
   clientX: number,
@@ -460,6 +492,7 @@ async function zoomToScaleAtPoint(
   const clampedScale = clampActualZoom(targetScale)
 
   if (snapToFit && clampedScale <= fitScale.value * FIT_MODE_SNAP_RATIO) {
+    // 接近适屏比例时吸附回 contain，避免出现难以察觉的微小放大。
     await showFitMode()
     return
   }
@@ -468,6 +501,7 @@ async function zoomToScaleAtPoint(
   lightbox.setActualZoom(clampedScale)
 
   if (!anchor) {
+    // 没有有效锚点时只需重新布局并居中。
     await nextTick()
     syncViewportPosition()
     return
@@ -476,6 +510,7 @@ async function zoomToScaleAtPoint(
   await restoreZoomAnchor(anchor, clampedScale)
 }
 
+// 在视口中心执行缩放；没有可用 viewport 时退化为直接设置比例。
 async function zoomToScaleAtCenter(targetScale: number, options: { snapToFit?: boolean } = {}) {
   const center = getViewportCenterClientPoint()
   if (!center) {
@@ -493,33 +528,39 @@ async function zoomToScaleAtCenter(targetScale: number, options: { snapToFit?: b
   await zoomToScaleAtPoint(targetScale, center.clientX, center.clientY, options)
 }
 
+// 在指定点击位置切换到 1:1。
 async function showActualSizeAtPoint(clientX: number, clientY: number) {
   await zoomToScaleAtPoint(1, clientX, clientY, { snapToFit: false })
 }
 
+// 在视口中心切换到 1:1。
 async function showActualSize() {
   await zoomToScaleAtCenter(1, { snapToFit: false })
 }
 
+// 按固定倍率放大当前图片。
 async function zoomIn() {
   await zoomToScaleAtCenter(getCurrentScale() * ZOOM_STEP)
 }
 
+// 按固定倍率缩小当前图片。
 async function zoomOut() {
   await zoomToScaleAtCenter(getCurrentScale() / ZOOM_STEP)
 }
 
+// 屏蔽图片拖拽后的合成 click，避免误触缩放模式。
 function scheduleSuppressClickReset() {
   if (suppressClickResetTimer !== null) {
     window.clearTimeout(suppressClickResetTimer)
   }
 
   suppressClickResetTimer = window.setTimeout(() => {
-    suppressClick.value = false
+    suppressStageClick.value = false
     suppressClickResetTimer = null
   }, 0)
 }
 
+// 清除图片内部平移 pointer，并在需要时释放 stage 的捕获。
 function resetPointerState(pointerId?: number) {
   if (pointerId !== undefined && stageRef.value?.hasPointerCapture(pointerId)) {
     stageRef.value.releasePointerCapture(pointerId)
@@ -529,6 +570,7 @@ function resetPointerState(pointerId?: number) {
   dragMoved.value = false
 }
 
+// 原图加载完成后再显示原图层，缩略图作为过渡底图保持稳定。
 function handleOriginalLoad() {
   originalOpacityTransition.value = true
   originalLoaded.value = true
@@ -538,6 +580,7 @@ function isRootMappedOriginalUrl(url: string): boolean {
   return /^https:\/\/r-\d+\.test\//i.test(url)
 }
 
+// 只对根映射 URL 做一次可达性确认，避免普通资源错误触发无限刷新。
 async function tryAutoRecoverByReload() {
   if (autoRecovering.value) {
     return
@@ -569,6 +612,7 @@ async function tryAutoRecoverByReload() {
   window.location.replace(currentUrl.toString())
 }
 
+// 原图加载失败时尝试确认文件可达，并通过一次带参数的 reload 恢复映射。
 function handleImageError() {
   imageError.value = true
 
@@ -577,17 +621,10 @@ function handleImageError() {
   })
 }
 
-function handlePrevious() {
-  lightbox.goToPrevious()
-}
-
-function handleNext() {
-  lightbox.goToNext()
-}
-
+// 点击图片在适屏和实际大小之间切换；滑动产生的 click 会被前置拦截。
 async function handleStageClick(event: MouseEvent) {
-  if (suppressClick.value) {
-    suppressClick.value = false
+  if (suppressStageClick.value) {
+    suppressStageClick.value = false
     return
   }
 
@@ -603,6 +640,7 @@ async function handleStageClick(event: MouseEvent) {
   await showFitMode()
 }
 
+// 只有图片处于可平移放大状态时，才由图片自己的拖拽逻辑接管 pointer。
 function handleStagePointerDown(event: PointerEvent) {
   if (event.button !== 0 || !isPannable.value || !viewportRef.value || !stageRef.value) {
     return
@@ -614,11 +652,13 @@ function handleStagePointerDown(event: PointerEvent) {
   dragStartScrollLeft.value = viewportRef.value.scrollLeft
   dragStartScrollTop.value = viewportRef.value.scrollTop
   dragMoved.value = false
-  suppressClick.value = false
+  suppressStageClick.value = false
+  // 放大图片需要稳定捕获 pointer，避免拖出 stage 后丢失移动事件。
   stageRef.value.setPointerCapture(event.pointerId)
   event.preventDefault()
 }
 
+// 将手指位移转换成 viewport 的反向滚动。
 function handleStagePointerMove(event: PointerEvent) {
   if (activePointerId.value !== event.pointerId || !viewportRef.value) {
     return
@@ -634,44 +674,49 @@ function handleStagePointerMove(event: PointerEvent) {
   setViewportScroll(dragStartScrollLeft.value - deltaX, dragStartScrollTop.value - deltaY)
 }
 
+// 结束图片平移；真正发生位移时屏蔽后续 click。
 function handleStagePointerUp(event: PointerEvent) {
   if (activePointerId.value !== event.pointerId) {
     return
   }
 
   if (dragMoved.value) {
-    suppressClick.value = true
+    suppressStageClick.value = true
     scheduleSuppressClickReset()
   }
 
   resetPointerState(event.pointerId)
 }
 
+// 系统取消图片平移时同样清理 pointer 状态。
 function handleStagePointerCancel(event: PointerEvent) {
   if (activePointerId.value !== event.pointerId) {
     return
   }
 
   if (dragMoved.value) {
-    suppressClick.value = true
+    suppressStageClick.value = true
     scheduleSuppressClickReset()
   }
 
   resetPointerState(event.pointerId)
 }
 
+// 图片 stage 丢失捕获时清除本地拖拽状态。
 function handleStageLostPointerCapture(event: PointerEvent) {
   if (activePointerId.value === event.pointerId) {
     resetPointerState()
   }
 }
 
+// 在实际大小或 Ctrl+滚轮时执行以指针为锚点的缩放。
 function handleViewportWheel(event: WheelEvent) {
   if (!displayAsset.value || imageError.value) {
     return
   }
 
   if (!event.ctrlKey && fitMode.value !== 'actual') {
+    // 普通适屏滚轮不参与缩放，也不阻止外层滚轮行为。
     return
   }
 
@@ -692,26 +737,21 @@ defineExpose({
   zoomIn,
   zoomOut,
 })
+
+onUnmounted(() => {
+  // 组件卸载后不再执行 click 抑制定时器。
+  if (suppressClickResetTimer !== null) {
+    window.clearTimeout(suppressClickResetTimer)
+  }
+})
 </script>
 
 <template>
-  <div class="relative h-full w-full">
-    <button
-      v-if="canGoToPrevious"
-      class="surface-top absolute top-1/2 left-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
-      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
-      @click="handlePrevious"
-      :aria-label="t('gallery.lightbox.image.previousTitle')"
-    >
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-    </button>
-
+  <div class="relative h-full w-full overflow-hidden">
     <div
       ref="viewportRef"
-      class="lightbox-viewport h-full w-full overflow-auto"
-      :style="heroAnimating ? { visibility: 'hidden' } : {}"
+      class="lightbox-viewport absolute inset-0 z-10 h-full w-full overflow-auto"
+      :style="{ touchAction: isPannable ? 'none' : 'pan-y' }"
       @wheel="handleViewportWheel"
     >
       <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">
@@ -767,18 +807,6 @@ defineExpose({
         </div>
       </div>
     </div>
-
-    <button
-      v-if="canGoToNext"
-      class="surface-top absolute top-1/2 right-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
-      :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
-      @click="handleNext"
-      :aria-label="t('gallery.lightbox.image.nextTitle')"
-    >
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
   </div>
 </template>
 

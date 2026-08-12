@@ -12,6 +12,7 @@ import {
   Maximize,
   ZoomOut,
   ZoomIn,
+  Info,
 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -28,6 +29,10 @@ import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 
 const ACTUAL_SIZE_EPSILON = 0.001
 
+const props = defineProps<{
+  detailsOpen: boolean
+}>()
+
 const emit = defineEmits<{
   back: []
   fit: []
@@ -37,6 +42,7 @@ const emit = defineEmits<{
   rotate: [deltaDegrees: number]
   toggleFilmstrip: []
   toggleImmersive: []
+  toggleDetails: []
 }>()
 
 const { t } = useI18n()
@@ -369,6 +375,23 @@ function handleToolbarContextMenu(event: MouseEvent) {
               }}
             </span>
             <Kbd>Tab</Kbd>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="sidebarGhost"
+              size="icon-sm"
+              class="flex @[640px]:hidden"
+              :class="props.detailsOpen ? toggleActiveClass : ''"
+              @click="emit('toggleDetails')"
+            >
+              <Info class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {{ t('gallery.lightbox.toolbar.detailsTitle') }}
           </TooltipContent>
         </Tooltip>
 
