@@ -132,13 +132,6 @@ auto extract_original_request_locator(std::string_view url, std::string_view pre
                                 .relative_path = std::move(*decoded_relative_path)};
 }
 
-// resolver 用的最小文件校验。
-// 这里不做业务层判断，只确认文件存在且是普通文件。
-auto validate_asset_file(const std::filesystem::path& path) -> bool {
-  std::error_code ec;
-  return std::filesystem::exists(path, ec) && std::filesystem::is_regular_file(path, ec) && !ec;
-}
-
 // ============= HTTP 静态服务解析器 =============
 
 auto register_http_resolvers(core::AppState& state) -> void {
@@ -162,11 +155,8 @@ auto register_http_resolvers(core::AppState& state) -> void {
           Logger().warn("Unsafe thumbnail path requested: {}", full_path.string());
           return std::unexpected("Unsafe thumbnail path");
         }
-        if (!validate_asset_file(full_path)) {
-          Logger().debug("Thumbnail file not found: {}", full_path.string());
-          return std::unexpected("Thumbnail file not found");
-        }
 
+        // 文件存在性由统一静态服务入口查询，避免 resolver 重复访问磁盘。
         Logger().debug("Resolved thumbnail path: {}", full_path.string());
         return core::http_server::PathResolutionData{
             .file_path = full_path,
@@ -193,11 +183,7 @@ auto register_http_resolvers(core::AppState& state) -> void {
           return std::unexpected(path_result.error());
         }
 
-        if (!validate_asset_file(*path_result)) {
-          Logger().warn("Original file not found: {}", path_result->string());
-          return std::unexpected("Asset file not found");
-        }
-
+        // 文件存在性由统一静态服务入口查询，避免 resolver 重复访问磁盘。
         Logger().debug("Resolved original locator {}/{} to {}", locator->root_id,
                        locator->relative_path, path_result->string());
         return core::http_server::PathResolutionData{

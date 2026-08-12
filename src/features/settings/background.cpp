@@ -620,11 +620,12 @@ auto register_static_resolvers(core::AppState& app_state) -> void {
         }
 
         auto background_path_result =
-            resolve_existing_managed_background_file(std::filesystem::path(*relative_path));
+            resolve_managed_background_file(std::filesystem::path(*relative_path));
         if (!background_path_result) {
           return std::unexpected(background_path_result.error());
         }
 
+        // 文件存在性由统一静态服务入口查询，避免 resolver 重复访问磁盘。
         return core::http_server::PathResolutionData{
             .file_path = background_path_result.value(),
             .cache_duration = std::chrono::hours(1),

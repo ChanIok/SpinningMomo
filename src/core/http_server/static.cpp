@@ -4,6 +4,7 @@
 
 #include "vendor/asio.hpp"
 #include "vendor/uwebsockets.hpp"
+#include "vendor/windows/fileapi.hpp"
 
 #include "core/async/async.hpp"
 #include "core/http_server/access.hpp"
@@ -13,7 +14,6 @@
 #include "utils/file/mime.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
-#include "utils/time.hpp"
 
 namespace core::http_server::static_content {
 
@@ -69,25 +69,14 @@ auto try_custom_resolve(core::AppState& state, std::string_view url_path)
   return std::nullopt;
 }
 
-auto is_safe_path(const std::filesystem::path& path, const std::filesystem::path& base_path)
-    -> std::expected<bool, std::string> {
-  try {
-    std::filesystem::path normalized_path = path.lexically_normal();
-    std::filesystem::path normalized_base = base_path.lexically_normal();
-
-    std::string path_str = normalized_path.string();
-    std::string base_str = normalized_base.string();
-
-    // 检查路径是否以基础路径开头，或者路径等于基础路径
-    bool is_safe = path_str.rfind(base_str, 0) == 0 || normalized_path == normalized_base;
-    return is_safe;
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to check path safety: " + std::string(e.what()));
-  }
-}
-
 // 获取针对不同文件类型的缓存时间
-auto get_cache_duration(const std::string& extension) -> std::chrono::seconds {
+auto get_cache_duration(std::string_view url_path, const std::filesystem::path& file_path)
+    -> std::chrono::seconds {
+  // Vite 产物使用内容哈希命名；版本变化会产生新文件名，可以长期缓存。
+  if (url_path.starts_with("/assets/")) return std::chrono::seconds{31536000};
+
+  auto extension = file_path.extension().string();
+
   // HTML文件：短缓存，便于开发调试
   if (extension == ".html") return std::chrono::seconds{60};
 
@@ -105,9 +94,8 @@ auto get_cache_duration(const std::string& extension) -> std::chrono::seconds {
 }
 
 // 路径解析
-auto resolve_file_path(const std::string& url_path) -> std::filesystem::path {
-  auto web_root = utils::path::GetEmbeddedWebRootDirectory().value_or(".");
-
+auto resolve_file_path(const std::filesystem::path& web_root, const std::string& url_path)
+    -> std::filesystem::path {
   auto clean_path = url_path == "/" ? "/index.html" : url_path;
   if (clean_path.ends_with("/")) clean_path += "index.html";
 
@@ -201,6 +189,53 @@ struct CacheValidators {
   std::string last_modified;
 };
 
+struct FileMetadata {
+  size_t size = 0;
+  std::int64_t modified_seconds = 0;
+  std::chrono::system_clock::time_point modified_time{};
+};
+
+// 一次读取文件属性，复用文件大小和最后修改时间，避免多个 filesystem 查询。
+auto query_file_metadata(const std::filesystem::path& file_path)
+    -> std::expected<FileMetadata, std::string> {
+  WIN32_FILE_ATTRIBUTE_DATA attributes{};
+  if (!GetFileAttributesExW(file_path.c_str(), GetFileExInfoStandard, &attributes)) {
+    return std::unexpected(std::format("GetFileAttributesExW failed with Win32 error {}",
+                                       static_cast<unsigned long>(GetLastError())));
+  }
+
+  if ((attributes.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+    return std::unexpected("Resolved path is a directory");
+  }
+
+  ULARGE_INTEGER size{};
+  size.LowPart = attributes.nFileSizeLow;
+  size.HighPart = attributes.nFileSizeHigh;
+  if (size.QuadPart > std::numeric_limits<size_t>::max()) {
+    return std::unexpected("Resolved file is too large for this platform");
+  }
+
+  ULARGE_INTEGER modified_time{};
+  modified_time.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
+  modified_time.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
+
+  // Windows FILETIME uses 100ns ticks since 1601-01-01; HTTP dates use Unix seconds.
+  constexpr std::uint64_t kWindowsToUnixEpoch100ns = 116444736000000000ULL;
+  if (modified_time.QuadPart < kWindowsToUnixEpoch100ns) {
+    return std::unexpected("Resolved file has an invalid last write time");
+  }
+
+  const auto modified_seconds =
+      static_cast<std::int64_t>((modified_time.QuadPart - kWindowsToUnixEpoch100ns) / 10000000ULL);
+
+  return FileMetadata{
+      .size = static_cast<size_t>(size.QuadPart),
+      .modified_seconds = modified_seconds,
+      .modified_time =
+          std::chrono::system_clock::time_point{std::chrono::seconds{modified_seconds}},
+  };
+}
+
 // 去掉条件请求头两端的空白，避免匹配时受逗号分段或客户端格式影响。
 auto trim_http_header_value(std::string_view value) -> std::string_view {
   while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) {
@@ -213,26 +248,17 @@ auto trim_http_header_value(std::string_view value) -> std::string_view {
 }
 
 // 为默认静态资源生成强缓存头；自定义 resolver 可再覆盖成更具体的策略。
-auto build_cache_control_header(std::chrono::seconds cache_duration) -> std::string {
-  return std::format("public, max-age={}", cache_duration.count());
+auto build_cache_control_header(std::chrono::seconds cache_duration, bool immutable = false)
+    -> std::string {
+  return std::format("public, max-age={}{}", cache_duration.count(),
+                     immutable ? ", immutable" : "");
 }
 
 // 基于文件大小和最后修改时间构造条件缓存校验器，避免为原图额外计算内容哈希。
-auto build_cache_validators(const std::filesystem::path& file_path, size_t file_size)
-    -> std::expected<CacheValidators, std::string> {
-  std::error_code ec;
-  auto last_write_time = std::filesystem::last_write_time(file_path, ec);
-  if (ec) {
-    return std::unexpected("Failed to query file last write time: " + ec.message());
-  }
-
-  auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
-      utils::time::file_time_to_system_clock(last_write_time));
-  auto modified_seconds = utils::time::file_time_to_seconds(last_write_time);
-
+auto build_cache_validators(const FileMetadata& metadata) -> CacheValidators {
   return CacheValidators{
-      .etag = std::format("\"{:x}-{:x}\"", file_size, modified_seconds),
-      .last_modified = std::format("{:%a, %d %b %Y %H:%M:%S GMT}", modified_time)};
+      .etag = std::format("\"{:x}-{:x}\"", metadata.size, metadata.modified_seconds),
+      .last_modified = std::format("{:%a, %d %b %Y %H:%M:%S GMT}", metadata.modified_time)};
 }
 
 // HTTP 的 If-None-Match 允许逗号分隔多个 ETag；这里只要任一命中即可视为未变更。
@@ -495,19 +521,21 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
 
 // 图库 /static 原文件与磁盘 web 根路径共用：统一处理 Range、HEAD/GET，并择流式或整读。
 auto serve_resolved_file_request(core::AppState& state, const std::filesystem::path& file_path,
+                                 std::string_view url_path,
                                  std::optional<std::chrono::seconds> cache_duration_override,
                                  std::optional<std::string> cache_control_override, auto* res,
                                  auto* req, bool is_head) -> void {
-  // 检查文件是否存在
-  if (!std::filesystem::exists(file_path)) {
-    Logger().warn("Resolved file not found: {}", file_path.string());
+  auto metadata_result = query_file_metadata(file_path);
+  if (!metadata_result) {
+    Logger().warn("Resolved file unavailable: {} ({})", file_path.string(),
+                  metadata_result.error());
     res->writeStatus("404 Not Found");
     res->end("File not found");
     return;
   }
 
-  // 获取文件大小
-  size_t file_size = std::filesystem::file_size(file_path);
+  const auto& metadata = metadata_result.value();
+  const size_t file_size = metadata.size;
 
   // 决定mime类型和缓存时间
   std::string mime_type = utils::file::mime::get_mime_type(file_path);
@@ -515,22 +543,16 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
   if (cache_duration_override) {
     cache_duration = *cache_duration_override;
   } else {
-    auto extension = file_path.extension().string();
-    cache_duration = get_cache_duration(extension);
+    cache_duration = get_cache_duration(url_path, file_path);
   }
-  auto cache_control = cache_control_override.value_or(build_cache_control_header(cache_duration));
+  auto cache_control =
+      cache_control_override
+          ? std::move(*cache_control_override)
+          : build_cache_control_header(cache_duration, url_path.starts_with("/assets/"));
 
-  auto validators_result = build_cache_validators(file_path, file_size);
-  if (!validators_result) {
-    Logger().error("Failed to build cache validators for {}: {}", file_path.string(),
-                   validators_result.error());
-    res->writeStatus("500 Internal Server Error");
-    res->end("Internal server error");
-    return;
-  }
-  auto validators = std::move(validators_result.value());
+  auto validators = build_cache_validators(metadata);
 
-  auto range_parse = parse_range_header(std::string(req->getHeader("range")), file_size);
+  auto range_parse = parse_range_header(req->getHeader("range"), file_size);
   if (!range_parse.valid) {
     write_range_not_satisfiable(res, file_size);
     return;
@@ -576,7 +598,7 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
        range = range_parse.range]() -> asio::awaitable<void> {
         try {
           // 异步读取文件
-          auto file_result = co_await utils::file::read_file(file_path);
+          auto file_result = co_await utils::file::read_file(file_path, file_size);
           if (!file_result) {
             Logger().error("Failed to read custom file: {}", file_result.error());
             loop->defer([res]() {
@@ -586,7 +608,16 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
             co_return;
           }
 
-          auto file_data = file_result.value();
+          auto file_data = std::move(file_result.value());
+          if (file_data.data.size() < file_size) {
+            Logger().error("File changed while reading: {}", file_path.string());
+            loop->defer([res]() {
+              res->writeStatus("500 Internal Server Error");
+              res->end("Internal server error");
+            });
+            co_return;
+          }
+
           size_t range_start = range.has_value() ? range->start : 0;
           size_t range_end = range.has_value() ? range->end : (file_size - 1);
           size_t content_length = range_end >= range_start ? (range_end - range_start + 1) : 0;
@@ -634,7 +665,7 @@ auto handle_static_request(core::AppState& state, const std::string& url_path, a
   if (auto custom_result = try_custom_resolve(state, url_path)) {
     if (custom_result->has_value()) {
       Logger().debug("Using custom resolver for: {}", url_path);
-      serve_resolved_file_request(state, custom_result->value().file_path,
+      serve_resolved_file_request(state, custom_result->value().file_path, url_path,
                                   custom_result->value().cache_duration,
                                   custom_result->value().cache_control_header, res, req, is_head);
       return;
@@ -642,27 +673,19 @@ auto handle_static_request(core::AppState& state, const std::string& url_path, a
   }
 
   // 2. 否则使用默认的 web 资源解析
-  auto file_path = resolve_file_path(url_path);
   auto web_root = get_web_root();
+  auto file_path = resolve_file_path(web_root, url_path);
 
   // 路径安全检查
-  auto safety_check = is_safe_path(file_path, web_root);
-  if (!safety_check.has_value() || !safety_check.value()) {
+  if (!utils::path::IsPathWithinBase(file_path, web_root)) {
     Logger().warn("Unsafe path requested: {}", file_path.string());
     res->writeStatus("403 Forbidden");
     res->end("Forbidden");
     return;
   }
 
-  // 检查文件是否存在
-  if (!std::filesystem::exists(file_path)) {
-    Logger().warn("File not found: {}", file_path.string());
-    res->writeStatus("404 Not Found");
-    res->end("File not found");
-    return;
-  }
-
-  serve_resolved_file_request(state, file_path, std::nullopt, std::nullopt, res, req, is_head);
+  serve_resolved_file_request(state, file_path, url_path, std::nullopt, std::nullopt, res, req,
+                              is_head);
 }
 
 // 注册静态文件路由

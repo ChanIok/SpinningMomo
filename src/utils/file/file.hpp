@@ -86,8 +86,9 @@ struct CopyResult {
   bool is_recursive_copy{false};  // 是否为递归复制
 };
 
-// 异步读取文件（原始数据）
-auto read_file(const std::filesystem::path& file_path)
+// 异步读取文件（原始数据）；已知大小可避免打开后再次查询文件元数据。
+auto read_file(const std::filesystem::path& file_path,
+               std::optional<size_t> known_file_size = std::nullopt)
     -> asio::awaitable<std::expected<FileReadResult, std::string>>;
 
 // 异步读取文件并编码（用于RPC等需要文本传输的场景）

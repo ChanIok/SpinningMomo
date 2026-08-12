@@ -99,14 +99,14 @@ auto is_text_mime_type(const std::string& mime_type) -> bool {
          mime_type.starts_with("application/javascript") || mime_type.ends_with("; charset=utf-8");
 }
 
-auto read_file(const std::filesystem::path& file_path)
+auto read_file(const std::filesystem::path& file_path, std::optional<size_t> known_file_size)
     -> asio::awaitable<std::expected<FileReadResult, std::string>> {
   try {
     // 获取当前executor
     auto executor = co_await asio::this_coro::executor;
 
     asio::stream_file file(executor, file_path.string(), asio::file_base::read_only);
-    auto file_size = file.size();
+    const auto file_size = known_file_size ? *known_file_size : file.size();
 
     FileReadResult result;
     result.path = file_path.string();
