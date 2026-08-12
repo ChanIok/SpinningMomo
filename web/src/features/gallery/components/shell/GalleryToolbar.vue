@@ -47,6 +47,7 @@ import {
   X,
 } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
+import { isLocalAccess } from '@/core/access'
 import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
 import { useGalleryView } from '../../composables'
@@ -73,11 +74,18 @@ const settingsStore = useSettingsStore()
 const store = useGalleryStore()
 const galleryView = useGalleryView()
 
-const showMapEntry = computed(() => settingsStore.appSettings.extensions.infinityNikki.enable)
+// 第三方地图会读取本机鉴权资源，因此只在 local 页面展示入口。
+const showMapEntry = computed(
+  () => isLocalAccess() && settingsStore.appSettings.extensions.infinityNikki.enable
+)
 
 const isPreferencesTooltipAllowed = ref(true)
 
 const handleOpenMap = () => {
+  // 即使通过代码触发，也不能让 LAN 页面进入地图路由。
+  if (!isLocalAccess()) {
+    return
+  }
   void pushWithViewTransition(router, '/map')
 }
 

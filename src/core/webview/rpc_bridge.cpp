@@ -48,8 +48,9 @@ auto handle_webview_message(core::AppState& state, const std::string& message)
                  message.substr(0, 100) + (message.size() > 100 ? "..." : ""));
 
   try {
-    // 在异步线程上处理rpc请求
-    auto response = co_await core::rpc::process_request(state, message);
+    // WebView2 始终代表本机调用者，直接授予 local 访问等级。
+    auto response =
+        co_await core::rpc::process_request(state, message, core::rpc::AccessLevel::local);
 
     // 直接投递响应字符串到UI线程处理
     core::events::post(state, core::webview::events::WebViewResponseEvent{response});

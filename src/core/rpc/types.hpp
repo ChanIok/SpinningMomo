@@ -14,7 +14,15 @@ enum class ErrorCode {
   MethodNotFound = -32601,  // 方法未找到
   InvalidParams = -32602,   // 无效参数
   InternalError = -32603,   // 内部错误
-  ServerError = -32000      // 服务器错误
+  ServerError = -32000,     // 服务器错误
+  AccessDenied = -32003,    // 当前访问等级无权调用
+};
+
+// RPC 调用者访问等级。local 高于 lan；WebView2 和 loopback HTTP 属于 local，
+// 经过令牌认证的局域网 HTTP 属于 lan。
+enum class AccessLevel : std::uint8_t {
+  lan = 0,
+  local = 1,
 };
 
 // RPC错误结构
@@ -77,6 +85,7 @@ struct MethodInfo {
   std::string name;
   std::string description;
   std::string params_schema;  // 参数的JSON Schema
+  AccessLevel required_access = AccessLevel::local;
   std::move_only_function<RpcJsonAwaitable(rfl::Generic, rfl::Generic) const> handler;
 };
 

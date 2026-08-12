@@ -21,25 +21,39 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
   return rfl::json::write<rfl::SnakeCaseToCamelCase>(error_response);
 }
 
-// 获取所有已注册方法的列表
-auto get_method_list(const core::AppState& app_state) -> std::vector<MethodListItem> {
+// 获取当前访问等级可以调用的已注册方法列表。
+auto get_method_list(const core::AppState& app_state, AccessLevel caller_access)
+    -> std::vector<MethodListItem> {
   std::vector<MethodListItem> methods;
   const auto& registry = app_state.rpc->registry;
 
   for (const auto& [name, info] : registry) {
+    if (caller_access < info.required_access) {
+      continue;
+    }
     methods.emplace_back(MethodListItem{.name = name, .description = info.description});
   }
 
   return methods;
 }
 
-// 处理系统内置方法
+// 处理系统内置方法，并在查询元数据时应用调用者访问等级。
 auto handle_system_method(core::AppState& app_state, const JsonRpcRequest& request,
-                          rfl::Generic request_id) -> std::optional<std::string> {
+                          rfl::Generic request_id, AccessLevel caller_access)
+    -> std::optional<std::string> {
   if (request.method == "system.listMethods") {
     JsonRpcSuccessResponse success_response;
     success_response.id = request_id;
-    success_response.result = rfl::to_generic(get_method_list(app_state));
+    success_response.result = rfl::to_generic(get_method_list(app_state, caller_access));
+    return rfl::json::write<rfl::SnakeCaseToCamelCase>(success_response);
+  }
+
+  if (request.method == "system.getAccessLevel") {
+    // 前端只需要知道当前传输层已经确认的等级，不重复推断来源。
+    JsonRpcSuccessResponse success_response;
+    success_response.id = request_id;
+    success_response.result = rfl::to_generic(
+        caller_access == AccessLevel::local ? std::string{"local"} : std::string{"lan"});
     return rfl::json::write<rfl::SnakeCaseToCamelCase>(success_response);
   }
 
@@ -67,6 +81,12 @@ auto handle_system_method(core::AppState& app_state, const JsonRpcRequest& reque
                                    "Method not found: " + signature_request_result.value().method);
     }
 
+    // 方法签名本身也属于能力信息，未授权调用者不能用它探测受限接口。
+    if (caller_access < method_it->second.required_access) {
+      return create_error_response(request_id, ErrorCode::AccessDenied,
+                                   "Access denied for this method");
+    }
+
     // 构造响应
     MethodSignatureResponse signature_response{.method = method_it->second.name,
                                                .description = method_it->second.description,
@@ -81,7 +101,7 @@ auto handle_system_method(core::AppState& app_state, const JsonRpcRequest& reque
   return std::nullopt;  // 不是系统方法
 }
 
-// 执行已注册的方法
+// 执行已完成参数转换的业务处理器，并统一转换异常结果。
 auto execute_registered_method(const MethodInfo& method_info, rfl::Generic params_generic,
                                rfl::Generic request_id) -> RpcJsonAwaitable {
   try {
@@ -96,9 +116,9 @@ auto execute_registered_method(const MethodInfo& method_info, rfl::Generic param
   }
 }
 
-// 处理JSON-RPC 2.0协议请求 - 优化版本
-auto process_request(core::AppState& app_state, const std::string& request_json)
-    -> RpcJsonAwaitable {
+// 解析 JSON-RPC 请求、执行内置方法，并在业务调用前检查访问等级。
+auto process_request(core::AppState& app_state, const std::string& request_json,
+                     AccessLevel caller_access) -> RpcJsonAwaitable {
   try {
     // 解析JSON-RPC请求
     auto request_result = rfl::json::read<JsonRpcRequest, rfl::SnakeCaseToCamelCase>(request_json);
@@ -119,7 +139,8 @@ auto process_request(core::AppState& app_state, const std::string& request_json)
     }
 
     // 处理系统内置方法
-    if (auto system_response = handle_system_method(app_state, request, request_id)) {
+    if (auto system_response =
+            handle_system_method(app_state, request, request_id, caller_access)) {
       co_return system_response.value();
     }
 
@@ -130,6 +151,13 @@ auto process_request(core::AppState& app_state, const std::string& request_json)
       const auto error_msg = "Method not found: " + request.method;
       Logger().error(error_msg);
       co_return create_error_response(request_id, ErrorCode::MethodNotFound, error_msg);
+    }
+
+    // 这是所有注册 RPC 的最终权限闸门，不能只依赖前端隐藏按钮。
+    if (caller_access < method_it->second.required_access) {
+      Logger().warn("Rejected RPC method '{}' for insufficient access level", request.method);
+      co_return create_error_response(request_id, ErrorCode::AccessDenied,
+                                      "Access denied for this method");
     }
 
     // 准备参数

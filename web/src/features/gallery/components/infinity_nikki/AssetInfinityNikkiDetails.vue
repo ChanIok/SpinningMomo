@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { readClipboardText } from '@/core/clipboard'
+import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useMapStore } from '@/features/map/store'
@@ -58,6 +59,8 @@ const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
 const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
+// “读取剪贴板填充染色码”是宿主机能力，远端只允许手动输入。
+const canReadHostClipboard = computed(() => isLocalAccess())
 const canShowSameOutfitDyeFillPrompt = computed(() => {
   const preview = sameOutfitDyeFillPreview.value
   return (
@@ -339,6 +342,11 @@ async function handleCodeValueAction() {
     return
   }
 
+  // 没有本机权限时不读取宿主剪贴板，避免远端页面产生失败提示。
+  if (!canReadHostClipboard.value) {
+    return
+  }
+
   let normalizedClipboardText = ''
   try {
     normalizedClipboardText = (await readClipboardText())?.trim() ?? ''
@@ -413,6 +421,11 @@ async function handleSelectWorldId(nextWorldId: string | undefined) {
 }
 
 async function handleOpenMapLocation() {
+  // 地图跳转会打开仅本机可用的第三方地图页面。
+  if (!isLocalAccess()) {
+    return
+  }
+
   const target = currentMapLocationTarget.value
   if (!target) {
     return
@@ -573,6 +586,7 @@ watch(
             @keydown.esc.prevent="resetUserRecordDraft"
           />
           <Button
+            v-if="hasCodeValueDraft || canReadHostClipboard"
             variant="outline"
             size="sm"
             class="h-6 px-2 text-xs"
@@ -763,7 +777,9 @@ watch(
             t('gallery.details.infinityNikki.nikkiLocation')
           }}</span>
           <div class="flex min-w-0 items-center gap-1">
+            <!-- 本机才显示可点击的地图世界入口；远端只展示当前名称。 -->
             <button
+              v-if="isLocalAccess()"
               type="button"
               class="min-w-0 cursor-pointer truncate text-left transition-colors hover:text-primary disabled:cursor-default disabled:text-foreground"
               :disabled="!currentMapLocationTarget"
@@ -771,6 +787,7 @@ watch(
             >
               {{ currentWorldLabel }}
             </button>
+            <span v-else class="min-w-0 truncate text-left">{{ currentWorldLabel }}</span>
             <Popover v-model:open="isWorldPopoverOpen">
               <PopoverTrigger as-child>
                 <Button

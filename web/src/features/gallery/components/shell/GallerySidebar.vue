@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
+import { isLocalAccess } from '@/core/access'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Split } from '@/components/ui/split'
@@ -47,6 +48,8 @@ const galleryStore = useGalleryStore()
 const { sidebarFolderSplitSize } = useGalleryLayout()
 const { toast } = useToast()
 const { t } = useI18n()
+// 侧边栏仍展示图库树，但所有宿主机文件操作都由这个能力开关统一控制。
+const canUseLocalFileSystem = computed(() => isLocalAccess())
 
 const isFoldersCollapsed = ref(false)
 const isTagsCollapsed = ref(false)
@@ -117,6 +120,10 @@ const isAllMediaSelected = computed(
 )
 
 function startAddFolder() {
+  // 远端不能创建真实目录或打开目录选择框。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
   showAddFolderDialog.value = true
 }
 
@@ -146,6 +153,10 @@ function handleInfinityNikkiMetadataDialogOpenChange(open: boolean) {
 }
 
 function openRescanDialog(folderId: number, folderName: string) {
+  // 扫描对话框只允许从本机页面打开。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
   rescanFolderId.value = folderId
   rescanFolderName.value = folderName
   showRescanDialog.value = true
@@ -258,6 +269,11 @@ async function handleRenameFolderDisplayName(folderId: number, displayName: stri
 }
 
 async function handleOpenFolderInExplorer(folderId: number) {
+  // 双重保护：按钮已隐藏时，仍阻止其他事件入口调用资源管理器。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
+
   try {
     await openFolderInExplorer(folderId)
   } catch (error) {
@@ -296,6 +312,12 @@ async function handleRemoveFolderWatch(folderId: number) {
 }
 
 async function confirmRescanFolder() {
+  // 权限在对话框打开后发生变化时，先清理状态再退出。
+  if (!canUseLocalFileSystem.value) {
+    resetRescanDialogState()
+    return
+  }
+
   const folderId = rescanFolderId.value
   if (folderId === null) {
     return
@@ -335,6 +357,11 @@ async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
 
 // 将文件夹树右键命中的节点作为粘贴目标，不依赖当前筛选状态。
 async function handlePasteClipboardToFolder(folderId: number) {
+  // 系统剪贴板导入只允许本机页面触发。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
+
   await folderActions.pasteClipboardToFolder(folderId)
 }
 
@@ -518,7 +545,8 @@ onMounted(() => {
                       {{ t('gallery.sidebar.folders.collapseAll') }}
                     </TooltipContent>
                   </Tooltip>
-                  <Tooltip>
+                  <!-- LAN 页面不显示创建真实图库目录的入口。 -->
+                  <Tooltip v-if="canUseLocalFileSystem">
                     <TooltipTrigger as-child>
                       <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
                         <Plus class="h-3 w-3" />

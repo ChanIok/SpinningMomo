@@ -29,7 +29,7 @@ export function useCardImageScheduler(
   const allowedOriginalAssetIds = ref<Set<number>>(new Set())
 
   let latestItems: CardImageScheduleItem[] = []
-  let scrollIdleTimer: ReturnType<typeof window.setTimeout> | null = null
+  let scrollIdleTimer: number | null = null
   let thumbnailScheduleVersion = 0
   let originalScheduleVersion = 0
   let thumbnailTaskController = createBrowserTaskController('user-visible')

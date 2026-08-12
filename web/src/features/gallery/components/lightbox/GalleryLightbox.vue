@@ -11,6 +11,7 @@ import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { isLocalAccess } from '@/core/access'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
@@ -246,6 +247,8 @@ function handleKeydown(event: KeyboardEvent) {
   if (
     (event.ctrlKey || event.metaKey) &&
     !event.shiftKey &&
+    // 灯箱普通 Ctrl+C 会写入宿主机剪贴板，远端应保留浏览器默认行为。
+    isLocalAccess() &&
     event.key.toLowerCase() === 'c' &&
     store.selection.selectedIds.size > 0
   ) {

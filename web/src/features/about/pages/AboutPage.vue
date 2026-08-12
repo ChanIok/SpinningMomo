@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { call } from '@/core/rpc'
+import { isLocalAccess } from '@/core/access'
 import { useTaskStore } from '@/core/tasks/store'
 import { useSettingsStore } from '@/features/settings/store'
 import { useI18n } from '@/composables/useI18n'
@@ -52,6 +53,8 @@ const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
 const settingsStore = useSettingsStore()
+// About 页仍可远端查看，但更新和日志目录等宿主机操作只对本机显示。
+const canUseLocalHostActions = computed(() => isLocalAccess())
 
 const runtimeInfo = ref<RuntimeInfo | null>(null)
 const currentVersionFromUpdate = ref<string | null>(null)
@@ -133,6 +136,11 @@ const loadRuntimeInfo = async () => {
 }
 
 const checkForUpdate = async (silent = false) => {
+  // 更新流程会读写本机文件并启动安装器，远端页面不参与。
+  if (!canUseLocalHostActions.value) {
+    return
+  }
+
   if (isCheckingUpdate.value || isStartingDownload.value || isInstallingUpdate.value) {
     return
   }
@@ -172,6 +180,11 @@ const checkForUpdate = async (silent = false) => {
 }
 
 const downloadAndInstallUpdate = async () => {
+  // 下载和安装属于宿主机动作，避免 LAN 页面误触发。
+  if (!canUseLocalHostActions.value) {
+    return
+  }
+
   if (isCheckingUpdate.value || isStartingDownload.value || isInstallingUpdate.value) {
     return
   }
@@ -230,6 +243,11 @@ const copyFeedbackEmail = async () => {
 }
 
 const openLogDirectory = async () => {
+  // 日志目录只能由本机窗口交给资源管理器打开。
+  if (!canUseLocalHostActions.value) {
+    return
+  }
+
   if (isOpeningLogDirectory.value) {
     return
   }
@@ -249,7 +267,7 @@ const openLogDirectory = async () => {
 
 onMounted(() => {
   void loadRuntimeInfo()
-  if (settingsStore.appSettings.update.autoCheck) {
+  if (canUseLocalHostActions.value && settingsStore.appSettings.update.autoCheck) {
     void checkForUpdate(true)
   }
 })
@@ -287,7 +305,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="flex h-8 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium text-card-foreground transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-              :disabled="isVersionBusy || appVersionText === '-'"
+              :disabled="!canUseLocalHostActions || isVersionBusy || appVersionText === '-'"
               @click="handleUpdateAction"
             >
               <!-- Status Icon -->
@@ -409,7 +427,9 @@ onBeforeUnmount(() => {
                     {{ t('about.feedback.step2.description') }}
                   </p>
                   <div class="mt-2 flex flex-wrap gap-2">
+                    <!-- 远端只能查看版本信息，不能启动本机更新操作。 -->
                     <Button
+                      v-if="canUseLocalHostActions"
                       variant="secondary"
                       size="sm"
                       class="h-7 text-xs"

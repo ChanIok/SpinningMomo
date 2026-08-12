@@ -94,22 +94,23 @@ auto handle_remove_folder_watch(core::AppState& app_state,
   co_return remove_result.value();
 }
 
-// ============= RPC 方法注册 =============
+// 注册文件夹浏览、编辑和宿主文件夹操作，并明确区分 LAN 与 local 权限。
 
 auto register_all(core::AppState& app_state) -> void {
   // 文件夹树
   register_method<EmptyParams, std::vector<features::gallery::FolderTreeNode>>(
       app_state, app_state.rpc->registry, "gallery.getFolderTree", handle_get_folder_tree,
-      "Get folder tree structure for navigation");
+      "Get folder tree structure for navigation", AccessLevel::lan);
 
   register_method<CreateFolderParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.createFolder", handle_create_folder,
-      "Create a physical child folder and index it immediately");
+      "Create a physical child folder and index it immediately", AccessLevel::lan);
 
   register_method<UpdateFolderDisplayNameParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateFolderDisplayName",
-      handle_update_folder_display_name, "Update folder display name");
+      handle_update_folder_display_name, "Update folder display name", AccessLevel::lan);
 
+  // 打开资源管理器和移除监听会操作宿主机文件系统，仅允许 local 调用。
   register_method<features::gallery::GetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openFolderInExplorer",
       handle_open_folder_in_explorer, "Open folder in explorer");

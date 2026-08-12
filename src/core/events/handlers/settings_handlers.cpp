@@ -4,6 +4,8 @@
 
 #include "core/commands/registry.hpp"
 #include "core/events/events.hpp"
+#include "core/http_server/http_server.hpp"
+#include "core/http_server/sse_manager.hpp"
 #include "core/i18n/i18n.hpp"
 #include "core/rpc/notification_hub.hpp"
 #include "core/state/app_state.hpp"
@@ -174,6 +176,21 @@ auto handle_settings_changed(core::AppState& state,
         has_webview_host_mode_changes(event.data.old_settings, event.data.new_settings);
     auto webview_theme_mode_changed =
         has_webview_theme_mode_changes(event.data.old_settings, event.data.new_settings);
+
+    const bool old_lan_enabled = event.data.old_settings.app.lan_access.enabled;
+    const bool new_lan_enabled = event.data.new_settings.app.lan_access.enabled;
+
+    if (old_lan_enabled != new_lan_enabled) {
+      // 关闭 LAN 后立即踢出远端 SSE，避免连接继续接收旧会话的推送。
+      if (!new_lan_enabled) {
+        core::http_server::sse_manager::request_close_all_connections(state);
+      }
+
+      if (auto rebind_result = core::http_server::rebind_listen_socket(state, new_lan_enabled);
+          !rebind_result) {
+        Logger().warn("Failed to apply LAN access listener change: {}", rebind_result.error());
+      }
+    }
 
     if (webview_host_mode_changed) {
       if (auto recreate_result = ui::webview_window::recreate_webview_host(state);

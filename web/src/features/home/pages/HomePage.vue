@@ -12,6 +12,7 @@ import { formatFileSize } from '@/lib/utils'
 import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
 import { pushWithViewTransition } from '@/router/viewTransition'
+import { isLocalAccess } from '@/core/access'
 import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
 
 interface NavAction {
@@ -119,12 +120,17 @@ const navActions = computed<NavAction[]>(() => [
     icon: Images,
     action: () => handleOpenPage('gallery'),
   },
-  {
-    key: 'settings',
-    label: t('app.navigation.settings'),
-    icon: Settings,
-    action: () => handleOpenPage('settings'),
-  },
+  // 设置页包含原生对话框和宿主机配置，只加入本机导航菜单。
+  ...(isLocalAccess()
+    ? [
+        {
+          key: 'settings',
+          label: t('app.navigation.settings'),
+          icon: Settings,
+          action: () => handleOpenPage('settings'),
+        },
+      ]
+    : []),
   {
     key: 'about',
     label: t('app.navigation.about'),

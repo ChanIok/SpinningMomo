@@ -15,6 +15,7 @@ import {
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
 import { isWebView } from '@/core/env'
+import { isLocalAccess } from '@/core/access'
 import {
   computeLightboxHeroRect,
   consumeHero,
@@ -330,6 +331,8 @@ function handleKeydown(event: KeyboardEvent) {
   if (
     (event.ctrlKey || event.metaKey) &&
     !event.shiftKey &&
+    // 普通系统剪贴板只属于本机；LAN 下保留浏览器默认快捷键行为。
+    isLocalAccess() &&
     event.key.toLowerCase() === 'c' &&
     store.selection.selectedIds.size > 0
   ) {
@@ -339,7 +342,8 @@ function handleKeydown(event: KeyboardEvent) {
   }
 
   // 普通 Ctrl+V 只导入到当前明确选中的文件夹，不占用标签粘贴快捷键。
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+  // LAN 下不拦截默认粘贴，避免远端页面弹出本机 Clipboard API 错误。
+  if ((event.ctrlKey || event.metaKey) && isLocalAccess() && event.key.toLowerCase() === 'v') {
     event.preventDefault()
     void folderActions.pasteClipboardToSelectedFolder()
     return
@@ -428,7 +432,9 @@ function resetExternalDragState() {
 
 // 只有 HWND WebView 的普通图库视图绑定了唯一文件夹时才接受外部文件。
 function canImportExternalFiles(): boolean {
+  // 外部文件导入要求本机 WebView、唯一目标文件夹且当前没有其他导入任务。
   return (
+    isLocalAccess() &&
     isWebView() &&
     !store.lightbox.isOpen &&
     !isDropImporting.value &&
@@ -493,8 +499,8 @@ async function handleViewerDrop(event: DragEvent) {
     const targetFolderId = folderActions.selectedFolderId.value
     resetExternalDragState()
 
-    // 浏览器、灯箱和重复提交都只消费 drop，不启动新的导入批次。
-    if (!isWebView() || store.lightbox.isOpen || isDropImporting.value) {
+    // 浏览器、LAN、灯箱和重复提交都只消费 drop，不启动新的导入批次。
+    if (!isLocalAccess() || !isWebView() || store.lightbox.isOpen || isDropImporting.value) {
       return
     }
     if (targetFolderId === undefined) {

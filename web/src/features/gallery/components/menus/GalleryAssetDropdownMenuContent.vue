@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
+import { isLocalAccess } from '@/core/access'
 import { Copy, Eraser, ExternalLink, FolderOpen, Star, Trash2, X } from '@lucide/vue'
 import {
   DropdownMenuItem,
@@ -15,38 +17,43 @@ import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
+// 下拉菜单与右键菜单共享同一套宿主机能力边界。
+const canUseLocalFileSystem = computed(() => isLocalAccess())
 const ratingOptions = [1, 2, 3, 4, 5] as const
 </script>
 
 <template>
-  <DropdownMenuItem
-    :disabled="!assetActions.isSingleSelection"
-    @click="assetActions.handleOpenAssetDefault"
-  >
-    <ExternalLink />
-    {{ t('gallery.contextMenu.openDefaultApp.label') }}
-  </DropdownMenuItem>
-  <DropdownMenuItem
-    :disabled="!assetActions.isSingleSelection"
-    @click="assetActions.handleRevealAssetInExplorer"
-  >
-    <FolderOpen />
-    {{ t('gallery.contextMenu.revealInExplorer.label') }}
-  </DropdownMenuItem>
-  <DropdownMenuSeparator />
-  <DropdownMenuItem
-    :disabled="!assetActions.hasSelection"
-    @click="assetActions.handleCopyAssetsToClipboard"
-  >
-    <Copy />
-    {{ t('gallery.contextMenu.copyFiles.label') }}
-    <DropdownMenuShortcut>
-      <KbdGroup>
-        <Kbd>Ctrl</Kbd>
-        <Kbd>C</Kbd>
-      </KbdGroup>
-    </DropdownMenuShortcut>
-  </DropdownMenuItem>
+  <!-- 远端隐藏文件打开、资源管理器和系统剪贴板入口。 -->
+  <template v-if="canUseLocalFileSystem">
+    <DropdownMenuItem
+      :disabled="!assetActions.isSingleSelection"
+      @click="assetActions.handleOpenAssetDefault"
+    >
+      <ExternalLink />
+      {{ t('gallery.contextMenu.openDefaultApp.label') }}
+    </DropdownMenuItem>
+    <DropdownMenuItem
+      :disabled="!assetActions.isSingleSelection"
+      @click="assetActions.handleRevealAssetInExplorer"
+    >
+      <FolderOpen />
+      {{ t('gallery.contextMenu.revealInExplorer.label') }}
+    </DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem
+      :disabled="!assetActions.hasSelection"
+      @click="assetActions.handleCopyAssetsToClipboard"
+    >
+      <Copy />
+      {{ t('gallery.contextMenu.copyFiles.label') }}
+      <DropdownMenuShortcut>
+        <KbdGroup>
+          <Kbd>Ctrl</Kbd>
+          <Kbd>C</Kbd>
+        </KbdGroup>
+      </DropdownMenuShortcut>
+    </DropdownMenuItem>
+  </template>
   <GalleryPasteDropdownMenuItem />
   <DropdownMenuItem
     inset

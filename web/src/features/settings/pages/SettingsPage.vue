@@ -10,6 +10,7 @@ import HotkeySettingsContent from '../components/HotkeySettingsContent.vue'
 import WindowSceneContent from '../components/WindowSceneContent.vue'
 import FloatingWindowContent from '../components/FloatingWindowContent.vue'
 import BackupSettingsContent from '../components/BackupSettingsContent.vue'
+import NetworkAccessContent from '../components/NetworkAccessContent.vue'
 import { useSettingsStore } from '../store'
 
 const activePage = ref<SettingsPageKey>('general')
@@ -38,6 +39,8 @@ watch(activePage, () => {
         <ScrollArea ref="scrollAreaRef" class="h-full w-full flex-1">
           <div class="px-8 py-4">
             <GeneralSettingsContent v-if="activePage === 'general'" />
+            <!-- LAN 访问配置包含本机服务和令牌操作。 -->
+            <NetworkAccessContent v-if="activePage === 'networkAccess'" />
             <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
             <CaptureSettingsContent v-if="activePage === 'capture'" />
             <ExtensionsContent v-if="activePage === 'extensions'" />

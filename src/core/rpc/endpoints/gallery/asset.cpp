@@ -403,52 +403,58 @@ auto handle_check_asset_reachable(core::AppState& app_state,
 // ============= RPC 方法注册 =============
 
 auto register_all(core::AppState& app_state) -> void {
+  // 查询、标签、图库元数据和资产整理允许 LAN；打开系统程序等宿主操作保持 local。
   // 时间线视图
   register_method<features::gallery::TimelineBucketsParams,
                   features::gallery::TimelineBucketsResponse>(
       app_state, app_state.rpc->registry, "gallery.getTimelineBuckets", handle_get_timeline_buckets,
-      "Get timeline buckets (months) with asset counts for timeline view");
+      "Get timeline buckets (months) with asset counts for timeline view", AccessLevel::lan);
 
   register_method<features::gallery::GetAssetsByMonthParams,
                   features::gallery::GetAssetsByMonthResponse>(
       app_state, app_state.rpc->registry, "gallery.getAssetsByMonth", handle_get_assets_by_month,
-      "Get all assets for a specific month in timeline view");
+      "Get all assets for a specific month in timeline view", AccessLevel::lan);
 
   // 统一资产查询接口
   register_method<features::gallery::QueryAssetsParams, features::gallery::ListResponse>(
       app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
       "Unified asset query interface with flexible filters (folder, month, year, type, search) "
-      "and optional pagination");
+      "and optional pagination",
+      AccessLevel::lan);
 
   register_method<features::gallery::QueryAssetLayoutMetaParams,
                   features::gallery::QueryAssetLayoutMetaResponse>(
       app_state, app_state.rpc->registry, "gallery.queryAssetLayoutMeta",
       handle_query_asset_layout_meta,
-      "Query lightweight asset layout metadata for adaptive gallery layout calculation");
+      "Query lightweight asset layout metadata for adaptive gallery layout calculation",
+      AccessLevel::lan);
 
   register_method<features::gallery::GetAssetMainColorsParams,
                   std::vector<features::gallery::AssetMainColor>>(
       app_state, app_state.rpc->registry, "gallery.getAssetMainColors",
-      handle_get_asset_main_colors, "Get extracted main colors for the specified asset");
+      handle_get_asset_main_colors, "Get extracted main colors for the specified asset",
+      AccessLevel::lan);
 
   register_method<EmptyParams, features::gallery::HomeStats>(
       app_state, app_state.rpc->registry, "gallery.getHomeStats", handle_get_home_stats,
-      "Get home page gallery stats summary");
+      "Get home page gallery stats summary", AccessLevel::lan);
 
   register_method<features::gallery::BatchSelectionSummaryParams,
                   features::gallery::BatchSelectionSummary>(
       app_state, app_state.rpc->registry, "gallery.getBatchSelectionSummary",
       handle_get_batch_selection_summary,
-      "Get the aggregated review and common-tag summary for the current selection");
+      "Get the aggregated review and common-tag summary for the current selection",
+      AccessLevel::lan);
 
   register_method<EmptyParams, features::gallery::MissingAssetsResponse>(
       app_state, app_state.rpc->registry, "gallery.getMissingAssets", handle_get_missing_assets,
-      "List assets in the missing recovery period and their reclaimable thumbnail storage");
+      "List assets in the missing recovery period and their reclaimable thumbnail storage",
+      AccessLevel::lan);
 
   register_method<features::gallery::PurgeMissingAssetsParams,
                   features::gallery::PurgeMissingAssetsResult>(
       app_state, app_state.rpc->registry, "gallery.purgeMissingAssets", handle_purge_missing_assets,
-      "Permanently purge selected or all assets that are still marked missing");
+      "Permanently purge selected or all assets that are still marked missing", AccessLevel::lan);
 
   register_method<features::gallery::GetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,
@@ -475,35 +481,37 @@ auto register_all(core::AppState& app_state) -> void {
 
   register_method<features::gallery::DeleteAssetsParams, features::gallery::DeleteAssetsResult>(
       app_state, app_state.rpc->registry, "gallery.deleteAssets", handle_delete_assets,
-      "Recycle selected asset files where possible or permanently delete them");
+      "Recycle selected asset files where possible or permanently delete them", AccessLevel::lan);
 
   register_method<features::gallery::MoveAssetsToFolderParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.moveAssetsToFolder",
       handle_move_assets_to_folder,
-      "Move selected assets to an indexed target folder and update gallery index paths");
+      "Move selected assets to an indexed target folder and update gallery index paths",
+      AccessLevel::lan);
 
   register_method<features::gallery::UpdateAssetsReviewStateParams,
                   features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetsReviewState",
       handle_update_assets_review_state,
-      "Batch update Lightroom-style review metadata such as rating and pick/reject state");
+      "Batch update Lightroom-style review metadata such as rating and pick/reject state",
+      AccessLevel::lan);
 
   register_method<features::gallery::UpdateAssetDescriptionParams,
                   features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetDescription",
       handle_update_asset_description,
-      "Update a single asset description in the gallery details panel");
+      "Update a single asset description in the gallery details panel", AccessLevel::lan);
 
   register_method<features::gallery::UpdateAssetsDescriptionParams,
                   features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateAssetsDescription",
       handle_update_assets_description,
-      "Batch update selected assets description in the gallery details panel");
+      "Batch update selected assets description in the gallery details panel", AccessLevel::lan);
 
   register_method<CheckAssetReachableParams, CheckAssetReachableResult>(
       app_state, app_state.rpc->registry, "gallery.checkAssetReachable",
       handle_check_asset_reachable,
-      "Check whether an indexed asset file still exists and is readable on disk");
+      "Check whether an indexed asset file still exists and is readable on disk", AccessLevel::lan);
 }
 
 }  // namespace core::rpc::endpoints::gallery::asset

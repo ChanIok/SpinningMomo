@@ -230,6 +230,7 @@ auto handle_infinity_nikki_set_world_record(
 }
 
 auto register_all(core::AppState& app_state) -> void {
+  // 扩展接口按是否触及宿主机或第三方地图资源分别授予 local/LAN 权限。
   core::rpc::register_method<rfl::Generic,
                              ::extensions::infinity_nikki::InfinityNikkiGameDirResult>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getGameDirectory",
@@ -259,35 +260,42 @@ auto register_all(core::AppState& app_state) -> void {
                              std::vector<::extensions::infinity_nikki::PhotoMapPoint>>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.queryPhotoMapPoints",
       handle_infinity_nikki_query_photo_map_points,
-      "Query Infinity Nikki photo map points using the current gallery filters");
+      "Query Infinity Nikki photo map points using the current gallery filters",
+      // 地图 iframe 属于第三方 origin，LAN 模式不能安全地向其提供本地缩略图鉴权。
+      core::rpc::AccessLevel::local);
 
   core::rpc::register_method<::extensions::infinity_nikki::GetInfinityNikkiDetailsParams,
                              ::extensions::infinity_nikki::InfinityNikkiDetails>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getDetails",
       handle_infinity_nikki_get_details,
-      "Get Infinity Nikki extracted data and user record for the specified asset");
+      "Get Infinity Nikki extracted data and user record for the specified asset",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<::extensions::infinity_nikki::GetDyeCodeAssetIdsParams,
                              std::vector<std::int64_t>>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getDyeCodeAssetIds",
       handle_infinity_nikki_get_dye_code_asset_ids,
-      "Return which of the specified assets have a non-empty Infinity Nikki dye code");
+      "Return which of the specified assets have a non-empty Infinity Nikki dye code",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<rfl::Generic, ::extensions::infinity_nikki::InfinityNikkiMapConfig>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getMapConfig",
-      handle_infinity_nikki_get_map_config, "Get online Infinity Nikki map world configuration");
+      handle_infinity_nikki_get_map_config, "Get online Infinity Nikki map world configuration",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<::extensions::infinity_nikki::GetInfinityNikkiMetadataNamesParams,
                              ::extensions::infinity_nikki::InfinityNikkiMetadataNames>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getMetadataNames",
       handle_infinity_nikki_get_metadata_names,
-      "Resolve localized names for Infinity Nikki metadata ids such as pose/filter/light");
+      "Resolve localized names for Infinity Nikki metadata ids such as pose/filter/light",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<::extensions::infinity_nikki::SetInfinityNikkiUserRecordParams,
                              features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.setUserRecord",
       handle_infinity_nikki_set_user_record,
-      "Set or clear a single Infinity Nikki user record in the gallery details panel");
+      "Set or clear a single Infinity Nikki user record in the gallery details panel",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<
       ::extensions::infinity_nikki::PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
@@ -295,7 +303,8 @@ auto register_all(core::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "extensions.infinityNikki.previewSameOutfitDyeCodeFill",
       handle_infinity_nikki_preview_same_outfit_dye_code_fill,
       "Preview how many same Infinity Nikki outfit and dye assets can receive the current dye "
-      "code");
+      "code",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<
       ::extensions::infinity_nikki::FillInfinityNikkiSameOutfitDyeCodeParams,
@@ -303,13 +312,15 @@ auto register_all(core::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "extensions.infinityNikki.fillSameOutfitDyeCode",
       handle_infinity_nikki_fill_same_outfit_dye_code,
       "Fill dye code records on assets with the same Infinity Nikki outfit and dye data, "
-      "overwriting existing values");
+      "overwriting existing values",
+      core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<::extensions::infinity_nikki::SetInfinityNikkiWorldRecordParams,
                              features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "extensions.infinityNikki.setWorldRecord",
       handle_infinity_nikki_set_world_record,
-      "Set or clear a single Infinity Nikki world record in the gallery details panel");
+      "Set or clear a single Infinity Nikki world record in the gallery details panel",
+      core::rpc::AccessLevel::lan);
 
   Logger().info("Extensions RPC endpoints registered");
 }

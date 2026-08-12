@@ -119,6 +119,12 @@ export interface AppSettings {
     // 始终以管理员权限运行
     alwaysRunAsAdmin: boolean
 
+    // 局域网图库访问设置；访问令牌由后端单独管理。
+    lanAccess: {
+      enabled: boolean // 是否监听局域网接口
+      preferredAdapterId: string // 生成链接时优先展示的稳定适配器 ID
+    }
+
     // 首次引导
     onboarding: {
       completed: boolean
@@ -264,6 +270,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // app 设置
   app: {
     alwaysRunAsAdmin: true,
+    lanAccess: {
+      enabled: false,
+      preferredAdapterId: '',
+    },
     onboarding: {
       completed: true,
       flowVersion: CURRENT_ONBOARDING_FLOW_VERSION,

@@ -68,6 +68,14 @@ struct AppSettings {
   struct App {
     bool always_run_as_admin = true;  // 始终以管理员权限运行
 
+    // 局域网图库访问设置；令牌单独保存在 HTTP 服务配置中，不进入 AppSettings。
+    struct LanAccess {
+      // 修改后立即切换 HTTP 服务的监听范围。
+      bool enabled = false;
+      // 保存稳定的适配器 ID；为空时由后端自动排序选择地址。
+      std::string preferred_adapter_id;
+    } lan_access;
+
     // 首次引导设置
     struct Onboarding {
       // 默认为 true，避免老用户升级时被强制进入引导；首次创建配置时会改写为 false

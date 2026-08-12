@@ -2,6 +2,7 @@
 // 挂在 ContentArea、与 router-view 平级：离开 /map 不销毁 iframe，避免每次重进地图冷启动
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { isLocalAccess } from '@/core/access'
 import { useGalleryStore } from '@/features/gallery/store'
 import { MAP_URL } from '@/features/map/bridge/protocol'
 import { useMapBridge } from '@/features/map/composables/useMapBridge'
@@ -17,7 +18,8 @@ const router = useRouter()
 const galleryStore = useGalleryStore()
 const mapStore = useMapStore()
 const mapIframe = ref<HTMLIFrameElement | null>(null)
-const isMapRoute = computed(() => route.name === 'map')
+// 地图 iframe 需要本机页面提供缩略图鉴权，LAN/unknown 时不激活它。
+const isMapRoute = computed(() => route.name === 'map' && isLocalAccess())
 /** 是否已首次进入过 /map；为 true 后 iframe 常驻 DOM，仅用 v-show 隐藏 */
 const hostActivated = ref(false)
 /** 官方地图页 URL；变更会触发 iframe 导航，须同步 resetIframeSession */

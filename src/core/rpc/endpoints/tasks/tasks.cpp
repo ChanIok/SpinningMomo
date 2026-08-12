@@ -30,13 +30,14 @@ auto handle_clear_finished_tasks(core::AppState& app_state,
 }
 
 auto register_all(core::AppState& app_state) -> void {
+  // 远端只允许查看和清理后台任务结果，不直接授予宿主机配置能力。
   register_method<EmptyParams, std::vector<core::tasks::TaskSnapshot>>(
       app_state, app_state.rpc->registry, "task.list", handle_list_tasks,
-      "List recent background tasks");
+      "List recent background tasks", AccessLevel::lan);
 
   register_method<EmptyParams, ClearFinishedTasksResult>(
       app_state, app_state.rpc->registry, "task.clearFinished", handle_clear_finished_tasks,
-      "Clear finished background tasks");
+      "Clear finished background tasks", AccessLevel::lan);
 }
 
 }  // namespace core::rpc::endpoints::tasks

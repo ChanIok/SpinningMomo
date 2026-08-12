@@ -22,15 +22,18 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
                            const std::string& message) -> std::string;
 
 // 处理JSON-RPC请求
-auto process_request(core::AppState& app_state, const std::string& request_json)
-    -> RpcJsonAwaitable;
+// caller_access 由 WebView 或 HTTP 层确定，不能由请求体自行声明。
+auto process_request(core::AppState& app_state, const std::string& request_json,
+                     AccessLevel caller_access) -> RpcJsonAwaitable;
 
 // 注册 RPC 方法：擦除业务处理器类型并生成统一的 JSON-RPC 协程入口
 template <typename Request, typename Response>
 inline auto register_method(core::AppState& app_state,
                             std::unordered_map<std::string, MethodInfo>& registry,
                             const std::string& method_name, AsyncHandler<Request, Response> handler,
-                            const std::string& description = "") -> void {
+                            const std::string& description = "",
+                            // 默认只允许本机，公开给 LAN 的方法必须显式标记。
+                            AccessLevel required_access = AccessLevel::local) -> void {
   // 注册表独占业务处理器，包装层只保留可重复 const 调用能力
   auto wrapped_handler = [handler = std::move(handler), &app_state](
                              rfl::Generic params_generic, rfl::Generic id) -> RpcJsonAwaitable {
@@ -68,6 +71,7 @@ inline auto register_method(core::AppState& app_state,
   registry[method_name] = MethodInfo{.name = method_name,
                                      .description = description,
                                      .params_schema = std::move(params_schema),
+                                     .required_access = required_access,
                                      .handler = std::move(wrapped_handler)};
 }
 

@@ -2,6 +2,7 @@
 import { computed, ref, watch, Transition } from 'vue'
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
+import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useGalleryData } from '../../composables/useGalleryData'
@@ -70,6 +71,8 @@ const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 const { runtimeCapabilities } = storeToRefs(settingsStore)
+// 扫描和目录选择都涉及宿主机文件系统，LAN 页面只保留图库浏览。
+const canUseLocalFileSystem = computed(() => isLocalAccess())
 
 /** 是否为 Windows 盘符根路径（如 C:\\、D:/），用于避免将输出目录设为整盘根。 */
 const isWindowsDriveRoot = (raw: string) => {
@@ -225,6 +228,11 @@ function buildScanIgnoreRules(): ScanIgnoreRule[] | undefined {
 }
 
 async function handleSelectScanDirectory() {
+  // 未获本机权限时直接退出，避免创建原生目录对话框。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
+
   try {
     const parentWindowMode = isWebView() ? 1 : 2
     const result = await call<{ path: string }>(
@@ -267,6 +275,11 @@ async function handleSelectScanDirectory() {
 }
 
 async function handleImportAlbum() {
+  // 扫描任务会读取宿主机目录，权限不足时不提交任务。
+  if (!canUseLocalFileSystem.value) {
+    return
+  }
+
   const directory = scanDirectory.value.trim()
   if (!directory) {
     toast.error(t('gallery.sidebar.scan.selectDirectoryRequired'))
@@ -353,7 +366,7 @@ function handleExpandLeave(el: Element) {
                 />
                 <Button
                   variant="outline"
-                  :disabled="isSubmittingScanTask"
+                  :disabled="!canUseLocalFileSystem || isSubmittingScanTask"
                   @click="handleSelectScanDirectory"
                 >
                   {{ t('gallery.sidebar.scan.selectDirectory') }}
@@ -487,7 +500,10 @@ function handleExpandLeave(el: Element) {
           >
             {{ t('gallery.sidebar.scan.cancel') }}
           </Button>
-          <Button :disabled="!canSubmitAddFolder" @click="handleImportAlbum">
+          <Button
+            :disabled="!canUseLocalFileSystem || !canSubmitAddFolder"
+            @click="handleImportAlbum"
+          >
             <Loader2 v-if="isSubmittingScanTask" class="mr-2 h-4 w-4 animate-spin" />
             {{
               isSubmittingScanTask

@@ -175,52 +175,53 @@ auto handle_get_tags_by_asset_ids(core::AppState& app_state, const GetTagsByAsse
 // ============= RPC 方法注册 =============
 
 auto register_all(core::AppState& app_state) -> void {
+  // 标签树、标签统计和标签关联属于图库管理能力，允许 LAN 调用。
   // 标签管理
   register_method<EmptyParams, std::vector<features::gallery::TagTreeNode>>(
       app_state, app_state.rpc->registry, "gallery.getTagTree", handle_get_tag_tree,
-      "Get tag tree structure for navigation");
+      "Get tag tree structure for navigation", AccessLevel::lan);
 
   register_method<features::gallery::CreateTagParams, std::int64_t>(
       app_state, app_state.rpc->registry, "gallery.createTag", handle_create_tag,
-      "Create a new tag");
+      "Create a new tag", AccessLevel::lan);
 
   register_method<features::gallery::UpdateTagParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.updateTag", handle_update_tag,
-      "Update an existing tag");
+      "Update an existing tag", AccessLevel::lan);
 
   register_method<features::gallery::GetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.deleteTag", handle_delete_tag,
-      "Delete a tag and its associations");
+      "Delete a tag and its associations", AccessLevel::lan);
 
   register_method<EmptyParams, std::vector<features::gallery::TagStats>>(
       app_state, app_state.rpc->registry, "gallery.getTagStats", handle_get_tag_stats,
-      "Get tag usage statistics");
+      "Get tag usage statistics", AccessLevel::lan);
 
   // 资产-标签关联
   register_method<features::gallery::AddTagsToAssetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.addTagsToAsset", handle_add_tags_to_asset,
-      "Add tags to an asset");
+      "Add tags to an asset", AccessLevel::lan);
 
   register_method<features::gallery::AddTagToAssetsParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.addTagToAssets", handle_add_tag_to_assets,
-      "Add a tag to multiple assets");
+      "Add a tag to multiple assets", AccessLevel::lan);
 
   register_method<features::gallery::RemoveTagFromAssetsParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.removeTagFromAssets",
-      handle_remove_tag_from_assets, "Remove a tag from multiple assets");
+      handle_remove_tag_from_assets, "Remove a tag from multiple assets", AccessLevel::lan);
 
   register_method<features::gallery::RemoveTagsFromAssetParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.removeTagsFromAsset",
-      handle_remove_tags_from_asset, "Remove tags from an asset");
+      handle_remove_tags_from_asset, "Remove tags from an asset", AccessLevel::lan);
 
   register_method<features::gallery::GetAssetTagsParams, std::vector<features::gallery::Tag>>(
       app_state, app_state.rpc->registry, "gallery.getAssetTags", handle_get_asset_tags,
-      "Get all tags for a specific asset");
+      "Get all tags for a specific asset", AccessLevel::lan);
 
   register_method<GetTagsByAssetIdsParams,
                   std::unordered_map<std::int64_t, std::vector<features::gallery::Tag>>>(
       app_state, app_state.rpc->registry, "gallery.getTagsByAssetIds", handle_get_tags_by_asset_ids,
-      "Batch get tags for multiple assets");
+      "Batch get tags for multiple assets", AccessLevel::lan);
 }
 
 }  // namespace core::rpc::endpoints::gallery::tag

@@ -17,6 +17,9 @@ auto remove_connection(core::AppState& state, const std::string& client_id) -> v
 // 关闭所有 SSE 连接（应在 HTTP loop 线程调用）
 auto close_all_connections(core::AppState& state) -> void;
 
+// 将关闭请求投递到 HTTP loop，供令牌/监听配置变化等非 HTTP 线程安全地撤销会话。
+auto request_close_all_connections(core::AppState& state) -> void;
+
 // 广播事件到所有 SSE 客户端（线程安全，内部会切换到 HTTP loop 线程）
 auto broadcast_event(core::AppState& state, const std::string& event_data) -> void;
 

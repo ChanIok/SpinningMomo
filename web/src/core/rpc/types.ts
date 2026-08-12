@@ -49,6 +49,7 @@ export const JsonRpcErrorCode = {
   INTERNAL_ERROR: -32603,
   TIMEOUT: -32001,
   TRANSPORT_UNAVAILABLE: -32002,
+  ACCESS_DENIED: -32003, // 当前访问等级不能调用该 RPC
 } as const
 
 export type JsonRpcErrorCode = (typeof JsonRpcErrorCode)[keyof typeof JsonRpcErrorCode]

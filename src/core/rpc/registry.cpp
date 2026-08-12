@@ -8,6 +8,7 @@
 #include "core/rpc/endpoints/extensions/extensions.hpp"
 #include "core/rpc/endpoints/file/file.hpp"
 #include "core/rpc/endpoints/gallery/gallery.hpp"
+#include "core/rpc/endpoints/lan_access/lan_access.hpp"
 #include "core/rpc/endpoints/registry/registry.hpp"
 #include "core/rpc/endpoints/runtime_info/runtime_info.hpp"
 #include "core/rpc/endpoints/settings/settings.hpp"
@@ -56,6 +57,9 @@ auto register_all_endpoints(core::AppState& state) -> void {
 
   // 注册Gallery端点
   endpoints::gallery::register_all(state);
+
+  // 注册本机 LAN 设置接口；接口自身仍要求 local 访问等级。
+  endpoints::lan_access::register_all(state);
 
   // 注册拓展端点
   endpoints::extensions::register_all(state);

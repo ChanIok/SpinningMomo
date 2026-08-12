@@ -146,6 +146,7 @@ auto handle_get_thumbnail_stats(core::AppState& app_state,
 // ============= RPC 方法注册 =============
 
 auto register_all(core::AppState& app_state) -> void {
+  // 缩略图统计和清理只操作应用管理的数据，因此允许 LAN 调用。
   // 注册子模块的 RPC 方法
   asset::register_all(app_state);
   tag::register_all(app_state);
@@ -164,11 +165,11 @@ auto register_all(core::AppState& app_state) -> void {
   // 缩略图操作
   register_method<EmptyParams, features::gallery::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.cleanupThumbnails", handle_cleanup_thumbnails,
-      "Clean up orphaned thumbnail files");
+      "Clean up orphaned thumbnail files", AccessLevel::lan);
 
   register_method<EmptyParams, std::string>(app_state, app_state.rpc->registry,
                                             "gallery.thumbnailStats", handle_get_thumbnail_stats,
-                                            "Get thumbnail storage statistics");
+                                            "Get thumbnail storage statistics", AccessLevel::lan);
 }
 
 }  // namespace core::rpc::endpoints::gallery

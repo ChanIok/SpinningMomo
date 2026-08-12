@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useI18n } from '@/composables/useI18n'
+import { isLocalAccess } from '@/core/access'
 import { useSettingsStore } from '@/features/settings/store'
 import TagInlineEditor from '../tags/TagInlineEditor.vue'
 import { useGalleryStore } from '../../store'
@@ -68,6 +69,8 @@ const settingsStore = useSettingsStore()
 const infinityNikkiEnabled = computed(
   () => settingsStore.appSettings.extensions.infinityNikki.enable
 )
+// 文件夹右键菜单中的资源管理器、扫描和剪贴板操作只对本机开放。
+const canUseLocalFileSystem = computed(() => isLocalAccess())
 
 // 展开状态放在 gallery store，递归节点重挂载后也能恢复，并可跨会话持久化。
 const isExpanded = computed(() => galleryStore.isFolderExpanded(props.folder.id))
@@ -299,7 +302,8 @@ function handleDrop(event: DragEvent) {
           <FolderPlus />
           {{ t('gallery.sidebar.folders.menu.create') }}
         </ContextMenuItem>
-        <ContextMenuItem @click="handlePasteClipboard">
+        <!-- LAN 页面保留图库管理菜单，但隐藏会触及宿主机剪贴板的入口。 -->
+        <ContextMenuItem v-if="canUseLocalFileSystem" @click="handlePasteClipboard">
           <ClipboardPaste />
           {{ t('gallery.sidebar.folders.menu.paste') }}
         </ContextMenuItem>
@@ -308,21 +312,21 @@ function handleDrop(event: DragEvent) {
           <Pen />
           {{ t('gallery.sidebar.folders.menu.renameDisplayName') }}
         </ContextMenuItem>
-        <ContextMenuItem @click="handleOpenInExplorer">
+        <ContextMenuItem v-if="canUseLocalFileSystem" @click="handleOpenInExplorer">
           <FolderOpen />
           {{ t('gallery.sidebar.folders.menu.openInExplorer') }}
         </ContextMenuItem>
-        <ContextMenuItem inset @click="handleRescanFolder">
+        <ContextMenuItem v-if="canUseLocalFileSystem" inset @click="handleRescanFolder">
           {{ t('gallery.sidebar.folders.menu.rescan') }}
         </ContextMenuItem>
         <ContextMenuItem
-          v-if="infinityNikkiEnabled"
+          v-if="canUseLocalFileSystem && infinityNikkiEnabled"
           inset
           @click="handleExtractInfinityNikkiMetadata"
         >
           {{ t('gallery.sidebar.folders.menu.extractInfinityNikkiMetadata') }}
         </ContextMenuItem>
-        <template v-if="isRootFolder">
+        <template v-if="isRootFolder && canUseLocalFileSystem">
           <ContextMenuSeparator />
           <ContextMenuItem variant="destructive" @click="requestRemoveWatch">
             <Trash2 />

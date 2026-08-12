@@ -56,12 +56,12 @@ auto handle_invoke_command(core::AppState& app_state,
   }
 }
 
-// 注册命令查询与调用相关的 RPC 方法
+// 注册命令查询与调用相关的 RPC 方法，并限制命令调用只来自本机。
 auto register_all(core::AppState& app_state) -> void {
   core::rpc::register_method<core::commands::GetAllCommandsParams,
                              core::commands::GetAllCommandsResult>(
       app_state, app_state.rpc->registry, "commands.getAll", handle_get_all_commands,
-      "Get all available command descriptors");
+      "Get all available command descriptors", core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<core::commands::InvokeCommandParams,
                              core::commands::InvokeCommandResult>(

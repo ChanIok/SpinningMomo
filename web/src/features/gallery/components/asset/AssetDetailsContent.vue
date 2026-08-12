@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'

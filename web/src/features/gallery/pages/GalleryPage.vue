@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
+import { isLocalAccess } from '@/core/access'
 import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
@@ -36,7 +37,10 @@ const settingsStore = useSettingsStore()
 // 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
   const config = settingsStore.appSettings.extensions.infinityNikki
-  return config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
+  // 引导会配置本机游戏目录，因此 LAN 页面不显示。
+  return (
+    isLocalAccess() && config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
+  )
 })
 
 let isUnmounted = false

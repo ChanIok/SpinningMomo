@@ -29,9 +29,10 @@ auto handle_get_runtime_info(core::AppState& app_state,
 }
 
 auto register_all(core::AppState& app_state) -> void {
+  // 运行时能力信息用于远端页面决定可展示内容，因此允许 LAN 查询。
   core::rpc::register_method<GetRuntimeInfoParams, GetRuntimeInfoResult>(
       app_state, app_state.rpc->registry, "runtime_info.get", handle_get_runtime_info,
-      "Get application runtime info and capability flags");
+      "Get application runtime info and capability flags", core::rpc::AccessLevel::lan);
 }
 
 }  // namespace core::rpc::endpoints::runtime_info

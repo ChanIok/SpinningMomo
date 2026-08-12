@@ -5,6 +5,7 @@
 ## 产品定位
 
 - 在 **WebView / iframe** 中加载官方地图（`MAP_URL` / `MAP_ORIGIN` 见 [`bridge/protocol.ts`](./bridge/protocol.ts)）。
+- 地图仅在本机访问等级下启用；LAN 浏览器无法向第三方 iframe 安全地提供本地缩略图鉴权。
 - 宿主通过 **postMessage** 把「当前区域照片坐标 + 展示配置」同步进 iframe；注入脚本在 Leaflet 上画点、聚合、悬停卡片；卡片可跳回图库。
 - 地图世界列表、区域 polygon、zRange、官方 `worldId` 版本和坐标转换参数来自后端远端 JSON 配置，不再由前端或客户端 C++ 硬编码。
 

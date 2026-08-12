@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
+import { isLocalAccess } from '@/core/access'
 import { Copy, Eraser, ExternalLink, FolderOpen, Star, Trash2, X } from '@lucide/vue'
 import {
   ContextMenuItem,
@@ -14,38 +16,43 @@ import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
+// 打开默认程序、资源管理器和系统剪贴板都属于 local 能力。
+const canUseLocalFileSystem = computed(() => isLocalAccess())
 const ratingOptions = [1, 2, 3, 4, 5] as const
 </script>
 
 <template>
-  <ContextMenuItem
-    :disabled="!assetActions.isSingleSelection"
-    @click="assetActions.handleOpenAssetDefault"
-  >
-    <ExternalLink />
-    {{ t('gallery.contextMenu.openDefaultApp.label') }}
-  </ContextMenuItem>
-  <ContextMenuItem
-    :disabled="!assetActions.isSingleSelection"
-    @click="assetActions.handleRevealAssetInExplorer"
-  >
-    <FolderOpen />
-    {{ t('gallery.contextMenu.revealInExplorer.label') }}
-  </ContextMenuItem>
-  <ContextMenuSeparator />
-  <ContextMenuItem
-    :disabled="!assetActions.hasSelection"
-    @click="assetActions.handleCopyAssetsToClipboard"
-  >
-    <Copy />
-    {{ t('gallery.contextMenu.copyFiles.label') }}
-    <ContextMenuShortcut>
-      <KbdGroup>
-        <Kbd>Ctrl</Kbd>
-        <Kbd>C</Kbd>
-      </KbdGroup>
-    </ContextMenuShortcut>
-  </ContextMenuItem>
+  <!-- LAN 仍可管理图库标签，但不展示宿主机文件操作。 -->
+  <template v-if="canUseLocalFileSystem">
+    <ContextMenuItem
+      :disabled="!assetActions.isSingleSelection"
+      @click="assetActions.handleOpenAssetDefault"
+    >
+      <ExternalLink />
+      {{ t('gallery.contextMenu.openDefaultApp.label') }}
+    </ContextMenuItem>
+    <ContextMenuItem
+      :disabled="!assetActions.isSingleSelection"
+      @click="assetActions.handleRevealAssetInExplorer"
+    >
+      <FolderOpen />
+      {{ t('gallery.contextMenu.revealInExplorer.label') }}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem
+      :disabled="!assetActions.hasSelection"
+      @click="assetActions.handleCopyAssetsToClipboard"
+    >
+      <Copy />
+      {{ t('gallery.contextMenu.copyFiles.label') }}
+      <ContextMenuShortcut>
+        <KbdGroup>
+          <Kbd>Ctrl</Kbd>
+          <Kbd>C</Kbd>
+        </KbdGroup>
+      </ContextMenuShortcut>
+    </ContextMenuItem>
+  </template>
   <ContextMenuItem
     inset
     :disabled="!assetActions.hasSelection"

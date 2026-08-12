@@ -3,6 +3,7 @@ import type { Router } from 'vue-router'
 import { useI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
+import { isLocalAccess } from '@/core/access'
 
 /**
  * 路由守卫与文档标题配置
@@ -31,6 +32,16 @@ export function setupDocumentTitle(router: Router) {
 // 全局前置守卫
 export function setupRouterGuards(router: Router) {
   router.beforeEach((to) => {
+    // 权限探测完成后，LAN 和 unknown 都不能进入宿主机设置页面。
+    // 只有明确的 local 调用者可以进入宿主机设置、引导和第三方地图页面；
+    // LAN 或权限未知时统一回到图库，避免展示无法执行的宿主机操作。
+    if (
+      !isLocalAccess() &&
+      (to.name === 'settings' || to.name === 'welcome' || to.name === 'map')
+    ) {
+      return { name: 'gallery', replace: true }
+    }
+
     const settingsStore = useSettingsStore()
     if (settingsStore.isInitialized) {
       const onboarding = settingsStore.appSettings.app.onboarding

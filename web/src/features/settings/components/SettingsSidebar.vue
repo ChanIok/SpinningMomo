@@ -9,6 +9,7 @@ import {
   Menu,
   Palette,
   DatabaseBackup,
+  Wifi,
 } from '@lucide/vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
@@ -22,6 +23,8 @@ export type SettingsPageKey =
   | 'floatingWindow'
   | 'webAppearance'
   | 'backup'
+  // LAN 访问配置只会在 local 路由中出现。
+  | 'networkAccess'
 
 interface SettingsMenuItem {
   key: SettingsPageKey
@@ -74,6 +77,12 @@ const settingsMenus: SettingsMenuItem[] = [
     key: 'extensions',
     label: 'settings.layout.extensions.title',
     icon: Blocks,
+  },
+  {
+    // 网络共享属于低频高级能力，放在扩展与数据维护之间。
+    key: 'networkAccess',
+    label: 'settings.layout.networkAccess.title',
+    icon: Wifi,
   },
   {
     key: 'backup',

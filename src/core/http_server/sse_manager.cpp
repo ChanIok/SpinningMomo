@@ -114,7 +114,16 @@ auto close_all_connections(core::AppState& state) -> void {
     ++closed_count;
   }
 
-  Logger().info("Closed {} SSE connections during shutdown", closed_count);
+  Logger().info("Closed {} SSE connections", closed_count);
+}
+
+// 将会话关闭动作投递到 uWS 事件循环，供其他线程安全调用。
+auto request_close_all_connections(core::AppState& state) -> void {
+  if (!state.http_server || !state.http_server->loop) {
+    return;
+  }
+
+  state.http_server->loop->defer([&state]() { close_all_connections(state); });
 }
 
 auto broadcast_event(core::AppState& state, const std::string& event_data) -> void {

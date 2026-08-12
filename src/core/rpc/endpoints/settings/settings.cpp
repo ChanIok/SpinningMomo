@@ -91,10 +91,11 @@ auto handle_remove_background([[maybe_unused]] core::AppState& app_state,
 }
 
 auto register_all(core::AppState& app_state) -> void {
+  // 读取设置只用于页面初始化；修改设置和文件操作接口继续保持 local。
   core::rpc::register_method<features::settings::GetSettingsParams,
                              features::settings::GetSettingsResult>(
       app_state, app_state.rpc->registry, "settings.get", handle_get_settings,
-      "Get current settings configuration");
+      "Get current settings configuration", core::rpc::AccessLevel::lan);
 
   core::rpc::register_method<features::settings::UpdateSettingsParams,
                              features::settings::UpdateSettingsResult>(

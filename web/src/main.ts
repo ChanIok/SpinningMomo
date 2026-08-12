@@ -4,6 +4,7 @@ import { createPinia } from 'pinia'
 import router from './router'
 import { setupDocumentTitle, setupRouterGuards } from './router/guards'
 import { initializeRPC } from '@/core/rpc'
+import { initializeAccessLevel } from '@/core/access'
 import { initI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
@@ -17,12 +18,8 @@ const pinia = createPinia()
 
 const app = createApp(App)
 
-// 注册插件
+// Pinia 必须先安装，后续权限探测和路由守卫会读取其状态。
 app.use(pinia)
-app.use(router)
-
-// 设置路由守卫
-setupRouterGuards(router)
 
 // 初始化 RPC 通信
 initializeRPC()
@@ -31,7 +28,15 @@ initializeRPC()
 ;(async () => {
   // 首先初始化 i18n（使用默认语言）
   await initI18n('zh-CN')
+
+  // 先确定调用者访问等级，再初始化会根据权限显示不同内容的页面。
+  await initializeAccessLevel()
+
+  // 守卫必须在安装 Router 前注册；app.use(router) 会立即启动首次导航。
+  setupRouterGuards(router)
   setupDocumentTitle(router)
+  app.use(router)
+  await router.isReady()
 
   // 然后初始化 settings store，它会自动同步后端的语言设置
   const settingsStore = useSettingsStore()

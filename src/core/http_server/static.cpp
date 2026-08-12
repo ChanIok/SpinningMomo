@@ -6,6 +6,7 @@
 #include "vendor/uwebsockets.hpp"
 
 #include "core/async/async.hpp"
+#include "core/http_server/access.hpp"
 #include "core/http_server/types.hpp"
 #include "core/state/app_state.hpp"
 #include "utils/file/file.hpp"
@@ -618,6 +619,17 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
 // 处理静态文件请求
 auto handle_static_request(core::AppState& state, const std::string& url_path, auto* res, auto* req,
                            bool is_head = false) -> void {
+  // 静态页面和资源也属于远端会话的一部分，未认证请求不能读取应用内容。
+  if (!core::http_server::access::resolve_http_access(state, res->getRemoteAddressAsText(),
+                                                      req->getHeader("cookie"))) {
+    // 先写 401，避免鉴权失败响应被默认成 200。
+    res->writeStatus("401 Unauthorized");
+    res->writeHeader("Cache-Control", "no-store");
+    res->writeHeader("Content-Type", "text/plain; charset=utf-8");
+    res->end("Authentication required");
+    return;
+  }
+
   // 1. 先尝试自定义解析器
   if (auto custom_result = try_custom_resolve(state, url_path)) {
     if (custom_result->has_value()) {

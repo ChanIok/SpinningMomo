@@ -39,6 +39,16 @@ import type {
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
+import { isLocalAccess } from '@/core/access'
+
+// 在发起可能触及宿主机的图库操作前，先阻止 LAN 页面进入本机 API。
+function requireLocalAccess(action: string): void {
+  if (!isLocalAccess()) {
+    throw new Error(`${action} is only available in the local application window.`)
+  }
+}
+
+// 以下接口在后端也受 local 权限保护；前端检查用于避免误触发和显示明确错误。
 
 // 为内置输出目录补充本地化显示名称，同时保留用户设置的名称。
 export function transformDefaultOutputFolderTree(tree: FolderTreeNode[]): FolderTreeNode[] {
@@ -70,19 +80,27 @@ export function updateFolderDisplayName(
   return call<OperationResult>('gallery.updateFolderDisplayName', params)
 }
 
+// 在 Windows 资源管理器中打开图库文件夹。
 export function openFolderInExplorer(folderId: number): Promise<OperationResult> {
+  requireLocalAccess('Opening a folder in Explorer')
   return call<OperationResult>('gallery.openFolderInExplorer', { id: folderId })
 }
 
+// 移除根目录监听并让后端清理对应索引。
 export function removeFolderWatch(folderId: number): Promise<OperationResult> {
+  requireLocalAccess('Removing a folder watch')
   return call<OperationResult>('gallery.removeFolderWatch', { id: folderId })
 }
 
+// 同步扫描指定目录，调用者通常只在本机设置流程中使用。
 export function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsResult> {
+  requireLocalAccess('Scanning a directory')
   return call<ScanAssetsResult>('gallery.scanDirectory', params, 0)
 }
 
+// 创建后台扫描任务并返回任务标识。
 export function startScanAssets(params: ScanAssetsParams): Promise<StartScanAssetsResult> {
+  requireLocalAccess('Scanning a directory')
   return call<StartScanAssetsResult>('gallery.startScanDirectory', params)
 }
 
@@ -104,27 +122,37 @@ export function purgeMissingAssets(
   return call<PurgeMissingAssetsResult>('gallery.purgeMissingAssets', params)
 }
 
+// 使用系统默认程序打开指定资产。
 export function openAssetDefault(assetId: number): Promise<OperationResult> {
+  requireLocalAccess('Opening an asset')
   return call<OperationResult>('gallery.openAssetDefault', { id: assetId })
 }
 
+// 在资源管理器中定位指定资产文件。
 export function revealAssetInExplorer(assetId: number): Promise<OperationResult> {
+  requireLocalAccess('Revealing an asset in Explorer')
   return call<OperationResult>('gallery.revealAssetInExplorer', { id: assetId })
 }
 
+// 将选中的资产文件复制到宿主机剪贴板。
 export function copyAssetsToClipboard(assetIds: number[]): Promise<OperationResult> {
+  requireLocalAccess('Copying assets to the clipboard')
   return call<OperationResult>('gallery.copyAssetsToClipboard', { ids: assetIds })
 }
 
+// 读取宿主机剪贴板文件并导入指定图库文件夹。
 export function pasteClipboardToFolder(folderId: number): Promise<OperationResult> {
+  requireLocalAccess('Pasting clipboard files')
   return call<OperationResult>('gallery.pasteClipboardToFolder', { folderId })
 }
 
 // WebView2 DOM File 通过附加对象传输，文件内容不进入 JSON。
+// 将拖入的文件对象交给后端导入指定图库文件夹。
 export function importDroppedFilesToFolder(
   folderId: number,
   files: File[]
 ): Promise<OperationResult> {
+  requireLocalAccess('Importing dropped files')
   return callWithAdditionalObjects<OperationResult>(
     'gallery.importDroppedFilesToFolder',
     { folderId },
