@@ -4,6 +4,7 @@ import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type { Asset, AssetLayoutMetaItem } from '../types'
+import { GALLERY_CARD_GAP } from '../constants'
 
 /**
  * 瀑布流视图虚拟化 Composable
@@ -16,7 +17,7 @@ import type { Asset, AssetLayoutMetaItem } from '../types'
  */
 
 /** 默认列间距（px），与 CSS gap 保持一致 */
-const DEFAULT_MASONRY_GAP = 16
+const DEFAULT_MASONRY_GAP = GALLERY_CARD_GAP
 const MASONRY_MIN_ITEM_HEIGHT = 80
 // TanStack masonry lanes 偶尔会返回比真实视口大很多的连续 range。
 // 渲染与分页加载只消费视口附近几屏，避免一次性拉取大量后端分页。

@@ -27,6 +27,15 @@ import GalleryContent from './GalleryContent.vue'
 import GalleryLightbox from '../lightbox/GalleryLightbox.vue'
 import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
 
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
+
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
@@ -562,7 +571,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
         @dragleave="handleViewerDragLeave"
         @drop="handleViewerDrop"
       >
-        <GalleryContent ref="galleryContentRef" />
+        <GalleryContent ref="galleryContentRef" :compact="props.compact" />
 
         <div
           v-if="isExternalDragActive || isDropImporting"

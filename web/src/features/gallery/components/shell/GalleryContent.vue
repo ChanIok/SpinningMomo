@@ -9,6 +9,15 @@ import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
 import GalleryMoveToFolderDialog from '../dialogs/GalleryMoveToFolderDialog.vue'
 import GalleryDeleteAssetsDialog from '../dialogs/GalleryDeleteAssetsDialog.vue'
 
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
+
 const store = useGalleryStore()
 const viewMode = computed(() => store.viewConfig.mode)
 
@@ -41,10 +50,10 @@ defineExpose({ scrollToIndex, getCardRect })
 
 <template>
   <div class="h-full w-full">
-    <GridView v-if="viewMode === 'grid'" ref="gridViewRef" />
+    <GridView v-if="viewMode === 'grid'" ref="gridViewRef" :compact="props.compact" />
     <ListView v-else-if="viewMode === 'list'" ref="listViewRef" />
-    <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" />
-    <AdaptiveView v-else ref="adaptiveViewRef" />
+    <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" :compact="props.compact" />
+    <AdaptiveView v-else ref="adaptiveViewRef" :compact="props.compact" />
     <GallerySharedContextMenu />
     <GalleryMoveToFolderDialog />
     <GalleryDeleteAssetsDialog />

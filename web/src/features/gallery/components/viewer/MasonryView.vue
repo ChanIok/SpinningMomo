@@ -19,6 +19,16 @@ import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
+import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
+
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
 
 const store = useGalleryStore()
 const galleryView = useGalleryView()
@@ -31,20 +41,20 @@ const { locale } = useI18n()
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
-const GAP = 12 // ← 卡片间距，统一控制水平和垂直
+const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
-  return Math.max(1, Math.floor((containerWidth.value + GAP) / (itemSize + GAP)))
+  return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 
 const masonryVirtualizer = useMasonryVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
-  gap: GAP,
+  gap,
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
@@ -166,7 +176,8 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar h-full flex-1 overflow-auto py-2 pr-2 pl-4"
+      :class="compact ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"
     >
       <div>
@@ -202,6 +213,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
               "
               :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+              :compact="props.compact"
               :style="{
                 height: `${virtualItem.size}px`,
                 minHeight: `${masonryVirtualizer.minItemHeight}px`,
@@ -218,7 +230,8 @@ defineExpose({ scrollToIndex, getCardRect })
 
             <div
               v-else
-              class="animate-pulse rounded bg-muted"
+              class="animate-pulse bg-muted"
+              :class="!props.compact && 'rounded'"
               :style="{
                 width: '100%',
                 height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,

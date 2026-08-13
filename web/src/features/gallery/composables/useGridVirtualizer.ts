@@ -3,11 +3,13 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import type { Asset } from '../types'
+import { GALLERY_CARD_GAP } from '../constants'
 
 export interface UseGridVirtualizerOptions {
   containerRef: Ref<HTMLElement | null>
   columns: Ref<number>
   containerWidth: Ref<number>
+  gap?: number
 }
 
 export interface VirtualRow {
@@ -18,7 +20,7 @@ export interface VirtualRow {
 }
 
 export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
-  const { containerRef, columns, containerWidth } = options
+  const { containerRef, columns, containerWidth, gap = GALLERY_CARD_GAP } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -34,7 +36,6 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
     if (width === 0) return 200
 
-    const gap = 12
     const cardWidth = Math.floor((width - (columns.value - 1) * gap) / columns.value)
     return cardWidth + gap
   })

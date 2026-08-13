@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useThrottleFn } from '@vueuse/core'
+import { ChevronDown, ChevronUp } from '@lucide/vue'
 
 // 通用滚动轨道的数据模型。
 // 轨道本身不关心“这是月份还是别的业务标记”，只关心内容坐标与展示文案。
@@ -43,7 +44,7 @@ const CONTENT_OFFSET_BOTTOM = 24
 const MOBILE_HANDLE_HEIGHT = 56
 const TIMELINE_LABEL_HEIGHT = 24
 const TIMELINE_LABEL_GAP = 4
-const MOBILE_COLLAPSE_DELAY = 700
+const MOBILE_COLLAPSE_DELAY = 3000
 
 const availableHeight = computed(() => {
   return Math.max(0, props.containerHeight - CONTENT_OFFSET_TOP - CONTENT_OFFSET_BOTTOM)
@@ -94,10 +95,30 @@ const hasScrollableContent = computed(() => scrollRange.value > 0)
 
 // 拖拽和 hover 都以轨道坐标表达，再统一映射回内容坐标。
 const isDragging = ref(false)
-const isExpanded = ref(false)
+const isHandleVisible = ref(false)
+const isTrackVisible = ref(false)
 const activePointerId = ref<number | null>(null)
 const hoverY = ref<number | null>(null)
-let collapseTimer: number | null = null
+let trackCollapseTimer: number | null = null
+let handleCollapseTimer: number | null = null
+
+watch(
+  () => props.scrollTop,
+  (newVal, oldVal) => {
+    if (newVal === oldVal || !hasScrollableContent.value) {
+      return
+    }
+
+    // 模式一：划动内容区，只显现滑块，绝不出轨道
+    if (!isDragging.value) {
+      isTrackVisible.value = false
+      clearTrackCollapseTimer()
+
+      isHandleVisible.value = true
+      scheduleHandleCollapse(3000)
+    }
+  }
+)
 
 function contentToTimeline(contentY: number): number {
   if (scrollRange.value === 0 || availableHeight.value === 0) {
@@ -281,19 +302,47 @@ const throttledScroll = useThrottleFn((y: number) => {
   props.virtualizer.scrollToOffset(targetScrollTop, { behavior: 'auto' })
 }, 16)
 
-function clearCollapseTimer() {
-  if (collapseTimer !== null) {
-    window.clearTimeout(collapseTimer)
-    collapseTimer = null
+function clearTrackCollapseTimer() {
+  if (trackCollapseTimer !== null) {
+    window.clearTimeout(trackCollapseTimer)
+    trackCollapseTimer = null
   }
 }
 
-function scheduleCollapse() {
-  clearCollapseTimer()
-  collapseTimer = window.setTimeout(() => {
-    collapseTimer = null
-    isExpanded.value = false
-  }, MOBILE_COLLAPSE_DELAY)
+function clearHandleCollapseTimer() {
+  if (handleCollapseTimer !== null) {
+    window.clearTimeout(handleCollapseTimer)
+    handleCollapseTimer = null
+  }
+}
+
+function clearAllCollapseTimers() {
+  clearTrackCollapseTimer()
+  clearHandleCollapseTimer()
+}
+
+function scheduleHandleCollapse(delay = 3000) {
+  clearHandleCollapseTimer()
+  handleCollapseTimer = window.setTimeout(() => {
+    handleCollapseTimer = null
+    isHandleVisible.value = false
+  }, delay)
+}
+
+function scheduleTwoStageCollapse() {
+  clearAllCollapseTimers()
+
+  // 阶段 1：松手 3 秒后关闭背景轨道（退回到模式一形态）
+  trackCollapseTimer = window.setTimeout(() => {
+    trackCollapseTimer = null
+    isTrackVisible.value = false
+  }, 3000)
+
+  // 阶段 2：松手 6 秒后（即轨道隐去后再过 3 秒）关闭滑块
+  handleCollapseTimer = window.setTimeout(() => {
+    handleCollapseTimer = null
+    isHandleVisible.value = false
+  }, 6000)
 }
 
 function updateHoverPosition(clientY: number) {
@@ -325,8 +374,9 @@ function handlePointerDown(event: PointerEvent) {
     return
   }
 
-  clearCollapseTimer()
-  isExpanded.value = true
+  clearAllCollapseTimers()
+  isHandleVisible.value = true
+  isTrackVisible.value = true
   activePointerId.value = event.pointerId
   isDragging.value = true
   timelineRef.value.setPointerCapture(event.pointerId)
@@ -363,7 +413,7 @@ function finishPointerInteraction(event: PointerEvent) {
     timelineRef.value.releasePointerCapture(event.pointerId)
   }
 
-  scheduleCollapse()
+  scheduleTwoStageCollapse()
 }
 
 function handleLostPointerCapture(event: PointerEvent) {
@@ -380,7 +430,7 @@ function handleWheel(event: WheelEvent) {
 }
 
 onUnmounted(() => {
-  clearCollapseTimer()
+  clearAllCollapseTimers()
   scrollResizeObserver?.disconnect()
 })
 </script>
@@ -391,7 +441,8 @@ onUnmounted(() => {
     :class="[
       'timeline-scrollbar h-full w-10 select-none',
       {
-        'timeline-scrollbar-expanded': isExpanded,
+        'timeline-scrollbar-track-active': isTrackVisible,
+        'timeline-scrollbar-handle-active': isHandleVisible,
         'timeline-scrollbar-disabled': !hasScrollableContent,
       },
     ]"
@@ -427,9 +478,12 @@ onUnmounted(() => {
 
         <div
           v-if="hasScrollableContent"
-          class="timeline-mobile-handle pointer-events-none absolute rounded-full"
+          class="timeline-mobile-handle pointer-events-none absolute rounded-full text-[var(--timeline-surface-foreground)]"
           :style="{ top: `${mobileHandleTop}px`, height: `${MOBILE_HANDLE_HEIGHT}px` }"
-        />
+        >
+          <ChevronUp class="h-2.5 w-2.5 shrink-0 opacity-80" />
+          <ChevronDown class="h-2.5 w-2.5 shrink-0 opacity-80" />
+        </div>
       </div>
 
       <div
@@ -568,10 +622,10 @@ onUnmounted(() => {
     transition: opacity 180ms ease-out;
   }
 
-  .timeline-scrollbar-expanded .timeline-marker,
-  .timeline-scrollbar-expanded .timeline-label,
-  .timeline-scrollbar-expanded .timeline-hover-indicator,
-  .timeline-scrollbar-expanded .timeline-hover-label {
+  .timeline-scrollbar-track-active .timeline-marker,
+  .timeline-scrollbar-track-active .timeline-label,
+  .timeline-scrollbar-track-active .timeline-hover-indicator,
+  .timeline-scrollbar-track-active .timeline-hover-label {
     opacity: 1;
   }
 
@@ -602,20 +656,35 @@ onUnmounted(() => {
       transform 180ms ease-out;
   }
 
-  .timeline-scrollbar-expanded .timeline-mobile-track {
+  .timeline-scrollbar-track-active .timeline-mobile-track {
     opacity: 1;
     transform: scaleY(1);
   }
 
   .timeline-mobile-handle {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     right: 0;
     left: 0;
     width: auto;
     background-color: var(--timeline-thumb-surface);
   }
 
-  .timeline-scrollbar-expanded .timeline-label {
+  .timeline-mobile-handle {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease-out;
+  }
+
+  .timeline-scrollbar-handle-active .timeline-mobile-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .timeline-scrollbar-track-active .timeline-label {
     right: calc(var(--timeline-rail-right) + var(--timeline-rail-width) + 0.375rem);
     left: auto;
     width: max-content;
@@ -640,8 +709,9 @@ onUnmounted(() => {
       transform 180ms ease-out;
   }
 
-  .timeline-scrollbar-expanded .timeline-mobile-active-label {
+  .timeline-scrollbar-track-active .timeline-mobile-active-label {
     opacity: 1;
+    pointer-events: auto;
     transform: translateX(0);
   }
 

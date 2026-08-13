@@ -14,6 +14,7 @@ const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
+  compact?: boolean
   aspectRatio?: string
   allowThumbnailLoad?: boolean
   allowOriginalLoad?: boolean
@@ -22,6 +23,7 @@ interface AssetCardProps {
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
+  compact: false,
   aspectRatio: '1 / 1',
   allowThumbnailLoad: true,
   allowOriginalLoad: false,
@@ -80,7 +82,7 @@ const canStartOriginalUpgrade = computed(
 )
 const hasThumbnail = computed(() => scheduledThumbnailUrl.value.length > 0)
 const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
-const enableHoverScale = computed(() => !useOriginalImagesForCards.value)
+const enableHoverScale = computed(() => !useOriginalImagesForCards.value && !props.compact)
 const isVideoAsset = computed(() => props.asset.type === 'video')
 
 const showPlaceholder = computed(
@@ -391,13 +393,14 @@ function getAdjustedPlaceholderColor(hex?: string): string {
   <div
     data-asset-card
     draggable="true"
-    class="group transition-ring relative w-full overflow-hidden rounded-md bg-background duration-200 contain-[layout_size_paint] select-none"
+    class="group transition-ring relative w-full overflow-hidden bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
-      {
-        'ring-4 ring-primary': isSelected,
-        'shadow-md hover:shadow-lg': !isSelected,
-        'shadow-lg': isSelected,
-      },
+      compact ? 'rounded-none shadow-none' : 'rounded-md',
+      isSelected
+        ? compact
+          ? 'ring-2 ring-primary ring-inset'
+          : 'shadow-lg ring-4 ring-primary'
+        : !compact && 'shadow-md hover:shadow-lg',
     ]"
     :style="{ aspectRatio: props.aspectRatio }"
     @click="handleClick"
@@ -406,7 +409,11 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     @dragstart="handleDragStart"
   >
     <!-- 卡片图像容器 -->
-    <div data-asset-thumbnail class="relative h-full w-full overflow-hidden rounded-md">
+    <div
+      data-asset-thumbnail
+      class="relative h-full w-full overflow-hidden"
+      :class="compact ? 'rounded-none' : 'rounded-md'"
+    >
       <!-- 缩略图是卡片的基础显示层，主色占位只服务它的首次加载。 -->
       <img
         v-if="hasThumbnail && !imageError"
@@ -485,18 +492,21 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 
       <div
         v-if="isVideoAsset"
-        class="absolute inset-x-0 bottom-0 flex items-end justify-start bg-gradient-to-t from-black/50 via-black/10 to-transparent p-3"
+        class="absolute inset-x-0 bottom-0 flex items-end justify-start bg-gradient-to-t from-black/50 via-black/10 to-transparent"
+        :class="compact ? 'p-1.5' : 'p-3'"
       >
         <div
-          class="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-sm backdrop-blur-sm"
+          class="flex items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-sm backdrop-blur-sm"
+          :class="compact ? 'h-6 w-6' : 'h-8 w-8'"
         >
-          <Play class="ml-0.5 h-4 w-4 fill-current" />
+          <Play class="ml-0.5 fill-current" :class="compact ? 'h-3 w-3' : 'h-4 w-4'" />
         </div>
       </div>
 
       <MediaStatusChips
         :rating="asset.rating"
         :review-flag="asset.reviewFlag"
+        :compact="props.compact"
         :show-rating="showRatingBadge"
         :has-dye-code="showDyeCodeBadge"
         :show-tags="showTagBadges"
@@ -507,9 +517,10 @@ function getAdjustedPlaceholderColor(hex?: string): string {
       <div
         v-if="isSelected"
         data-selection-indicator
-        class="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+        class="absolute flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+        :class="compact ? 'top-1 right-1 h-5 w-5' : 'top-2 right-2 h-6 w-6'"
       >
-        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+        <svg class="h-4 w-4" :class="compact && 'h-3 w-3'" fill="currentColor" viewBox="0 0 20 20">
           <path
             fill-rule="evenodd"
             d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"

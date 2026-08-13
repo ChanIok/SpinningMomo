@@ -18,6 +18,16 @@ import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
+import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
+
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
@@ -28,6 +38,7 @@ const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
+const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 // AdaptiveView 不再依赖 ScrollArea，避免第三方滚动容器内部测量语义干扰 thumb 尺寸。
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -35,6 +46,7 @@ const { width: containerWidth, height: containerHeight } = useElementSize(scroll
 const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerRef: scrollContainerRef,
   containerWidth,
+  gap,
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
@@ -149,7 +161,8 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-4"
+      :class="compact ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
       <div class="pb-3">
@@ -187,6 +200,7 @@ defineExpose({ scrollToIndex, getCardRect })
                   :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(item.asset.id)"
                   :original-preview-short-edge="Math.min(item.width, item.height)"
                   :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
+                  :compact="props.compact"
                   @click="(asset, event) => handleAssetClick(asset, event, item.index)"
                   @double-click="(asset, event) => handleAssetDoubleClick(asset, event, item.index)"
                   @context-menu="
@@ -195,7 +209,11 @@ defineExpose({ scrollToIndex, getCardRect })
                   @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
                 />
 
-                <div v-else class="h-full w-full animate-pulse rounded-lg bg-muted" />
+                <div
+                  v-else
+                  class="h-full w-full animate-pulse bg-muted"
+                  :class="!props.compact && 'rounded-lg'"
+                />
               </div>
             </template>
           </div>

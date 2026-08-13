@@ -324,14 +324,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="h-full w-full p-1 pt-0">
-    <div class="relative h-full w-full overflow-hidden rounded-sm">
+  <div ref="pageRef" class="h-full w-full" :class="isCompactViewport ? 'p-0' : 'p-1 pt-0'">
+    <div
+      class="relative h-full w-full overflow-hidden"
+      :class="[!isCompactViewport && 'rounded-sm']"
+    >
       <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
       <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
 
       <!-- 窄屏布局：图库保持全宽，侧栏以覆盖式抽屉打开。 -->
       <template v-else-if="isCompactViewport">
-        <GalleryViewer />
+        <GalleryViewer compact />
 
         <Transition name="gallery-mobile-drawer">
           <div

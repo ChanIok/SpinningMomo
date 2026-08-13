@@ -19,6 +19,16 @@ import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import { useI18n } from '@/composables/useI18n'
+import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
+
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
 
 const store = useGalleryStore()
 const galleryView = useGalleryView()
@@ -30,16 +40,15 @@ const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
+const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
-  const gap = 12
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 const gridCardSize = computed(() => {
-  const gap = 12
   const totalGap = Math.max(0, columns.value - 1) * gap
   const availableWidth = containerWidth.value || scrollContainerRef.value?.clientWidth || 0
 
@@ -50,6 +59,7 @@ const gridVirtualizer = useGridVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
+  gap,
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
@@ -159,7 +169,8 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-4"
+      :class="compact ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
       <div
@@ -182,9 +193,10 @@ defineExpose({ scrollToIndex, getCardRect })
           }"
         >
           <div
-            class="grid gap-3"
+            class="grid"
             :style="{
               gridTemplateColumns: `repeat(${columns}, ${gridCardSize}px)`,
+              gap: `${gap}px`,
               justifyContent: 'start',
             }"
           >
@@ -199,6 +211,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(asset.id)"
                 :original-preview-short-edge="gridCardSize"
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                :compact="props.compact"
                 @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                 @double-click="
                   (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
@@ -209,7 +222,12 @@ defineExpose({ scrollToIndex, getCardRect })
                 @drag-start="(a, e) => handleAssetDragStart(a, e)"
               />
 
-              <div v-else class="skeleton-card w-full rounded" :style="{ aspectRatio: '1 / 1' }" />
+              <div
+                v-else
+                class="skeleton-card w-full"
+                :class="!props.compact && 'rounded'"
+                :style="{ aspectRatio: '1 / 1' }"
+              />
             </template>
           </div>
         </div>

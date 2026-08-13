@@ -4,15 +4,15 @@ import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type { AdaptiveLayoutRow, AdaptiveLayoutRowItem, Asset, AssetLayoutMetaItem } from '../types'
-
-// 自适应视图的行内间距（与 grid/masonry 统一保持 12px 间距）。
-const ADAPTIVE_GAP = 12
+import { GALLERY_CARD_GAP } from '../constants'
 
 export interface UseAdaptiveVirtualizerOptions {
   // 原生滚动容器；adaptive 不再依赖 ScrollArea，而是直接读写真实滚动元素。
   containerRef: Ref<HTMLElement | null>
   // 内容区宽度，用来把“按比例排版”转换成真实行宽与行高。
   containerWidth: Ref<number>
+  // 行内与行间间距；由视图层根据当前布局模式决定。
+  gap?: number
 }
 
 export interface VirtualAdaptiveRowItem extends AdaptiveLayoutRowItem {
@@ -125,7 +125,7 @@ function buildAdaptiveRows(
 }
 
 export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
-  const { containerRef, containerWidth } = options
+  const { containerRef, containerWidth, gap = GALLERY_CARD_GAP } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -139,12 +139,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   const loadingPages = ref<Set<number>>(new Set())
 
   const layout = computed(() =>
-    buildAdaptiveRows(
-      layoutMetaItems.value,
-      contentWidth.value,
-      targetRowHeight.value,
-      ADAPTIVE_GAP
-    )
+    buildAdaptiveRows(layoutMetaItems.value, contentWidth.value, targetRowHeight.value, gap)
   )
 
   // 虚拟滚动的单位是“行”而不是“资产”。这正是 adaptive 与 masonry/grid 的核心区别。
@@ -154,7 +149,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: (index) => layout.value.rows[index]?.size ?? targetRowHeight.value,
-    gap: ADAPTIVE_GAP,
+    gap,
     paddingStart: 0,
     paddingEnd: 16,
     overscan: 8,
@@ -288,7 +283,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     virtualRows,
     rows: computed(() => layout.value.rows),
     rowIndexByAssetIndex: computed(() => layout.value.rowIndexByAssetIndex),
-    gap: ADAPTIVE_GAP,
+    gap,
     init,
     scrollToIndex,
   }
