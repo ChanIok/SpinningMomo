@@ -50,7 +50,6 @@ import { useI18n } from '@/composables/useI18n'
 import { isLocalAccess } from '@/core/access'
 import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
-import { useGalleryView } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { GALLERY_COMPACT_BREAKPOINT } from '../../constants'
 import type {
@@ -65,6 +64,15 @@ import type {
 
 type SourceType = 'all' | 'folder' | 'tag'
 
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
+
 const emit = defineEmits<{
   'open-preferences': []
 }>()
@@ -73,7 +81,6 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const store = useGalleryStore()
-const galleryView = useGalleryView()
 
 // 第三方地图会读取本机鉴权资源，因此只在 local 页面展示入口。
 const showMapEntry = computed(
@@ -95,11 +102,11 @@ const handleOpenPreferences = () => {
   emit('open-preferences')
 }
 
-const viewMode = computed(() => galleryView.viewMode.value)
-const sortBy = computed(() => galleryView.sortBy.value)
-const sortOrder = computed(() => galleryView.sortOrder.value)
-const currentFolderOnly = computed(() => !galleryView.includeSubfolders.value)
-const filter = computed(() => galleryView.filter.value)
+const viewMode = computed(() => store.view.mode)
+const sortBy = computed(() => store.sortBy)
+const sortOrder = computed(() => store.sortOrder)
+const currentFolderOnly = computed(() => !store.includeSubfolders)
+const filter = computed(() => store.filter)
 const searchQuery = computed(() => filter.value.searchQuery || '')
 const activeColorHex = computed(() => filter.value.colorHex)
 const activeColorDistance = computed(
@@ -113,7 +120,7 @@ const COLOR_DISTANCE_MAX = 40
 const COLOR_DISTANCE_DEFAULT = 18
 const STARS = [1, 2, 3, 4, 5] as const
 
-const currentSliderPosition = computed(() => galleryView.getSliderPosition())
+const currentSliderPosition = computed(() => store.getSliderPosition(props.compact))
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 const draftColorDistance = ref(activeColorDistance.value)
@@ -373,7 +380,7 @@ function applyDateFilter() {
   const end = draftDateRange.value.end ?? start
   const [rangeStart, rangeEnd] = orderRangeDates(start, end)
 
-  galleryView.setFilter({
+  store.setFilter({
     createdAtFrom: calendarDateToLocalStartMillis(rangeStart),
     createdAtTo: calendarDateToExclusiveEndMillis(rangeEnd),
   })
@@ -383,7 +390,7 @@ function applyDateFilter() {
 function clearDateFilter(event?: Event) {
   event?.preventDefault()
   event?.stopPropagation()
-  galleryView.setFilter({
+  store.setFilter({
     createdAtFrom: undefined,
     createdAtTo: undefined,
   })
@@ -403,11 +410,11 @@ function keepDatePopoverForCalendarSelect(event: CustomEvent<{ originalEvent?: E
 }
 
 function updateSearchQuery(query: string | number) {
-  galleryView.setSearchQuery(String(query))
+  store.setFilter({ searchQuery: String(query).trim() || undefined })
 }
 
 function clearSearch() {
-  galleryView.setSearchQuery('')
+  store.setFilter({ searchQuery: undefined })
 }
 
 function clearSearchFromTrigger(event: Event) {
@@ -419,18 +426,18 @@ function clearSearchFromTrigger(event: Event) {
 function onTypeFilterChange(value: string | number | bigint | Record<string, any> | null) {
   const stringValue = String(value || 'all')
   const type = stringValue === 'all' ? undefined : (stringValue as AssetType)
-  galleryView.setTypeFilter(type)
+  store.setFilter({ type })
 }
 
 function clearTypeFilter(event?: Event) {
   event?.preventDefault()
   event?.stopPropagation()
-  galleryView.setTypeFilter(undefined)
+  store.setFilter({ type: undefined })
 }
 
 function onReviewFlagChange(value: string | number | bigint | Record<string, any> | null) {
   const stringValue = String(value || 'all')
-  galleryView.setFilter({
+  store.setFilter({
     reviewFlag: stringValue === 'all' ? undefined : (stringValue as ReviewFlag),
   })
 }
@@ -438,7 +445,7 @@ function onReviewFlagChange(value: string | number | bigint | Record<string, any
 function clearReviewFlagFilter(event?: Event) {
   event?.preventDefault()
   event?.stopPropagation()
-  galleryView.setFilter({ reviewFlag: undefined })
+  store.setFilter({ reviewFlag: undefined })
 }
 
 function isRatingSelected(value: number): boolean {
@@ -447,7 +454,7 @@ function isRatingSelected(value: number): boolean {
 
 function setRatingFilters(values: number[]) {
   const ratings = normalizeRatings(values)
-  galleryView.setFilter({ ratings: ratings.length > 0 ? ratings : undefined })
+  store.setFilter({ ratings: ratings.length > 0 ? ratings : undefined })
 }
 
 function toggleRatingFilter(value: number) {
@@ -463,26 +470,26 @@ function toggleRatingFilter(value: number) {
 function clearRatingFilter(event?: Event) {
   event?.preventDefault()
   event?.stopPropagation()
-  galleryView.setFilter({ ratings: undefined })
+  store.setFilter({ ratings: undefined })
 }
 
 function onSortByChange(value: string | number | bigint | Record<string, any> | null) {
   if (value) {
     const newSortBy = String(value) as SortBy
-    galleryView.setSorting(newSortBy, sortOrder.value)
+    store.setSorting(newSortBy, sortOrder.value)
   }
 }
 
 function toggleSortOrder() {
-  galleryView.toggleSortOrder()
+  store.setSorting(sortBy.value, sortOrder.value === 'asc' ? 'desc' : 'asc')
 }
 
 function onCurrentFolderOnlyChange(value: boolean) {
-  galleryView.setIncludeSubfolders(!value)
+  store.includeSubfolders = !value
 }
 
 function applyColorFilter() {
-  galleryView.setFilter({
+  store.setFilter({
     colorHex: draftColorHex.value,
     colorDistance: draftColorDistance.value,
   })
@@ -491,7 +498,7 @@ function applyColorFilter() {
 function clearColorFilter(event?: Event) {
   event?.preventDefault()
   event?.stopPropagation()
-  galleryView.setFilter({
+  store.setFilter({
     colorHex: undefined,
     colorDistance: undefined,
   })
@@ -507,7 +514,16 @@ function onColorDistanceChange(value: number[] | undefined) {
 }
 
 function clearAttributeFilters() {
-  galleryView.clearAttributeFilters()
+  store.setFilter({
+    searchQuery: undefined,
+    createdAtFrom: undefined,
+    createdAtTo: undefined,
+    type: undefined,
+    ratings: undefined,
+    reviewFlag: undefined,
+    colorHex: undefined,
+    colorDistance: undefined,
+  })
   draftColorHex.value = '#FFFFFF'
   draftColorDistance.value = COLOR_DISTANCE_DEFAULT
   draftDateRange.value = { start: undefined, end: undefined }
@@ -539,13 +555,13 @@ function setViewMode(
     | (string | number | bigint | Record<string, any> | null)[]
 ) {
   if (mode && typeof mode === 'string') {
-    galleryView.setViewMode(mode as ViewMode)
+    store.view.mode = mode as ViewMode
   }
 }
 
 function onViewSizeSliderChange(value: number[] | undefined) {
   if (value && value.length > 0 && value[0] !== undefined) {
-    galleryView.setViewSizeFromSlider(value[0])
+    store.setViewSizeFromSlider(value[0], props.compact)
   }
 }
 </script>

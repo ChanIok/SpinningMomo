@@ -25,7 +25,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   const store = useGalleryStore()
   const galleryData = useGalleryData()
 
-  const isTimelineMode = computed(() => store.isTimelineMode && store.viewConfig.mode === 'grid')
+  const isTimelineMode = computed(() => store.isTimelineMode && store.view.mode === 'grid')
   const totalCount = computed(() =>
     isTimelineMode.value ? store.timelineTotalCount : store.totalCount
   )

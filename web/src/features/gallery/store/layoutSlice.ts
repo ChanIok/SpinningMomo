@@ -14,41 +14,48 @@ interface LayoutSliceArgs {
  */
 export function createLayoutSlice(args: LayoutSliceArgs) {
   const { settings } = args
-  const sidebarOpen = computed(() => settings.value.layout.sidebarOpen)
-  const detailsOpen = computed(() => settings.value.layout.detailsOpen)
-  const leftSidebarSize = computed(() => settings.value.layout.leftSidebarSize)
-  const rightDetailsSize = computed(() => settings.value.layout.rightDetailsSize)
-  const leftSidebarOpenSize = computed(() => settings.value.layout.leftSidebarOpenSize)
-  const rightDetailsOpenSize = computed(() => settings.value.layout.rightDetailsOpenSize)
-  const sidebarFolderSplitSize = computed(() => settings.value.layout.sidebarFolderSplitSize ?? 0.5)
-
-  function setSidebarOpen(open: boolean) {
-    settings.value.layout.sidebarOpen = open
-  }
-
-  function setDetailsOpen(open: boolean) {
-    settings.value.layout.detailsOpen = open
-  }
-
-  function setLeftSidebarSize(size: string) {
-    settings.value.layout.leftSidebarSize = size
-  }
-
-  function setRightDetailsSize(size: string) {
-    settings.value.layout.rightDetailsSize = size
-  }
-
-  function setLeftSidebarOpenSize(size: string) {
-    settings.value.layout.leftSidebarOpenSize = size
-  }
-
-  function setRightDetailsOpenSize(size: string) {
-    settings.value.layout.rightDetailsOpenSize = size
-  }
-
-  function setSidebarFolderSplitSize(size: number | string) {
-    settings.value.layout.sidebarFolderSplitSize = size
-  }
+  const sidebarOpen = computed({
+    get: () => settings.value.layout.sidebarOpen,
+    set: (open: boolean) => {
+      settings.value.layout.sidebarOpen = open
+    },
+  })
+  const detailsOpen = computed({
+    get: () => settings.value.layout.detailsOpen,
+    set: (open: boolean) => {
+      settings.value.layout.detailsOpen = open
+    },
+  })
+  const leftSidebarSize = computed({
+    get: () => settings.value.layout.leftSidebarSize,
+    set: (size: string) => {
+      settings.value.layout.leftSidebarSize = size
+    },
+  })
+  const rightDetailsSize = computed({
+    get: () => settings.value.layout.rightDetailsSize,
+    set: (size: string) => {
+      settings.value.layout.rightDetailsSize = size
+    },
+  })
+  const leftSidebarOpenSize = computed({
+    get: () => settings.value.layout.leftSidebarOpenSize,
+    set: (size: string) => {
+      settings.value.layout.leftSidebarOpenSize = size
+    },
+  })
+  const rightDetailsOpenSize = computed({
+    get: () => settings.value.layout.rightDetailsOpenSize,
+    set: (size: string) => {
+      settings.value.layout.rightDetailsOpenSize = size
+    },
+  })
+  const sidebarFolderSplitSize = computed({
+    get: () => settings.value.layout.sidebarFolderSplitSize ?? 0.5,
+    set: (size: number | string) => {
+      settings.value.layout.sidebarFolderSplitSize = size
+    },
+  })
 
   function resetLayoutState() {
     const defaults = createDefaultGallerySettings()
@@ -63,13 +70,6 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
     leftSidebarOpenSize,
     rightDetailsOpenSize,
     sidebarFolderSplitSize,
-    setSidebarOpen,
-    setDetailsOpen,
-    setLeftSidebarSize,
-    setRightDetailsSize,
-    setLeftSidebarOpenSize,
-    setRightDetailsOpenSize,
-    setSidebarFolderSplitSize,
     resetLayoutState,
   }
 }

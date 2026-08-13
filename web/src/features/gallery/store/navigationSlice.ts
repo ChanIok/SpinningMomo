@@ -1,16 +1,9 @@
 import { ref, computed, type Ref } from 'vue'
-import type {
-  ViewConfig,
-  AssetFilter,
-  SortBy,
-  SortOrder,
-  FolderTreeNode,
-  TagTreeNode,
-} from '../types'
+import type { AssetFilter, SortBy, SortOrder, FolderTreeNode, TagTreeNode } from '../types'
 import { collectTreeIds, createDefaultGallerySettings, type GallerySettings } from './persistence'
 
 interface NavigationSliceArgs {
-  // 由入口注入 gallerySettings 根对象，slice 自行消费所需子域。
+  // 由 Store 传入 gallerySettings 根对象，slice 只消费所需子域。
   settings: Ref<GallerySettings>
 }
 
@@ -20,7 +13,6 @@ interface NavigationSliceArgs {
  * 关注点:
  * - 左侧导航相关状态（folder/tag tree + expanded）
  * - 查询维度（filter/sort/includeSubfolders）
- * - 视图配置（view mode / size）
  */
 export function createNavigationSlice(args: NavigationSliceArgs) {
   const { settings } = args
@@ -32,10 +24,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   const tags = ref<TagTreeNode[]>([])
   const tagsError = ref<string | null>(null)
 
-  const viewConfig = ref<ViewConfig>({
-    mode: settings.value.view.mode,
-    size: settings.value.view.size,
-  })
   // 这里的 filter 是“查询输入”，不是 UI 临时态。
   const filter = ref<AssetFilter>({})
   const sortBy = ref<SortBy>('createdAt')
@@ -136,13 +124,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     tagsError.value = errorMessage
   }
 
-  function setViewConfig(config: Partial<ViewConfig>) {
-    const merged = { ...viewConfig.value, ...config }
-    viewConfig.value = merged
-    settings.value.view.size = viewConfig.value.size
-    settings.value.view.mode = viewConfig.value.mode
-  }
-
   function setFilter(newFilter: Partial<AssetFilter>) {
     // 使用 merge 而不是覆盖，允许 composable 按字段增量更新筛选项。
     filter.value = { ...filter.value, ...newFilter }
@@ -155,10 +136,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   function setSorting(newSortBy: SortBy, newSortOrder: SortOrder) {
     sortBy.value = newSortBy
     sortOrder.value = newSortOrder
-  }
-
-  function setIncludeSubfolders(include: boolean) {
-    includeSubfolders.value = include
   }
 
   function resetNavigationState() {
@@ -175,8 +152,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     settings.value.navigation.expandedTagIds = []
     settings.value.navigation.includeSubfolders = defaults.navigation.includeSubfolders
 
-    viewConfig.value = { ...defaults.view }
-    settings.value.view = { ...defaults.view }
     resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
@@ -187,7 +162,6 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     foldersError,
     tags,
     tagsError,
-    viewConfig,
     filter,
     sortBy,
     sortOrder,
@@ -207,11 +181,9 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     setFoldersError,
     setTags,
     setTagsError,
-    setViewConfig,
     setFilter,
     resetFilter,
     setSorting,
-    setIncludeSubfolders,
     resetNavigationState,
   }
 }

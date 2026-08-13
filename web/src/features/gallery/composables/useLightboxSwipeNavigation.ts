@@ -1,4 +1,4 @@
-import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, onUnmounted, ref, watch, type CSSProperties, type Ref } from 'vue'
 import { galleryApi } from '../api'
 import { useGalleryData } from './useGalleryData'
 import { useGalleryStore } from '../store'
@@ -89,7 +89,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   }))
 
   // 横向交给 Pager，纵向仍允许宿主滚动；禁用时恢复浏览器默认行为。
-  const swipeGestureSurfaceStyle = computed(() => ({
+  const swipeGestureSurfaceStyle = computed<CSSProperties>(() => ({
     touchAction: enabled.value ? 'pan-y' : 'auto',
     overscrollBehaviorX: enabled.value ? 'none' : 'auto',
   }))

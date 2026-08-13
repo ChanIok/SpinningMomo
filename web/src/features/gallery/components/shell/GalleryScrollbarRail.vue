@@ -115,7 +115,7 @@ watch(
       clearTrackCollapseTimer()
 
       isHandleVisible.value = true
-      scheduleHandleCollapse(3000)
+      scheduleHandleCollapse(MOBILE_COLLAPSE_DELAY)
     }
   }
 )
@@ -321,7 +321,7 @@ function clearAllCollapseTimers() {
   clearHandleCollapseTimer()
 }
 
-function scheduleHandleCollapse(delay = 3000) {
+function scheduleHandleCollapse(delay = MOBILE_COLLAPSE_DELAY) {
   clearHandleCollapseTimer()
   handleCollapseTimer = window.setTimeout(() => {
     handleCollapseTimer = null
@@ -332,17 +332,17 @@ function scheduleHandleCollapse(delay = 3000) {
 function scheduleTwoStageCollapse() {
   clearAllCollapseTimers()
 
-  // 阶段 1：松手 3 秒后关闭背景轨道（退回到模式一形态）
+  // 阶段 1：松手一段时间后关闭背景轨道（退回到模式一形态）
   trackCollapseTimer = window.setTimeout(() => {
     trackCollapseTimer = null
     isTrackVisible.value = false
-  }, 3000)
+  }, MOBILE_COLLAPSE_DELAY)
 
-  // 阶段 2：松手 6 秒后（即轨道隐去后再过 3 秒）关闭滑块
+  // 阶段 2：轨道隐去后再过同样的时间关闭滑块
   handleCollapseTimer = window.setTimeout(() => {
     handleCollapseTimer = null
     isHandleVisible.value = false
-  }, 6000)
+  }, MOBILE_COLLAPSE_DELAY * 2)
 }
 
 function updateHoverPosition(clientY: number) {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGalleryLayout } from '@/features/gallery/composables'
+import { useGalleryStore } from '@/features/gallery/store'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { call } from '@/core/rpc'
@@ -82,7 +82,9 @@ const expandedTaskIds = ref<Record<string, boolean>>({})
 const overflowingTaskIds = ref<Record<string, boolean>>({})
 const taskMessageElements = new Map<string, HTMLElement>()
 
-const { isSidebarOpen, isDetailsOpen, toggleSidebar, toggleDetails } = useGalleryLayout()
+const galleryStore = useGalleryStore()
+const isSidebarOpen = computed(() => galleryStore.sidebarOpen)
+const isDetailsOpen = computed(() => galleryStore.detailsOpen)
 
 const handleMinimize = () => {
   call('webview.minimize').catch((err) => {
@@ -116,11 +118,11 @@ const handleNavigationKeydown = (event: KeyboardEvent) => {
 }
 
 const handleToggleSidebar = () => {
-  toggleSidebar()
+  galleryStore.sidebarOpen = !galleryStore.sidebarOpen
 }
 
 const handleToggleDetails = () => {
-  toggleDetails()
+  galleryStore.detailsOpen = !galleryStore.detailsOpen
 }
 
 function resolveTaskTypeLabel(type: string): string {

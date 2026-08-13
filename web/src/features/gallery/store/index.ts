@@ -8,6 +8,7 @@ import {
 } from './persistence'
 import { createQuerySlice } from './querySlice'
 import { createNavigationSlice } from './navigationSlice'
+import { createViewSlice } from './viewSlice'
 import { createInteractionSlice } from './interactionSlice'
 import { createLayoutSlice } from './layoutSlice'
 
@@ -20,11 +21,11 @@ import { createLayoutSlice } from './layoutSlice'
  *
  * 拆分说明:
  * - index.ts 只负责“装配”，不承载具体业务细节
- * - query/navigation/layout/interaction 四个 slice 负责各自领域状态
+ * - query/navigation/view/layout/interaction 五个 slice 负责各自领域状态
  * - 对外仍然暴露同一个 store，避免调用方心智负担上升
  */
 export const useGalleryStore = defineStore('gallery', () => {
-  // 持久化层保持单一根对象：gallerySettings 是 gallery 偏好的唯一入口。
+  // 持久化数据集中在 gallerySettings，各 slice 只提供同一对象的领域访问。
   const gallerySettings = useStorage(
     GALLERY_SETTINGS_STORAGE_KEY,
     createDefaultGallerySettings(),
@@ -34,8 +35,12 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // 查询与缓存层：负责结果集、分页、时间线、并发刷新版本。
   const querySlice = createQuerySlice()
-  // 导航与筛选层：负责 folder/tag 树、展开态、排序筛选、视图配置。
+  // 导航与筛选层：负责 folder/tag 树、展开态、排序筛选。
   const navigationSlice = createNavigationSlice({
+    settings: gallerySettings,
+  })
+  // 视图配置直接映射到持久化对象，避免运行时状态与持久化配置分叉。
+  const viewSlice = createViewSlice({
     settings: gallerySettings,
   })
   // 布局层：负责三栏布局的完整真相源与本地持久化。
@@ -58,14 +63,16 @@ export const useGalleryStore = defineStore('gallery', () => {
   function reset() {
     querySlice.resetQueryState()
     navigationSlice.resetNavigationState()
+    viewSlice.resetViewState()
     layoutSlice.resetLayoutState()
     interactionSlice.resetInteractionState()
   }
 
   return {
-    // 展开顺序代表心智顺序：先数据查询，再导航筛选，再布局，最后交互 UI。
+    // 展开顺序代表心智顺序：查询、导航筛选、视图、布局，最后是交互 UI。
     ...querySlice,
     ...navigationSlice,
+    ...viewSlice,
     ...layoutSlice,
     ...interactionSlice,
     gallerySettings,

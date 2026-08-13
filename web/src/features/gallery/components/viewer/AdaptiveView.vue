@@ -39,6 +39,7 @@ const { locale } = useI18n()
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const targetRowHeight = computed(() => store.getEffectiveViewSize(props.compact))
 
 // AdaptiveView 不再依赖 ScrollArea，避免第三方滚动容器内部测量语义干扰 thumb 尺寸。
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -46,11 +47,12 @@ const { width: containerWidth, height: containerHeight } = useElementSize(scroll
 const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerRef: scrollContainerRef,
   containerWidth,
+  targetRowHeight,
   gap,
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
-  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+  computed(() => store.view.useOriginalImagesForCards)
 )
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({

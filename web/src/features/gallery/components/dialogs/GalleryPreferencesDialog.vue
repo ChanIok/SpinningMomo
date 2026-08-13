@@ -32,30 +32,30 @@ const isInfinityNikkiEnabled = computed(
 )
 
 const useOriginalImagesForCards = computed({
-  get: () => store.gallerySettings.view.useOriginalImagesForCards,
+  get: () => store.view.useOriginalImagesForCards,
   set: (value: boolean) => {
-    store.gallerySettings.view.useOriginalImagesForCards = value
+    store.view.useOriginalImagesForCards = value
   },
 })
 
 const showRatingBadge = computed({
-  get: () => store.gallerySettings.view.showRatingBadge,
+  get: () => store.view.showRatingBadge,
   set: (value: boolean) => {
-    store.gallerySettings.view.showRatingBadge = value
+    store.view.showRatingBadge = value
   },
 })
 
 const showDyeCodeBadge = computed({
-  get: () => store.gallerySettings.view.showDyeCodeBadge,
+  get: () => store.view.showDyeCodeBadge,
   set: (value: boolean) => {
-    store.gallerySettings.view.showDyeCodeBadge = value
+    store.view.showDyeCodeBadge = value
   },
 })
 
 const showTagBadges = computed({
-  get: () => store.gallerySettings.view.showTagBadges,
+  get: () => store.view.showTagBadges,
   set: (value: boolean) => {
-    store.gallerySettings.view.showTagBadges = value
+    store.view.showTagBadges = value
   },
 })
 

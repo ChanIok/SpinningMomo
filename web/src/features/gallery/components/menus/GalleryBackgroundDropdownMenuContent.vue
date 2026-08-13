@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ArrowUpDown, LayoutGrid } from '@lucide/vue'
 import {
   DropdownMenuRadioGroup,
@@ -9,15 +10,15 @@ import {
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/composables/useI18n'
-import { useGalleryView } from '../../composables'
+import { useGalleryStore } from '../../store'
 import type { SortBy, SortOrder, ViewMode } from '../../types'
 import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
 
 const { t } = useI18n()
-const galleryView = useGalleryView()
-const viewMode = galleryView.viewMode
-const sortBy = galleryView.sortBy
-const sortOrder = galleryView.sortOrder
+const store = useGalleryStore()
+const viewMode = computed(() => store.view.mode)
+const sortBy = computed(() => store.sortBy)
+const sortOrder = computed(() => store.sortOrder)
 
 const viewModeOptions = [
   { value: 'grid' as ViewMode, i18nKey: 'gallery.toolbar.viewMode.grid' },
@@ -34,11 +35,11 @@ const sortByOptions = [
 ]
 
 function setSortBy(value: SortBy) {
-  galleryView.setSorting(value, sortOrder.value)
+  store.setSorting(value, sortOrder.value)
 }
 
 function setSortOrder(value: SortOrder) {
-  galleryView.setSorting(sortBy.value, value)
+  store.setSorting(sortBy.value, value)
 }
 </script>
 
@@ -57,7 +58,7 @@ function setSortOrder(value: SortOrder) {
           v-for="option in viewModeOptions"
           :key="option.value"
           :value="option.value"
-          @click="galleryView.setViewMode(option.value)"
+          @click="store.view.mode = option.value"
         >
           {{ t(option.i18nKey) }}
         </DropdownMenuRadioItem>

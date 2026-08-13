@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -22,7 +23,6 @@ import {
 import {
   useGallerySidebar,
   useGalleryData,
-  useGalleryLayout,
   useGalleryAssetActions,
   useGalleryFolderActions,
 } from '../../composables'
@@ -45,7 +45,7 @@ const galleryData = useGalleryData()
 const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
 const galleryStore = useGalleryStore()
-const { sidebarFolderSplitSize } = useGalleryLayout()
+const { sidebarFolderSplitSize } = storeToRefs(galleryStore)
 const { toast } = useToast()
 const { t } = useI18n()
 // 侧边栏仍展示图库树，但所有宿主机文件操作都由这个能力开关统一控制。

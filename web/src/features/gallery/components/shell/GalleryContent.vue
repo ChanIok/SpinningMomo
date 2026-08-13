@@ -19,7 +19,7 @@ const props = withDefaults(
 )
 
 const store = useGalleryStore()
-const viewMode = computed(() => store.viewConfig.mode)
+const viewMode = computed(() => store.view.mode)
 
 interface GalleryViewExposed {
   scrollToIndex: (index: number) => void
@@ -51,7 +51,7 @@ defineExpose({ scrollToIndex, getCardRect })
 <template>
   <div class="h-full w-full">
     <GridView v-if="viewMode === 'grid'" ref="gridViewRef" :compact="props.compact" />
-    <ListView v-else-if="viewMode === 'list'" ref="listViewRef" />
+    <ListView v-else-if="viewMode === 'list'" ref="listViewRef" :compact="props.compact" />
     <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" :compact="props.compact" />
     <AdaptiveView v-else ref="adaptiveViewRef" :compact="props.compact" />
     <GallerySharedContextMenu />

@@ -6,13 +6,13 @@ import {
   useGallerySelection,
   useGalleryLightbox,
   useGalleryContextMenu,
-  useGalleryView,
   useListVirtualizer,
 } from '../../composables'
 import type { Asset, SortBy, SortOrder } from '../../types'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
+import { useGalleryStore } from '../../store'
 import AssetListRow from '../asset/AssetListRow.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
@@ -22,8 +22,17 @@ const LIST_ROW_HEIGHT_FACTOR = 0.4
 // 固定表头高度（表头在滚动区外，不参与虚拟列表的 scrollPadding）
 const LIST_HEADER_HEIGHT = 36
 
+const props = withDefaults(
+  defineProps<{
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
+
 const { t } = useI18n()
-const galleryView = useGalleryView()
+const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
@@ -32,7 +41,9 @@ const { prepareAssetDrag } = useGalleryDragPayload()
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
-const rowHeight = computed(() => Math.round(galleryView.viewSize.value * LIST_ROW_HEIGHT_FACTOR))
+const rowHeight = computed(() =>
+  Math.round(store.getEffectiveViewSize(props.compact) * LIST_ROW_HEIGHT_FACTOR)
+)
 
 // 缩略图尺寸略小于行高，留出上下内边距；最小 28px 保证可辨识
 const thumbnailSize = computed(() => Math.max(28, rowHeight.value - 12))
@@ -48,8 +59,8 @@ const listVirtualizer = useListVirtualizer({
   rowHeight,
 })
 
-const sortBy = computed(() => galleryView.sortBy.value)
-const sortOrder = computed(() => galleryView.sortOrder.value)
+const sortBy = computed(() => store.sortBy)
+const sortOrder = computed(() => store.sortOrder)
 
 function getDefaultSortOrder(field: SortBy): SortOrder {
   // 名称默认升序，其余字段默认降序（大/新的排前面）
@@ -68,11 +79,11 @@ function getDefaultSortOrder(field: SortBy): SortOrder {
 
 function handleSortHeaderClick(field: SortBy) {
   if (sortBy.value === field) {
-    galleryView.toggleSortOrder()
+    store.setSorting(sortBy.value, sortOrder.value === 'asc' ? 'desc' : 'asc')
     return
   }
 
-  galleryView.setSorting(field, getDefaultSortOrder(field))
+  store.setSorting(field, getDefaultSortOrder(field))
 }
 
 function getSortIcon(field: SortBy) {

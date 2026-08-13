@@ -18,7 +18,6 @@ import { GALLERY_CARD_GAP } from '../constants'
 
 /** 默认列间距（px），与 CSS gap 保持一致 */
 const DEFAULT_MASONRY_GAP = GALLERY_CARD_GAP
-const MASONRY_MIN_ITEM_HEIGHT = 80
 // TanStack masonry lanes 偶尔会返回比真实视口大很多的连续 range。
 // 渲染与分页加载只消费视口附近几屏，避免一次性拉取大量后端分页。
 const MASONRY_LOAD_BUFFER_VIEWPORTS = 2
@@ -30,6 +29,8 @@ export interface UseMasonryVirtualizerOptions {
   columns: Ref<number>
   /** 容器宽度（px），用于计算单列宽度 */
   containerWidth: Ref<number>
+  /** 初始测量尚未完成时使用的目标列宽。 */
+  targetColumnSize: Ref<number>
   /** 卡片间距（px），水平和垂直统一使用该值 */
   gap?: number
 }
@@ -49,7 +50,7 @@ export interface VirtualMasonryItem {
 
 /**
  * 根据资产原始尺寸和列宽计算卡片渲染高度。
- * 未知尺寸时回退为正方形（columnWidth），最小高度为 80px。
+ * 未知尺寸时回退为正方形；已知尺寸始终遵循原始宽高比，不额外设置高度下限。
  */
 function getAssetDimensions(
   asset: Asset | null,
@@ -81,17 +82,20 @@ function getAssetHeight(
 
   const dimensions = getAssetDimensions(asset, meta)
   if (!dimensions) {
-    return columnWidth
+    return Math.max(1, Math.round(columnWidth))
   }
 
-  return Math.max(
-    MASONRY_MIN_ITEM_HEIGHT,
-    Math.round((columnWidth * dimensions.height) / dimensions.width)
-  )
+  return Math.max(1, Math.round((columnWidth * dimensions.height) / dimensions.width))
 }
 
 export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
-  const { containerRef, columns, containerWidth, gap = DEFAULT_MASONRY_GAP } = options
+  const {
+    containerRef,
+    columns,
+    containerWidth,
+    targetColumnSize,
+    gap = DEFAULT_MASONRY_GAP,
+  } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -105,7 +109,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   // 单列宽度 = (容器宽度 - 列间总间距) / 列数
   const columnWidth = computed(() => {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
-    if (width <= 0) return store.viewConfig.size
+    if (width <= 0) return targetColumnSize.value
 
     const totalGap = Math.max(0, columns.value - 1) * gap
     return Math.max(1, Math.floor((width - totalGap) / Math.max(columns.value, 1)))
@@ -339,7 +343,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     virtualItems,
     columnWidth,
     gap,
-    minItemHeight: MASONRY_MIN_ITEM_HEIGHT,
     init,
     measureElement,
     getLaneOffset,

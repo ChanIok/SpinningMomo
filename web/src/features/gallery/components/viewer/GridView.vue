@@ -4,7 +4,6 @@ import { useElementSize } from '@vueuse/core'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
 import {
-  useGalleryView,
   useGallerySelection,
   useGalleryLightbox,
   useGalleryContextMenu,
@@ -31,7 +30,6 @@ const props = withDefaults(
 )
 
 const store = useGalleryStore()
-const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
@@ -45,7 +43,7 @@ const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
-  const itemSize = galleryView.viewSize.value
+  const itemSize = store.getEffectiveViewSize(props.compact)
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 const gridCardSize = computed(() => {
@@ -63,7 +61,7 @@ const gridVirtualizer = useGridVirtualizer({
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
-  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+  computed(() => store.view.useOriginalImagesForCards)
 )
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({

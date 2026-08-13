@@ -9,7 +9,7 @@ import {
   useGalleryData,
   useGalleryFolderActions,
   useGallerySelection,
-  useGalleryView,
+  useGalleryPinchZoom,
   useVisibleAssetTags,
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
@@ -42,7 +42,6 @@ const assetActions = useGalleryAssetActions()
 const galleryContextMenu = useGalleryContextMenu()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
-const galleryView = useGalleryView()
 const { t } = useI18n()
 const viewerRef = ref<HTMLElement | null>(null)
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
@@ -54,6 +53,19 @@ const preferencesOpen = ref(false)
 const isExternalDragActive = ref(false)
 const isDropImporting = ref(false)
 let externalDragDepth = 0
+
+const pinchZoomEnabled = computed(
+  () => props.compact && store.view.mode !== 'list' && !store.lightbox.isOpen
+)
+
+useGalleryPinchZoom({
+  surfaceRef: contentRef,
+  enabled: pinchZoomEnabled,
+  getSize: () => store.getEffectiveViewSize(props.compact),
+  getMinSize: () => store.getViewSizeRange(props.compact).min,
+  getMaxSize: () => store.getViewSizeRange(props.compact).max,
+  setSize: (size) => store.setViewSize(size, props.compact),
+})
 
 useVisibleAssetTags()
 
@@ -405,12 +417,12 @@ function handleContentWheel(event: WheelEvent) {
 
   while (Math.abs(wheelZoomDelta) >= CONTENT_WHEEL_ZOOM_THRESHOLD) {
     if (wheelZoomDelta > 0) {
-      galleryView.decreaseSize()
+      store.decreaseViewSize(props.compact)
       wheelZoomDelta -= CONTENT_WHEEL_ZOOM_THRESHOLD
       continue
     }
 
-    galleryView.increaseSize()
+    store.increaseViewSize(props.compact)
     wheelZoomDelta += CONTENT_WHEEL_ZOOM_THRESHOLD
   }
 }
@@ -561,10 +573,11 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
-      <GalleryToolbar @open-preferences="preferencesOpen = true" />
+      <GalleryToolbar :compact="props.compact" @open-preferences="preferencesOpen = true" />
       <div
         ref="contentRef"
         class="relative flex-1 overflow-hidden"
+        :class="props.compact && 'gallery-compact-touch-surface'"
         @contextmenu="handleContentContextMenu"
         @dragenter="handleViewerDragEnter"
         @dragover="handleViewerDragOver"
@@ -623,3 +636,10 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+/* 单指保留原生纵向滚动，双指由 useGalleryPinchZoom 接管为图库尺寸调整。 */
+.gallery-compact-touch-surface {
+  touch-action: pan-y;
+}
+</style>

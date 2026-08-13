@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch, type ComponentPublicInstance } from 'v
 import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
-  useGalleryView,
   useGallerySelection,
   useGalleryLightbox,
   useGalleryContextMenu,
@@ -31,7 +30,6 @@ const props = withDefaults(
 )
 
 const store = useGalleryStore()
-const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
@@ -44,9 +42,10 @@ const scrollTop = ref(0)
 const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
+const targetColumnSize = computed(() => store.getEffectiveViewSize(props.compact))
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
-  const itemSize = galleryView.viewSize.value
+  const itemSize = targetColumnSize.value
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 
@@ -54,11 +53,12 @@ const masonryVirtualizer = useMasonryVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
+  targetColumnSize,
   gap,
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
-  computed(() => store.gallerySettings.view.useOriginalImagesForCards)
+  computed(() => store.view.useOriginalImagesForCards)
 )
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({
@@ -216,7 +216,6 @@ defineExpose({ scrollToIndex, getCardRect })
               :compact="props.compact"
               :style="{
                 height: `${virtualItem.size}px`,
-                minHeight: `${masonryVirtualizer.minItemHeight}px`,
               }"
               @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
               @double-click="

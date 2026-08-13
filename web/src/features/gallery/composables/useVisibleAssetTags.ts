@@ -35,7 +35,7 @@ export function useVisibleAssetTags() {
   }
 
   async function loadVisibleAssetTags() {
-    if (disposed || !store.gallerySettings.view.showTagBadges) {
+    if (disposed || !store.view.showTagBadges) {
       return
     }
 
@@ -75,7 +75,7 @@ export function useVisibleAssetTags() {
 
   watch(
     () => [
-      store.gallerySettings.view.showTagBadges,
+      store.view.showTagBadges,
       store.visibleRange.startIndex,
       store.visibleRange.endIndex,
       store.paginatedAssetsVersion,

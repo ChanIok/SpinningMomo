@@ -185,7 +185,7 @@ export function useMapBridge(options: UseMapBridgeOptions) {
 
     if (data.action === ACTION_CLEAR_GALLERY_FILTERS) {
       galleryStore.resetFilter()
-      galleryStore.setIncludeSubfolders(true)
+      galleryStore.includeSubfolders = true
       void galleryData.refreshCurrentQuery()
       return
     }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useDebounceFn, useElementSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
@@ -7,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Split } from '@/components/ui/split'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
-import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
+import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from '../components/shell/GallerySidebar.vue'
 import GalleryViewer from '../components/shell/GalleryViewer.vue'
@@ -24,17 +25,15 @@ const COLLAPSED_SIZE = '0px'
 const COLLAPSE_TRIGGER_PX = 40
 const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
-// 使用布局管理
+const galleryStore = useGalleryStore()
 const {
-  isSidebarOpen,
-  isDetailsOpen,
+  sidebarOpen: isSidebarOpen,
+  detailsOpen: isDetailsOpen,
   leftSidebarSize,
   rightDetailsSize,
   leftSidebarOpenSize,
   rightDetailsOpenSize,
-  setSidebarOpen,
-  setDetailsOpen,
-} = useGalleryLayout()
+} = storeToRefs(galleryStore)
 const galleryData = useGalleryData()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
@@ -96,8 +95,8 @@ function syncCompactLayout(compact: boolean) {
       sidebarOpen: isSidebarOpen.value,
       detailsOpen: isDetailsOpen.value,
     }
-    setSidebarOpen(false)
-    setDetailsOpen(false)
+    isSidebarOpen.value = false
+    isDetailsOpen.value = false
     return
   }
 
@@ -106,8 +105,8 @@ function syncCompactLayout(compact: boolean) {
     return
   }
 
-  setSidebarOpen(snapshot.sidebarOpen)
-  setDetailsOpen(snapshot.detailsOpen)
+  isSidebarOpen.value = snapshot.sidebarOpen
+  isDetailsOpen.value = snapshot.detailsOpen
   compactLayoutSnapshot.value = null
 }
 
@@ -208,7 +207,7 @@ function handleLeftDrag(e: MouseEvent) {
 
   if (isSidebarOpen.value) {
     if (isAtMinSize(leftSidebarSize.value, LEFT_MIN_PX) && overshoot >= COLLAPSE_TRIGGER_PX) {
-      setSidebarOpen(false)
+      isSidebarOpen.value = false
       leftCollapsedByDrag.value = true
       leftSidebarSize.value = COLLAPSED_SIZE
     }
@@ -223,7 +222,7 @@ function handleLeftDrag(e: MouseEvent) {
   if (overshoot <= COLLAPSE_TRIGGER_PX) {
     const restoredSize = `${Math.max(LEFT_MIN_PX, Math.round(currentDragSizePx))}px`
     leftSidebarOpenSize.value = restoredSize
-    setSidebarOpen(true)
+    isSidebarOpen.value = true
     leftCollapsedByDrag.value = false
   }
 }
@@ -246,7 +245,7 @@ function handleRightDrag(e: MouseEvent) {
 
   if (isDetailsOpen.value) {
     if (isAtMinSize(rightDetailsSize.value, RIGHT_MIN_PX) && overshoot >= COLLAPSE_TRIGGER_PX) {
-      setDetailsOpen(false)
+      isDetailsOpen.value = false
       rightCollapsedByDrag.value = true
       rightDetailsSize.value = COLLAPSED_SIZE
     }
@@ -261,7 +260,7 @@ function handleRightDrag(e: MouseEvent) {
   if (overshoot <= COLLAPSE_TRIGGER_PX) {
     const restoredSize = `${Math.max(RIGHT_MIN_PX, Math.round(currentDragSizePx))}px`
     rightDetailsOpenSize.value = restoredSize
-    setDetailsOpen(true)
+    isDetailsOpen.value = true
     rightCollapsedByDrag.value = false
   }
 }
@@ -334,7 +333,7 @@ onUnmounted(() => {
 
       <!-- 窄屏布局：图库保持全宽，侧栏以覆盖式抽屉打开。 -->
       <template v-else-if="isCompactViewport">
-        <GalleryViewer compact />
+        <GalleryViewer :compact="isCompactViewport" />
 
         <Transition name="gallery-mobile-drawer">
           <div
@@ -348,7 +347,7 @@ onUnmounted(() => {
               type="button"
               class="absolute inset-0 cursor-default bg-black/50"
               :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-              @click="setSidebarOpen(false)"
+              @click="isSidebarOpen = false"
             />
 
             <aside
@@ -361,7 +360,7 @@ onUnmounted(() => {
                   size="icon"
                   class="h-10 w-10"
                   :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-                  @click="setSidebarOpen(false)"
+                  @click="isSidebarOpen = false"
                 >
                   <X class="h-5 w-5" />
                 </Button>

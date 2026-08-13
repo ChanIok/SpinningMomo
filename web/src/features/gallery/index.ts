@@ -11,7 +11,7 @@ export { galleryApi } from './api'
 export { useGalleryStore } from './store'
 
 // 业务逻辑层 (Composables)
-export { useGalleryData, useGalleryView } from './composables'
+export { useGalleryData } from './composables'
 
 // 路由配置
 export { default as routes } from './routes'

@@ -140,12 +140,6 @@ export interface AssetFilter {
   colorDistance?: number
 }
 
-// 视图配置
-export interface ViewConfig {
-  mode: ViewMode
-  size: number // 缩略图目标尺寸（px）
-}
-
 export type {
   // 扫描/可达性
   OperationResult,

@@ -11,6 +11,8 @@ export interface UseAdaptiveVirtualizerOptions {
   containerRef: Ref<HTMLElement | null>
   // 内容区宽度，用来把“按比例排版”转换成真实行宽与行高。
   containerWidth: Ref<number>
+  // 目标行高由视图层根据 Pinia 状态和当前布局上下文计算后传入。
+  targetRowHeight: Ref<number>
   // 行内与行间间距；由视图层根据当前布局模式决定。
   gap?: number
 }
@@ -125,13 +127,12 @@ function buildAdaptiveRows(
 }
 
 export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
-  const { containerRef, containerWidth, gap = GALLERY_CARD_GAP } = options
+  const { containerRef, containerWidth, targetRowHeight, gap = GALLERY_CARD_GAP } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
 
   // 在 adaptive 模式里，viewSize 的语义不再是“方形卡片边长”，而是“目标行高”。
-  const targetRowHeight = computed(() => Math.max(100, store.viewConfig.size))
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
   const { layoutMetaItems, reloadLayoutMeta } = useGalleryLayoutMeta('adaptive')

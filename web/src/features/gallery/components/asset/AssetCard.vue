@@ -52,13 +52,11 @@ let originalPreviewAbortController: AbortController | null = null
 const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
 const { generateOriginalPreview } = useOriginalPreviewWorker()
 const store = useGalleryStore()
-const useOriginalImagesForCards = computed(
-  () => store.gallerySettings.view.useOriginalImagesForCards
-)
-const showRatingBadge = computed(() => store.gallerySettings.view.showRatingBadge)
-const showTagBadges = computed(() => store.gallerySettings.view.showTagBadges)
+const useOriginalImagesForCards = computed(() => store.view.useOriginalImagesForCards)
+const showRatingBadge = computed(() => store.view.showRatingBadge)
+const showTagBadges = computed(() => store.view.showTagBadges)
 const showDyeCodeBadge = computed(
-  () => store.gallerySettings.view.showDyeCodeBadge && store.dyeCodeAssetIds.has(props.asset.id)
+  () => store.view.showDyeCodeBadge && store.dyeCodeAssetIds.has(props.asset.id)
 )
 const assetTags = computed(() =>
   showTagBadges.value ? (store.assetTagsById.get(props.asset.id) ?? []) : []
