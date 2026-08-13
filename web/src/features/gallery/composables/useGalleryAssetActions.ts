@@ -1,52 +1,23 @@
-import { computed, reactive, readonly } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { galleryApi } from '../api'
 import { useGalleryData } from './useGalleryData'
-import { useGalleryTagClipboard } from './useGalleryTagClipboard'
 import { useGalleryStore } from '../store'
 import type { ReviewFlag } from '../types'
 import type { GalleryDeleteMode } from '../store/persistence'
-
-interface MoveToFolderDialogState {
-  open: boolean
-}
-
-const moveToFolderDialogState = reactive<MoveToFolderDialogState>({
-  open: false,
-})
-
-interface DeleteAssetsDialogState {
-  open: boolean
-  ids: number[]
-  mode: GalleryDeleteMode
-  recycleBinCount: number
-  permanentCount: number
-  unknownCount: number
-}
-
-const deleteAssetsDialogState = reactive<DeleteAssetsDialogState>({
-  open: false,
-  ids: [],
-  mode: 'recycleBin',
-  recycleBinCount: 0,
-  permanentCount: 0,
-  unknownCount: 0,
-})
 
 export function useGalleryAssetActions() {
   const store = useGalleryStore()
   const { t } = useI18n()
   const { toast } = useToast()
   const galleryData = useGalleryData()
-  const tagClipboard = useGalleryTagClipboard()
 
   const selectedAssetIds = computed(() => Array.from(store.selection.selectedIds))
   const hasSelection = computed(() => selectedAssetIds.value.length > 0)
   const isSingleSelection = computed(() => selectedAssetIds.value.length === 1)
   const canCopyTags = computed(() => hasSelection.value)
-  const canPasteTags = computed(() => hasSelection.value && tagClipboard.hasPayload.value)
-  const copiedTagCount = computed(() => tagClipboard.state.tagIds.length)
+  const canPasteTags = computed(() => hasSelection.value && store.hasTagClipboard)
   const selectedAssetId = computed(() => {
     if (!isSingleSelection.value) {
       return undefined
@@ -164,8 +135,6 @@ export function useGalleryAssetActions() {
       await Promise.all([galleryData.loadTagTree(), galleryData.refreshCurrentQuery()])
     } catch (error) {
       console.error('Failed to refresh gallery after tag mutation:', error)
-    } finally {
-      store.bumpAssetTagsVersion()
     }
   }
 
@@ -302,11 +271,7 @@ export function useGalleryAssetActions() {
       return
     }
 
-    moveToFolderDialogState.open = true
-  }
-
-  function setMoveToFolderDialogOpen(open: boolean) {
-    moveToFolderDialogState.open = open
+    store.setMoveToFolderDialogOpen(true)
   }
 
   function getKnownDeleteImpact(ids: number[], mode: GalleryDeleteMode) {
@@ -348,17 +313,6 @@ export function useGalleryAssetActions() {
       recycleBinCount,
       permanentCount,
       unknownCount,
-    }
-  }
-
-  function openDeleteAssetsDialog(options: Omit<DeleteAssetsDialogState, 'open'>) {
-    Object.assign(deleteAssetsDialogState, options, { open: true })
-  }
-
-  function setDeleteAssetsDialogOpen(open: boolean) {
-    deleteAssetsDialogState.open = open
-    if (!open) {
-      deleteAssetsDialogState.ids = []
     }
   }
 
@@ -425,7 +379,7 @@ export function useGalleryAssetActions() {
       impact.permanentCount > 0 ||
       impact.unknownCount > 0
     ) {
-      openDeleteAssetsDialog({
+      store.openDeleteAssetsDialog({
         ids,
         mode,
         ...impact,
@@ -437,7 +391,7 @@ export function useGalleryAssetActions() {
   }
 
   async function confirmDeleteAssets() {
-    const { ids, mode, permanentCount } = deleteAssetsDialogState
+    const { ids, mode, permanentCount } = store.deleteAssetsDialog
     if (ids.length === 0) {
       return false
     }
@@ -447,7 +401,7 @@ export function useGalleryAssetActions() {
 
     const completed = await executeDeleteAssets([...ids], effectiveMode)
     if (completed) {
-      setDeleteAssetsDialogOpen(false)
+      store.setDeleteAssetsDialogOpen(false)
     }
     return completed
   }
@@ -461,14 +415,14 @@ export function useGalleryAssetActions() {
     try {
       const tags = await galleryApi.getAssetTags(sourceAssetId)
       if (tags.length === 0) {
-        tagClipboard.clear()
+        store.clearTagClipboard()
         toast.warning(t('gallery.contextMenu.copyTags.emptyTitle'), {
           description: t('gallery.contextMenu.copyTags.emptyDescription'),
         })
         return
       }
 
-      tagClipboard.setFromTags(sourceAssetId, tags)
+      store.setTagClipboardFromTags(tags)
       toast.success(t('gallery.contextMenu.copyTags.successTitle'), {
         description: t('gallery.contextMenu.copyTags.successDescription', {
           count: tags.length,
@@ -487,7 +441,7 @@ export function useGalleryAssetActions() {
       return
     }
 
-    const tagIds = [...new Set(tagClipboard.state.tagIds)].filter((tagId) => tagId > 0)
+    const tagIds = [...new Set(store.tagClipboard.tagIds)].filter((tagId) => tagId > 0)
     if (tagIds.length === 0) {
       toast.warning(t('gallery.contextMenu.pasteTags.emptyTitle'), {
         description: t('gallery.contextMenu.pasteTags.emptyDescription'),
@@ -695,19 +649,14 @@ export function useGalleryAssetActions() {
     canCopyTags,
     canPasteTags,
     refreshTagViewsAfterMutation,
-    copiedTagCount,
     selectedAssetId,
     deleteMenuLabel,
-    moveToFolderDialog: readonly(moveToFolderDialogState),
     openMoveToFolderDialog,
-    setMoveToFolderDialogOpen,
     moveAssetsToFolderByIds,
     handleMoveSelectedAssetsToFolder,
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
     handleCopyAssetsToClipboard,
-    deleteAssetsDialog: readonly(deleteAssetsDialogState),
-    setDeleteAssetsDialogOpen,
     requestDeleteAssets,
     confirmDeleteAssets,
     copySelectedAssetTags,

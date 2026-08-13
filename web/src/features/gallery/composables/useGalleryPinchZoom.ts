@@ -180,10 +180,14 @@ export function useGalleryPinchZoom(options: UseGalleryPinchZoomOptions) {
     }
 
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    capturePointer(event.pointerId)
 
     if (pointers.size !== 2) {
       return
+    }
+
+    // 单指阶段交给卡片和浏览器处理；确定进入双指缩放后再接管两根指针。
+    for (const pointerId of pointers.keys()) {
+      capturePointer(pointerId)
     }
 
     const distance = getPinchDistance()
@@ -271,6 +275,9 @@ export function useGalleryPinchZoom(options: UseGalleryPinchZoomOptions) {
   useEventListener(surfaceRef, 'pointermove', handlePointerMove)
   useEventListener(surfaceRef, 'pointerup', handlePointerEnd)
   useEventListener(surfaceRef, 'pointercancel', handlePointerEnd)
+  // 第一根指针没有 capture 时，离开内容区后仍需清理跟踪状态。
+  useEventListener(window, 'pointerup', handlePointerEnd)
+  useEventListener(window, 'pointercancel', handlePointerEnd)
   useEventListener(surfaceRef, 'lostpointercapture', handleLostPointerCapture)
   useEventListener(surfaceRef, 'click', handleClick, { capture: true })
   useEventListener(surfaceRef, 'dblclick', handleClick, { capture: true })

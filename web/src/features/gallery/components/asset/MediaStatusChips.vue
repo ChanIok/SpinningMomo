@@ -16,8 +16,8 @@ interface MediaStatusChipsProps {
   rating?: number
   /** 审核/标记状态（如 rejected 等） */
   reviewFlag?: ReviewFlag
-  /** 是否为紧凑模式（例如缩略图/底栏小卡片） */
-  compact?: boolean
+  /** 是否使用紧凑角标布局（例如缩略图/底栏小卡片） */
+  dense?: boolean
   /** 是否显示星级角标 */
   showRating?: boolean
   /** 是否包含染色码数据 */
@@ -34,7 +34,7 @@ const MAX_RENDERED_CARD_TAGS = 12
 const props = withDefaults(defineProps<MediaStatusChipsProps>(), {
   rating: 0,
   reviewFlag: 'none',
-  compact: false,
+  dense: false,
   showRating: true,
   hasDyeCode: false,
   showTags: false,
@@ -47,9 +47,9 @@ const { t } = useI18n()
 const hasRating = computed(() => props.showRating && (props.rating ?? 0) > 0)
 const isRejected = computed(() => props.reviewFlag === 'rejected')
 
-// 仅在非紧凑模式且开启 showTags 时，限制最多展示 MAX_RENDERED_CARD_TAGS 个标签
+// 仅在非紧凑布局且开启 showTags 时，限制最多展示 MAX_RENDERED_CARD_TAGS 个标签
 const renderedTags = computed(() =>
-  props.showTags && !props.compact ? props.tags.slice(0, MAX_RENDERED_CARD_TAGS) : []
+  props.showTags && !props.dense ? props.tags.slice(0, MAX_RENDERED_CARD_TAGS) : []
 )
 
 // 悬浮提示文本：拼合所有标签名称
@@ -69,7 +69,7 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
     <div
       v-if="hasTopContent"
       class="absolute flex flex-col items-start gap-1 overflow-hidden"
-      :class="compact ? 'top-1 left-1' : 'top-2 right-2 bottom-10 left-2'"
+      :class="dense ? 'top-1 left-1' : 'top-2 right-2 bottom-10 left-2'"
     >
       <!-- 星级与染色码角标行 -->
       <div v-if="hasStatusMarkers" class="flex shrink-0 items-start gap-1">
@@ -77,11 +77,11 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
         <div
           v-if="hasRating"
           class="flex items-center gap-1 rounded-md border border-white/15 bg-black/45 text-white"
-          :class="compact ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'"
+          :class="dense ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'"
         >
           <Star
             class="shrink-0 fill-current text-current"
-            :class="compact ? 'h-2.5 w-2.5' : 'h-3 w-3'"
+            :class="dense ? 'h-2.5 w-2.5' : 'h-3 w-3'"
           />
           <span class="font-medium">{{ rating }}</span>
         </div>
@@ -90,9 +90,9 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
           v-if="hasDyeCode"
           :title="t('gallery.preferences.badges.dyeCodeTooltip')"
           class="flex items-center justify-center rounded-md border border-white/15 bg-black/45 text-white"
-          :class="compact ? 'h-4 w-4' : 'h-6 w-6'"
+          :class="dense ? 'h-4 w-4' : 'h-6 w-6'"
         >
-          <Paintbrush :class="compact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'" />
+          <Paintbrush :class="dense ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'" />
         </div>
       </div>
 
@@ -114,7 +114,7 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
 
     <!-- 紧凑模式（如底栏 Filmstrip）弃用标记：右下角小红 X 方框 -->
     <div
-      v-if="isRejected && compact"
+      v-if="isRejected && dense"
       :title="t('gallery.review.flag.rejected')"
       class="absolute right-1 bottom-1 flex h-4 w-4 items-center justify-center rounded-sm border border-white/20 bg-black/50 text-current shadow-sm backdrop-blur-sm"
     >
@@ -123,7 +123,7 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
 
     <!-- 主图库卡片弃用标记：右下角胶囊角标（红 X + 文字） -->
     <div
-      v-if="isRejected && !compact"
+      v-if="isRejected && !dense"
       :title="t('gallery.review.flag.rejected')"
       class="absolute right-2 bottom-2 flex items-center gap-1 rounded-md border border-white/15 bg-black/50 px-2 py-1 text-[11px] text-white transition-opacity duration-150"
     >

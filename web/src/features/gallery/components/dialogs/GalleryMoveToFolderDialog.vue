@@ -24,8 +24,8 @@ const expandedIds = ref<Set<number>>(new Set())
 const isSubmitting = ref(false)
 
 const open = computed({
-  get: () => assetActions.moveToFolderDialog.open,
-  set: (value: boolean) => assetActions.setMoveToFolderDialogOpen(value),
+  get: () => store.moveToFolderDialogOpen,
+  set: (value: boolean) => store.setMoveToFolderDialogOpen(value),
 })
 
 const folders = computed(() => store.folders)

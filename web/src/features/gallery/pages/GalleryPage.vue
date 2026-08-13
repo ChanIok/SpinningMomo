@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDebounceFn, useElementSize } from '@vueuse/core'
+import { useDebounceFn, useWindowSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,6 @@ import GallerySidebar from '../components/shell/GallerySidebar.vue'
 import GalleryViewer from '../components/shell/GalleryViewer.vue'
 import GalleryDetails from '../components/shell/GalleryDetails.vue'
 import InfinityNikkiGuidePanel from '../components/infinity_nikki/InfinityNikkiGuidePanel.vue'
-import { GALLERY_COMPACT_BREAKPOINT } from '../constants'
 
 const LEFT_MIN_SIZE = '180px'
 const RIGHT_MIN_SIZE = '180px'
@@ -27,6 +26,7 @@ const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
 const galleryStore = useGalleryStore()
 const {
+  isCompactWindow,
   sidebarOpen: isSidebarOpen,
   detailsOpen: isDetailsOpen,
   leftSidebarSize,
@@ -37,11 +37,9 @@ const {
 const galleryData = useGalleryData()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
-const pageRef = ref<HTMLElement | null>(null)
-const { width: pageWidth } = useElementSize(pageRef)
-const isCompactViewport = computed(
-  () => pageWidth.value > 0 && pageWidth.value < GALLERY_COMPACT_BREAKPOINT
-)
+const { width: windowWidth } = useWindowSize()
+
+watch(windowWidth, (width) => galleryStore.setWindowWidth(width), { immediate: true })
 
 // 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
@@ -110,7 +108,7 @@ function syncCompactLayout(compact: boolean) {
   compactLayoutSnapshot.value = null
 }
 
-watch(isCompactViewport, syncCompactLayout, { immediate: true })
+watch(isCompactWindow, syncCompactLayout, { immediate: true })
 
 const leftMinSize = computed(() => (isSidebarOpen.value ? LEFT_MIN_SIZE : COLLAPSED_SIZE))
 const rightMinSize = computed(() => (isDetailsOpen.value ? RIGHT_MIN_SIZE : COLLAPSED_SIZE))
@@ -323,17 +321,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="h-full w-full" :class="isCompactViewport ? 'p-0' : 'p-1 pt-0'">
-    <div
-      class="relative h-full w-full overflow-hidden"
-      :class="[!isCompactViewport && 'rounded-sm']"
-    >
+  <div class="h-full w-full" :class="isCompactWindow ? 'p-0' : 'p-1 pt-0'">
+    <div class="relative h-full w-full overflow-hidden" :class="[!isCompactWindow && 'rounded-sm']">
       <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
       <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
 
       <!-- 窄屏布局：图库保持全宽，侧栏以覆盖式抽屉打开。 -->
-      <template v-else-if="isCompactViewport">
-        <GalleryViewer :compact="isCompactViewport" />
+      <template v-else-if="isCompactWindow">
+        <GalleryViewer />
 
         <Transition name="gallery-mobile-drawer">
           <div

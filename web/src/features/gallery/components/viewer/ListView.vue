@@ -2,12 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
-import {
-  useGallerySelection,
-  useGalleryLightbox,
-  useGalleryContextMenu,
-  useListVirtualizer,
-} from '../../composables'
+import { useGallerySelection, useGalleryLightbox, useListVirtualizer } from '../../composables'
 import type { Asset, SortBy, SortOrder } from '../../types'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
@@ -22,28 +17,16 @@ const LIST_ROW_HEIGHT_FACTOR = 0.4
 // 固定表头高度（表头在滚动区外，不参与虚拟列表的 scrollPadding）
 const LIST_HEADER_HEIGHT = 36
 
-const props = withDefaults(
-  defineProps<{
-    compact?: boolean
-  }>(),
-  {
-    compact: false,
-  }
-)
-
 const { t } = useI18n()
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
-const galleryContextMenu = useGalleryContextMenu()
 const { prepareAssetDrag } = useGalleryDragPayload()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
-const rowHeight = computed(() =>
-  Math.round(store.getEffectiveViewSize(props.compact) * LIST_ROW_HEIGHT_FACTOR)
-)
+const rowHeight = computed(() => Math.round(store.getEffectiveViewSize() * LIST_ROW_HEIGHT_FACTOR))
 
 // 缩略图尺寸略小于行高，留出上下内边距；最小 28px 保证可辨识
 const thumbnailSize = computed(() => Math.max(28, rowHeight.value - 12))
@@ -108,6 +91,11 @@ onMounted(async () => {
 })
 
 function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
+  if (store.selection.mode === 'multi-select') {
+    void gallerySelection.toggleIndex(index, asset)
+    return
+  }
+
   void gallerySelection.handleAssetClick(asset, event, index)
 }
 
@@ -119,13 +107,12 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
 
-  gallerySelection.handleAssetDoubleClick(asset, event)
   void galleryLightbox.openLightbox(index)
 }
 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
-  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'list' })
+  store.openContextMenuForAsset(event)
 }
 
 function handleAssetDragStart(asset: Asset, event: DragEvent) {

@@ -51,7 +51,7 @@ import { isLocalAccess } from '@/core/access'
 import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
 import { useGalleryStore } from '../../store'
-import { GALLERY_COMPACT_BREAKPOINT } from '../../constants'
+import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
 import type {
   AssetFilter,
   AssetType,
@@ -63,15 +63,6 @@ import type {
 } from '../../types'
 
 type SourceType = 'all' | 'folder' | 'tag'
-
-const props = withDefaults(
-  defineProps<{
-    compact?: boolean
-  }>(),
-  {
-    compact: false,
-  }
-)
 
 const emit = defineEmits<{
   'open-preferences': []
@@ -102,7 +93,9 @@ const handleOpenPreferences = () => {
   emit('open-preferences')
 }
 
-const viewMode = computed(() => store.view.mode)
+const viewMode = computed(() =>
+  store.isCompactWindow && store.view.mode === 'list' ? 'grid' : store.view.mode
+)
 const sortBy = computed(() => store.sortBy)
 const sortOrder = computed(() => store.sortOrder)
 const currentFolderOnly = computed(() => !store.includeSubfolders)
@@ -120,7 +113,7 @@ const COLOR_DISTANCE_MAX = 40
 const COLOR_DISTANCE_DEFAULT = 18
 const STARS = [1, 2, 3, 4, 5] as const
 
-const currentSliderPosition = computed(() => store.getSliderPosition(props.compact))
+const currentSliderPosition = computed(() => store.getSliderPosition())
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 const draftColorDistance = ref(activeColorDistance.value)
@@ -131,7 +124,7 @@ const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
 const isWide = computed(() => toolbarWidth.value >= 720)
 const isFilterCompact = computed(
-  () => toolbarWidth.value > 0 && toolbarWidth.value < GALLERY_COMPACT_BREAKPOINT
+  () => toolbarWidth.value > 0 && toolbarWidth.value < GALLERY_TOOLBAR_COMPACT_BREAKPOINT
 )
 
 const filterScrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
@@ -161,8 +154,12 @@ const viewModes = [
   { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
 ]
 
+const availableViewModes = computed(() =>
+  store.isCompactWindow ? viewModes.filter((mode) => mode.value !== 'list') : viewModes
+)
+
 const currentViewModeIcon = computed(() => {
-  const mode = viewModes.find((m) => m.value === viewMode.value)
+  const mode = availableViewModes.value.find((m) => m.value === viewMode.value)
   return mode?.icon || Grid3x3
 })
 
@@ -555,13 +552,16 @@ function setViewMode(
     | (string | number | bigint | Record<string, any> | null)[]
 ) {
   if (mode && typeof mode === 'string') {
+    if (store.isCompactWindow && mode === 'list') {
+      return
+    }
     store.view.mode = mode as ViewMode
   }
 }
 
 function onViewSizeSliderChange(value: number[] | undefined) {
   if (value && value.length > 0 && value[0] !== undefined) {
-    store.setViewSizeFromSlider(value[0], props.compact)
+    store.setViewSizeFromSlider(value[0])
   }
 }
 </script>
@@ -688,7 +688,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                         <p class="text-sm font-medium">{{ t('gallery.toolbar.viewMode.label') }}</p>
                         <div class="grid grid-cols-4 gap-2">
                           <Button
-                            v-for="mode in viewModes"
+                            v-for="mode in availableViewModes"
                             :key="mode.value"
                             :variant="viewMode === mode.value ? 'default' : 'outline'"
                             size="sm"

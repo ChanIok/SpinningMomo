@@ -1,5 +1,8 @@
-/** 图库进入紧凑布局的容器宽度边界。 */
-export const GALLERY_COMPACT_BREAKPOINT = 640
+/** 应用窗口进入紧凑图库布局的宽度边界。 */
+export const GALLERY_WINDOW_COMPACT_BREAKPOINT = 640
+
+/** 图库内部工具栏开始压缩的内容宽度边界；它不参与窗口级布局切换。 */
+export const GALLERY_TOOLBAR_COMPACT_BREAKPOINT = 640
 
 /** 缩略图卡片在常规布局下的几何间距。 */
 export const GALLERY_CARD_GAP = 12

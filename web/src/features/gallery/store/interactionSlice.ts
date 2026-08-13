@@ -6,6 +6,7 @@ import type {
   DetailsPanelFocus,
   BatchSelectionSummary,
 } from '../types'
+import type { GalleryInputType } from '../input'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
 
 interface InteractionSliceArgs {
@@ -32,6 +33,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   // - activeIndex: 当前结果集位置（可能随查询变化失效）
   // - activeAssetId: 当前聚焦资产身份（跨查询变化保持语义）
   const selection = reactive<SelectionState>({
+    mode: 'browse',
     selectedIds: new Set<number>(),
     anchorIndex: undefined,
     // activeIndex 是当前结果集里的位置缓存；筛选/排序变化后可能失效，需要重定位。
@@ -44,6 +46,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   const lightbox = reactive<LightboxState>({
     isOpen: false,
     isClosing: false,
+    inputType: 'mouse',
     isImmersive: false,
     showFilmstrip: true,
     zoom: 1.0,
@@ -51,15 +54,11 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     rotationDegrees: 0,
   })
 
-  // detailsPanel 是右侧详情“当前焦点类型”的真相源。
-  const detailsPanel: DetailsPanelFocus = reactive<DetailsPanelFocus>({
-    type: 'none',
-  })
+  // detailsPanel 只保存右侧详情的焦点身份，不复制资产/树节点数据。
+  const detailsPanel = ref<DetailsPanelFocus>({ type: 'none' })
 
   const selectedCount = computed(() => selection.selectedIds.size)
   const hasSelection = computed(() => selectedCount.value > 0)
-  // 右侧详情的标签列表不是 query 资产字段的一部分，用独立版本号驱动重载最直接。
-  const assetTagsVersion = ref(0)
   const batchSummary = ref<BatchSelectionSummary | null>(null)
   const batchSummaryLoading = ref(false)
   const batchSummaryRequestVersion = ref(0)
@@ -104,15 +103,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       paginatedAssets.value = nextPages
       bumpPaginatedAssetsVersion()
     }
-
-    // 详情面板若正聚焦某个被 patch 的资产，也要同步更新，避免左右视图状态分叉。
-    if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
-      detailsPanel.asset = {
-        ...detailsPanel.asset,
-        ...(updates.rating !== undefined ? { rating: updates.rating } : {}),
-        ...(updates.reviewFlag !== undefined ? { reviewFlag: updates.reviewFlag } : {}),
-      }
-    }
   }
 
   function patchAssetDescription(assetId: number, description?: string) {
@@ -142,13 +132,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     if (hasCacheChange) {
       paginatedAssets.value = nextPages
       bumpPaginatedAssetsVersion()
-    }
-
-    if (detailsPanel.type === 'asset' && detailsPanel.asset.id === assetId) {
-      detailsPanel.asset = {
-        ...detailsPanel.asset,
-        description,
-      }
     }
   }
 
@@ -185,17 +168,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       paginatedAssets.value = nextPages
       bumpPaginatedAssetsVersion()
     }
-
-    if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
-      detailsPanel.asset = {
-        ...detailsPanel.asset,
-        description,
-      }
-    }
-  }
-
-  function bumpAssetTagsVersion() {
-    assetTagsVersion.value += 1
   }
 
   function beginBatchSummaryRefresh(): number {
@@ -228,7 +200,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function patchBatchSummaryReviewState(updates: Partial<Pick<Asset, 'rating' | 'reviewFlag'>>) {
-    if (detailsPanel.type !== 'batch' || batchSummary.value === null) {
+    if (detailsPanel.value.type !== 'batch' || batchSummary.value === null) {
       return
     }
 
@@ -243,7 +215,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function patchBatchSummaryDescription(description?: string) {
-    if (detailsPanel.type !== 'batch' || batchSummary.value === null) {
+    if (detailsPanel.value.type !== 'batch' || batchSummary.value === null) {
       return
     }
 
@@ -264,6 +236,17 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     } else {
       selection.selectedIds.delete(id)
     }
+  }
+
+  function enterMultiSelectMode() {
+    selection.mode = 'multi-select'
+  }
+
+  function exitMultiSelectMode() {
+    selection.mode = 'browse'
+    selection.selectedIds.clear()
+    selection.anchorIndex = undefined
+    clearDetailsFocus()
   }
 
   function clearSelection() {
@@ -306,8 +289,9 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.rotationDegrees = 0
   }
 
-  function openLightbox() {
+  function openLightbox(inputType: GalleryInputType = 'mouse') {
     resetLightboxView()
+    lightbox.inputType = inputType
     lightbox.isClosing = false
     lightbox.isOpen = true
   }
@@ -320,6 +304,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
+    lightbox.inputType = 'mouse'
     resetLightboxView()
   }
 
@@ -374,16 +359,16 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function setDetailsFocus(focus: DetailsPanelFocus) {
-    // 用 assign 保持 reactive 对象引用不变，减少依赖断联风险。
-    Object.assign(detailsPanel, focus)
+    detailsPanel.value = focus
   }
 
   function clearDetailsFocus() {
-    detailsPanel.type = 'none'
+    detailsPanel.value = { type: 'none' }
   }
 
   function resetInteractionState() {
     // 只重置交互域。query/navigation 的 reset 由主入口统一调度。
+    selection.mode = 'browse'
     selection.selectedIds.clear()
     selection.anchorIndex = undefined
     selection.activeIndex = undefined
@@ -392,10 +377,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
+    lightbox.inputType = 'mouse'
     lightbox.showFilmstrip = true
     resetLightboxView()
 
-    assetTagsVersion.value = 0
     resetBatchSummary()
     clearDetailsFocus()
   }
@@ -406,7 +391,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     detailsPanel,
     selectedCount,
     hasSelection,
-    assetTagsVersion,
     batchSummary,
     batchSummaryLoading,
     batchSummaryRequestVersion,
@@ -415,13 +399,14 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     patchAssetsDescription,
     patchBatchSummaryReviewState,
     patchBatchSummaryDescription,
-    bumpAssetTagsVersion,
     beginBatchSummaryRefresh,
     finishBatchSummaryRefresh,
     isBatchSummaryRequestCurrent,
     setBatchSummary,
     resetBatchSummary,
     selectAsset,
+    enterMultiSelectMode,
+    exitMultiSelectMode,
     clearSelection,
     replaceSelection,
     setSelectionAnchor,

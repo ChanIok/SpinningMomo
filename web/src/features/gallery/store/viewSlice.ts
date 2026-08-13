@@ -9,6 +9,7 @@ import { createDefaultGallerySettings, type GallerySettings } from './persistenc
 
 interface ViewSliceArgs {
   settings: Ref<GallerySettings>
+  isCompactWindow: Readonly<Ref<boolean>>
 }
 
 interface GalleryViewSizeRange {
@@ -34,49 +35,49 @@ function sizeToSlider(size: number, range: GalleryViewSizeRange): number {
  * 视图状态集中在持久化 view 对象，紧凑尺寸只是基于布局上下文的派生值。
  */
 export function createViewSlice(args: ViewSliceArgs) {
-  const { settings } = args
+  const { settings, isCompactWindow } = args
 
   const view = computed(() => settings.value.view)
 
-  function getViewSizeRange(compact: boolean): GalleryViewSizeRange {
-    return compact
+  function getViewSizeRange(): GalleryViewSizeRange {
+    return isCompactWindow.value
       ? { min: GALLERY_COMPACT_VIEW_SIZE_MIN, max: GALLERY_COMPACT_VIEW_SIZE_MAX }
       : { min: GALLERY_VIEW_SIZE_MIN, max: GALLERY_VIEW_SIZE_MAX }
   }
 
-  function getEffectiveViewSize(compact: boolean): number {
-    return clampViewSize(view.value.size, getViewSizeRange(compact))
+  function getEffectiveViewSize(): number {
+    return clampViewSize(view.value.size, getViewSizeRange())
   }
 
-  function setViewSize(size: number, compact: boolean) {
-    const range = getViewSizeRange(compact)
+  function setViewSize(size: number) {
+    const range = getViewSizeRange()
     const validSize = clampViewSize(size, range)
     view.value.size = validSize
     console.log('📏 视图大小调整:', validSize, 'px')
   }
 
-  function setViewSizeFromSlider(sliderPosition: number, compact: boolean) {
-    const range = getViewSizeRange(compact)
+  function setViewSizeFromSlider(sliderPosition: number) {
+    const range = getViewSizeRange()
     const validSize = sliderToSize(sliderPosition, range)
     view.value.size = validSize
     console.log('📏 视图大小调整:', validSize, 'px (slider:', sliderPosition, '%)')
   }
 
-  function getSliderPosition(compact: boolean): number {
-    return sizeToSlider(getEffectiveViewSize(compact), getViewSizeRange(compact))
+  function getSliderPosition(): number {
+    return sizeToSlider(getEffectiveViewSize(), getViewSizeRange())
   }
 
-  function increaseViewSize(compact: boolean) {
-    const currentSlider = getSliderPosition(compact)
+  function increaseViewSize() {
+    const currentSlider = getSliderPosition()
     if (currentSlider < 100) {
-      setViewSizeFromSlider(Math.min(100, currentSlider + 5), compact)
+      setViewSizeFromSlider(Math.min(100, currentSlider + 5))
     }
   }
 
-  function decreaseViewSize(compact: boolean) {
-    const currentSlider = getSliderPosition(compact)
+  function decreaseViewSize() {
+    const currentSlider = getSliderPosition()
     if (currentSlider > 0) {
-      setViewSizeFromSlider(Math.max(0, currentSlider - 5), compact)
+      setViewSizeFromSlider(Math.max(0, currentSlider - 5))
     }
   }
 

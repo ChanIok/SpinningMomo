@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
-import { LoaderCircle, Upload } from '@lucide/vue'
+import { LoaderCircle, Upload, X } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
 import {
   useGalleryAssetActions,
-  useGalleryContextMenu,
   useGalleryData,
   useGalleryFolderActions,
   useGallerySelection,
@@ -17,6 +17,11 @@ import { useGalleryStore } from '../../store'
 import { isWebView } from '@/core/env'
 import { isLocalAccess } from '@/core/access'
 import {
+  isGalleryTouchContextMenu,
+  normalizeGalleryInputType,
+  type GalleryInputType,
+} from '../../input'
+import {
   computeLightboxHeroRect,
   consumeHero,
   endHeroAnimation,
@@ -26,20 +31,11 @@ import GalleryToolbar from './GalleryToolbar.vue'
 import GalleryContent from './GalleryContent.vue'
 import GalleryLightbox from '../lightbox/GalleryLightbox.vue'
 import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
-
-const props = withDefaults(
-  defineProps<{
-    compact?: boolean
-  }>(),
-  {
-    compact: false,
-  }
-)
+import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
-const galleryContextMenu = useGalleryContextMenu()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const { t } = useI18n()
@@ -52,19 +48,19 @@ const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
 const preferencesOpen = ref(false)
 const isExternalDragActive = ref(false)
 const isDropImporting = ref(false)
+const lastInputType = ref<GalleryInputType>('mouse')
 let externalDragDepth = 0
+const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
-const pinchZoomEnabled = computed(
-  () => props.compact && store.view.mode !== 'list' && !store.lightbox.isOpen
-)
+const pinchZoomEnabled = computed(() => store.isCompactWindow && !store.lightbox.isOpen)
 
 useGalleryPinchZoom({
   surfaceRef: contentRef,
   enabled: pinchZoomEnabled,
-  getSize: () => store.getEffectiveViewSize(props.compact),
-  getMinSize: () => store.getViewSizeRange(props.compact).min,
-  getMaxSize: () => store.getViewSizeRange(props.compact).max,
-  setSize: (size) => store.setViewSize(size, props.compact),
+  getSize: () => store.getEffectiveViewSize(),
+  getMinSize: () => store.getViewSizeRange().min,
+  getMaxSize: () => store.getViewSizeRange().max,
+  setSize: (size) => store.setViewSize(size),
 })
 
 useVisibleAssetTags()
@@ -220,7 +216,7 @@ watch(
       containerRect,
       hero.width,
       hero.height,
-      store.lightbox.showFilmstrip
+      store.isCompactWindow ? false : store.lightbox.showFilmstrip
     )
 
     heroOverlay.value = { thumbnailUrl: hero.thumbnailUrl, toRect }
@@ -417,24 +413,36 @@ function handleContentWheel(event: WheelEvent) {
 
   while (Math.abs(wheelZoomDelta) >= CONTENT_WHEEL_ZOOM_THRESHOLD) {
     if (wheelZoomDelta > 0) {
-      store.decreaseViewSize(props.compact)
+      store.decreaseViewSize()
       wheelZoomDelta -= CONTENT_WHEEL_ZOOM_THRESHOLD
       continue
     }
 
-    store.increaseViewSize(props.compact)
+    store.increaseViewSize()
     wheelZoomDelta += CONTENT_WHEEL_ZOOM_THRESHOLD
   }
 }
 
 function handleContentContextMenu(event: MouseEvent) {
+  if (isGalleryTouchContextMenu(event, lastInputType.value)) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
   if (isEditableTarget(event.target)) {
     return
   }
 
   // 背景右键切换到当前文件夹上下文，与素材右键的选区动作明确分离。
   gallerySelection.clearSelection()
-  galleryContextMenu.openForBackground(event)
+  store.openContextMenuForBackground(event)
+}
+
+function handleContentPointerDown(event: PointerEvent) {
+  if (event.isPrimary !== false) {
+    lastInputType.value = normalizeGalleryInputType(event.pointerType)
+  }
 }
 
 // 区分资源管理器文件与图库内部资产拖拽，避免两套 drop 语义互相抢占。
@@ -573,38 +581,66 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
-      <GalleryToolbar :compact="props.compact" @open-preferences="preferencesOpen = true" />
+      <GalleryToolbar v-if="!isMultiSelectMode" @open-preferences="preferencesOpen = true" />
+      <div
+        v-else
+        class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2"
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-10 w-10"
+          :aria-label="t('gallery.mobile.selection.exit')"
+          @click="store.exitMultiSelectMode"
+        >
+          <X class="size-5" />
+        </Button>
+        <span class="text-sm font-medium">
+          <template v-if="store.selectedCount > 0">
+            {{ t('gallery.mobile.selection.selectedCount', { count: store.selectedCount }) }}
+          </template>
+          <template v-else>
+            {{ t('gallery.mobile.selection.empty') }}
+          </template>
+        </span>
+        <div class="h-10 w-10" aria-hidden="true" />
+      </div>
       <div
         ref="contentRef"
-        class="relative flex-1 overflow-hidden"
-        :class="props.compact && 'gallery-compact-touch-surface'"
+        class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+        :class="store.isCompactWindow && 'gallery-compact-touch-surface'"
+        @pointerdown="handleContentPointerDown"
         @contextmenu="handleContentContextMenu"
         @dragenter="handleViewerDragEnter"
         @dragover="handleViewerDragOver"
         @dragleave="handleViewerDragLeave"
         @drop="handleViewerDrop"
       >
-        <GalleryContent ref="galleryContentRef" :compact="props.compact" />
+        <div class="relative min-h-0 flex-1">
+          <GalleryContent ref="galleryContentRef" />
 
-        <div
-          v-if="isExternalDragActive || isDropImporting"
-          class="pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/70 bg-background/88 shadow-2xl backdrop-blur-md"
-        >
-          <div class="flex max-w-md flex-col items-center gap-3 px-8 text-center">
-            <LoaderCircle v-if="isDropImporting" class="size-10 animate-spin text-primary" />
-            <Upload v-else class="size-10 text-primary" />
-            <div class="text-lg font-semibold">
-              {{
-                isDropImporting
-                  ? t('gallery.drop.overlayImporting')
-                  : t('gallery.drop.overlayTitle')
-              }}
-            </div>
-            <div v-if="!isDropImporting" class="text-sm text-muted-foreground">
-              {{ t('gallery.drop.overlayDescription') }}
+          <div
+            v-if="isExternalDragActive || isDropImporting"
+            class="pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/70 bg-background/88 shadow-2xl backdrop-blur-md"
+          >
+            <div class="flex max-w-md flex-col items-center gap-3 px-8 text-center">
+              <LoaderCircle v-if="isDropImporting" class="size-10 animate-spin text-primary" />
+              <Upload v-else class="size-10 text-primary" />
+              <div class="text-lg font-semibold">
+                {{
+                  isDropImporting
+                    ? t('gallery.drop.overlayImporting')
+                    : t('gallery.drop.overlayTitle')
+                }}
+              </div>
+              <div v-if="!isDropImporting" class="text-sm text-muted-foreground">
+                {{ t('gallery.drop.overlayDescription') }}
+              </div>
             </div>
           </div>
         </div>
+
+        <GalleryMobileActionBar v-if="isMultiSelectMode" />
       </div>
     </div>
 

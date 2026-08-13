@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions } from '../../composables'
+import { useGalleryStore } from '../../store'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -14,9 +15,10 @@ import {
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
+const store = useGalleryStore()
 const isSubmitting = ref(false)
 
-const state = computed(() => assetActions.deleteAssetsDialog)
+const state = computed(() => store.deleteAssetsDialog)
 const hasPermanentDeletion = computed(() => state.value.permanentCount > 0)
 const hasUnknownLocation = computed(() => state.value.unknownCount > 0)
 const isMixedDeletion = computed(
@@ -88,7 +90,7 @@ function handleOpenChange(open: boolean) {
   if (isSubmitting.value && !open) {
     return
   }
-  assetActions.setDeleteAssetsDialogOpen(open)
+  store.setDeleteAssetsDialogOpen(open)
 }
 
 async function handleConfirm() {

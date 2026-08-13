@@ -11,6 +11,8 @@ import { createNavigationSlice } from './navigationSlice'
 import { createViewSlice } from './viewSlice'
 import { createInteractionSlice } from './interactionSlice'
 import { createLayoutSlice } from './layoutSlice'
+import { createViewportSlice } from './viewportSlice'
+import { createUiSlice } from './uiSlice'
 
 /**
  * Gallery Pinia Store
@@ -21,7 +23,7 @@ import { createLayoutSlice } from './layoutSlice'
  *
  * 拆分说明:
  * - index.ts 只负责“装配”，不承载具体业务细节
- * - query/navigation/view/layout/interaction 五个 slice 负责各自领域状态
+ * - query/navigation/view/layout/viewport/ui/interaction slices 负责各自领域状态
  * - 对外仍然暴露同一个 store，避免调用方心智负担上升
  */
 export const useGalleryStore = defineStore('gallery', () => {
@@ -39,9 +41,14 @@ export const useGalleryStore = defineStore('gallery', () => {
   const navigationSlice = createNavigationSlice({
     settings: gallerySettings,
   })
+  // 窗口级响应式状态不写入持久化设置；页面只负责同步窗口宽度，组件直接读取这里的派生值。
+  const viewportSlice = createViewportSlice()
+  // 页面级共享 UI：上下文菜单、操作对话框和标签剪贴板不再由 composable 隐式单例持有。
+  const uiSlice = createUiSlice()
   // 视图配置直接映射到持久化对象，避免运行时状态与持久化配置分叉。
   const viewSlice = createViewSlice({
     settings: gallerySettings,
+    isCompactWindow: viewportSlice.isCompactWindow,
   })
   // 布局层：负责三栏布局的完整真相源与本地持久化。
   const layoutSlice = createLayoutSlice({
@@ -66,6 +73,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     viewSlice.resetViewState()
     layoutSlice.resetLayoutState()
     interactionSlice.resetInteractionState()
+    viewportSlice.resetViewportState()
+    uiSlice.resetUiState()
   }
 
   return {
@@ -74,6 +83,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     ...navigationSlice,
     ...viewSlice,
     ...layoutSlice,
+    ...viewportSlice,
+    ...uiSlice,
     ...interactionSlice,
     gallerySettings,
     isTimelineMode,

@@ -106,7 +106,7 @@ export function useGallerySelection() {
     if (store.selectedCount === 1) {
       const asset = getPrimarySelectedAsset(preferredAsset)
       if (asset) {
-        store.setDetailsFocus({ type: 'asset', asset })
+        store.setDetailsFocus({ type: 'asset', assetId: asset.id })
         return
       }
     }
@@ -151,13 +151,13 @@ export function useGallerySelection() {
     return asset
   }
 
-  async function toggleIndex(index: number) {
+  async function toggleIndex(index: number, preferredAsset?: Asset) {
     const normalizedIndex = normalizeIndex(index)
     if (normalizedIndex === undefined) {
       return undefined
     }
 
-    const asset = await getAssetByIndex(normalizedIndex)
+    const asset = preferredAsset ?? (await getAssetByIndex(normalizedIndex))
     if (!asset) {
       return undefined
     }
@@ -171,6 +171,21 @@ export function useGallerySelection() {
       store.setSelectionAnchor(undefined)
     }
 
+    store.setActiveAsset(asset.id, normalizedIndex)
+    syncDetailsFocusFromSelection(asset)
+
+    return asset
+  }
+
+  function enterMultiSelectMode(asset: Asset, index: number) {
+    const normalizedIndex = normalizeIndex(index)
+    if (normalizedIndex === undefined) {
+      return undefined
+    }
+
+    store.enterMultiSelectMode()
+    store.replaceSelection([asset.id])
+    store.setSelectionAnchor(normalizedIndex)
     store.setActiveAsset(asset.id, normalizedIndex)
     syncDetailsFocusFromSelection(asset)
     return asset
@@ -256,10 +271,6 @@ export function useGallerySelection() {
     await selectOnlyIndex(index)
   }
 
-  function handleAssetDoubleClick(_asset: Asset, _event: MouseEvent) {
-    // The view layer decides what double click should do (for example, open the Lightbox).
-  }
-
   async function prepareContextMenuForIndex(index: number) {
     const normalizedIndex = normalizeIndex(index)
     if (normalizedIndex === undefined) {
@@ -312,13 +323,13 @@ export function useGallerySelection() {
     activateIndex,
     selectOnlyIndex,
     toggleIndex,
+    enterMultiSelectMode,
     rangeSelectToIndex,
     selectAllCurrentQuery,
     syncDetailsFocusFromSelection,
     prepareContextMenuForIndex,
 
     handleAssetClick,
-    handleAssetDoubleClick,
     handleAssetContextMenu,
 
     isAssetSelected,

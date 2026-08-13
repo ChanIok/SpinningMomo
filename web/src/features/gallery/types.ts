@@ -1,6 +1,8 @@
 // Gallery模块类型定义 - Vue版本
 // 基于 React 版本，去掉 React 特定的 Props 类型
 
+import type { GalleryInputType } from './input'
+
 // ============= 核心数据类型 =============
 
 export interface Asset {
@@ -170,8 +172,12 @@ export type {
 
 // ============= UI状态类型 =============
 
+// 图库选择模式；browse 沿用桌面端 Ctrl/Shift 选择语义，multi-select 由触摸长按进入。
+export type GalleryInteractionMode = 'browse' | 'multi-select'
+
 // 选择状态
 export interface SelectionState {
+  mode: GalleryInteractionMode
   selectedIds: Set<number>
   anchorIndex?: number
   activeIndex?: number
@@ -183,6 +189,8 @@ export interface LightboxState {
   isOpen: boolean
   /** 关闭动画阶段：为 true 时仍可认为灯箱打开，但 gallery 层已开始淡入 */
   isClosing: boolean
+  /** 记录本次灯箱由哪种输入打开，用于保持触摸操作入口的一致性 */
+  inputType: GalleryInputType
   /** 沉浸模式：仅页面内 Teleport + 固定层铺满视口，不调用系统/浏览器全屏 */
   isImmersive: boolean
   showFilmstrip: boolean
@@ -199,9 +207,9 @@ export interface SidebarState {
 // 详情面板焦点状态
 export type DetailsPanelFocus =
   | { type: 'none' }
-  | { type: 'folder'; folder: FolderTreeNode }
-  | { type: 'tag'; tag: TagTreeNode }
-  | { type: 'asset'; asset: Asset }
+  | { type: 'folder'; folderId: number }
+  | { type: 'tag'; tagId: number }
+  | { type: 'asset'; assetId: number }
   | { type: 'batch' }
 
 // ============= 错误类型 =============

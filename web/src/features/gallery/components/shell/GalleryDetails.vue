@@ -27,7 +27,7 @@ import AssetInfinityNikkiDetails from '../infinity_nikki/AssetInfinityNikkiDetai
 import AssetHistogram from '../asset/AssetHistogram.vue'
 import AssetReviewControls from '../asset/AssetReviewControls.vue'
 import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, Tag } from '../../types'
+import type { Asset, AssetMainColor, FolderTreeNode, Tag, TagTreeNode } from '../../types'
 import type { InfinityNikkiDetails } from '@/extensions/infinity_nikki/types'
 
 const store = useGalleryStore()
@@ -36,19 +36,72 @@ const { t } = useI18n()
 const { toast } = useToast()
 const assetActions = useGalleryAssetActions()
 
+const ROOT_FOLDER_ID = -1
+const ROOT_TAG_ID = -1
+
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
 
-// 根据焦点直接获取对象引用
+function findFolderById(nodes: FolderTreeNode[], id: number): FolderTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node
+    }
+    const found = findFolderById(node.children, id)
+    if (found) {
+      return found
+    }
+  }
+  return null
+}
+
+function findTagById(nodes: TagTreeNode[], id: number): TagTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node
+    }
+    const found = findTagById(node.children, id)
+    if (found) {
+      return found
+    }
+  }
+  return null
+}
+
+// Store 只保存详情焦点身份；详情对象始终从当前树/查询缓存派生，避免维护第二份资产数据。
 const currentFolder = computed(() => {
-  return detailsFocus.value.type === 'folder' ? detailsFocus.value.folder : null
+  const focus = detailsFocus.value
+  if (focus.type !== 'folder') {
+    return null
+  }
+
+  if (focus.folderId === ROOT_FOLDER_ID) {
+    return {
+      id: ROOT_FOLDER_ID,
+      path: '',
+      parentId: undefined,
+      name: '__root__',
+      displayName: '__root__',
+      coverAssetId: undefined,
+      sortOrder: 0,
+      isHidden: false,
+      createdAt: 0,
+      updatedAt: 0,
+      isNetwork: false,
+      assetCount: store.foldersAssetTotalCount,
+      children: [],
+    } satisfies FolderTreeNode
+  }
+
+  return findFolderById(store.folders, focus.folderId)
 })
 const isRootFolderSummary = computed(() => currentFolder.value?.id === -1)
 const rootFolderCount = computed(() => store.folders.length)
 const rootFolderAssetTotalCount = computed(() => store.foldersAssetTotalCount)
 
 const activeAsset = computed(() => {
-  return detailsFocus.value.type === 'asset' ? detailsFocus.value.asset : null
+  const focus = detailsFocus.value
+  return focus.type === 'asset' ? findLoadedAssetById(focus.assetId) : null
 })
 
 // 使用gallery数据composable
@@ -161,7 +214,25 @@ const hasMainColors = computed(() => assetMainColors.value.length > 0)
 
 // 当前标签（详情面板焦点为 tag 时）
 const currentTag = computed(() => {
-  return detailsFocus.value.type === 'tag' ? detailsFocus.value.tag : null
+  const focus = detailsFocus.value
+  if (focus.type !== 'tag') {
+    return null
+  }
+
+  if (focus.tagId === ROOT_TAG_ID) {
+    return {
+      id: ROOT_TAG_ID,
+      name: '__root__',
+      parentId: undefined,
+      sortOrder: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      assetCount: store.tagsAssetTotalCount,
+      children: [],
+    } satisfies TagTreeNode
+  }
+
+  return findTagById(store.tags, focus.tagId)
 })
 const isRootTagSummary = computed(() => currentTag.value?.id === -1)
 const rootTagCount = computed(() => store.tags.length)

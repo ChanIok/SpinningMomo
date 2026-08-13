@@ -25,8 +25,7 @@ const debugState = computed(() => {
   return {
     route: String(route.name ?? ''),
     queryVersion: galleryStore.queryVersion,
-    isRefreshing: galleryStore.isRefreshing,
-    isLoading: galleryStore.isLoading,
+    queryStatus: galleryStore.queryStatus,
     totalCount: galleryStore.totalCount,
     currentPage: galleryStore.currentPage,
     perPage: galleryStore.perPage,
@@ -80,10 +79,7 @@ const debugState = computed(() => {
     </div>
     <div v-if="!isCollapsed">
       <div>route: {{ debugState.route }}</div>
-      <div>
-        query: v{{ debugState.queryVersion }} / refreshing={{ debugState.isRefreshing }} /
-        loading={{ debugState.isLoading }}
-      </div>
+      <div>query: v{{ debugState.queryVersion }} / status={{ debugState.queryStatus }}</div>
       <div>
         page: {{ debugState.currentPage }} / total={{ debugState.totalCount }} / per={{
           debugState.perPage

@@ -5,7 +5,6 @@ import type { Asset } from '../../types'
 import {
   useGallerySelection,
   useGalleryLightbox,
-  useGalleryContextMenu,
   useMasonryVirtualizer,
   useCardImageScheduler,
   useTimelineRail,
@@ -19,30 +18,21 @@ import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
-
-const props = withDefaults(
-  defineProps<{
-    compact?: boolean
-  }>(),
-  {
-    compact: false,
-  }
-)
+import { isGalleryTouchInput, markGalleryScroll, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
-const galleryContextMenu = useGalleryContextMenu()
 const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
-const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
-const targetColumnSize = computed(() => store.getEffectiveViewSize(props.compact))
+const targetColumnSize = computed(() => store.getEffectiveViewSize())
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
   const itemSize = targetColumnSize.value
@@ -78,6 +68,7 @@ onMounted(async () => {
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
 
+  markGalleryScroll()
   // 滚动热路径优先小批量缩略图，原图增强等空闲后再升级。
   cardImageScheduler.markScrolling()
   scrollTop.value = target.scrollTop
@@ -119,11 +110,43 @@ function getAssetAspectRatio(asset: Asset | null): string {
   return `${asset.width} / ${asset.height}`
 }
 
-function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
+function handleAssetClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
+  if (store.selection.mode === 'multi-select') {
+    void gallerySelection.toggleIndex(index, asset)
+    return
+  }
+
+  if (isGalleryTouchInput(inputType)) {
+    openAssetLightbox(asset, event, index, inputType)
+    return
+  }
+
   void gallerySelection.handleAssetClick(asset, event, index)
 }
 
+function handleAssetLongPress(asset: Asset, _event: PointerEvent, index: number) {
+  if (store.selection.mode === 'multi-select') {
+    return
+  }
+
+  gallerySelection.enterMultiSelectMode(asset, index)
+}
+
 function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
+  openAssetLightbox(asset, event, index, 'mouse')
+}
+
+function openAssetLightbox(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
   const cardEl = (event.target as HTMLElement).closest('[data-asset-card]')
   if (cardEl) {
     const rect = cardEl.getBoundingClientRect()
@@ -131,13 +154,12 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
 
-  gallerySelection.handleAssetDoubleClick(asset, event)
-  void galleryLightbox.openLightbox(index)
+  void galleryLightbox.openLightbox(index, inputType)
 }
 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
-  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'masonry' })
+  store.openContextMenuForAsset(event)
 }
 
 function handleAssetDragStart(asset: Asset, event: DragEvent) {
@@ -176,7 +198,7 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      :class="compact ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      :class="store.isCompactWindow ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
       class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"
     >
@@ -213,11 +235,14 @@ defineExpose({ scrollToIndex, getCardRect })
                 Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
               "
               :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-              :compact="props.compact"
               :style="{
                 height: `${virtualItem.size}px`,
               }"
-              @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
+              @click="
+                (asset, event, inputType) =>
+                  handleAssetClick(asset, event, virtualItem.index, inputType)
+              "
+              @long-press="(asset, event) => handleAssetLongPress(asset, event, virtualItem.index)"
               @double-click="
                 (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
               "
@@ -230,7 +255,7 @@ defineExpose({ scrollToIndex, getCardRect })
             <div
               v-else
               class="animate-pulse bg-muted"
-              :class="!props.compact && 'rounded'"
+              :class="!store.isCompactWindow && 'rounded'"
               :style="{
                 width: '100%',
                 height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,

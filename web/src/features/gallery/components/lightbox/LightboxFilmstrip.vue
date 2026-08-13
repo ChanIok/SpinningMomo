@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { Play } from '@lucide/vue'
 import { galleryApi } from '../../api'
-import { useGalleryContextMenu, useGalleryData, useGallerySelection } from '../../composables'
+import { useGalleryData, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
@@ -12,7 +12,6 @@ import MediaStatusChips from '../asset/MediaStatusChips.vue'
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryData = useGalleryData()
-const galleryContextMenu = useGalleryContextMenu()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const filmstripRef = ref<HTMLElement | null>(null)
@@ -145,7 +144,7 @@ function handleThumbnailContextMenu(index: number, event: MouseEvent) {
   event.stopPropagation()
   // 先同步 selection 语义，再打开共享右键菜单，和主视图保持一致。
   void gallerySelection.handleAssetContextMenu(asset, event, index).then(() => {
-    galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'filmstrip' })
+    store.openContextMenuForAsset(event)
   })
 }
 
@@ -218,7 +217,7 @@ function handleWheel(event: WheelEvent) {
                 </div>
               </div>
 
-              <MediaStatusChips :rating="item.rating" :review-flag="item.reviewFlag" compact />
+              <MediaStatusChips :rating="item.rating" :review-flag="item.reviewFlag" dense />
 
               <div
                 v-if="item.isSelected"

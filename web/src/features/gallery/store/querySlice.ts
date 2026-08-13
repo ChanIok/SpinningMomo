@@ -1,6 +1,8 @@
 import { ref, reactive, shallowRef } from 'vue'
 import type { Asset, Tag, TimelineBucket } from '../types'
 
+export type GalleryQueryStatus = 'idle' | 'loading' | 'refreshing' | 'error'
+
 /**
  * Query Slice
  *
@@ -9,19 +11,18 @@ import type { Asset, Tag, TimelineBucket } from '../types'
  * - 提供分页缓存与时间线元数据，供虚拟列表和数据加载层复用
  */
 export function createQuerySlice() {
-  // 全局查询态：加载、错误、总量、当前页。
-  const isLoading = ref(false)
-  const isInitialLoading = ref(false)
+  // 全局查询态：状态、错误、总量、当前页。
+  const queryStatus = ref<GalleryQueryStatus>('idle')
   const error = ref<string | null>(null)
   const totalCount = ref(0)
   const currentPage = ref(1)
   const hasNextPage = ref(false)
-  const isRefreshing = ref(false)
   const queryVersion = ref(0)
   const dyeCodeAssetIds = ref<Set<number>>(new Set())
   const assetTagsById = ref<Map<number, Tag[]>>(new Map())
   const loadedAssetTagIds = ref<Set<number>>(new Set())
-  const assetTagsEpoch = ref(0)
+  // 资产标签缓存失效和详情面板刷新共用一个版本号，避免两个“标签变更信号”分叉。
+  const assetTagsVersion = ref(0)
 
   // ============= 分页缓存状态（普通模式使用） =============
   // paginatedAssets: 只缓存已加载页，避免一次性加载全量资产。
@@ -43,16 +44,11 @@ export function createQuerySlice() {
   const timelineBuckets = ref<TimelineBucket[]>([])
   const timelineTotalCount = ref(0)
 
-  function setLoading(loading: boolean) {
-    isLoading.value = loading
-  }
-
-  function setInitialLoading(loading: boolean) {
-    isInitialLoading.value = loading
-  }
-
   function setError(errorMessage: string | null) {
     error.value = errorMessage
+    if (errorMessage !== null) {
+      queryStatus.value = 'error'
+    }
   }
 
   function setPagination(total: number, page: number, hasNext: boolean) {
@@ -64,13 +60,15 @@ export function createQuerySlice() {
   function beginQueryRefresh(): number {
     // 版本号是并发请求裁决核心：后到的旧响应不会覆盖新查询。
     queryVersion.value += 1
-    isRefreshing.value = true
+    const hasExistingResults =
+      paginatedAssets.value.size > 0 || totalCount.value > 0 || timelineBuckets.value.length > 0
+    queryStatus.value = hasExistingResults ? 'refreshing' : 'loading'
     return queryVersion.value
   }
 
   function finishQueryRefresh(version: number) {
-    if (queryVersion.value === version) {
-      isRefreshing.value = false
+    if (queryVersion.value === version && queryStatus.value !== 'error') {
+      queryStatus.value = 'idle'
     }
   }
 
@@ -144,7 +142,7 @@ export function createQuerySlice() {
     if (assetIds === undefined) {
       assetTagsById.value = new Map()
       loadedAssetTagIds.value = new Set()
-      assetTagsEpoch.value += 1
+      assetTagsVersion.value += 1
       return
     }
 
@@ -157,7 +155,7 @@ export function createQuerySlice() {
 
     assetTagsById.value = nextTagsById
     loadedAssetTagIds.value = nextLoadedIds
-    assetTagsEpoch.value += 1
+    assetTagsVersion.value += 1
   }
 
   function replacePaginatedAssets(pages: Map<number, Asset[]>) {
@@ -192,13 +190,11 @@ export function createQuerySlice() {
 
   function resetQueryState() {
     // query slice 的 reset 只负责“查询域”，不触碰筛选与交互态。
-    isLoading.value = false
-    isInitialLoading.value = false
+    queryStatus.value = 'idle'
     error.value = null
     totalCount.value = 0
     currentPage.value = 1
     hasNextPage.value = false
-    isRefreshing.value = false
     queryVersion.value = 0
 
     clearTimelineData()
@@ -209,26 +205,22 @@ export function createQuerySlice() {
   }
 
   return {
-    isLoading,
-    isInitialLoading,
+    queryStatus,
     error,
     totalCount,
     currentPage,
     hasNextPage,
-    isRefreshing,
     queryVersion,
     dyeCodeAssetIds,
     assetTagsById,
     loadedAssetTagIds,
-    assetTagsEpoch,
+    assetTagsVersion,
     paginatedAssets,
     paginatedAssetsVersion,
     perPage,
     visibleRange,
     timelineBuckets,
     timelineTotalCount,
-    setLoading,
-    setInitialLoading,
     setError,
     setPagination,
     beginQueryRefresh,

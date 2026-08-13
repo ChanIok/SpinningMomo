@@ -7,6 +7,13 @@ import { useOriginalPreviewWorker } from '../../composables/useOriginalPreviewWo
 import { useGalleryStore } from '../../store'
 import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../../types'
+import {
+  isGalleryTouchContextMenu,
+  isGalleryTouchInput,
+  isGalleryScrollRecent,
+  normalizeGalleryInputType,
+  type GalleryInputType,
+} from '../../input'
 
 const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 
@@ -14,7 +21,6 @@ const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
-  compact?: boolean
   aspectRatio?: string
   allowThumbnailLoad?: boolean
   allowOriginalLoad?: boolean
@@ -23,7 +29,6 @@ interface AssetCardProps {
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
-  compact: false,
   aspectRatio: '1 / 1',
   allowThumbnailLoad: true,
   allowOriginalLoad: false,
@@ -32,8 +37,9 @@ const props = withDefaults(defineProps<AssetCardProps>(), {
 
 // Emits 定义
 const emit = defineEmits<{
-  click: [asset: Asset, event: MouseEvent]
+  click: [asset: Asset, event: MouseEvent, inputType: GalleryInputType]
   'double-click': [asset: Asset, event: MouseEvent]
+  'long-press': [asset: Asset, event: PointerEvent]
   'context-menu': [asset: Asset, event: MouseEvent]
   'drag-start': [asset: Asset, event: DragEvent]
 }>()
@@ -48,6 +54,14 @@ const originalPreviewUrl = ref('')
 let imageRequestVersion = 0
 let originalPreloadVersion = 0
 let originalPreviewAbortController: AbortController | null = null
+// 垂直滚动优先于长按；不捕获触摸指针，让浏览器在滚动开始时接管手势。
+const LONG_PRESS_DELAY = 500
+const LONG_PRESS_MOVE_THRESHOLD = 16
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let longPressStartPoint: { x: number; y: number } | null = null
+let longPressTriggered = false
+let longPressBlocked = false
+let lastInputType: GalleryInputType = 'mouse'
 
 const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
 const { generateOriginalPreview } = useOriginalPreviewWorker()
@@ -80,7 +94,7 @@ const canStartOriginalUpgrade = computed(
 )
 const hasThumbnail = computed(() => scheduledThumbnailUrl.value.length > 0)
 const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
-const enableHoverScale = computed(() => !useOriginalImagesForCards.value && !props.compact)
+const enableHoverScale = computed(() => !useOriginalImagesForCards.value && !store.isCompactWindow)
 const isVideoAsset = computed(() => props.asset.type === 'video')
 
 const showPlaceholder = computed(
@@ -145,25 +159,111 @@ watch(
 
 onBeforeUnmount(() => {
   resetOriginalPreview()
+  cancelLongPress()
 })
 
 // 事件处理
 function handleClick(event: MouseEvent) {
-  emit('click', props.asset, event)
+  // 长按结束后浏览器仍可能补发 click；该 click 只属于长按手势，不应再打开暗房。
+  if (longPressTriggered) {
+    longPressTriggered = false
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
+  emit('click', props.asset, event, event.detail === 0 ? 'keyboard' : lastInputType)
 }
 
 function handleDoubleClick(event: MouseEvent) {
+  if (lastInputType !== 'mouse') {
+    return
+  }
+
   emit('double-click', props.asset, event)
+}
+
+function handlePointerDown(event: PointerEvent) {
+  if (event.isPrimary === false) {
+    return
+  }
+
+  lastInputType = normalizeGalleryInputType(event.pointerType)
+  if (!isGalleryTouchInput(lastInputType)) {
+    longPressTriggered = false
+    longPressBlocked = false
+    cancelLongPress()
+    return
+  }
+
+  if (lastInputType === 'pen' && event.button !== 0) {
+    return
+  }
+
+  longPressTriggered = false
+  cancelLongPress()
+  longPressBlocked = isGalleryScrollRecent()
+  if (longPressBlocked) {
+    return
+  }
+
+  longPressStartPoint = { x: event.clientX, y: event.clientY }
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null
+    if (longPressBlocked || longPressStartPoint === null || isGalleryScrollRecent()) {
+      longPressBlocked = true
+      return
+    }
+
+    longPressTriggered = true
+    navigator.vibrate?.(10)
+    emit('long-press', props.asset, event)
+  }, LONG_PRESS_DELAY)
+}
+
+function handlePointerMove(event: PointerEvent) {
+  if (!longPressStartPoint || longPressTriggered || longPressBlocked) {
+    return
+  }
+
+  const distance = Math.hypot(
+    event.clientX - longPressStartPoint.x,
+    event.clientY - longPressStartPoint.y
+  )
+  if (distance > LONG_PRESS_MOVE_THRESHOLD) {
+    longPressBlocked = true
+    cancelLongPress()
+  }
+}
+
+function handlePointerUp() {
+  cancelLongPress()
+  longPressBlocked = false
+}
+
+function cancelLongPress() {
+  if (longPressTimer !== null) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+  longPressStartPoint = null
 }
 
 function handleContextMenu(event: MouseEvent) {
   // 素材菜单需要等待选区准备完成；先同步截断冒泡，避免内容区背景菜单抢先打开。
   event.preventDefault()
   event.stopPropagation()
-  emit('context-menu', props.asset, event)
+  const isLongPressGesture = longPressStartPoint !== null || longPressTriggered
+  if (!isGalleryTouchContextMenu(event, lastInputType) && !isLongPressGesture) {
+    emit('context-menu', props.asset, event)
+  }
 }
 
 function handleDragStart(event: DragEvent) {
+  if (lastInputType !== 'mouse') {
+    event.preventDefault()
+    return
+  }
   emit('drag-start', props.asset, event)
 }
 
@@ -393,16 +493,21 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     draggable="true"
     class="group transition-ring relative w-full overflow-hidden bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
-      compact ? 'rounded-none shadow-none' : 'rounded-md',
+      store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-md',
       isSelected
-        ? compact
+        ? store.isCompactWindow
           ? 'ring-2 ring-primary ring-inset'
           : 'shadow-lg ring-4 ring-primary'
-        : !compact && 'shadow-md hover:shadow-lg',
+        : !store.isCompactWindow && 'shadow-md hover:shadow-lg',
     ]"
-    :style="{ aspectRatio: props.aspectRatio }"
+    :style="{ aspectRatio: props.aspectRatio, touchAction: 'pan-y' }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
+    @pointerdown="handlePointerDown"
+    @pointermove="handlePointerMove"
+    @pointerup="handlePointerUp"
+    @pointercancel="handlePointerUp"
+    @pointerleave="handlePointerUp"
     @contextmenu="handleContextMenu"
     @dragstart="handleDragStart"
   >
@@ -410,7 +515,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     <div
       data-asset-thumbnail
       class="relative h-full w-full overflow-hidden"
-      :class="compact ? 'rounded-none' : 'rounded-md'"
+      :class="store.isCompactWindow ? 'rounded-none' : 'rounded-md'"
     >
       <!-- 缩略图是卡片的基础显示层，主色占位只服务它的首次加载。 -->
       <img
@@ -491,20 +596,23 @@ function getAdjustedPlaceholderColor(hex?: string): string {
       <div
         v-if="isVideoAsset"
         class="absolute inset-x-0 bottom-0 flex items-end justify-start bg-gradient-to-t from-black/50 via-black/10 to-transparent"
-        :class="compact ? 'p-1.5' : 'p-3'"
+        :class="store.isCompactWindow ? 'p-1.5' : 'p-3'"
       >
         <div
           class="flex items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-sm backdrop-blur-sm"
-          :class="compact ? 'h-6 w-6' : 'h-8 w-8'"
+          :class="store.isCompactWindow ? 'h-6 w-6' : 'h-8 w-8'"
         >
-          <Play class="ml-0.5 fill-current" :class="compact ? 'h-3 w-3' : 'h-4 w-4'" />
+          <Play
+            class="ml-0.5 fill-current"
+            :class="store.isCompactWindow ? 'h-3 w-3' : 'h-4 w-4'"
+          />
         </div>
       </div>
 
       <MediaStatusChips
         :rating="asset.rating"
         :review-flag="asset.reviewFlag"
-        :compact="props.compact"
+        :dense="store.isCompactWindow"
         :show-rating="showRatingBadge"
         :has-dye-code="showDyeCodeBadge"
         :show-tags="showTagBadges"
@@ -516,9 +624,14 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         v-if="isSelected"
         data-selection-indicator
         class="absolute flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
-        :class="compact ? 'top-1 right-1 h-5 w-5' : 'top-2 right-2 h-6 w-6'"
+        :class="store.isCompactWindow ? 'top-1 right-1 h-5 w-5' : 'top-2 right-2 h-6 w-6'"
       >
-        <svg class="h-4 w-4" :class="compact && 'h-3 w-3'" fill="currentColor" viewBox="0 0 20 20">
+        <svg
+          class="h-4 w-4"
+          :class="store.isCompactWindow && 'h-3 w-3'"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
           <path
             fill-rule="evenodd"
             d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"

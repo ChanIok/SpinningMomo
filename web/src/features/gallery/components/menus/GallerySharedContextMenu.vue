@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
-import { useGalleryContextMenu } from '../../composables/useGalleryContextMenu'
+import { useGalleryStore } from '../../store'
 import GalleryAssetDropdownMenuContent from './GalleryAssetDropdownMenuContent.vue'
 import GalleryBackgroundDropdownMenuContent from './GalleryBackgroundDropdownMenuContent.vue'
 import {
@@ -9,10 +9,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const contextMenu = useGalleryContextMenu()
+const store = useGalleryStore()
 
 watch(
-  () => contextMenu.state.requestToken,
+  () => store.contextMenu.requestToken,
   async (token) => {
     if (token <= 0) {
       return
@@ -20,7 +20,7 @@ watch(
 
     // 等待锚点位移先提交到 DOM，再以受控方式打开菜单，避免定位闪动。
     await nextTick()
-    contextMenu.setOpen(true)
+    store.setContextMenuOpen(true)
   }
 )
 </script>
@@ -28,16 +28,16 @@ watch(
 <template>
   <div>
     <DropdownMenu
-      :open="contextMenu.state.isOpen"
+      :open="store.contextMenu.isOpen"
       :modal="false"
-      @update:open="contextMenu.setOpen"
+      @update:open="store.setContextMenuOpen"
     >
       <DropdownMenuTrigger as-child>
         <div
           class="pointer-events-none fixed h-px w-px opacity-0"
           :style="{
-            left: `${contextMenu.state.anchorX}px`,
-            top: `${contextMenu.state.anchorY}px`,
+            left: `${store.contextMenu.anchorX}px`,
+            top: `${store.contextMenu.anchorY}px`,
           }"
         />
       </DropdownMenuTrigger>
@@ -47,10 +47,10 @@ watch(
         :side-offset="0"
         :align-offset="0"
         @contextmenu.prevent.stop
-        @escape-key-down="contextMenu.setOpen(false)"
-        @pointer-down-outside="contextMenu.setOpen(false)"
+        @escape-key-down="store.setContextMenuOpen(false)"
+        @pointer-down-outside="store.setContextMenuOpen(false)"
       >
-        <GalleryAssetDropdownMenuContent v-if="contextMenu.state.target === 'asset'" />
+        <GalleryAssetDropdownMenuContent v-if="store.contextMenu.target === 'asset'" />
         <GalleryBackgroundDropdownMenuContent v-else />
       </DropdownMenuContent>
     </DropdownMenu>

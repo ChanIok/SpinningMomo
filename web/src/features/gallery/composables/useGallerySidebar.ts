@@ -95,7 +95,7 @@ export function useGallerySidebar() {
     // 查找文件夹对象并设置详情面板
     const folder = findFolderById(store.folders, folderId)
     if (folder) {
-      store.setDetailsFocus({ type: 'folder', folder })
+      store.setDetailsFocus({ type: 'folder', folderId: folder.id })
     }
 
     console.log('📁 选择文件夹:', folderName)
@@ -106,24 +106,7 @@ export function useGallerySidebar() {
    */
   function clearFolderFilter() {
     store.setFilter({ folderId: undefined })
-    store.setDetailsFocus({
-      type: 'folder',
-      folder: {
-        id: ROOT_FOLDER_ID,
-        path: '',
-        parentId: undefined,
-        name: '__root__',
-        displayName: '__root__',
-        coverAssetId: undefined,
-        sortOrder: 0,
-        isHidden: false,
-        createdAt: 0,
-        updatedAt: 0,
-        isNetwork: false,
-        assetCount: store.foldersAssetTotalCount,
-        children: [],
-      },
-    })
+    store.setDetailsFocus({ type: 'folder', folderId: ROOT_FOLDER_ID })
     console.log('📁 清空文件夹筛选')
   }
 
@@ -175,19 +158,7 @@ export function useGallerySidebar() {
    */
   function clearTagFilter() {
     store.setFilter({ tagIds: [], tagMatchMode: 'any' })
-    store.setDetailsFocus({
-      type: 'tag',
-      tag: {
-        id: ROOT_TAG_ID,
-        name: '__root__',
-        parentId: undefined,
-        sortOrder: 0,
-        createdAt: 0,
-        updatedAt: 0,
-        assetCount: store.tagsAssetTotalCount,
-        children: [],
-      },
-    })
+    store.setDetailsFocus({ type: 'tag', tagId: ROOT_TAG_ID })
     console.log('🏷️ 清空标签筛选')
   }
 
@@ -200,7 +171,7 @@ export function useGallerySidebar() {
     // 查找标签对象并设置详情面板
     const tag = findTagById(store.tags, tagId)
     if (tag) {
-      store.setDetailsFocus({ type: 'tag', tag })
+      store.setDetailsFocus({ type: 'tag', tagId: tag.id })
     }
 
     console.log('🏷️ 选择标签:', tagName)

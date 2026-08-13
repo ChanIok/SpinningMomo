@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize, useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
-import { GALLERY_COMPACT_BREAKPOINT } from '../../constants'
+import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
 import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../menus/GalleryAssetContextMenuContent.vue'
@@ -12,11 +12,14 @@ import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxNavigationButtons from './LightboxNavigationButtons.vue'
 import LightboxPager from './LightboxPager.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
+import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
+import { isGalleryTouchInput } from '../../input'
+import type { Asset } from '../../types'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
@@ -31,7 +34,6 @@ type LightboxPagerExposed = {
 }
 
 type GalleryContentRef = {
-  scrollToIndex: (index: number) => void
   getCardRect: (index: number) => DOMRect | null
 } | null
 
@@ -51,20 +53,44 @@ const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const { width: lightboxWidth } = useElementSize(lightboxRootRef)
 const mobileDetailsOpen = ref(false)
-const isCompactViewport = computed(
-  () => lightboxWidth.value > 0 && lightboxWidth.value < GALLERY_COMPACT_BREAKPOINT
+const preloadingAssetIds = new Set<number>()
+const preloadedAssetIds = new Set<number>()
+// 暗房内部宽度只决定顶部工具栏如何压缩，以及详情抽屉是否可用。
+const isToolbarCompressed = computed(
+  () => lightboxWidth.value > 0 && lightboxWidth.value < GALLERY_TOOLBAR_COMPACT_BREAKPOINT
 )
 const { t } = useI18n()
 
-watch(isCompactViewport, (compact) => {
-  if (!compact) {
+watch(isToolbarCompressed, (compressed) => {
+  if (!compressed) {
     mobileDetailsOpen.value = false
   }
 })
 
+// 预加载只由唯一的暗房实例协调，避免 GalleryLightbox/Pager/Image 各自注册重复 watcher。
+watch(
+  () => store.selection.activeIndex,
+  (newIndex, oldIndex) => {
+    if (!store.lightbox.isOpen || newIndex === undefined) {
+      return
+    }
+
+    if (newIndex !== oldIndex) {
+      store.resetLightboxView()
+    }
+
+    void preloadRange(newIndex).catch((error) => {
+      console.warn('Failed to preload lightbox range:', error)
+    })
+  },
+  { immediate: true }
+)
+
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
-const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
+const isTouchInput = computed(() => isGalleryTouchInput(store.lightbox.inputType))
+// 底片栏属于窗口级布局；它必须跟随整个应用窗口，而不是暗房中间内容区。
+const showFilmstrip = computed(() => !store.isCompactWindow && store.lightbox.showFilmstrip)
 const fitMode = computed(() => store.lightbox.fitMode)
 const currentAsset = computed(() => {
   const currentIndex = store.selection.activeIndex
@@ -89,6 +115,81 @@ const lightboxRootClass = computed(() => {
   }
   return cls
 })
+
+function isPreloadableImageAsset(asset: Asset | null): boolean {
+  // 视频交给 <video> 自己按需拉取分片；这里的图片预热只服务 still image 的秒开体验。
+  return asset?.type === 'photo' || asset?.type === 'live_photo'
+}
+
+/** 使用 Image 写入浏览器缓存；预加载状态只属于当前暗房实例。 */
+async function preloadImage(asset: Asset): Promise<void> {
+  if (
+    !isPreloadableImageAsset(asset) ||
+    preloadedAssetIds.has(asset.id) ||
+    preloadingAssetIds.has(asset.id)
+  ) {
+    return
+  }
+
+  preloadingAssetIds.add(asset.id)
+  const url = galleryApi.getAssetUrl(asset)
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      preloadingAssetIds.delete(asset.id)
+      preloadedAssetIds.add(asset.id)
+      resolve()
+    }
+    img.onerror = () => {
+      preloadingAssetIds.delete(asset.id)
+      reject(new Error(`Failed to load image: ${asset.id}`))
+    }
+    img.src = url
+  })
+}
+
+async function preloadRange(currentIndex: number) {
+  const PRELOAD_RANGE = 2
+  const start = Math.max(0, currentIndex - PRELOAD_RANGE)
+  const end = Math.min(store.totalCount - 1, currentIndex + PRELOAD_RANGE)
+  const currentAsset = store.getAssetsInRange(currentIndex, currentIndex)[0]
+  if (!currentAsset) {
+    return
+  }
+
+  if (isPreloadableImageAsset(currentAsset)) {
+    try {
+      await preloadImage(currentAsset)
+    } catch (error) {
+      console.warn(
+        `Failed to preload current image [index=${currentIndex}, id=${currentAsset.id}]`,
+        error
+      )
+    }
+  }
+
+  const preloadPromises: Promise<void>[] = []
+  for (let offset = 1; offset <= PRELOAD_RANGE; offset += 1) {
+    const indexes = [currentIndex + offset, currentIndex - offset]
+    for (const index of indexes) {
+      if (index < start || index > end) {
+        continue
+      }
+
+      const asset = store.getAssetsInRange(index, index)[0]
+      if (asset) {
+        preloadPromises.push(
+          preloadImage(asset).catch((error) => {
+            console.warn(`Failed to preload image [index=${index}, id=${asset.id}]`, error)
+          })
+        )
+      }
+    }
+  }
+
+  await Promise.allSettled(preloadPromises)
+}
 
 const throttledPrevious = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
@@ -166,8 +267,13 @@ function handleClose() {
   }
 
   const delay = didReverseHero ? CLOSE_AFTER_REVERSE_HERO_MS : CLOSE_AFTER_NO_HERO_MS
+  const shouldClearSelection = store.isCompactWindow || isTouchInput.value
   window.setTimeout(() => {
     lightbox.closeLightbox()
+    if (shouldClearSelection) {
+      gallerySelection.clearSelection()
+      store.clearActiveAsset()
+    }
   }, delay)
 }
 
@@ -211,7 +317,7 @@ function handleToolbarToggleFilmstrip() {
 }
 
 function handleToolbarToggleDetails() {
-  if (!isCompactViewport.value) {
+  if (!isToolbarCompressed.value) {
     return
   }
 
@@ -410,6 +516,7 @@ useEventListener(window, 'keydown', handleKeydown)
         >
           <LightboxToolbar
             v-if="!isClosing"
+            :compressed="isToolbarCompressed"
             :details-open="mobileDetailsOpen"
             @back="handleClose"
             @fit="handleToolbarFit"
@@ -423,7 +530,7 @@ useEventListener(window, 'keydown', handleKeydown)
           />
         </Transition>
 
-        <ContextMenu v-if="currentAsset">
+        <ContextMenu v-if="currentAsset && !isTouchInput">
           <ContextMenuTrigger as-child>
             <div
               class="relative min-h-0 flex-1 transition-opacity duration-[180ms]"
@@ -447,11 +554,21 @@ useEventListener(window, 'keydown', handleKeydown)
         </ContextMenu>
         <div
           v-else
-          class="min-h-0 flex-1 transition-opacity duration-[180ms]"
+          class="relative min-h-0 flex-1 transition-opacity duration-[180ms]"
           :class="isClosing ? 'opacity-0' : 'opacity-100'"
+          @contextmenu.prevent.stop
+          @wheel="handleMediaWheel"
         >
           <LightboxPager ref="lightboxPagerRef" />
+          <LightboxNavigationButtons
+            :can-previous="canGoToPrevious"
+            :can-next="canGoToNext"
+            @previous="throttledPrevious"
+            @next="throttledNext"
+          />
         </div>
+
+        <GalleryMobileActionBar v-if="isTouchInput && !isClosing" />
 
         <Transition
           appear
@@ -467,7 +584,7 @@ useEventListener(window, 'keydown', handleKeydown)
 
         <Transition name="gallery-mobile-details">
           <div
-            v-if="isCompactViewport && mobileDetailsOpen && !isClosing"
+            v-if="isToolbarCompressed && mobileDetailsOpen && !isClosing"
             class="absolute inset-0 z-20 flex items-end"
             role="dialog"
             aria-modal="true"

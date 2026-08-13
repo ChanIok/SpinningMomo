@@ -45,12 +45,6 @@ export function useGalleryData() {
     return undefined
   }
 
-  function hasRenderableResults(): boolean {
-    return (
-      store.paginatedAssets.size > 0 || store.totalCount > 0 || store.timelineBuckets.length > 0
-    )
-  }
-
   function getAnchorPageNumber() {
     const startIndex = store.visibleRange.startIndex
     if (startIndex === undefined || startIndex < 0) {
@@ -144,7 +138,7 @@ export function useGalleryData() {
     // 资产详情/暗房是当前查询结果集的连续浏览器：当前资产消失时，落到同索引的新资产。
     if (activeAssetIndex === undefined) {
       const detailsTracksActiveAsset =
-        store.detailsPanel.type === 'asset' && store.detailsPanel.asset.id === activeAssetId
+        store.detailsPanel.type === 'asset' && store.detailsPanel.assetId === activeAssetId
       const detailsTracksSelection = detailsTracksActiveAsset || store.detailsPanel.type === 'batch'
       const shouldRestoreAdjacentFocus = store.lightbox.isOpen || detailsTracksSelection
 
@@ -163,7 +157,7 @@ export function useGalleryData() {
           store.setActiveAsset(targetAsset.id, targetIndex)
           store.replaceSelection([targetAsset.id])
           store.setSelectionAnchor(targetIndex)
-          store.setDetailsFocus({ type: 'asset', asset: targetAsset })
+          store.setDetailsFocus({ type: 'asset', assetId: targetAsset.id })
           return
         }
       }
@@ -196,15 +190,15 @@ export function useGalleryData() {
     if (
       loadedActiveAsset &&
       store.detailsPanel.type === 'asset' &&
-      store.detailsPanel.asset.id === loadedActiveAsset.id
+      store.detailsPanel.assetId === loadedActiveAsset.id
     ) {
-      store.setDetailsFocus({ type: 'asset', asset: loadedActiveAsset })
+      store.setDetailsFocus({ type: 'asset', assetId: loadedActiveAsset.id })
     }
 
     if (store.lightbox.isOpen && loadedActiveAsset) {
       store.replaceSelection([loadedActiveAsset.id])
       store.setSelectionAnchor(activeAssetIndex)
-      store.setDetailsFocus({ type: 'asset', asset: loadedActiveAsset })
+      store.setDetailsFocus({ type: 'asset', assetId: loadedActiveAsset.id })
     }
   }
 
@@ -237,7 +231,7 @@ export function useGalleryData() {
     store.replaceSelection([firstAsset.id])
     store.setSelectionAnchor(0)
     store.setActiveAsset(firstAsset.id, 0)
-    store.setDetailsFocus({ type: 'asset', asset: firstAsset })
+    store.setDetailsFocus({ type: 'asset', assetId: firstAsset.id })
   }
 
   /**
@@ -246,12 +240,8 @@ export function useGalleryData() {
    */
   async function refreshPagedAssetQuery() {
     const requestVersion = store.beginQueryRefresh()
-    const shouldShowLoading = !hasRenderableResults()
 
     try {
-      if (shouldShowLoading) {
-        store.setLoading(true)
-      }
       store.setError(null)
 
       let pageNum = getAnchorPageNumber()
@@ -295,20 +285,13 @@ export function useGalleryData() {
       store.setError('加载数据失败')
     } finally {
       store.finishQueryRefresh(requestVersion)
-      if (shouldShowLoading) {
-        store.setLoading(false)
-      }
     }
   }
 
   async function refreshTimelineData() {
     const requestVersion = store.beginQueryRefresh()
-    const shouldShowLoading = !hasRenderableResults()
 
     try {
-      if (shouldShowLoading) {
-        store.setLoading(true)
-      }
       store.setError(null)
 
       const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
@@ -371,9 +354,6 @@ export function useGalleryData() {
       store.setError('加载时间线数据失败')
     } finally {
       store.finishQueryRefresh(requestVersion)
-      if (shouldShowLoading) {
-        store.setLoading(false)
-      }
     }
   }
 

@@ -30,6 +30,7 @@ import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 const ACTUAL_SIZE_EPSILON = 0.001
 
 const props = defineProps<{
+  compressed?: boolean
   detailsOpen: boolean
 }>()
 
@@ -142,7 +143,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
             >{{ currentIndex + 1 }} / {{ totalCount }}</span
           >
           <span class="truncate text-xs text-muted-foreground">{{ lightboxMode }}</span>
-          <span v-if="selectedCount > 0" class="shrink-0 text-xs text-primary">
+          <span v-if="!props.compressed && selectedCount > 0" class="shrink-0 text-xs text-primary">
             {{ t('gallery.lightbox.toolbar.selected') }} {{ selectedCount }}
           </span>
         </div>
@@ -326,7 +327,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         </Tooltip>
 
         <!-- 评分与标记筛选 -->
-        <Tooltip>
+        <Tooltip v-if="!props.compressed">
           <TooltipTrigger as-child>
             <span class="inline-flex">
               <Popover>
@@ -355,7 +356,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip>
+        <Tooltip v-if="!props.compressed">
           <TooltipTrigger as-child>
             <Button
               variant="sidebarGhost"

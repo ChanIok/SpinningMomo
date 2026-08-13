@@ -53,12 +53,12 @@ export function useVisibleAssetTags() {
     ].filter((assetId) => !store.loadedAssetTagIds.has(assetId) && !inFlightAssetIds.has(assetId))
 
     for (const batch of chunkAssetIds(pendingAssetIds)) {
-      const requestEpoch = store.assetTagsEpoch
+      const requestVersion = store.assetTagsVersion
       batch.forEach((assetId) => inFlightAssetIds.add(assetId))
 
       try {
         const tagsByAssetId = await galleryApi.getTagsByAssetIds(batch)
-        if (!disposed && requestEpoch === store.assetTagsEpoch) {
+        if (!disposed && requestVersion === store.assetTagsVersion) {
           store.setAssetTagsForAssets(batch, tagsByAssetId)
         }
       } catch (error) {
@@ -66,7 +66,7 @@ export function useVisibleAssetTags() {
         console.warn('Failed to load visible gallery tags:', error)
       } finally {
         batch.forEach((assetId) => inFlightAssetIds.delete(assetId))
-        if (!disposed && requestEpoch !== store.assetTagsEpoch) {
+        if (!disposed && requestVersion !== store.assetTagsVersion) {
           scheduleVisibleTagLoad()
         }
       }
@@ -79,7 +79,7 @@ export function useVisibleAssetTags() {
       store.visibleRange.startIndex,
       store.visibleRange.endIndex,
       store.paginatedAssetsVersion,
-      store.assetTagsEpoch,
+      store.assetTagsVersion,
     ],
     scheduleVisibleTagLoad,
     { immediate: true }

@@ -6,7 +6,6 @@ import type { Asset } from '../../types'
 import {
   useGallerySelection,
   useGalleryLightbox,
-  useGalleryContextMenu,
   useGridVirtualizer,
   useCardImageScheduler,
   useTimelineRail,
@@ -19,31 +18,22 @@ import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import { useI18n } from '@/composables/useI18n'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
-
-const props = withDefaults(
-  defineProps<{
-    compact?: boolean
-  }>(),
-  {
-    compact: false,
-  }
-)
+import { isGalleryTouchInput, markGalleryScroll, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
-const galleryContextMenu = useGalleryContextMenu()
 const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
-const gap = props.compact ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 
 const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
-  const itemSize = store.getEffectiveViewSize(props.compact)
+  const itemSize = store.getEffectiveViewSize()
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 const gridCardSize = computed(() => {
@@ -82,6 +72,7 @@ onMounted(async () => {
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
 
+  markGalleryScroll()
   // 滚动热路径优先小批量缩略图，原图增强等空闲后再升级。
   cardImageScheduler.markScrolling()
   scrollTop.value = target.scrollTop
@@ -117,24 +108,55 @@ watch(
   { immediate: true }
 )
 
-function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
+function handleAssetClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
+  if (store.selection.mode === 'multi-select') {
+    void gallerySelection.toggleIndex(index, asset)
+    return
+  }
+
+  if (isGalleryTouchInput(inputType)) {
+    openAssetLightbox(asset, event, index, inputType)
+    return
+  }
+
   void gallerySelection.handleAssetClick(asset, event, index)
 }
 
+function handleAssetLongPress(asset: Asset, _event: PointerEvent, index: number) {
+  if (store.selection.mode === 'multi-select') {
+    return
+  }
+
+  gallerySelection.enterMultiSelectMode(asset, index)
+}
+
 function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
+  openAssetLightbox(asset, event, index, 'mouse')
+}
+
+function openAssetLightbox(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
   const cardEl = (event.target as HTMLElement).closest('[data-asset-card]')
   if (cardEl) {
     const rect = cardEl.getBoundingClientRect()
     const thumbnailUrl = galleryApi.getAssetThumbnailUrl(asset)
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
-  gallerySelection.handleAssetDoubleClick(asset, event)
-  void galleryLightbox.openLightbox(index)
+  void galleryLightbox.openLightbox(index, inputType)
 }
 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
-  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'grid' })
+  store.openContextMenuForAsset(event)
 }
 
 function handleAssetDragStart(asset: Asset, event: DragEvent) {
@@ -167,7 +189,7 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      :class="compact ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      :class="store.isCompactWindow ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
@@ -209,8 +231,11 @@ defineExpose({ scrollToIndex, getCardRect })
                 :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(asset.id)"
                 :original-preview-short-edge="gridCardSize"
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                :compact="props.compact"
-                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
+                @click="
+                  (a, e, inputType) =>
+                    handleAssetClick(a, e, virtualRow.index * columns + idx, inputType)
+                "
+                @long-press="(a, e) => handleAssetLongPress(a, e, virtualRow.index * columns + idx)"
                 @double-click="
                   (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
                 "
@@ -223,7 +248,7 @@ defineExpose({ scrollToIndex, getCardRect })
               <div
                 v-else
                 class="skeleton-card w-full"
-                :class="!props.compact && 'rounded'"
+                :class="!store.isCompactWindow && 'rounded'"
                 :style="{ aspectRatio: '1 / 1' }"
               />
             </template>
