@@ -1,4 +1,5 @@
 import { computed, onUnmounted, ref, watch, type CSSProperties, type Ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import { galleryApi } from '../api'
 import { useGalleryData } from './useGalleryData'
 import { useGalleryStore } from '../store'
@@ -16,20 +17,37 @@ const SWIPE_COMMIT_SLOW_DISTANCE_MAX = 140
 const SWIPE_FLING_VELOCITY = 200
 // 视觉动画保持固定时长；输入可以在动画期间中断它。
 const SWIPE_SETTLE_DURATION = 400
+// 所有触摸手势结束后的合成 click 都不能落到媒体或 chrome 上。
+const TOUCH_GESTURE_CLICK_SUPPRESS_DURATION = 350
+
+// 临时诊断开关：确认适屏状态下手势是在哪个状态被拦截或误分类的。
+const LIGHTBOX_GESTURE_DEBUG = true
 
 export type LightboxSwipeDirection = 'previous' | 'next'
-export type LightboxSwipePhase = 'idle' | 'dragging' | 'settling'
+export type LightboxSwipePhase = 'idle' | 'pending' | 'dragging' | 'settling'
 
 type ReadonlyNumberRef = Readonly<Ref<number>>
 type ReadonlyBooleanRef = Readonly<Ref<boolean>>
 type SwipeSample = { x: number; time: number }
 type SwipePage = { index: number; asset: Asset }
+type TouchPointer = Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY'>
+type TouchPointerPair = [TouchPointer, TouchPointer]
+type TouchGestureMode = 'pending' | 'swiping' | 'panning' | 'pinching' | 'pinch-complete'
 
 interface UseLightboxSwipeNavigationOptions {
   gestureSurfaceRef: Ref<HTMLElement | null>
   availableWidth: ReadonlyNumberRef
   enabled: ReadonlyBooleanRef
+  pannable: ReadonlyBooleanRef
   navigateToIndex: (index: number) => void
+  onTouchTap?: (event: PointerEvent, startTarget: EventTarget | null) => boolean
+  onPanStart?: (event: PointerEvent) => void
+  onPanMove?: (event: PointerEvent) => void
+  onPanEnd?: (event: PointerEvent) => void
+  onPanCancel?: () => void
+  onPinchStart?: (pointers: TouchPointerPair) => void
+  onPinchMove?: (pointers: TouchPointerPair) => void
+  onPinchEnd?: () => void
 }
 
 // 只有能显示缩略图的媒体才进入 Pager 的相邻页面缓存。
@@ -44,7 +62,21 @@ function isNavigableAsset(asset: Asset | null | undefined): asset is Asset {
  * 这样动画进行中可以重新接管指针，并把新的手势接在当前轨道位置上。
  */
 export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOptions) {
-  const { gestureSurfaceRef, availableWidth, enabled, navigateToIndex } = options
+  const {
+    gestureSurfaceRef,
+    availableWidth,
+    enabled,
+    pannable,
+    navigateToIndex,
+    onTouchTap,
+    onPanStart,
+    onPanMove,
+    onPanEnd,
+    onPanCancel,
+    onPinchStart,
+    onPinchMove,
+    onPinchEnd,
+  } = options
   const store = useGalleryStore()
   const galleryData = useGalleryData()
 
@@ -55,11 +87,11 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   const swipeStartY = ref(0)
   const swipeStartOffset = ref(0)
   const swipeGestureOriginIndex = ref<number | null>(null)
-  const swipeAxisLocked = ref(false)
-  const swipeMoved = ref(false)
   const swipeDirection = ref<LightboxSwipeDirection | null>(null)
   const swipeOffset = ref(0)
   const swipePhase = ref<LightboxSwipePhase>('idle')
+  const multiTouchActive = ref(false)
+  const touchGestureMode = ref<TouchGestureMode | null>(null)
   const animationTargetIndex = ref<number | null>(null)
   const pendingNavigationIndex = ref<number | null>(null)
   const navigationReadyIndex = ref<number | null>(null)
@@ -71,15 +103,63 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   let swipeAnimationFrame: number | null = null
   let suppressClickResetTimer: number | null = null
   const swipeSamples: SwipeSample[] = []
+  const trackedTouchPointers = new Map<number, TouchPointer>()
+  let touchStartTarget: EventTarget | null = null
   let swipeVelocityX = 0
 
-  // 只有空闲或正在回弹/前进的 Pager 才能接收新的 pointerdown。
+  // 第一根指针先进入 pending；只有确认横向滑动后才升级为 dragging 并捕获指针。
   const canSwipeNavigate = computed(
     () =>
       enabled.value &&
       (swipePhase.value === 'idle' || swipePhase.value === 'settling') &&
-      swipePointerId.value === null
+      swipePointerId.value === null &&
+      !multiTouchActive.value
   )
+
+  function logGesture(label: string, event?: PointerEvent, details: Record<string, unknown> = {}) {
+    if (!LIGHTBOX_GESTURE_DEBUG) {
+      return
+    }
+
+    const target = event?.target
+    const targetClass =
+      typeof Element !== 'undefined' && target instanceof Element
+        ? target.getAttribute('class')
+        : null
+    const targetElement =
+      typeof Element !== 'undefined' && target instanceof Element
+        ? `${target.tagName.toLowerCase()}${targetClass ? `.${targetClass.trim().replace(/\s+/g, '.')}` : ''}`
+        : target?.constructor?.name
+
+    console.log(`[LightboxGesture] ${label}`, {
+      eventType: event?.type,
+      pointerId: event?.pointerId,
+      pointerType: event?.pointerType,
+      clientX: event?.clientX,
+      clientY: event?.clientY,
+      defaultPrevented: event?.defaultPrevented,
+      activeIndex: store.selection.activeIndex,
+      baseIndex: baseIndex.value,
+      enabled: enabled.value,
+      pannable: pannable.value,
+      canSwipeNavigate: canSwipeNavigate.value,
+      phase: swipePhase.value,
+      mode: touchGestureMode.value,
+      animationTargetIndex: animationTargetIndex.value,
+      interruptedSettling,
+      swipeOffset: swipeOffset.value,
+      swipePointerId: swipePointerId.value,
+      trackedPointers: trackedTouchPointers.size,
+      multiTouchActive: multiTouchActive.value,
+      surfaceTouchAction: gestureSurfaceRef.value?.style.touchAction,
+      surfaceHasPointerCapture:
+        event?.pointerId !== undefined && gestureSurfaceRef.value
+          ? gestureSurfaceRef.value.hasPointerCapture(event.pointerId)
+          : undefined,
+      targetElement,
+      ...details,
+    })
+  }
 
   // 当前媒体页始终跟随轨道偏移；动画由 RAF 驱动，因此这里不依赖 CSS transition。
   const swipeViewportStyle = computed(() => ({
@@ -88,10 +168,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     willChange: swipePhase.value === 'idle' ? 'auto' : 'transform',
   }))
 
-  // 横向交给 Pager，纵向仍允许宿主滚动；禁用时恢复浏览器默认行为。
+  // 暗房是全屏查看器，触摸始终由 Pager 仲裁，避免浏览器接管水平滑动或原生 pinch。
   const swipeGestureSurfaceStyle = computed<CSSProperties>(() => ({
-    touchAction: enabled.value ? 'pan-y' : 'auto',
-    overscrollBehaviorX: enabled.value ? 'none' : 'auto',
+    touchAction: enabled.value || pannable.value ? 'none' : 'auto',
+    overscrollBehaviorX: enabled.value || pannable.value ? 'none' : 'auto',
   }))
 
   // 相邻页按“索引差 × 屏宽”排布，和当前媒体页共享同一个 swipeOffset。
@@ -291,16 +371,53 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     return Math.max(velocityInDirection, 0)
   }
 
+  function isTouchPointer(event: PointerEvent): boolean {
+    return event.pointerType === 'touch' || event.pointerType === 'pen'
+  }
+
+  function updateTouchPointer(event: PointerEvent) {
+    trackedTouchPointers.set(event.pointerId, event)
+  }
+
+  function getTouchPointerPair(): TouchPointerPair | null {
+    const pointers = [...trackedTouchPointers.values()]
+    if (pointers.length < 2) {
+      return null
+    }
+
+    return [pointers[0], pointers[1]]
+  }
+
+  function captureTouchPointer(pointerId: number) {
+    const surface = gestureSurfaceRef.value
+    if (!surface || surface.hasPointerCapture(pointerId)) {
+      return
+    }
+
+    surface.setPointerCapture(pointerId)
+  }
+
+  function releaseTouchPointerCaptures() {
+    const surface = gestureSurfaceRef.value
+    if (!surface) {
+      return
+    }
+
+    for (const pointerId of trackedTouchPointers.keys()) {
+      if (surface.hasPointerCapture(pointerId)) {
+        surface.releasePointerCapture(pointerId)
+      }
+    }
+  }
+
   // 释放 Pager 对当前指针的捕获，并清空本次手势的指针状态。
   function releaseSwipePointer(pointerId: number) {
     const hasPointerCapture = gestureSurfaceRef.value?.hasPointerCapture(pointerId) ?? false
 
     swipePointerId.value = null
-    swipeAxisLocked.value = false
-    swipeMoved.value = false
 
     if (hasPointerCapture) {
-      // 正常结束时主动释放；lostpointercapture 只负责异常兜底。
+      // 正常结束时主动释放；异常结束由 pointercancel 负责收尾。
       gestureSurfaceRef.value?.releasePointerCapture(pointerId)
     }
   }
@@ -313,8 +430,6 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     pageLoadToken += 1
     clearSwipeVelocity()
     swipePointerId.value = null
-    swipeAxisLocked.value = false
-    swipeMoved.value = false
     swipePhase.value = 'idle'
     swipeOffset.value = 0
     swipeStartOffset.value = 0
@@ -326,8 +441,19 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     interruptedSettling = false
   }
 
+  function resetTouchTracking() {
+    releaseTouchPointerCaptures()
+    trackedTouchPointers.clear()
+    touchStartTarget = null
+    multiTouchActive.value = false
+    touchGestureMode.value = null
+  }
+
   // 切换视觉基准页，并重新准备它两侧的相邻页面。
-  function resetPagerToIndex(index: number | undefined) {
+  function resetPagerToIndex(index: number | undefined, preserveTouchTracking = false) {
+    if (!preserveTouchTracking) {
+      resetTouchTracking()
+    }
     resetSwipeGesture()
     // 基准页是轨道坐标原点；外部导航或媒体 ready 后才更新它。
     baseIndex.value = index === undefined ? null : getValidIndex(index)
@@ -344,8 +470,8 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     resetPagerToIndex(store.selection.activeIndex)
   }
 
-  // 在 pointerup 后短暂保留“这是一次滑动”的标记，阻止随后的 click 误触媒体。
-  function scheduleSuppressClickReset() {
+  // 在触摸手势结束后短暂保留标记，阻止随后的合成 click 误触媒体。
+  function scheduleSuppressClickReset(delayMs = TOUCH_GESTURE_CLICK_SUPPRESS_DURATION) {
     if (suppressClickResetTimer !== null) {
       window.clearTimeout(suppressClickResetTimer)
     }
@@ -353,7 +479,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     suppressClickResetTimer = window.setTimeout(() => {
       suppressClick.value = false
       suppressClickResetTimer = null
-    }, 0)
+    }, delayMs)
   }
 
   // 读取并消费一次滑动产生的 click 抑制标记。
@@ -448,7 +574,16 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     swipeAnimationFrame = requestAnimationFrame(animate)
   }
 
-  // 用户在 settling 期间没有形成新目标时，继续旧动画或回弹到原目标。
+  // 新手势可以中断 settling，但必须保留旧目标，后续才能继续或恢复这段动画。
+  function interruptSettlingForTouch() {
+    interruptedSettling = swipePhase.value === 'settling'
+    if (interruptedSettling) {
+      clearSwipeAnimation()
+      swipeAnimationToken += 1
+    }
+  }
+
+  // 新手势没有形成新目标时，恢复被中断的旧动画。
   function resumeInterruptedAnimation() {
     const targetIndex = interruptedSettling
       ? (animationTargetIndex.value ?? baseIndex.value)
@@ -465,98 +600,97 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     startSwipeAnimation(targetIndex, shouldCommit)
   }
 
-  // 轴向锁定失败时取消本次手势；若原来有动画，则恢复原动画。
-  function cancelSwipeTracking(pointerId: number) {
-    releaseSwipePointer(pointerId)
-    clearSwipeVelocity()
-
+  function finishSwipeTracking() {
     if (interruptedSettling) {
       resumeInterruptedAnimation()
-      return
+    } else {
+      resetSwipeGesture()
     }
-
-    resetSwipeGesture()
   }
 
-  // 开始一次新手势；settling 阶段允许从当前轨道位置中断旧动画。
+  function beginMultiTouch(event: PointerEvent) {
+    const pair = getTouchPointerPair()
+    if (!pair) {
+      return
+    }
+
+    logGesture('multi-touch-started', event)
+    onPanCancel?.()
+
+    multiTouchActive.value = true
+    event.preventDefault()
+    resetPagerToIndex(store.selection.activeIndex, true)
+    touchGestureMode.value = 'pinching'
+    swipePhase.value = 'dragging'
+    swipePointerId.value = pair[0].pointerId
+    for (const pointerId of trackedTouchPointers.keys()) {
+      captureTouchPointer(pointerId)
+    }
+
+    suppressClick.value = true
+    scheduleSuppressClickReset(TOUCH_GESTURE_CLICK_SUPPRESS_DURATION)
+    onPinchStart?.(pair)
+  }
+
+  // Pager 是触摸手势的唯一入口；Image 只通过回调接收平移和 pinch。
   function handleSwipePointerDown(event: PointerEvent) {
-    // 鼠标继续使用桌面端按钮，触摸/笔输入才进入拖动切图。
-    if (
-      event.pointerType === 'mouse' ||
-      (event.pointerType !== 'touch' && event.button !== 0) ||
-      !gestureSurfaceRef.value ||
-      !enabled.value ||
-      store.selection.activeIndex === undefined
-    ) {
+    if (!isTouchPointer(event) || !gestureSurfaceRef.value) {
       return
     }
 
-    if (!canSwipeNavigate.value) {
+    logGesture('pointerdown', event)
+
+    if (trackedTouchPointers.size > 0) {
+      if (!trackedTouchPointers.has(event.pointerId) && trackedTouchPointers.size >= 2) {
+        logGesture('pointerdown-ignored', event, { reason: 'too-many-pointers' })
+        event.preventDefault()
+        return
+      }
+
+      updateTouchPointer(event)
+      if (trackedTouchPointers.size === 2 && !multiTouchActive.value) {
+        beginMultiTouch(event)
+      } else {
+        event.preventDefault()
+      }
       return
     }
 
-    interruptedSettling = swipePhase.value === 'settling'
-    if (interruptedSettling) {
-      // 保存 animationTargetIndex，后续无效手势可以恢复到旧目标。
-      clearSwipeAnimation()
-      swipeAnimationToken += 1
+    const ignoredReasons: string[] = []
+    if (store.selection.activeIndex === undefined) {
+      ignoredReasons.push('missing-active-index')
+    }
+    if (!enabled.value && !pannable.value) {
+      ignoredReasons.push('gesture-disabled-and-not-pannable')
+    }
+    if (!canSwipeNavigate.value && !pannable.value) {
+      ignoredReasons.push('swipe-navigation-unavailable')
+    }
+    if (ignoredReasons.length > 0) {
+      logGesture('pointerdown-ignored', event, { reason: ignoredReasons })
+      return
     }
 
+    onPanCancel?.()
+    interruptSettlingForTouch()
+    updateTouchPointer(event)
     swipePointerId.value = event.pointerId
     swipeStartX.value = event.clientX
     swipeStartY.value = event.clientY
     swipeStartOffset.value = swipeOffset.value
     swipeGestureOriginIndex.value =
       animationTargetIndex.value ?? baseIndex.value ?? store.selection.activeIndex
-    swipeAxisLocked.value = false
-    swipeMoved.value = false
     swipeDirection.value = null
-    swipePhase.value = 'dragging'
+    touchGestureMode.value = 'pending'
+    swipePhase.value = 'pending'
     clearSwipeVelocity()
     recordSwipeSample(event)
-    // 手势开始时同时准备前后两侧，方向改变时无需重新建立状态机。
-    prepareSwipePages('next', swipeGestureOriginIndex.value)
-    prepareSwipePages('previous', swipeGestureOriginIndex.value)
-    // 固定外层负责捕获整段手势，轨道移动不会改变后续 pointer 事件的命中区域。
-    gestureSurfaceRef.value.setPointerCapture(event.pointerId)
+    // pending 阶段不捕获 pointer，保留视频原生控件的 click 目标；确认手势后再捕获。
+    touchStartTarget = event.target
+    logGesture('pending-started', event)
   }
 
-  // 根据移动轨迹锁定横轴，并把位移转换成 Pager 轨道偏移。
-  function handleSwipePointerMove(event: PointerEvent) {
-    if (swipePointerId.value !== event.pointerId) {
-      return
-    }
-
-    recordSwipeSample(event)
-
-    const deltaX = event.clientX - swipeStartX.value
-    const deltaY = event.clientY - swipeStartY.value
-
-    if (!swipeAxisLocked.value) {
-      // 小位移先不判轴，避免手指刚落下时误触发切图。
-      if (Math.hypot(deltaX, deltaY) < SWIPE_AXIS_LOCK_THRESHOLD) {
-        return
-      }
-
-      if (Math.abs(deltaX) <= Math.abs(deltaY) * 1.2) {
-        // 更像纵向滚动时放弃本次切图，让宿主继续处理它。
-        cancelSwipeTracking(event.pointerId)
-        return
-      }
-
-      swipeAxisLocked.value = true
-      swipeMoved.value = true
-      swipeDirection.value = deltaX < 0 ? 'next' : 'previous'
-      prepareSwipePages(swipeDirection.value, swipeGestureOriginIndex.value)
-    }
-
-    // 横轴已锁定，阻止浏览器把这次手势转成水平导航或返回。
-    event.preventDefault()
-
-    if (swipeDirection.value === null) {
-      return
-    }
-
+  function updateSwipeOffset(event: PointerEvent, deltaX: number) {
     const width = Math.max(availableWidth.value, 1)
     const currentIndex = baseIndex.value
     if (currentIndex === null) {
@@ -567,7 +701,6 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     const maxOffset = currentIndex * width
     const nextOffset = swipeStartOffset.value + deltaX
     if (nextOffset < minOffset) {
-      // 到达首尾边界后保留少量阻尼，给用户明确的边界反馈。
       swipeOffset.value = minOffset + (nextOffset - minOffset) * 0.25
     } else if (nextOffset > maxOffset) {
       swipeOffset.value = maxOffset + (nextOffset - maxOffset) * 0.25
@@ -577,30 +710,183 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     const nextDirection: LightboxSwipeDirection = deltaX < 0 ? 'next' : 'previous'
     if (nextDirection !== swipeDirection.value) {
-      // 手指中途反向时只切换目标页，不重置当前轨道偏移。
       swipeDirection.value = nextDirection
       prepareSwipePages(nextDirection, swipeGestureOriginIndex.value)
     }
+
+    event.preventDefault()
   }
 
-  // 在松手时决定提交、回弹，或继续被中断的旧动画。
-  function handleSwipePointerUp(event: PointerEvent) {
+  function handleSwipePointerMove(event: PointerEvent) {
+    if (!trackedTouchPointers.has(event.pointerId)) {
+      return
+    }
+
+    updateTouchPointer(event)
+
+    if (multiTouchActive.value) {
+      event.preventDefault()
+      if (touchGestureMode.value === 'pinching') {
+        const pair = getTouchPointerPair()
+        if (pair) {
+          onPinchMove?.(pair)
+        }
+      }
+      return
+    }
+
     if (swipePointerId.value !== event.pointerId) {
       return
     }
 
-    recordSwipeSample(event)
+    if (touchGestureMode.value === 'panning') {
+      event.preventDefault()
+      onPanMove?.(event)
+      return
+    }
 
-    const wasHorizontalSwipe = swipeAxisLocked.value && swipeMoved.value
-    const rawDistance = Math.abs(event.clientX - swipeStartX.value)
+    if (touchGestureMode.value === 'pinch-complete') {
+      event.preventDefault()
+      return
+    }
+
+    recordSwipeSample(event)
+    const deltaX = event.clientX - swipeStartX.value
+    const deltaY = event.clientY - swipeStartY.value
+
+    if (touchGestureMode.value === 'pending') {
+      if (Math.hypot(deltaX, deltaY) < SWIPE_AXIS_LOCK_THRESHOLD) {
+        return
+      }
+
+      if (pannable.value) {
+        touchGestureMode.value = 'panning'
+        swipePhase.value = 'dragging'
+        captureTouchPointer(event.pointerId)
+        onPanStart?.(event)
+        logGesture('classified-as-panning', event, { deltaX, deltaY })
+        event.preventDefault()
+        onPanMove?.(event)
+        return
+      }
+
+      if (Math.abs(deltaX) <= Math.abs(deltaY) * 1.2) {
+        touchGestureMode.value = 'pinch-complete'
+        swipePhase.value = 'dragging'
+        captureTouchPointer(event.pointerId)
+        suppressClick.value = true
+        scheduleSuppressClickReset()
+        logGesture('classified-as-vertical', event, { deltaX, deltaY })
+        event.preventDefault()
+        return
+      }
+
+      touchGestureMode.value = 'swiping'
+      swipeDirection.value = deltaX < 0 ? 'next' : 'previous'
+      swipePhase.value = 'dragging'
+      captureTouchPointer(event.pointerId)
+      prepareSwipePages('next', swipeGestureOriginIndex.value)
+      prepareSwipePages('previous', swipeGestureOriginIndex.value)
+      prepareSwipePages(swipeDirection.value, swipeGestureOriginIndex.value)
+      logGesture('classified-as-swiping', event, {
+        deltaX,
+        deltaY,
+        direction: swipeDirection.value,
+      })
+    }
+
+    if (touchGestureMode.value === 'swiping') {
+      updateSwipeOffset(event, deltaX)
+    }
+  }
+
+  function finishTouchTracking() {
+    resetTouchTracking()
+    resetSwipeGesture()
+  }
+
+  function handleSwipePointerUp(event: PointerEvent) {
+    if (!trackedTouchPointers.has(event.pointerId)) {
+      return
+    }
+
+    updateTouchPointer(event)
+    logGesture('pointerup', event)
+
+    if (multiTouchActive.value) {
+      trackedTouchPointers.delete(event.pointerId)
+      event.preventDefault()
+      if (touchGestureMode.value === 'pinching') {
+        onPinchEnd?.()
+        touchGestureMode.value = 'pinch-complete'
+        suppressClick.value = true
+        scheduleSuppressClickReset()
+      }
+
+      if (trackedTouchPointers.size === 0) {
+        multiTouchActive.value = false
+        finishTouchTracking()
+      }
+      return
+    }
+
+    if (swipePointerId.value !== event.pointerId) {
+      trackedTouchPointers.delete(event.pointerId)
+      return
+    }
+
+    const mode = touchGestureMode.value
+    trackedTouchPointers.delete(event.pointerId)
+
+    if (mode === 'pending') {
+      releaseSwipePointer(event.pointerId)
+      finishSwipeTracking()
+      const handled = onTouchTap?.(event, touchStartTarget) ?? false
+      if (handled) {
+        suppressClick.value = true
+        scheduleSuppressClickReset()
+      }
+      logGesture('tap-completed', event, { handled })
+      resetTouchTracking()
+      return
+    }
+
+    if (mode === 'panning') {
+      onPanEnd?.(event)
+      releaseSwipePointer(event.pointerId)
+      suppressClick.value = true
+      scheduleSuppressClickReset()
+      logGesture('pan-completed', event)
+      finishSwipeTracking()
+      resetTouchTracking()
+      return
+    }
+
+    if (mode === 'pinch-complete') {
+      releaseSwipePointer(event.pointerId)
+      suppressClick.value = true
+      scheduleSuppressClickReset()
+      finishSwipeTracking()
+      resetTouchTracking()
+      return
+    }
+
+    if (mode !== 'swiping') {
+      releaseSwipePointer(event.pointerId)
+      finishSwipeTracking()
+      resetTouchTracking()
+      return
+    }
+
+    recordSwipeSample(event)
     const direction = swipeDirection.value
+    const rawDistance = Math.abs(event.clientX - swipeStartX.value)
     const releaseDirection =
       event.clientX < swipeStartX.value
         ? 'next'
         : event.clientX > swipeStartX.value
           ? 'previous'
           : null
-    // 快扫看速度，慢拖看距离；两者共用同一个目标方向。
     const isFastFling =
       direction !== null && getSwipeVelocityInDirection(direction) >= SWIPE_FLING_VELOCITY
     const isSlowDrag = rawDistance >= getSlowSwipeCommitDistance()
@@ -608,76 +894,93 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     const targetIndex =
       direction && originIndex !== null ? getSwipeTargetIndex(direction, originIndex) : null
     const shouldCommit =
-      wasHorizontalSwipe &&
       targetIndex !== null &&
       direction !== null &&
       (releaseDirection === null || releaseDirection === direction) &&
       (isFastFling || isSlowDrag)
     const resumeTargetIndex = interruptedSettling ? animationTargetIndex.value : null
 
-    // 先释放指针捕获，再启动 RAF，避免旧 pointer 生命周期影响新动画。
+    logGesture('swipe-completed', event, {
+      direction,
+      releaseDirection,
+      rawDistance,
+      isFastFling,
+      isSlowDrag,
+      targetIndex,
+      shouldCommit,
+    })
+
     releaseSwipePointer(event.pointerId)
     clearSwipeVelocity()
-
-    if (!wasHorizontalSwipe) {
-      if (interruptedSettling) {
-        resumeInterruptedAnimation()
-      } else {
-        resetSwipeGesture()
-      }
-      return
-    }
-
-    // 无论最终提交还是回弹，都屏蔽这个手势生成的 click。
     suppressClick.value = true
     scheduleSuppressClickReset()
+    resetTouchTracking()
 
     if (shouldCommit && targetIndex !== null) {
-      // 形成了有效目标，开始向相邻页推进。
       interruptedSettling = false
       startSwipeAnimation(targetIndex, true)
       return
     }
 
     if (interruptedSettling && resumeTargetIndex !== null) {
-      // 新手势没有形成新目标，恢复第一次滑动的目标。
       resumeInterruptedAnimation()
       return
     }
 
     interruptedSettling = false
-    // 普通未达阈值的拖动回到当前基准页。
     startSwipeAnimation(baseIndex.value ?? store.selection.activeIndex ?? 0, false)
   }
 
-  // 处理系统取消或浏览器接管后的手势收尾。
   function handleSwipePointerCancel(event: PointerEvent) {
-    if (swipePointerId.value !== event.pointerId) {
+    if (!trackedTouchPointers.has(event.pointerId)) {
       return
     }
 
-    const wasHorizontalSwipe = swipeAxisLocked.value && swipeMoved.value
-    releaseSwipePointer(event.pointerId)
-    clearSwipeVelocity()
+    logGesture('pointercancel', event)
 
-    if (wasHorizontalSwipe) {
+    if (multiTouchActive.value) {
+      trackedTouchPointers.delete(event.pointerId)
+      if (touchGestureMode.value === 'pinching') {
+        onPinchEnd?.()
+        touchGestureMode.value = 'pinch-complete'
+      }
+      if (trackedTouchPointers.size === 0) {
+        multiTouchActive.value = false
+        finishTouchTracking()
+      }
+      return
+    }
+
+    const mode = touchGestureMode.value
+    trackedTouchPointers.delete(event.pointerId)
+    if (mode === 'panning') {
+      onPanCancel?.()
+    }
+    releaseSwipePointer(event.pointerId)
+    if (mode !== 'pending') {
       suppressClick.value = true
       scheduleSuppressClickReset()
     }
+    finishSwipeTracking()
+    resetTouchTracking()
+  }
 
-    if (interruptedSettling) {
-      resumeInterruptedAnimation()
-    } else {
-      resetSwipeGesture()
+  // pending 阶段尚未捕获指针，手指移出 Pager 后仍需在 window 上完成收尾。
+  function isEventInsideGestureSurface(event: PointerEvent): boolean {
+    const surface = gestureSurfaceRef.value
+    const target = event.target
+    return !!surface && target instanceof Node && surface.contains(target)
+  }
+
+  function handleWindowPointerMove(event: PointerEvent) {
+    if (!isEventInsideGestureSurface(event)) {
+      handleSwipePointerMove(event)
     }
   }
 
-  // 处理指针捕获意外丢失，统一复用 pointercancel 的恢复逻辑。
-  function handleSwipeLostPointerCapture(event: PointerEvent) {
-    if (swipePointerId.value === event.pointerId) {
-      handleSwipePointerCancel(event)
-    }
-  }
+  useEventListener(window, 'pointermove', handleWindowPointerMove)
+  useEventListener(window, 'pointerup', handleSwipePointerUp)
+  useEventListener(window, 'pointercancel', handleSwipePointerCancel)
 
   // 在目标媒体 ready 后提升 Pager 基准页，并清理上一轮轨道偏移。
   function completeNavigation(assetId: number) {
@@ -693,7 +996,9 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     if (
       swipePointerId.value !== null ||
+      swipePhase.value === 'pending' ||
       swipePhase.value === 'dragging' ||
+      multiTouchActive.value ||
       swipeAnimationFrame !== null
     ) {
       // 新手势正在使用这段轨道，先记住 ready，等它结束后再归零。
@@ -722,6 +1027,11 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
         return
       }
 
+      if (multiTouchActive.value) {
+        // pinch 期间由当前媒体保持手势状态，不能让外部索引更新清空已追踪指针。
+        return
+      }
+
       // 手势导航期间 Pinia 会先改变 activeIndex，但 Pager 要等媒体真正挂载后再换基准页。
       if (swipePhase.value !== 'idle' || pendingNavigationIndex.value !== null) {
         return
@@ -734,16 +1044,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     { immediate: true }
   )
 
-  // 图片进入可平移放大状态时暂停 Pager 手势，避免两个拖拽状态机抢同一个 pointer。
-  watch(enabled, (isEnabled) => {
-    if (!isEnabled && swipePhase.value !== 'idle') {
-      resetSwipeVisual()
-    }
-  })
-
   onUnmounted(() => {
     // 组件销毁时取消 RAF 和 click 定时器，避免异步回调访问已卸载的 Pager。
     clearSwipeAnimation()
+    resetTouchTracking()
     if (suppressClickResetTimer !== null) {
       window.clearTimeout(suppressClickResetTimer)
     }
@@ -751,6 +1055,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
   return {
     swipePhase,
+    multiTouchActive,
     swipePreviewPages,
     swipeViewportStyle,
     swipeGestureSurfaceStyle,
@@ -763,6 +1068,5 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     handleSwipePointerMove,
     handleSwipePointerUp,
     handleSwipePointerCancel,
-    handleSwipeLostPointerCapture,
   }
 }

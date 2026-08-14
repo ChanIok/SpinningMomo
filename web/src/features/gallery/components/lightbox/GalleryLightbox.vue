@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useElementSize, useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
@@ -18,13 +18,20 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/component
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
-import { isGalleryTouchInput } from '../../input'
+import {
+  isGalleryTouchContextMenu,
+  isGalleryTouchInput,
+  normalizeGalleryInputType,
+} from '../../input'
+import type { GalleryInputType } from '../../input'
 import type { Asset } from '../../types'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
 /** 无飞回动画时，与工具栏/内容区 leave ~180ms 对齐 */
 const CLOSE_AFTER_NO_HERO_MS = 180
+/** 静态图单击先等待双击窗口，避免双击时 chrome 先闪一次。 */
+const TOUCH_SINGLE_TAP_DELAY_MS = 300
 
 type LightboxPagerExposed = {
   showFitMode: () => Promise<void>
@@ -53,6 +60,11 @@ const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const { width: lightboxWidth } = useElementSize(lightboxRootRef)
 const mobileDetailsOpen = ref(false)
+// 界面层显隐与沉浸模式分离；触摸轻点只切换 chrome，不改变沉浸模式状态。
+const isLightboxChromeVisible = ref(true)
+let pendingTouchTapTimer: number | null = null
+// inputType 记录打开来源；这里单独记录会话内最近一次指针模态，支持混合触控设备切换。
+const activeInputType = ref<GalleryInputType>('mouse')
 const preloadingAssetIds = new Set<number>()
 const preloadedAssetIds = new Set<number>()
 // 暗房内部宽度只决定顶部工具栏如何压缩，以及详情抽屉是否可用。
@@ -76,6 +88,7 @@ watch(
     }
 
     if (newIndex !== oldIndex) {
+      clearPendingTouchTap()
       store.resetLightboxView()
     }
 
@@ -88,7 +101,7 @@ watch(
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
-const isTouchInput = computed(() => isGalleryTouchInput(store.lightbox.inputType))
+const isTouchInput = computed(() => isGalleryTouchInput(activeInputType.value))
 // 底片栏属于窗口级布局；它必须跟随整个应用窗口，而不是暗房中间内容区。
 const showFilmstrip = computed(() => !store.isCompactWindow && store.lightbox.showFilmstrip)
 const fitMode = computed(() => store.lightbox.fitMode)
@@ -115,6 +128,24 @@ const lightboxRootClass = computed(() => {
   }
   return cls
 })
+
+watch(
+  () => store.lightbox.isOpen,
+  (isOpen) => {
+    clearPendingTouchTap()
+    if (!isOpen) {
+      return
+    }
+
+    activeInputType.value = store.lightbox.inputType
+    isLightboxChromeVisible.value = true
+  },
+  { immediate: true }
+)
+
+function handleLightboxPointerDown(event: PointerEvent) {
+  activeInputType.value = normalizeGalleryInputType(event.pointerType)
+}
 
 function isPreloadableImageAsset(asset: Asset | null): boolean {
   // 视频交给 <video> 自己按需拉取分片；这里的图片预热只服务 still image 的秒开体验。
@@ -238,6 +269,7 @@ function exitImmersive() {
 }
 
 function handleClose() {
+  clearPendingTouchTap()
   mobileDetailsOpen.value = false
 
   if (store.lightbox.isClosing) return
@@ -253,12 +285,7 @@ function handleClose() {
       const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
       const containerRect = lightboxRootRef.value?.getBoundingClientRect()
       if (cardRect && asset && containerRect) {
-        const fromRect = computeLightboxHeroRect(
-          containerRect,
-          asset.width ?? 1,
-          asset.height ?? 1,
-          showFilmstrip.value
-        )
+        const fromRect = computeLightboxHeroRect(containerRect, asset.width ?? 1, asset.height ?? 1)
         prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         emit('requestReverseHero')
         didReverseHero = true
@@ -328,6 +355,55 @@ function closeMobileDetails() {
   mobileDetailsOpen.value = false
 }
 
+function clearPendingTouchTap() {
+  if (pendingTouchTapTimer !== null) {
+    window.clearTimeout(pendingTouchTapTimer)
+    pendingTouchTapTimer = null
+  }
+}
+
+function toggleLightboxChrome() {
+  isLightboxChromeVisible.value = !isLightboxChromeVisible.value
+  if (!isLightboxChromeVisible.value) {
+    closeMobileDetails()
+  }
+}
+
+function scheduleSingleTouchTap() {
+  clearPendingTouchTap()
+  pendingTouchTapTimer = window.setTimeout(() => {
+    pendingTouchTapTimer = null
+    if (!store.lightbox.isOpen || isClosing.value) {
+      return
+    }
+
+    toggleLightboxChrome()
+  }, TOUCH_SINGLE_TAP_DELAY_MS)
+}
+
+function handleTouchTap(isDoubleTap: boolean) {
+  if (isClosing.value) {
+    clearPendingTouchTap()
+    return
+  }
+
+  // 视频控件不参与双击缩放，保留其原有的即时单击响应。
+  if (!isZoomableAsset.value) {
+    clearPendingTouchTap()
+    toggleLightboxChrome()
+    return
+  }
+
+  if (isDoubleTap) {
+    clearPendingTouchTap()
+    isLightboxChromeVisible.value = false
+    closeMobileDetails()
+    return
+  }
+
+  scheduleSingleTouchTap()
+}
+
 function handleToolbarToggleImmersive() {
   if (isImmersive.value) {
     exitImmersive()
@@ -344,6 +420,17 @@ function handleImageContextMenu(event: MouseEvent) {
   }
 
   void gallerySelection.handleAssetContextMenu(asset, event, currentIndex)
+}
+
+function handleMediaContextMenu(event: MouseEvent) {
+  if (isGalleryTouchContextMenu(event, activeInputType.value)) {
+    // ContextMenuTrigger 仍保持挂载，但触摸长按不应打开桌面右键菜单。
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
+  handleImageContextMenu(event)
 }
 
 function handleMediaWheel(event: WheelEvent) {
@@ -493,6 +580,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 useEventListener(window, 'keydown', handleKeydown)
+onUnmounted(clearPendingTouchTap)
 </script>
 
 <template>
@@ -503,8 +591,9 @@ useEventListener(window, 'keydown', handleKeydown)
       :class="lightboxRootClass"
       style="--surface-opacity-scale: 0.96"
       @click.self="handleClose"
+      @pointerdown.capture="handleLightboxPointerDown"
     >
-      <div class="flex h-full min-h-0 w-full flex-col">
+      <div class="relative h-full min-h-0 w-full">
         <Transition
           appear
           enter-active-class="transition-opacity duration-[200ms] ease-out"
@@ -514,32 +603,36 @@ useEventListener(window, 'keydown', handleKeydown)
           leave-from-class="opacity-100"
           leave-to-class="opacity-0"
         >
-          <LightboxToolbar
-            v-if="!isClosing"
-            :compressed="isToolbarCompressed"
-            :details-open="mobileDetailsOpen"
-            @back="handleClose"
-            @fit="handleToolbarFit"
-            @actual="handleToolbarActual"
-            @zoom-in="handleToolbarZoomIn"
-            @zoom-out="handleToolbarZoomOut"
-            @rotate="handleToolbarRotate"
-            @toggle-filmstrip="handleToolbarToggleFilmstrip"
-            @toggle-details="handleToolbarToggleDetails"
-            @toggle-immersive="handleToolbarToggleImmersive"
-          />
+          <div
+            v-if="isLightboxChromeVisible && !isClosing"
+            class="pointer-events-auto absolute inset-x-0 top-0 z-30"
+          >
+            <LightboxToolbar
+              :compressed="isToolbarCompressed"
+              :details-open="mobileDetailsOpen"
+              @back="handleClose"
+              @fit="handleToolbarFit"
+              @actual="handleToolbarActual"
+              @zoom-in="handleToolbarZoomIn"
+              @zoom-out="handleToolbarZoomOut"
+              @rotate="handleToolbarRotate"
+              @toggle-filmstrip="handleToolbarToggleFilmstrip"
+              @toggle-details="handleToolbarToggleDetails"
+              @toggle-immersive="handleToolbarToggleImmersive"
+            />
+          </div>
         </Transition>
 
-        <ContextMenu v-if="currentAsset && !isTouchInput">
-          <ContextMenuTrigger as-child>
+        <ContextMenu v-if="currentAsset">
+          <ContextMenuTrigger as-child :disabled="isTouchInput">
             <div
-              class="relative min-h-0 flex-1 transition-opacity duration-[180ms]"
+              class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
               :class="isClosing ? 'opacity-0' : 'opacity-100'"
-              @contextmenu="handleImageContextMenu"
+              @contextmenu.capture="handleMediaContextMenu"
               @wheel="handleMediaWheel"
             >
               <!-- Pager 负责媒体轨道，按钮保持在轨道外，避免随页面一起移动。 -->
-              <LightboxPager ref="lightboxPagerRef" />
+              <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
               <LightboxNavigationButtons
                 :can-previous="canGoToPrevious"
                 :can-next="canGoToNext"
@@ -554,12 +647,12 @@ useEventListener(window, 'keydown', handleKeydown)
         </ContextMenu>
         <div
           v-else
-          class="relative min-h-0 flex-1 transition-opacity duration-[180ms]"
+          class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
           :class="isClosing ? 'opacity-0' : 'opacity-100'"
           @contextmenu.prevent.stop
           @wheel="handleMediaWheel"
         >
-          <LightboxPager ref="lightboxPagerRef" />
+          <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
           <LightboxNavigationButtons
             :can-previous="canGoToPrevious"
             :can-next="canGoToNext"
@@ -568,24 +661,47 @@ useEventListener(window, 'keydown', handleKeydown)
           />
         </div>
 
-        <GalleryMobileActionBar v-if="isTouchInput && !isClosing" />
+        <!-- 底部 chrome 叠放在媒体上；触摸操作栏位于最底部，胶片栏位于其上方。 -->
+        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col-reverse">
+          <Transition
+            appear
+            enter-active-class="transition-all duration-300"
+            enter-from-class="translate-y-full opacity-0"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition-all duration-300"
+            leave-from-class="translate-y-0 opacity-100"
+            leave-to-class="translate-y-full opacity-0"
+          >
+            <div
+              v-if="isLightboxChromeVisible && isTouchInput && !isClosing"
+              class="pointer-events-auto shrink-0"
+            >
+              <GalleryMobileActionBar />
+            </div>
+          </Transition>
 
-        <Transition
-          appear
-          enter-active-class="transition-all duration-300"
-          enter-from-class="translate-y-full opacity-0"
-          enter-to-class="translate-y-0 opacity-100"
-          leave-active-class="transition-all duration-300"
-          leave-from-class="translate-y-0 opacity-100"
-          leave-to-class="translate-y-full opacity-0"
-        >
-          <LightboxFilmstrip v-if="showFilmstrip && !isClosing" />
-        </Transition>
+          <Transition
+            appear
+            enter-active-class="transition-all duration-300"
+            enter-from-class="translate-y-full opacity-0"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition-all duration-300"
+            leave-from-class="translate-y-0 opacity-100"
+            leave-to-class="translate-y-full opacity-0"
+          >
+            <div
+              v-if="isLightboxChromeVisible && showFilmstrip && !isClosing"
+              class="pointer-events-auto shrink-0"
+            >
+              <LightboxFilmstrip />
+            </div>
+          </Transition>
+        </div>
 
         <Transition name="gallery-mobile-details">
           <div
             v-if="isToolbarCompressed && mobileDetailsOpen && !isClosing"
-            class="absolute inset-0 z-20 flex items-end"
+            class="absolute inset-0 z-40 flex items-end"
             role="dialog"
             aria-modal="true"
             :aria-label="t('gallery.details.title')"

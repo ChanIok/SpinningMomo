@@ -161,11 +161,7 @@ function handleVideoLoadedData() {
 
 <template>
   <div class="relative h-full w-full">
-    <div
-      ref="viewportRef"
-      class="lightbox-video-viewport h-full w-full"
-      style="touch-action: pan-y"
-    >
+    <div ref="viewportRef" class="lightbox-video-viewport h-full w-full">
       <div class="flex h-full w-full items-center justify-center">
         <div
           v-if="currentAsset && !videoError"

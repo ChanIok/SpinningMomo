@@ -212,12 +212,7 @@ watch(
     const viewerEl = viewerRef.value
     if (!viewerEl) return
     const containerRect = viewerEl.getBoundingClientRect()
-    const toRect = computeLightboxHeroRect(
-      containerRect,
-      hero.width,
-      hero.height,
-      store.isCompactWindow ? false : store.lightbox.showFilmstrip
-    )
+    const toRect = computeLightboxHeroRect(containerRect, hero.width, hero.height)
 
     heroOverlay.value = { thumbnailUrl: hero.thumbnailUrl, toRect }
     heroOverlayStyle.value = rectToFixedStyle(hero.rect, 'none')

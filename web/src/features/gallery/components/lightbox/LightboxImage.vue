@@ -5,6 +5,7 @@ import { galleryApi } from '../../api'
 import { useGalleryData, useGalleryLightbox } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
+import { isGalleryTouchInput, normalizeGalleryInputType } from '../../input'
 import { useI18n } from '@/composables/useI18n'
 
 const VIEWPORT_PADDING = 0
@@ -14,6 +15,15 @@ const FIT_MODE_SNAP_RATIO = 1.02
 const DRAG_THRESHOLD = 4
 const MIN_ACTUAL_ZOOM = 0.05
 const MAX_ACTUAL_ZOOM = 5
+/** 触摸双击缩放的过渡时长；桌面点击不使用这段动画。 */
+const TOUCH_ZOOM_ANIMATION_DURATION_MS = 240
+// 只用松手前一小段轨迹估算触摸平移速度，避免把停顿前的慢速拖动带入惯性。
+const PAN_VELOCITY_WINDOW_MS = 100
+// 低于这个速度时直接停下，避免尾端出现看不见但持续占用 RAF 的微小移动。
+const PAN_INERTIA_MIN_VELOCITY = 30
+// 每 16.67ms 保留约 92% 的速度，形成自然的减速尾巴。
+const PAN_INERTIA_DECAY = 0.92
+const PAN_INERTIA_MAX_DURATION_MS = 900
 
 interface ZoomAnchor {
   pointerX: number
@@ -21,6 +31,25 @@ interface ZoomAnchor {
   imageX: number
   imageY: number
 }
+
+interface StagePoint {
+  x: number
+  y: number
+}
+
+interface TouchPointer {
+  pointerId: number
+  clientX: number
+  clientY: number
+}
+
+interface PanSample {
+  x: number
+  y: number
+  time: number
+}
+
+type TouchPointerPair = readonly [TouchPointer, TouchPointer]
 
 const { t } = useI18n()
 const store = useGalleryStore()
@@ -47,9 +76,24 @@ const dragStartY = ref(0)
 const dragStartScrollLeft = ref(0)
 const dragStartScrollTop = ref(0)
 const dragMoved = ref(false)
-// 拖拽结束后屏蔽紧随而来的 click 事件，防止误触切换缩放模式
+const panSamples: PanSample[] = []
+let panAnimationFrame: number | null = null
+let panAnimationToken = 0
+// 鼠标拖拽结束后屏蔽紧随而来的 click，触摸手势由 Pager 统一处理。
 const suppressStageClick = ref(false)
-let suppressClickResetTimer: number | null = null
+let suppressStageClickResetTimer: number | null = null
+const pinchActive = ref(false)
+let pinchStartDistance = 0
+let pinchStartScale = 1
+let pinchAnchorImageX = 0
+let pinchAnchorImageY = 0
+let pinchAnimationFrame: number | null = null
+let zoomRenderToken = 0
+let pinchFinishing = false
+let pinchPointerPair: TouchPointerPair | null = null
+let touchZoomAnimationFrame: number | null = null
+let touchZoomAnimationToken = 0
+const touchZoomStageOffset = ref<StagePoint | null>(null)
 
 const { width, height } = useElementSize(viewportRef)
 
@@ -204,7 +248,9 @@ const stageStyle = computed(() => ({
   width: `${renderWidth.value}px`,
   height: `${renderHeight.value}px`,
   cursor: stageCursor.value,
-  touchAction: isPannable.value ? 'none' : 'auto',
+  transform: touchZoomStageOffset.value
+    ? `translate3d(${touchZoomStageOffset.value.x}px, ${touchZoomStageOffset.value.y}px, 0)`
+    : undefined,
 }))
 
 const imageLayerStyle = computed(() => {
@@ -261,8 +307,9 @@ async function commitDisplayAsset(assetId: number) {
   originalLoaded.value = false
   imageError.value = false
   // 切图时清掉旧图的平移和 click 抑制状态，避免把上一张图的交互带过来。
+  resetPinchTracking()
   resetPointerState()
-  suppressStageClick.value = false
+  clearStageClickSuppression()
 
   await nextTick()
   // 等 viewport 重新布局后再校正滚动位置。
@@ -280,6 +327,9 @@ watch(
   async ({ targetId, activeIndex }) => {
     if (activeIndex === undefined) {
       // 灯箱关闭或没有焦点时清空当前渲染对象。
+      resetPinchTracking()
+      resetPointerState()
+      clearStageClickSuppression()
       displayAssetId.value = null
       return
     }
@@ -338,8 +388,9 @@ watch(
   () => normalizedRotationDegrees.value,
   async () => {
     // 旋转会改变画布尺寸，先清理拖拽，再按新尺寸校正位置。
+    resetPinchTracking()
     resetPointerState()
-    suppressStageClick.value = false
+    clearStageClickSuppression()
 
     await nextTick()
     syncViewportPosition()
@@ -379,6 +430,122 @@ function setViewportScroll(left: number, top: number) {
 
   viewport.scrollLeft = clamp(left, 0, Math.max(viewport.scrollWidth - viewport.clientWidth, 0))
   viewport.scrollTop = clamp(top, 0, Math.max(viewport.scrollHeight - viewport.clientHeight, 0))
+}
+
+function cancelPanInertia() {
+  if (panAnimationFrame !== null) {
+    cancelAnimationFrame(panAnimationFrame)
+    panAnimationFrame = null
+  }
+
+  panAnimationToken += 1
+  panSamples.length = 0
+}
+
+function getPanSampleTime(event: PointerEvent): number {
+  return Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now()
+}
+
+function recordPanSample(event: PointerEvent) {
+  const time = getPanSampleTime(event)
+  panSamples.push({ x: event.clientX, y: event.clientY, time })
+
+  const cutoff = time - PAN_VELOCITY_WINDOW_MS
+  while (panSamples.length > 1 && panSamples[1].time < cutoff) {
+    panSamples.shift()
+  }
+}
+
+function getPanVelocity() {
+  if (panSamples.length < 2) {
+    return { x: 0, y: 0 }
+  }
+
+  const first = panSamples[0]
+  const last = panSamples[panSamples.length - 1]
+  const elapsed = last.time - first.time
+  if (elapsed <= 0) {
+    return { x: 0, y: 0 }
+  }
+
+  // viewport 的滚动方向与手指移动方向相反。
+  return {
+    x: ((first.x - last.x) / elapsed) * 1000,
+    y: ((first.y - last.y) / elapsed) * 1000,
+  }
+}
+
+function startPanInertia(initialVelocityX: number, initialVelocityY: number) {
+  cancelPanInertia()
+
+  if (!viewportRef.value || !isPannable.value) {
+    return
+  }
+
+  let velocityX = initialVelocityX
+  let velocityY = initialVelocityY
+  if (Math.hypot(velocityX, velocityY) < PAN_INERTIA_MIN_VELOCITY) {
+    return
+  }
+
+  const token = panAnimationToken
+  const startedAt = performance.now()
+  let previousTime = startedAt
+
+  const animate = (now: number) => {
+    if (token !== panAnimationToken) {
+      return
+    }
+
+    const viewport = viewportRef.value
+    if (!viewport || !isPannable.value) {
+      panAnimationFrame = null
+      return
+    }
+
+    const elapsed = clamp(now - previousTime, 1, 32)
+    previousTime = now
+
+    const maxScrollLeft = Math.max(viewport.scrollWidth - viewport.clientWidth, 0)
+    const maxScrollTop = Math.max(viewport.scrollHeight - viewport.clientHeight, 0)
+    const nextScrollLeft = clamp(
+      viewport.scrollLeft + (velocityX * elapsed) / 1000,
+      0,
+      maxScrollLeft
+    )
+    const nextScrollTop = clamp(viewport.scrollTop + (velocityY * elapsed) / 1000, 0, maxScrollTop)
+
+    viewport.scrollLeft = nextScrollLeft
+    viewport.scrollTop = nextScrollTop
+
+    // 到达边界后只停止撞向边界的轴，另一轴仍可继续惯性移动。
+    if (
+      (nextScrollLeft === 0 && velocityX < 0) ||
+      (nextScrollLeft === maxScrollLeft && velocityX > 0)
+    ) {
+      velocityX = 0
+    }
+    if (
+      (nextScrollTop === 0 && velocityY < 0) ||
+      (nextScrollTop === maxScrollTop && velocityY > 0)
+    ) {
+      velocityY = 0
+    }
+
+    const decay = Math.pow(PAN_INERTIA_DECAY, elapsed / 16.67)
+    velocityX *= decay
+    velocityY *= decay
+
+    const expired = now - startedAt >= PAN_INERTIA_MAX_DURATION_MS
+    if (expired || Math.hypot(velocityX, velocityY) < PAN_INERTIA_MIN_VELOCITY) {
+      panAnimationFrame = null
+      return
+    }
+
+    panAnimationFrame = requestAnimationFrame(animate)
+  }
+
+  panAnimationFrame = requestAnimationFrame(animate)
 }
 
 function getCurrentScale(): number {
@@ -450,8 +617,89 @@ function getZoomAnchor(clientX: number, clientY: number, scale: number): ZoomAnc
   }
 }
 
-async function restoreZoomAnchor(anchor: ZoomAnchor, scale: number) {
+function getStageViewportPosition(): StagePoint | null {
+  const viewport = viewportRef.value
+  const stage = stageRef.value
+  if (!viewport || !stage) {
+    return null
+  }
+
+  const viewportRect = viewport.getBoundingClientRect()
+  const stageRect = stage.getBoundingClientRect()
+  return {
+    x: stageRect.left - viewportRect.left,
+    y: stageRect.top - viewportRect.top,
+  }
+}
+
+function getZoomLayout(scale: number) {
+  const renderWidth = Math.max(visualImageWidth.value * scale, 1)
+  const renderHeight = Math.max(visualImageHeight.value * scale, 1)
+  const canvasContentWidth = Math.max(renderWidth, viewportInnerWidth.value)
+  const canvasContentHeight = Math.max(renderHeight, viewportInnerHeight.value)
+
+  return {
+    renderWidth,
+    renderHeight,
+    stageOffsetLeft: VIEWPORT_PADDING + (canvasContentWidth - renderWidth) / 2,
+    stageOffsetTop: VIEWPORT_PADDING + (canvasContentHeight - renderHeight) / 2,
+    maxScrollLeft: Math.max(canvasContentWidth - viewportInnerWidth.value, 0),
+    maxScrollTop: Math.max(canvasContentHeight - viewportInnerHeight.value, 0),
+  }
+}
+
+function getNormalStageViewportPosition(scale: number): StagePoint | null {
+  const viewport = viewportRef.value
+  if (!viewport) {
+    return null
+  }
+
+  const layout = getZoomLayout(scale)
+  return {
+    x: layout.stageOffsetLeft - viewport.scrollLeft,
+    y: layout.stageOffsetTop - viewport.scrollTop,
+  }
+}
+
+function constrainStagePosition(position: number, imageSize: number, viewportSize: number): number {
+  if (imageSize <= viewportSize) {
+    return (viewportSize - imageSize) / 2
+  }
+
+  return clamp(position, viewportSize - imageSize, 0)
+}
+
+// 计算动画终点；图片小于视口时保持适屏居中，大于视口时才允许在边界内平移。
+function getTouchZoomTargetPosition(anchor: ZoomAnchor, scale: number): StagePoint {
+  const layout = getZoomLayout(scale)
+  return {
+    x: constrainStagePosition(
+      anchor.pointerX - anchor.imageX * scale,
+      layout.renderWidth,
+      availableWidth.value
+    ),
+    y: constrainStagePosition(
+      anchor.pointerY - anchor.imageY * scale,
+      layout.renderHeight,
+      availableHeight.value
+    ),
+  }
+}
+
+function getScrollForStagePosition(position: StagePoint, scale: number) {
+  const layout = getZoomLayout(scale)
+  return {
+    left: clamp(layout.stageOffsetLeft - position.x, 0, layout.maxScrollLeft),
+    top: clamp(layout.stageOffsetTop - position.y, 0, layout.maxScrollTop),
+  }
+}
+
+async function restoreZoomAnchor(anchor: ZoomAnchor, scale: number, renderToken?: number) {
   await nextTick()
+
+  if (renderToken !== undefined && renderToken !== zoomRenderToken) {
+    return
+  }
 
   const viewport = viewportRef.value
   const stage = stageRef.value
@@ -470,8 +718,167 @@ async function restoreZoomAnchor(anchor: ZoomAnchor, scale: number) {
   )
 }
 
+function isTouchPointerEvent(event: PointerEvent): boolean {
+  return isGalleryTouchInput(normalizeGalleryInputType(event.pointerType))
+}
+
+function getPinchDistance(first: TouchPointer, second: TouchPointer): number {
+  return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)
+}
+
+function getPinchCenter(
+  first: TouchPointer,
+  second: TouchPointer
+): { clientX: number; clientY: number } {
+  return {
+    clientX: (first.clientX + second.clientX) / 2,
+    clientY: (first.clientY + second.clientY) / 2,
+  }
+}
+
+function getViewportRelativePoint(clientX: number, clientY: number) {
+  const viewport = viewportRef.value
+  if (!viewport) {
+    return null
+  }
+
+  const rect = viewport.getBoundingClientRect()
+  return {
+    pointerX: clamp(clientX - rect.left, 0, rect.width),
+    pointerY: clamp(clientY - rect.top, 0, rect.height),
+  }
+}
+
+function cancelPinchAnimation() {
+  if (pinchAnimationFrame !== null) {
+    cancelAnimationFrame(pinchAnimationFrame)
+    pinchAnimationFrame = null
+  }
+}
+
+function cancelTouchZoomAnimation() {
+  if (touchZoomAnimationFrame !== null) {
+    cancelAnimationFrame(touchZoomAnimationFrame)
+    touchZoomAnimationFrame = null
+  }
+
+  touchZoomAnimationToken += 1
+  zoomRenderToken += 1
+  touchZoomStageOffset.value = null
+}
+
+// 清除图片缩放手势的异步帧和基准，切图或组件卸载时不能把旧缩放带到下一张图。
+function resetPinchTracking() {
+  cancelPanInertia()
+  cancelPinchAnimation()
+  cancelTouchZoomAnimation()
+  pinchActive.value = false
+  pinchPointerPair = null
+  pinchStartDistance = 0
+  pinchStartScale = 1
+  pinchAnchorImageX = 0
+  pinchAnchorImageY = 0
+  pinchFinishing = false
+}
+
+// 根据双指当前距离和中心位置，更新缩放比例并保持初始锚点跟随双指中心。
+async function applyPinchScale(pair: TouchPointerPair | null) {
+  if (pinchFinishing || !pinchActive.value || !displayAsset.value || imageError.value || !pair) {
+    return
+  }
+
+  const center = getPinchCenter(pair[0], pair[1])
+  const viewportPoint = getViewportRelativePoint(center.clientX, center.clientY)
+  if (!viewportPoint || pinchStartDistance <= 0) {
+    return
+  }
+
+  const distance = Math.max(getPinchDistance(pair[0], pair[1]), 1)
+  const targetScale = clampActualZoom(pinchStartScale * (distance / pinchStartDistance))
+  const renderToken = ++zoomRenderToken
+  const anchor: ZoomAnchor = {
+    ...viewportPoint,
+    imageX: pinchAnchorImageX,
+    imageY: pinchAnchorImageY,
+  }
+
+  lightbox.setActualZoom(targetScale)
+  await restoreZoomAnchor(anchor, targetScale, renderToken)
+}
+
+function schedulePinchUpdate() {
+  if (pinchFinishing || pinchAnimationFrame !== null) {
+    return
+  }
+
+  pinchAnimationFrame = requestAnimationFrame(() => {
+    pinchAnimationFrame = null
+    void applyPinchScale(pinchPointerPair)
+  })
+}
+
+function beginPinch(pointers: TouchPointerPair) {
+  if (pinchFinishing || !displayAsset.value || imageError.value || !hasImageDimensions.value) {
+    return
+  }
+
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
+  const center = getPinchCenter(pointers[0], pointers[1])
+  const distance = Math.max(getPinchDistance(pointers[0], pointers[1]), 1)
+  const startScale = clampActualZoom(getCurrentScale())
+  const anchor = getZoomAnchor(center.clientX, center.clientY, startScale)
+
+  zoomRenderToken += 1
+  pinchPointerPair = pointers
+  pinchFinishing = false
+  pinchActive.value = true
+  pinchStartDistance = distance
+  pinchStartScale = startScale
+  pinchAnchorImageX = anchor?.imageX ?? visualImageWidth.value / 2
+  pinchAnchorImageY = anchor?.imageY ?? visualImageHeight.value / 2
+  // contain 模式切到 actual，但沿用同一个比例，避免双指刚落下时跳变。
+  lightbox.setActualZoom(startScale)
+}
+
+function updatePinch(pointers: TouchPointerPair) {
+  if (!pinchActive.value) {
+    return
+  }
+
+  pinchPointerPair = [pointers[0], pointers[1]]
+  schedulePinchUpdate()
+}
+
+// 双指结束后固定最终比例；剩余指针不会自动转成平移，避免手势状态再次分叉。
+async function endPinch() {
+  if (pinchFinishing) {
+    return
+  }
+
+  pinchFinishing = true
+  cancelPinchAnimation()
+  zoomRenderToken += 1
+
+  const finalScale = clampActualZoom(getCurrentScale())
+  if (finalScale <= fitScale.value * FIT_MODE_SNAP_RATIO) {
+    await showFitMode()
+  } else {
+    lightbox.setActualZoom(finalScale)
+    await nextTick()
+    clampViewportScroll()
+  }
+
+  pinchActive.value = false
+  pinchPointerPair = null
+  pinchStartDistance = 0
+  pinchFinishing = false
+}
+
 // 切回适屏模式并把内部 viewport 归零。
 async function showFitMode() {
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
   lightbox.showFitMode()
   await nextTick()
   syncViewportPosition()
@@ -484,6 +891,9 @@ async function zoomToScaleAtPoint(
   clientY: number,
   options: { snapToFit?: boolean } = {}
 ) {
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
+
   if (!displayAsset.value || imageError.value || !hasImageDimensions.value) {
     return
   }
@@ -512,6 +922,8 @@ async function zoomToScaleAtPoint(
 
 // 在视口中心执行缩放；没有可用 viewport 时退化为直接设置比例。
 async function zoomToScaleAtCenter(targetScale: number, options: { snapToFit?: boolean } = {}) {
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
   const center = getViewportCenterClientPoint()
   if (!center) {
     if ((options.snapToFit ?? true) && targetScale <= fitScale.value * FIT_MODE_SNAP_RATIO) {
@@ -533,6 +945,111 @@ async function showActualSizeAtPoint(clientX: number, clientY: number) {
   await zoomToScaleAtPoint(1, clientX, clientY, { snapToFit: false })
 }
 
+// 触摸双击专用的平滑缩放；桌面点击继续使用上面的即时切换路径。
+async function animateTouchZoomAtPoint(clientX: number, clientY: number) {
+  if (!displayAsset.value || imageError.value || !hasImageDimensions.value) {
+    cancelPanInertia()
+    cancelTouchZoomAnimation()
+    return
+  }
+
+  const isFitting = fitMode.value === 'contain'
+  const startScale = clampActualZoom(getCurrentScale())
+  const targetScale = clampActualZoom(isFitting ? 1 : fitScale.value)
+  const anchor = getZoomAnchor(clientX, clientY, startScale)
+  const startPosition = getStageViewportPosition()
+
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
+
+  const animationToken = ++touchZoomAnimationToken
+  const renderToken = ++zoomRenderToken
+  const targetPosition = anchor ? getTouchZoomTargetPosition(anchor, targetScale) : null
+
+  if (isFitting) {
+    // 先切到 actual 但沿用适屏比例，动画开始时不会发生跳变。
+    lightbox.setActualZoom(startScale)
+  }
+
+  if (Math.abs(targetScale - startScale) < 0.001) {
+    if (isFitting) {
+      lightbox.setActualZoom(targetScale)
+      await nextTick()
+      if (animationToken === touchZoomAnimationToken && renderToken === zoomRenderToken) {
+        syncViewportPosition()
+      }
+    } else {
+      await showFitMode()
+    }
+    return
+  }
+
+  const startedAt = performance.now()
+  const animate = async (now: number) => {
+    if (animationToken !== touchZoomAnimationToken) {
+      return
+    }
+
+    const progress = clamp((now - startedAt) / TOUCH_ZOOM_ANIMATION_DURATION_MS, 0, 1)
+    const easedProgress = 1 - Math.pow(1 - progress, 3)
+    const scale = startScale + (targetScale - startScale) * easedProgress
+    const position =
+      startPosition && targetPosition
+        ? {
+            x: startPosition.x + (targetPosition.x - startPosition.x) * easedProgress,
+            y: startPosition.y + (targetPosition.y - startPosition.y) * easedProgress,
+          }
+        : null
+
+    lightbox.setActualZoom(scale)
+    await nextTick()
+    if (renderToken !== zoomRenderToken) {
+      return
+    }
+
+    if (position) {
+      const normalPosition = getNormalStageViewportPosition(scale)
+      if (!normalPosition) {
+        return
+      }
+
+      // 动画期间用视觉位移覆盖 Grid 的居中布局，缩放和位移沿同一进度运行。
+      touchZoomStageOffset.value = {
+        x: position.x - normalPosition.x,
+        y: position.y - normalPosition.y,
+      }
+    } else {
+      touchZoomStageOffset.value = null
+      syncViewportPosition()
+    }
+
+    if (animationToken !== touchZoomAnimationToken || renderToken !== zoomRenderToken) {
+      return
+    }
+
+    if (progress < 1) {
+      touchZoomAnimationFrame = requestAnimationFrame(animate)
+      return
+    }
+
+    touchZoomAnimationFrame = null
+    if (isFitting) {
+      if (targetPosition) {
+        const finalScroll = getScrollForStagePosition(targetPosition, targetScale)
+        setViewportScroll(finalScroll.left, finalScroll.top)
+      } else {
+        syncViewportPosition()
+      }
+      // 把动画中的视觉位置提交给正常滚动状态，再移除临时位移。
+      touchZoomStageOffset.value = null
+    } else {
+      await showFitMode()
+    }
+  }
+
+  touchZoomAnimationFrame = requestAnimationFrame(animate)
+}
+
 // 在视口中心切换到 1:1。
 async function showActualSize() {
   await zoomToScaleAtCenter(1, { snapToFit: false })
@@ -548,26 +1065,90 @@ async function zoomOut() {
   await zoomToScaleAtCenter(getCurrentScale() / ZOOM_STEP)
 }
 
-// 屏蔽图片拖拽后的合成 click，避免误触缩放模式。
-function scheduleSuppressClickReset() {
-  if (suppressClickResetTimer !== null) {
-    window.clearTimeout(suppressClickResetTimer)
+// 屏蔽鼠标拖拽后的合成 click，触摸 click 由 Pager 统一拦截。
+function scheduleStageClickSuppression(delayMs = 350) {
+  suppressStageClick.value = true
+  if (suppressStageClickResetTimer !== null) {
+    window.clearTimeout(suppressStageClickResetTimer)
   }
 
-  suppressClickResetTimer = window.setTimeout(() => {
+  suppressStageClickResetTimer = window.setTimeout(() => {
     suppressStageClick.value = false
-    suppressClickResetTimer = null
-  }, 0)
+    suppressStageClickResetTimer = null
+  }, delayMs)
 }
 
-// 清除图片内部平移 pointer，并在需要时释放 stage 的捕获。
+function clearStageClickSuppression() {
+  suppressStageClick.value = false
+  if (suppressStageClickResetTimer !== null) {
+    window.clearTimeout(suppressStageClickResetTimer)
+    suppressStageClickResetTimer = null
+  }
+}
+
+// 清除图片内部平移 pointer；触摸 pointer 的捕获由 Pager 统一管理。
 function resetPointerState(pointerId?: number) {
-  if (pointerId !== undefined && stageRef.value?.hasPointerCapture(pointerId)) {
-    stageRef.value.releasePointerCapture(pointerId)
+  const pointerToRelease = pointerId ?? activePointerId.value
+  if (pointerToRelease !== null && stageRef.value?.hasPointerCapture(pointerToRelease)) {
+    stageRef.value.releasePointerCapture(pointerToRelease)
   }
 
   activePointerId.value = null
   dragMoved.value = false
+}
+
+// Pager 确认单指已经进入平移后，从这里接管图片 viewport 的滚动基准。
+function beginPan(event: PointerEvent) {
+  const viewport = viewportRef.value
+  if (!displayAsset.value || imageError.value || !isPannable.value || !viewport) {
+    return
+  }
+
+  cancelPanInertia()
+  cancelTouchZoomAnimation()
+  resetPointerState()
+  activePointerId.value = event.pointerId
+  dragStartX.value = event.clientX
+  dragStartY.value = event.clientY
+  dragStartScrollLeft.value = viewport.scrollLeft
+  dragStartScrollTop.value = viewport.scrollTop
+  dragMoved.value = false
+  panSamples.length = 0
+  recordPanSample(event)
+}
+
+function movePan(event: PointerEvent) {
+  if (activePointerId.value !== event.pointerId || !viewportRef.value) {
+    return
+  }
+
+  recordPanSample(event)
+  const deltaX = event.clientX - dragStartX.value
+  const deltaY = event.clientY - dragStartY.value
+  if (!dragMoved.value && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
+    dragMoved.value = true
+  }
+
+  setViewportScroll(dragStartScrollLeft.value - deltaX, dragStartScrollTop.value - deltaY)
+}
+
+// 正常抬指时根据最近轨迹启动惯性；Pager 负责把取消路径转给 cancelPan。
+function endPan(event: PointerEvent) {
+  if (activePointerId.value !== event.pointerId) {
+    cancelPanInertia()
+    resetPointerState()
+    return
+  }
+
+  recordPanSample(event)
+  const velocity = dragMoved.value ? getPanVelocity() : { x: 0, y: 0 }
+  resetPointerState(event.pointerId)
+  startPanInertia(velocity.x, velocity.y)
+}
+
+function cancelPan() {
+  cancelPanInertia()
+  resetPointerState()
 }
 
 // 原图加载完成后再显示原图层，缩略图作为过渡底图保持稳定。
@@ -614,6 +1195,9 @@ async function tryAutoRecoverByReload() {
 
 // 原图加载失败时尝试确认文件可达，并通过一次带参数的 reload 恢复映射。
 function handleImageError() {
+  resetPinchTracking()
+  resetPointerState()
+  clearStageClickSuppression()
   imageError.value = true
 
   void tryAutoRecoverByReload().catch((error) => {
@@ -621,10 +1205,10 @@ function handleImageError() {
   })
 }
 
-// 点击图片在适屏和实际大小之间切换；滑动产生的 click 会被前置拦截。
+// Pager 已经处理触摸轻点；这里仅保留桌面鼠标点击的适屏/实际大小切换。
 async function handleStageClick(event: MouseEvent) {
   if (suppressStageClick.value) {
-    suppressStageClick.value = false
+    clearStageClickSuppression()
     return
   }
 
@@ -640,8 +1224,12 @@ async function handleStageClick(event: MouseEvent) {
   await showFitMode()
 }
 
-// 只有图片处于可平移放大状态时，才由图片自己的拖拽逻辑接管 pointer。
+// 图片平移只保留桌面鼠标路径；触摸平移由 Pager 转发到 beginPan/movePan/endPan。
 function handleStagePointerDown(event: PointerEvent) {
+  if (isTouchPointerEvent(event)) {
+    return
+  }
+
   if (event.button !== 0 || !isPannable.value || !viewportRef.value || !stageRef.value) {
     return
   }
@@ -652,14 +1240,18 @@ function handleStagePointerDown(event: PointerEvent) {
   dragStartScrollLeft.value = viewportRef.value.scrollLeft
   dragStartScrollTop.value = viewportRef.value.scrollTop
   dragMoved.value = false
-  suppressStageClick.value = false
+  clearStageClickSuppression()
   // 放大图片需要稳定捕获 pointer，避免拖出 stage 后丢失移动事件。
   stageRef.value.setPointerCapture(event.pointerId)
   event.preventDefault()
 }
 
-// 将手指位移转换成 viewport 的反向滚动。
+// 将鼠标位移转换成 viewport 的反向滚动。
 function handleStagePointerMove(event: PointerEvent) {
+  if (isTouchPointerEvent(event)) {
+    return
+  }
+
   if (activePointerId.value !== event.pointerId || !viewportRef.value) {
     return
   }
@@ -676,13 +1268,16 @@ function handleStagePointerMove(event: PointerEvent) {
 
 // 结束图片平移；真正发生位移时屏蔽后续 click。
 function handleStagePointerUp(event: PointerEvent) {
+  if (isTouchPointerEvent(event)) {
+    return
+  }
+
   if (activePointerId.value !== event.pointerId) {
     return
   }
 
   if (dragMoved.value) {
-    suppressStageClick.value = true
-    scheduleSuppressClickReset()
+    scheduleStageClickSuppression()
   }
 
   resetPointerState(event.pointerId)
@@ -690,20 +1285,27 @@ function handleStagePointerUp(event: PointerEvent) {
 
 // 系统取消图片平移时同样清理 pointer 状态。
 function handleStagePointerCancel(event: PointerEvent) {
+  if (isTouchPointerEvent(event)) {
+    return
+  }
+
   if (activePointerId.value !== event.pointerId) {
     return
   }
 
   if (dragMoved.value) {
-    suppressStageClick.value = true
-    scheduleSuppressClickReset()
+    scheduleStageClickSuppression()
   }
 
   resetPointerState(event.pointerId)
 }
 
-// 图片 stage 丢失捕获时清除本地拖拽状态。
+// 图片 stage 丢失捕获时清除本地鼠标拖拽状态。
 function handleStageLostPointerCapture(event: PointerEvent) {
+  if (isTouchPointerEvent(event)) {
+    return
+  }
+
   if (activePointerId.value === event.pointerId) {
     resetPointerState()
   }
@@ -734,24 +1336,31 @@ function handleViewportWheel(event: WheelEvent) {
 defineExpose({
   showFitMode,
   showActualSize,
+  animateTouchZoomAtPoint,
   zoomIn,
   zoomOut,
+  beginPan,
+  movePan,
+  endPan,
+  cancelPan,
+  beginPinch,
+  updatePinch,
+  endPinch,
 })
 
 onUnmounted(() => {
-  // 组件卸载后不再执行 click 抑制定时器。
-  if (suppressClickResetTimer !== null) {
-    window.clearTimeout(suppressClickResetTimer)
-  }
+  // 组件卸载后不再执行缩放动画或 click 抑制定时器。
+  resetPinchTracking()
+  clearStageClickSuppression()
 })
 </script>
 
 <template>
   <div class="relative h-full w-full overflow-hidden">
+    <!-- Pager 仲裁触摸手势；viewport 只负责承载图片滚动和桌面滚轮。 -->
     <div
       ref="viewportRef"
       class="lightbox-viewport absolute inset-0 z-10 h-full w-full overflow-auto"
-      :style="{ touchAction: isPannable ? 'none' : 'pan-y' }"
       @wheel="handleViewportWheel"
     >
       <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">
@@ -812,6 +1421,8 @@ onUnmounted(() => {
 
 <style scoped>
 .lightbox-viewport {
+  /* 触摸手势由外层 Pager 仲裁，图片平移通过代码修改滚动位置。 */
+  touch-action: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
