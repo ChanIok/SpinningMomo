@@ -13,6 +13,10 @@ import {
   useVisibleAssetTags,
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
+import {
+  isGalleryLightboxOverlay,
+  useGalleryOverlayHistory,
+} from '../../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../../store'
 import { isWebView } from '@/core/env'
 import { isLocalAccess } from '@/core/access'
@@ -35,6 +39,7 @@ import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
+const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
@@ -92,14 +97,33 @@ let isViewerUnmounted = false
 let wheelZoomDelta = 0
 let isRestoringLightbox = false
 
+// 清理旧版恢复参数但保留当前 history state，避免启动恢复时破坏覆盖层历史链。
 function clearLightboxRecoveryParams() {
   const currentUrl = new URL(window.location.href)
   currentUrl.searchParams.delete('lbAssetId')
   currentUrl.searchParams.delete('lbFolderId')
   currentUrl.searchParams.delete('lbRetry')
-  window.history.replaceState({}, '', currentUrl.toString())
+  window.history.replaceState(window.history.state, '', currentUrl.toString())
 }
 
+// 按资产 ID 重建当前查询集中的选择，供前进/后退和页面恢复复用。
+async function restoreLightboxAsset(assetId: number): Promise<boolean> {
+  if (!Number.isInteger(assetId) || assetId <= 0) {
+    return false
+  }
+
+  await galleryData.refreshCurrentQuery()
+  const allAssetIds = await galleryData.queryCurrentAssetIds()
+  const index = allAssetIds.findIndex((id) => id === assetId)
+  if (index < 0) {
+    return false
+  }
+
+  const selectedAsset = await gallerySelection.selectOnlyIndex(index)
+  return Boolean(selectedAsset)
+}
+
+// 兼容外部恢复链接：先恢复筛选和资产，再创建新的暗房历史层。
 async function restoreLightboxFromQuery() {
   const currentUrl = new URL(window.location.href)
   const assetIdRaw = currentUrl.searchParams.get('lbAssetId')
@@ -131,20 +155,15 @@ async function restoreLightboxFromQuery() {
 
   try {
     isRestoringLightbox = true
-    await galleryData.refreshCurrentQuery()
-    const allAssetIds = await galleryData.queryCurrentAssetIds()
-    const index = allAssetIds.findIndex((id) => id === assetId)
-    if (index < 0) {
+    const restored = await restoreLightboxAsset(assetId)
+    if (!restored) {
       clearLightboxRecoveryParams()
       return
     }
 
-    const selectedAsset = await gallerySelection.selectOnlyIndex(index)
-    if (!selectedAsset) {
-      return
-    }
-
     store.openLightbox()
+    // 恢复逻辑成功后再写入覆盖层历史，避免无效资产污染返回栈。
+    await overlayHistory.openLightbox(assetId)
     clearLightboxRecoveryParams()
   } catch (error) {
     console.warn('Failed to restore lightbox state:', error)
@@ -225,6 +244,72 @@ watch(
         heroOverlayStyle.value = rectToFixedStyle(toRect, 'enter')
       })
     })
+  }
+)
+
+let lightboxHistoryRestoreRequest = 0
+
+// 将浏览器历史中的暗房快照还原为 Store 选择，路由变化本身不直接操作界面组件。
+async function syncLightboxFromHistory() {
+  const requestId = ++lightboxHistoryRestoreRequest
+  const snapshot = overlayHistory.snapshot.value
+  if (!isGalleryLightboxOverlay(snapshot.overlay) || snapshot.assetId === undefined) {
+    isRestoringLightbox = false
+    return
+  }
+
+  // URL 仍指向同一资产时只需保持现有暗房，不重复刷新查询结果。
+  if (store.lightbox.isOpen && store.selection.activeAssetId === snapshot.assetId) {
+    return
+  }
+
+  try {
+    isRestoringLightbox = true
+    const restored = await restoreLightboxAsset(snapshot.assetId)
+    if (!restored || requestId !== lightboxHistoryRestoreRequest) {
+      return
+    }
+
+    const currentSnapshot = overlayHistory.snapshot.value
+    if (
+      !isGalleryLightboxOverlay(currentSnapshot.overlay) ||
+      currentSnapshot.assetId !== snapshot.assetId
+    ) {
+      return
+    }
+
+    // 只有异步恢复完成且路由没有再次变化时才打开暗房，避免旧请求覆盖新状态。
+    store.openLightbox()
+  } catch (error) {
+    console.warn('Failed to restore lightbox history state:', error)
+  } finally {
+    if (requestId === lightboxHistoryRestoreRequest) {
+      isRestoringLightbox = false
+    }
+  }
+}
+
+watch(
+  () => [overlayHistory.snapshot.value.overlay, overlayHistory.snapshot.value.assetId] as const,
+  () => {
+    void syncLightboxFromHistory()
+  },
+  { immediate: true }
+)
+
+// 切换图片不增加历史层级，只更新当前条目的资产身份，保证前进时回到最后查看的图片。
+watch(
+  () => store.selection.activeAssetId,
+  (assetId) => {
+    if (
+      assetId === undefined ||
+      !store.lightbox.isOpen ||
+      !isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)
+    ) {
+      return
+    }
+
+    void overlayHistory.replaceLightboxAsset(assetId)
   }
 )
 

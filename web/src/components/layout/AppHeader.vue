@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGalleryStore } from '@/features/gallery/store'
+import { useGalleryOverlayHistory } from '@/features/gallery/composables/useGalleryOverlayHistory'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { call } from '@/core/rpc'
@@ -83,6 +84,7 @@ const overflowingTaskIds = ref<Record<string, boolean>>({})
 const taskMessageElements = new Map<string, HTMLElement>()
 
 const galleryStore = useGalleryStore()
+const overlayHistory = useGalleryOverlayHistory()
 const isSidebarOpen = computed(() => galleryStore.sidebarOpen)
 const isDetailsOpen = computed(() => galleryStore.detailsOpen)
 
@@ -104,7 +106,13 @@ const handleClose = () => {
   })
 }
 
+// 页面级返回先消费图库当前覆盖层；只有图库回到基础状态后才切换到上一级页面。
 const handleBack = () => {
+  if (isGalleryPage.value && overlayHistory.hasOverlay.value) {
+    void overlayHistory.closeTopOverlay()
+    return
+  }
+
   void backWithViewTransition(router, { name: 'home' })
 }
 
@@ -117,7 +125,17 @@ const handleNavigationKeydown = (event: KeyboardEvent) => {
   handleBack()
 }
 
+// 紧凑窗口中的文件夹按钮对应历史层；桌面布局仍只切换持久的侧栏宽度状态。
 const handleToggleSidebar = () => {
+  if (isGalleryPage.value && galleryStore.isCompactWindow) {
+    if (overlayHistory.snapshot.value.overlay === 'folder') {
+      void overlayHistory.closeFolderDrawer()
+    } else {
+      void overlayHistory.openFolderDrawer()
+    }
+    return
+  }
+
   galleryStore.sidebarOpen = !galleryStore.sidebarOpen
 }
 

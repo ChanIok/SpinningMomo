@@ -2,6 +2,10 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useElementSize, useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
+import {
+  isGalleryLightboxOverlay,
+  useGalleryOverlayHistory,
+} from '../../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../../store'
 import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
 import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
@@ -55,11 +59,15 @@ const emit = defineEmits<{
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
+const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
 const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const { width: lightboxWidth } = useElementSize(lightboxRootRef)
-const mobileDetailsOpen = ref(false)
+// 详情抽屉是否打开由历史快照决定，浏览器返回和界面按钮都能驱动同一个状态。
+const mobileDetailsOpen = computed(
+  () => overlayHistory.snapshot.value.overlay === 'lightbox-details'
+)
 // 界面层显隐与沉浸模式分离；触摸轻点只切换 chrome，不改变沉浸模式状态。
 const isLightboxChromeVisible = ref(true)
 let pendingTouchTapTimer: number | null = null
@@ -75,7 +83,8 @@ const { t } = useI18n()
 
 watch(isToolbarCompressed, (compressed) => {
   if (!compressed) {
-    mobileDetailsOpen.value = false
+    // 详情抽屉只属于紧凑工具栏，窗口变宽时同步消费其历史层。
+    closeMobileDetails()
   }
 })
 
@@ -141,6 +150,20 @@ watch(
     isLightboxChromeVisible.value = true
   },
   { immediate: true }
+)
+
+watch(
+  () => overlayHistory.snapshot.value.overlay,
+  (overlay, previousOverlay) => {
+    // 路由先完成历史回退，动画只在真正离开暗房层时启动，避免详情关闭误触发退场。
+    if (
+      isGalleryLightboxOverlay(previousOverlay) &&
+      !isGalleryLightboxOverlay(overlay) &&
+      store.lightbox.isOpen
+    ) {
+      animateClose()
+    }
+  }
 )
 
 function handleLightboxPointerDown(event: PointerEvent) {
@@ -268,9 +291,9 @@ function exitImmersive() {
   lightbox.setImmersive(false)
 }
 
-function handleClose() {
+// 播放暗房退场动画；动画完成后再清理选择，避免反向 hero 动画失去来源卡片。
+function animateClose() {
   clearPendingTouchTap()
-  mobileDetailsOpen.value = false
 
   if (store.lightbox.isClosing) return
   store.setLightboxClosing(true)
@@ -302,6 +325,16 @@ function handleClose() {
       store.clearActiveAsset()
     }
   }, delay)
+}
+
+// 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
+function requestClose() {
+  if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
+    void overlayHistory.closeLightbox()
+    return
+  }
+
+  animateClose()
 }
 
 function handleToolbarFit() {
@@ -343,16 +376,25 @@ function handleToolbarToggleFilmstrip() {
   lightbox.toggleFilmstrip()
 }
 
+// 紧凑工具栏的详情按钮使用独立历史层，不影响暗房本身的返回层级。
 function handleToolbarToggleDetails() {
   if (!isToolbarCompressed.value) {
     return
   }
 
-  mobileDetailsOpen.value = !mobileDetailsOpen.value
+  if (mobileDetailsOpen.value) {
+    // 已打开时回退一层，保留暗房本身的历史项。
+    closeMobileDetails()
+    return
+  }
+
+  // 未打开时新增详情层，让系统返回手势只关闭详情抽屉。
+  void overlayHistory.openLightboxDetails(store.selection.activeAssetId)
 }
 
+// 详情关闭只消费详情层，不直接关闭暗房。
 function closeMobileDetails() {
-  mobileDetailsOpen.value = false
+  void overlayHistory.closeLightboxDetails()
 }
 
 function clearPendingTouchTap() {
@@ -494,6 +536,7 @@ function handleKeydown(event: KeyboardEvent) {
       return
     case 'Escape':
       event.preventDefault()
+      // Escape 按覆盖层层级退出：详情抽屉 -> 沉浸模式 -> 暗房。
       if (mobileDetailsOpen.value) {
         closeMobileDetails()
         return
@@ -502,7 +545,7 @@ function handleKeydown(event: KeyboardEvent) {
         exitImmersive()
         return
       }
-      handleClose()
+      requestClose()
       return
     case 'f':
     case 'F':
@@ -590,7 +633,7 @@ onUnmounted(clearPendingTouchTap)
       class="lightbox-container"
       :class="lightboxRootClass"
       style="--surface-opacity-scale: 0.96"
-      @click.self="handleClose"
+      @click.self="requestClose"
       @pointerdown.capture="handleLightboxPointerDown"
     >
       <div class="relative h-full min-h-0 w-full">
@@ -610,7 +653,7 @@ onUnmounted(clearPendingTouchTap)
             <LightboxToolbar
               :compressed="isToolbarCompressed"
               :details-open="mobileDetailsOpen"
-              @back="handleClose"
+              @back="requestClose"
               @fit="handleToolbarFit"
               @actual="handleToolbarActual"
               @zoom-in="handleToolbarZoomIn"

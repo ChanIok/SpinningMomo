@@ -1,4 +1,5 @@
 import { useGalleryStore } from '../store'
+import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 import { galleryApi } from '../api'
 import type { Asset, ScanAssetsParams } from '../types'
 import { toQueryAssetsFilters } from '../queryFilters'
@@ -11,6 +12,7 @@ import { getDyeCodeAssetIds } from '@/extensions/infinity_nikki/api'
  */
 export function useGalleryData() {
   const store = useGalleryStore()
+  const overlayHistory = useGalleryOverlayHistory()
 
   async function refreshDyeCodeStatuses(assets: Asset[], requestVersion: number) {
     const assetIds = [...new Set(assets.map((asset) => asset.id))]
@@ -163,7 +165,12 @@ export function useGalleryData() {
       }
 
       if (store.lightbox.isOpen) {
-        store.closeLightbox()
+        // 当前资产已从结果集消失，先关闭 URL 暗房层，让浏览器历史和 Store 同步收口。
+        if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
+          void overlayHistory.closeLightbox()
+        } else {
+          store.closeLightbox()
+        }
       }
 
       if (detailsTracksSelection) {

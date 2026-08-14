@@ -1,10 +1,13 @@
 import { useGalleryStore } from '../store'
 import { useGallerySelection } from './useGallerySelection'
+import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 import type { GalleryInputType } from '../input'
 
+// 协调暗房的 Store 状态与 URL 历史，保证打开、切图和关闭由同一条状态链驱动。
 export function useGalleryLightbox() {
   const store = useGalleryStore()
   const gallerySelection = useGallerySelection()
+  const overlayHistory = useGalleryOverlayHistory()
   async function syncLightboxSelection(index: number) {
     if (store.selectedCount > 1) {
       return gallerySelection.activateIndex(index, { syncDetails: true })
@@ -13,6 +16,7 @@ export function useGalleryLightbox() {
     return gallerySelection.selectOnlyIndex(index)
   }
 
+  // 先同步选中资产，再同时打开暗房并写入可返回的历史层。
   async function openLightbox(index: number, inputType: GalleryInputType = 'mouse') {
     const asset = await syncLightboxSelection(index)
     if (!asset) {
@@ -20,6 +24,13 @@ export function useGalleryLightbox() {
     }
 
     store.openLightbox(inputType)
+    try {
+      // 历史写入失败时回滚 Store，避免出现看得见暗房但无法正常返回的半状态。
+      await overlayHistory.openLightbox(asset.id)
+    } catch (error) {
+      console.error('Failed to record lightbox history entry:', error)
+      store.closeLightbox()
+    }
   }
 
   function setImmersive(immersive: boolean) {
@@ -83,7 +94,13 @@ export function useGalleryLightbox() {
     void syncLightboxSelection(index)
   }
 
+  // 有覆盖层历史时通过回退关闭；没有历史时保留 Store 兜底，兼容内部临时状态。
   function closeLightbox() {
+    if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
+      void overlayHistory.closeLightbox()
+      return
+    }
+
     store.closeLightbox()
   }
 

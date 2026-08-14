@@ -9,6 +9,7 @@ import { Split } from '@/components/ui/split'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
 import { useGalleryData } from '../composables/useGalleryData'
+import { useGalleryOverlayHistory } from '../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from '../components/shell/GallerySidebar.vue'
@@ -25,6 +26,7 @@ const COLLAPSE_TRIGGER_PX = 40
 const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
 const galleryStore = useGalleryStore()
+const overlayHistory = useGalleryOverlayHistory()
 const {
   isCompactWindow,
   sidebarOpen: isSidebarOpen,
@@ -83,6 +85,7 @@ function isAtMinSize(size: SplitSize, minPx: number): boolean {
   return px <= minPx + 0.5
 }
 
+// 在窗口模式切换时保存/恢复桌面布局，同时让紧凑窗口的文件夹历史成为显隐来源。
 function syncCompactLayout(compact: boolean) {
   if (compact) {
     if (compactLayoutSnapshot.value) {
@@ -93,7 +96,8 @@ function syncCompactLayout(compact: boolean) {
       sidebarOpen: isSidebarOpen.value,
       detailsOpen: isDetailsOpen.value,
     }
-    isSidebarOpen.value = false
+    // 移动端文件夹抽屉由 URL 历史控制，桌面端原本打开的侧栏只作为布局快照保留。
+    isSidebarOpen.value = overlayHistory.snapshot.value.overlay === 'folder'
     isDetailsOpen.value = false
     return
   }
@@ -103,12 +107,30 @@ function syncCompactLayout(compact: boolean) {
     return
   }
 
-  isSidebarOpen.value = snapshot.sidebarOpen
+  // 离开紧凑布局时恢复桌面状态；若期间停留在 folder 历史层，优先保持抽屉打开。
+  isSidebarOpen.value = snapshot.sidebarOpen || overlayHistory.snapshot.value.overlay === 'folder'
   isDetailsOpen.value = snapshot.detailsOpen
   compactLayoutSnapshot.value = null
 }
 
 watch(isCompactWindow, syncCompactLayout, { immediate: true })
+
+// 文件夹抽屉的可见性由同页历史状态驱动；初始化和桌面布局变化不创建历史条目。
+watch(
+  () => overlayHistory.snapshot.value.overlay,
+  (overlay, previousOverlay) => {
+    const isFolderOverlay = overlay === 'folder'
+    const wasFolderOverlay = previousOverlay === 'folder'
+    if (!isFolderOverlay && !wasFolderOverlay) {
+      return
+    }
+
+    if (isSidebarOpen.value !== isFolderOverlay) {
+      isSidebarOpen.value = isFolderOverlay
+    }
+  },
+  { immediate: true }
+)
 
 const leftMinSize = computed(() => (isSidebarOpen.value ? LEFT_MIN_SIZE : COLLAPSED_SIZE))
 const rightMinSize = computed(() => (isDetailsOpen.value ? RIGHT_MIN_SIZE : COLLAPSED_SIZE))
@@ -275,6 +297,11 @@ function handleRightDragEnd() {
   rightCollapsedByDrag.value = false
 }
 
+// 抽屉关闭必须消费历史条目，不能只修改 store，否则系统返回会再次命中同一层。
+function closeFolderDrawer() {
+  void overlayHistory.closeFolderDrawer()
+}
+
 async function refreshGalleryFromNotification() {
   if (refreshInFlight) {
     refreshQueued = true
@@ -342,7 +369,7 @@ onUnmounted(() => {
               type="button"
               class="absolute inset-0 cursor-default bg-black/50"
               :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-              @click="isSidebarOpen = false"
+              @click="closeFolderDrawer"
             />
 
             <aside
@@ -355,7 +382,7 @@ onUnmounted(() => {
                   size="icon"
                   class="h-10 w-10"
                   :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-                  @click="isSidebarOpen = false"
+                  @click="closeFolderDrawer"
                 >
                   <X class="h-5 w-5" />
                 </Button>
