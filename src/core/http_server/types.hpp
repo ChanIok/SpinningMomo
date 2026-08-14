@@ -40,7 +40,7 @@ struct StreamContext {
   std::vector<char> buffer;
 
   // 状态
-  bool is_aborted;
+  std::shared_ptr<std::atomic_bool> abort_flag;
 };
 
 // 路径解析结果：成功时包含文件信息和缓存配置

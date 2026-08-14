@@ -338,7 +338,7 @@ auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
 // 在 uWS 线程中发送数据块
 auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::string> chunk_data)
     -> void {
-  if (ctx->is_aborted) {
+  if (ctx->abort_flag->load()) {
     Logger().debug("Stream aborted, stopping");
     return;
   }
@@ -349,12 +349,20 @@ auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::
   // tryEnd 的 total 必须为「整个 HTTP 响应体」长度；Range 时为片段长而非文件全长。
   auto [ok, done] = ctx->res->tryEnd(*chunk_data, ctx->response_size);
 
+  if (done) {
+    // tryEnd 已经完成响应；不要再访问响应对象或调度下一次读取。
+    ctx->bytes_sent = ctx->response_size;
+    ctx->file_offset = ctx->file_end_offset;
+    Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(), ctx->bytes_sent);
+    return;
+  }
+
   if (!ok) {
     // 背压：缓冲区满，需要等待可写
     Logger().debug("Backpressure detected, waiting for writable");
 
     ctx->res->onWritable([ctx, chunk_data, chunk_start_offset](size_t) -> bool {
-      if (ctx->is_aborted) {
+      if (ctx->abort_flag->load()) {
         return false;  // 停止等待
       }
 
@@ -366,23 +374,36 @@ auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::
         ctx->bytes_sent = ctx->res->getWriteOffset();
         ctx->file_offset += chunk_data->size();
 
+        // onWritable 的返回值表示写入是否成功，不负责移除回调。
+        ctx->res->onWritable(nullptr);
+
         // 继续读下一块
         read_and_send_next_chunk(ctx);
-        return false;  // 移除 onWritable
+        return true;
       }
 
       // 发送剩余数据
       auto remaining = chunk_data->substr(already_sent);
       auto [ok2, done2] = ctx->res->tryEnd(remaining, ctx->response_size);
 
-      if (ok2 || done2) {
-        // 发送成功
+      if (done2) {
+        // tryEnd 已经完成响应；它会清除 onWritable。
+        ctx->bytes_sent = ctx->response_size;
+        ctx->file_offset = ctx->file_end_offset;
+        Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
+                       ctx->bytes_sent);
+        return true;
+      }
+
+      if (ok2) {
+        // 发送成功，显式移除本次背压回调。
         ctx->bytes_sent = ctx->res->getWriteOffset();
         ctx->file_offset += chunk_data->size();
+        ctx->res->onWritable(nullptr);
 
         // 继续读下一块
         read_and_send_next_chunk(ctx);
-        return false;  // 移除 onWritable
+        return true;
       }
 
       // 继续等待
@@ -393,22 +414,16 @@ auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::
     ctx->bytes_sent = ctx->res->getWriteOffset();
     ctx->file_offset += chunk_data->size();
 
-    if (done) {
-      // 整个响应已完成
-      Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
-                     ctx->bytes_sent);
-    } else {
-      // 继续读下一块
-      read_and_send_next_chunk(ctx);
-    }
+    // 继续读下一块
+    read_and_send_next_chunk(ctx);
   }
 }
 
 // 读取并发送下一个数据块
 auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
   // 检查是否完成
-  if (ctx->file_offset >= ctx->file_end_offset || ctx->is_aborted) {
-    if (!ctx->is_aborted) {
+  if (ctx->file_offset >= ctx->file_end_offset || ctx->abort_flag->load()) {
+    if (!ctx->abort_flag->load()) {
       Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
                      ctx->bytes_sent);
     }
@@ -422,10 +437,17 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
   ctx->file.async_read_some_at(
       ctx->file_offset, asio::buffer(ctx->buffer.data(), to_read),
       [ctx](std::error_code ec, size_t bytes_read) {
+        if (ctx->abort_flag->load()) {
+          return;
+        }
+
         if (ec || bytes_read == 0) {
           Logger().error("Failed to read file {}: {}", ctx->file_path.string(),
                          ec ? ec.message() : "EOF");
           ctx->loop->defer([ctx]() {
+            if (ctx->abort_flag->load()) {
+              return;
+            }
             ctx->res->writeStatus("500 Internal Server Error");
             ctx->res->end("Internal server error");
           });
@@ -436,7 +458,12 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
         auto chunk_data = std::make_shared<std::string>(ctx->buffer.data(), bytes_read);
 
         // 在 uWS 线程中发送
-        ctx->loop->defer([ctx, chunk_data]() { send_chunk_to_uws(ctx, chunk_data); });
+        ctx->loop->defer([ctx, chunk_data]() {
+          if (ctx->abort_flag->load()) {
+            return;
+          }
+          send_chunk_to_uws(ctx, chunk_data);
+        });
       });
 }
 
@@ -451,10 +478,18 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
   size_t range_start = range.has_value() ? range->start : 0;
   size_t range_end = range.has_value() ? range->end : (file_size - 1);
   size_t response_size = range_end >= range_start ? (range_end - range_start + 1) : 0;
+  auto abort_flag = std::make_shared<std::atomic_bool>(false);
+
+  // 必须在异步打开文件前注册；否则客户端可能已经中止而流上下文尚未建立。
+  res->onAborted([abort_flag, file_path]() {
+    abort_flag->store(true);
+    Logger().debug("Stream aborted for: {}", file_path.string());
+  });
 
   // 对于大文件或分片请求，始终按偏移流式发送，避免把整段视频先读进内存。
   // 在 ASIO 线程中打开文件并初始化
-  asio::post(*io_context, [res, file_path, mime_type, cache_control = std::move(cache_control),
+  asio::post(*io_context, [abort_flag, res, file_path, mime_type,
+                           cache_control = std::move(cache_control),
                            validators = std::move(validators), loop, io_context, file_size, range,
                            range_start, range_end, response_size]() {
     try {
@@ -484,11 +519,15 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
           .loop = loop,
           .res = res,
           .buffer = std::vector<char>(STREAM_CHUNK_SIZE),
-          .is_aborted = false,
+          .abort_flag = abort_flag,
       });
 
       // 在 uWS 线程中设置响应头并开始传输
       loop->defer([ctx]() {
+        if (ctx->abort_flag->load()) {
+          return;
+        }
+
         ctx->res->writeStatus(ctx->status_code == 206 ? "206 Partial Content" : "200 OK");
         write_common_file_headers(
             ctx->res, ctx->mime_type, ctx->cache_control,
@@ -499,19 +538,16 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                                                      .end = ctx->file_end_offset - 1}}
                 : std::nullopt);
 
-        // 处理中止
-        ctx->res->onAborted([ctx]() {
-          Logger().debug("Stream aborted for: {}", ctx->file_path.string());
-          ctx->is_aborted = true;
-        });
-
         // 开始读取并发送第一块
         read_and_send_next_chunk(ctx);
       });
 
     } catch (const std::exception& e) {
       Logger().error("Error opening file for stream {}: {}", file_path.string(), e.what());
-      loop->defer([res]() {
+      loop->defer([abort_flag, res]() {
+        if (abort_flag->load()) {
+          return;
+        }
         res->writeStatus("500 Internal Server Error");
         res->end("Internal server error");
       });
@@ -697,15 +733,15 @@ auto register_routes(core::AppState& state, uWS::App& app) -> void {
     std::string url = std::string(req->getUrl());
     Logger().debug("Static file request: {}", url);
 
-    // 使用 cork 包裹整个异步操作，延长 res 的生命周期
+    // 先注册通用中止日志；流式处理会在 cork 内用自己的 abort_flag 覆盖它。
+    res->onAborted([]() { Logger().debug("Static file request aborted"); });
+
+    // cork 只批量提交同步写入，不延长异步操作中 res 的生命周期。
     res->cork([&state, res, req, url]() {
       Logger().debug("Corking static file request: {}", url);
       // 处理静态文件请求
       handle_static_request(state, url, res, req, false);
     });
-
-    // 连接中止时记录日志
-    res->onAborted([]() { Logger().debug("Static file request aborted"); });
   });
 
   // 也处理HEAD请求（用于文件存在性检查）
