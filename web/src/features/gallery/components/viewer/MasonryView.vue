@@ -266,7 +266,7 @@ defineExpose({ scrollToIndex, getCardRect })
             <div
               v-else
               class="animate-pulse bg-muted"
-              :class="!store.isCompactWindow && 'rounded'"
+              :class="!store.isCompactWindow && 'rounded-sm'"
               :style="{
                 width: '100%',
                 height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,

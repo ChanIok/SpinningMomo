@@ -260,7 +260,7 @@ defineExpose({ scrollToIndex, getCardRect })
               <div
                 v-else
                 class="skeleton-card w-full"
-                :class="!store.isCompactWindow && 'rounded'"
+                :class="!store.isCompactWindow && 'rounded-sm'"
                 :style="{ aspectRatio: '1 / 1' }"
               />
             </template>

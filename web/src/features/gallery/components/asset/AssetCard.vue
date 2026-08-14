@@ -495,7 +495,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     draggable="true"
     class="group transition-ring relative w-full overflow-hidden bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
-      store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-md',
+      store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-sm',
       isSelected
         ? store.isCompactWindow
           ? 'ring-2 ring-primary ring-inset'
@@ -517,7 +517,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     <div
       data-asset-thumbnail
       class="relative h-full w-full overflow-hidden"
-      :class="store.isCompactWindow ? 'rounded-none' : 'rounded-md'"
+      :class="store.isCompactWindow ? 'rounded-none' : 'rounded-sm'"
     >
       <!-- 缩略图是卡片的基础显示层，主色占位只服务它的首次加载。 -->
       <img
