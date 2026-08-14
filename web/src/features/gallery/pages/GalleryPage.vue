@@ -5,6 +5,7 @@ import { useDebounceFn, useWindowSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
 import { Button } from '@/components/ui/button'
+import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { Split } from '@/components/ui/split'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
@@ -400,43 +401,29 @@ onUnmounted(() => {
       <template v-else-if="isCompactWindow">
         <GalleryViewer />
 
-        <Transition name="gallery-mobile-drawer">
-          <div
-            v-if="isSidebarOpen"
-            class="absolute inset-0 z-50 flex"
-            role="dialog"
-            aria-modal="true"
-            :aria-label="t('app.navigation.gallery')"
-          >
-            <button
-              type="button"
-              class="absolute inset-0 cursor-default bg-black/50"
+        <MobileDrawer
+          :open="isSidebarOpen"
+          side="left"
+          class="w-[88vw] max-w-[360px]"
+          @close="closeFolderDrawer"
+        >
+          <div class="flex h-12 shrink-0 items-center justify-between border-b px-3">
+            <span class="text-sm font-medium">{{ t('app.navigation.gallery') }}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10"
               :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
               @click="closeFolderDrawer"
-            />
-
-            <aside
-              class="relative z-10 flex h-full w-[88vw] max-w-[360px] flex-col border-r border-border bg-background shadow-2xl"
             >
-              <div class="flex h-12 shrink-0 items-center justify-between border-b px-3">
-                <span class="text-sm font-medium">{{ t('app.navigation.gallery') }}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="h-10 w-10"
-                  :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-                  @click="closeFolderDrawer"
-                >
-                  <X class="h-5 w-5" />
-                </Button>
-              </div>
-
-              <div class="min-h-0 flex-1">
-                <GallerySidebar />
-              </div>
-            </aside>
+              <X class="h-5 w-5" />
+            </Button>
           </div>
-        </Transition>
+
+          <div class="min-h-0 flex-1">
+            <GallerySidebar />
+          </div>
+        </MobileDrawer>
       </template>
 
       <!-- 左中右三区域布局 -->
@@ -490,25 +477,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.gallery-mobile-drawer-enter-active,
-.gallery-mobile-drawer-leave-active {
-  transition: opacity 180ms ease-out;
-}
-
-.gallery-mobile-drawer-enter-from,
-.gallery-mobile-drawer-leave-to {
-  opacity: 0;
-}
-
-.gallery-mobile-drawer-enter-active aside,
-.gallery-mobile-drawer-leave-active aside {
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.gallery-mobile-drawer-enter-from aside,
-.gallery-mobile-drawer-leave-to aside {
-  transform: translateX(-100%);
-}
-</style>

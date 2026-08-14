@@ -145,7 +145,11 @@ export function useGalleryFilterControls() {
     const date = new Date(exclusiveEnd ? value - 1 : value)
     if (!Number.isFinite(date.getTime())) return undefined
 
-    return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
+    return new CalendarDate(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      date.getDate()
+    ) as unknown as DateValue
   }
 
   function calendarDateToLocalStartMillis(date: DateValue): number {

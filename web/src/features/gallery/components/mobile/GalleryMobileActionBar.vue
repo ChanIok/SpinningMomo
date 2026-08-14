@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { useGalleryAssetActions, useGalleryData } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { galleryApi } from '../../api'
@@ -369,130 +369,154 @@ async function handleDownload() {
     </AlertDialogContent>
   </AlertDialog>
 
-  <Sheet v-model:open="ratingSheetOpen">
-    <SheetContent
-      side="bottom"
-      class="rounded-t-2xl px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-      @contextmenu.prevent.stop
-    >
-      <SheetHeader class="px-0">
-        <SheetTitle>{{ t('gallery.mobile.sheet.ratingTitle') }}</SheetTitle>
-      </SheetHeader>
-      <div class="grid grid-cols-6 gap-2">
-        <Button
-          v-for="rating in [0, 1, 2, 3, 4, 5]"
-          :key="rating"
-          variant="outline"
-          class="h-12 flex-col gap-1 px-1"
-          @click="handleRating(rating)"
-        >
-          <template v-if="rating === 0">
-            <X class="size-4" />
-            <span class="text-[11px]">{{ t('gallery.mobile.sheet.clearRating') }}</span>
-          </template>
-          <template v-else>
-            <Star class="size-4 fill-amber-400 text-amber-400" />
-            <span class="text-xs">{{ rating }}</span>
-          </template>
-        </Button>
-      </div>
-    </SheetContent>
-  </Sheet>
-
-  <Sheet v-model:open="tagSheetOpen">
-    <SheetContent
-      side="bottom"
-      class="max-h-[82vh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-      @contextmenu.prevent.stop
-    >
-      <SheetHeader class="px-0">
-        <SheetTitle>{{ t('gallery.mobile.sheet.tagsTitle') }}</SheetTitle>
-      </SheetHeader>
-      <div
-        v-if="tagLoading && store.tags.length === 0"
-        class="py-8 text-center text-sm text-muted-foreground"
+  <MobileDrawer
+    :open="ratingSheetOpen"
+    side="bottom"
+    class="rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    @close="ratingSheetOpen = false"
+  >
+    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
+      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.ratingTitle') }}</h2>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+        :aria-label="t('common.close')"
+        @click="ratingSheetOpen = false"
       >
-        {{ t('gallery.sidebar.common.loading') }}
-      </div>
-      <TagSelectorPopover
-        v-else
-        :tags="store.tags"
-        :selected-tag-ids="tagIds"
-        @toggle="void handleTagToggle($event)"
-      />
-    </SheetContent>
-  </Sheet>
+        <X class="size-4" />
+      </Button>
+    </div>
+    <div class="grid grid-cols-6 gap-2 pt-2">
+      <Button
+        v-for="rating in [0, 1, 2, 3, 4, 5]"
+        :key="rating"
+        variant="outline"
+        class="h-12 flex-col gap-1 px-1"
+        @click="handleRating(rating)"
+      >
+        <template v-if="rating === 0">
+          <X class="size-4" />
+          <span class="text-[11px]">{{ t('gallery.mobile.sheet.clearRating') }}</span>
+        </template>
+        <template v-else>
+          <Star class="size-4 fill-amber-400 text-amber-400" />
+          <span class="text-xs">{{ rating }}</span>
+        </template>
+      </Button>
+    </div>
+  </MobileDrawer>
 
-  <Sheet v-model:open="moreSheetOpen">
-    <SheetContent
-      side="bottom"
-      class="max-h-[86vh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-      @contextmenu.prevent.stop
+  <MobileDrawer
+    :open="tagSheetOpen"
+    side="bottom"
+    class="max-h-[82vh] overflow-y-auto rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    @close="tagSheetOpen = false"
+  >
+    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
+      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.tagsTitle') }}</h2>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+        :aria-label="t('common.close')"
+        @click="tagSheetOpen = false"
+      >
+        <X class="size-4" />
+      </Button>
+    </div>
+    <div
+      v-if="tagLoading && store.tags.length === 0"
+      class="py-8 text-center text-sm text-muted-foreground"
     >
-      <SheetHeader class="px-0">
-        <SheetTitle>{{ t('gallery.mobile.sheet.moreTitle') }}</SheetTitle>
-      </SheetHeader>
-      <div class="grid gap-1">
-        <Button
-          v-if="canUseLocalFileSystem"
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3"
-          :disabled="!assetActions.isSingleSelection"
-          @click="handleOpenAssetDefault"
-        >
-          <ExternalLink class="size-5" />
-          {{ t('gallery.contextMenu.openDefaultApp.label') }}
-        </Button>
-        <Button
-          v-if="canUseLocalFileSystem"
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3"
-          :disabled="!assetActions.isSingleSelection"
-          @click="handleRevealAssetInExplorer"
-        >
-          <FolderOpen class="size-5" />
-          {{ t('gallery.contextMenu.revealInExplorer.label') }}
-        </Button>
-        <Button
-          v-if="canUseLocalFileSystem"
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3"
-          @click="handleCopyAssetsToClipboard"
-        >
-          <Copy class="size-5" />
-          {{ t('gallery.contextMenu.copyFiles.label') }}
-        </Button>
-        <Button variant="ghost" class="h-12 justify-start gap-3 px-3" @click="handleMoveToFolder">
-          <FolderOpen class="size-5" />
-          {{ t('gallery.contextMenu.moveToFolder.label') }}
-        </Button>
-        <Button
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3"
-          :disabled="!assetActions.canCopyTags"
-          @click="handleCopyTags"
-        >
-          <Tag class="size-5" />
-          {{ t('gallery.contextMenu.copyTags.label') }}
-        </Button>
-        <Button
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3"
-          :disabled="!assetActions.canPasteTags"
-          @click="handlePasteTags"
-        >
-          <Tag class="size-5" />
-          {{ t('gallery.contextMenu.pasteTags.label') }}
-        </Button>
-        <Button
-          variant="ghost"
-          class="h-12 justify-start gap-3 px-3 text-destructive hover:text-destructive"
-          @click="handleDelete"
-        >
-          <Trash2 class="size-5" />
-          {{ assetActions.deleteMenuLabel }}
-        </Button>
-      </div>
-    </SheetContent>
-  </Sheet>
+      {{ t('gallery.sidebar.common.loading') }}
+    </div>
+    <TagSelectorPopover
+      v-else
+      :tags="store.tags"
+      :selected-tag-ids="tagIds"
+      @toggle="void handleTagToggle($event)"
+    />
+  </MobileDrawer>
+
+  <MobileDrawer
+    :open="moreSheetOpen"
+    side="bottom"
+    class="max-h-[86vh] overflow-y-auto rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    @close="moreSheetOpen = false"
+  >
+    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
+      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.moreTitle') }}</h2>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+        :aria-label="t('common.close')"
+        @click="moreSheetOpen = false"
+      >
+        <X class="size-4" />
+      </Button>
+    </div>
+    <div class="grid gap-1 pt-1">
+      <Button
+        v-if="canUseLocalFileSystem"
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3"
+        :disabled="!assetActions.isSingleSelection"
+        @click="handleOpenAssetDefault"
+      >
+        <ExternalLink class="size-5" />
+        {{ t('gallery.contextMenu.openDefaultApp.label') }}
+      </Button>
+      <Button
+        v-if="canUseLocalFileSystem"
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3"
+        :disabled="!assetActions.isSingleSelection"
+        @click="handleRevealAssetInExplorer"
+      >
+        <FolderOpen class="size-5" />
+        {{ t('gallery.contextMenu.revealInExplorer.label') }}
+      </Button>
+      <Button
+        v-if="canUseLocalFileSystem"
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3"
+        @click="handleCopyAssetsToClipboard"
+      >
+        <Copy class="size-5" />
+        {{ t('gallery.contextMenu.copyFiles.label') }}
+      </Button>
+      <Button variant="ghost" class="h-12 justify-start gap-3 px-3" @click="handleMoveToFolder">
+        <FolderOpen class="size-5" />
+        {{ t('gallery.contextMenu.moveToFolder.label') }}
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3"
+        :disabled="!assetActions.canCopyTags"
+        @click="handleCopyTags"
+      >
+        <Tag class="size-5" />
+        {{ t('gallery.contextMenu.copyTags.label') }}
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3"
+        :disabled="!assetActions.canPasteTags"
+        @click="handlePasteTags"
+      >
+        <Tag class="size-5" />
+        {{ t('gallery.contextMenu.pasteTags.label') }}
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-12 justify-start gap-3 px-3 text-destructive hover:text-destructive"
+        @click="handleDelete"
+      >
+        <Trash2 class="size-5" />
+        {{ assetActions.deleteMenuLabel }}
+      </Button>
+    </div>
+  </MobileDrawer>
 </template>

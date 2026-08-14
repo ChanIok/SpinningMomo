@@ -41,7 +41,7 @@ importers:
         specifier: ^5.2.8
         version: 5.3.0
       '@lucide/vue':
-        specifier: ^1.28.0
+        specifier: ^1.31.0
         version: 1.31.0(vue@3.5.41(typescript@6.0.3))
       '@tailwindcss/vite':
         specifier: ^4.3.1
@@ -65,7 +65,7 @@ importers:
         specifier: ^1.5.4
         version: 1.5.4
       reka-ui:
-        specifier: ^2.10.1
+        specifier: ^2.10.3
         version: 2.10.3(vue@3.5.41(typescript@6.0.3))
       tailwind-merge:
         specifier: ^3.6.0

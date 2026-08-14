@@ -88,7 +88,9 @@ function changeVisibleMonth(value: string | number | bigint | Record<string, any
     return
   }
 
-  handlePlaceholderChange(new CalendarDate(visibleDate.value.year, month, visibleDate.value.day))
+  handlePlaceholderChange(
+    new CalendarDate(visibleDate.value.year, month, visibleDate.value.day) as unknown as DateValue
+  )
 }
 
 function changeVisibleYear(value: string | number | bigint | Record<string, any> | null) {
@@ -97,7 +99,9 @@ function changeVisibleYear(value: string | number | bigint | Record<string, any>
     return
   }
 
-  handlePlaceholderChange(new CalendarDate(year, visibleDate.value.month, visibleDate.value.day))
+  handlePlaceholderChange(
+    new CalendarDate(year, visibleDate.value.month, visibleDate.value.day) as unknown as DateValue
+  )
 }
 </script>
 

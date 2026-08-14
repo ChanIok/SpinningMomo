@@ -77,11 +77,11 @@ function exitMultiSelectMode() {
       <Button
         variant="ghost"
         size="icon"
-        class="h-10 w-10 shrink-0 rounded-sm"
+        class="h-8 w-8 shrink-0 rounded-sm text-foreground/80 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
         :aria-label="t('gallery.mobile.selection.exit')"
         @click="exitMultiSelectMode"
       >
-        <X class="size-5" />
+        <X class="size-4" :stroke-width="1.5" />
       </Button>
       <span class="min-w-0 truncate px-2 text-sm font-medium">
         <template v-if="store.selectedCount > 0">
@@ -92,29 +92,29 @@ function exitMultiSelectMode() {
         </template>
       </span>
       <div class="drag-region min-w-0 flex-1 self-stretch" aria-hidden="true" />
-      <div class="h-10 w-10 shrink-0" aria-hidden="true" />
+      <div class="h-8 w-8 shrink-0" aria-hidden="true" />
     </template>
 
     <template v-else>
       <Button
         variant="ghost"
         size="icon"
-        class="h-10 w-10 shrink-0 rounded-sm"
+        class="h-8 w-8 shrink-0 rounded-sm text-foreground/80 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
         :aria-label="t('gallery.mobile.toolbar.menu')"
         @click="emit('toggle-sidebar')"
       >
-        <Menu class="size-5" />
+        <Menu class="size-4" :stroke-width="1.5" />
       </Button>
 
       <Button
         v-if="!props.touchLike"
         variant="ghost"
         size="sm"
-        class="h-10 max-w-24 shrink-0 gap-1 rounded-sm px-2 text-foreground/80"
+        class="h-8 max-w-24 shrink-0 gap-1 rounded-sm px-2 text-foreground/80 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
         :aria-label="t('app.navigation.back')"
         @click="emit('back')"
       >
-        <ChevronLeft class="size-4 shrink-0" />
+        <ChevronLeft class="size-4 shrink-0" :stroke-width="1.5" />
         <span class="truncate text-xs font-medium">{{ props.pageTitle }}</span>
       </Button>
 
@@ -131,15 +131,15 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="relative h-10 w-10 rounded-sm"
-          :class="activeFilterCount > 0 ? 'text-primary' : ''"
+          class="relative h-8 w-8 rounded-sm text-foreground/80 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
+          :class="activeFilterCount > 0 ? 'text-primary hover:text-primary' : ''"
           :aria-label="t('gallery.mobile.toolbar.filter.title')"
           @click="openFilterPanel"
         >
-          <Funnel class="size-5" />
+          <Funnel class="size-4" :stroke-width="1.5" />
           <span
             v-if="activeFilterCount > 0"
-            class="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground"
+            class="absolute top-0.5 right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 font-mono text-[8px] leading-none text-primary-foreground"
           >
             {{ activeFilterCount > 9 ? '9+' : activeFilterCount }}
           </span>
@@ -148,11 +148,11 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="h-10 w-10 rounded-sm"
+          class="h-8 w-8 rounded-sm text-foreground/80 hover:bg-black/10 hover:text-foreground dark:hover:bg-white/10"
           :aria-label="t('gallery.mobile.toolbar.viewSettings.title')"
           @click="openViewSettingsPanel"
         >
-          <SlidersHorizontal class="size-5" />
+          <SlidersHorizontal class="size-4" :stroke-width="1.5" />
         </Button>
       </div>
     </template>
