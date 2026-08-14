@@ -18,7 +18,7 @@ import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
-import { isGalleryTouchInput, markGalleryScroll, type GalleryInputType } from '../../input'
+import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
@@ -115,7 +115,7 @@ function handleAssetClick(
     return
   }
 
-  if (isGalleryTouchInput(inputType)) {
+  if (shouldOpenAssetOnTap(store.isCompactWindow, inputType)) {
     openAssetLightbox(asset, event, index, inputType)
     return
   }
@@ -128,11 +128,21 @@ function handleAssetLongPress(asset: Asset, _event: PointerEvent, index: number)
     return
   }
 
+  if (!store.isCompactWindow) {
+    void gallerySelection.selectOnlyIndex(index)
+    return
+  }
+
   gallerySelection.enterMultiSelectMode(asset, index)
 }
 
-function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
-  openAssetLightbox(asset, event, index, 'mouse')
+function handleAssetDoubleClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
+  openAssetLightbox(asset, event, index, inputType)
 }
 
 function openAssetLightbox(
@@ -229,7 +239,10 @@ defineExpose({ scrollToIndex, getCardRect })
                       handleAssetClick(asset, event, item.index, inputType)
                   "
                   @long-press="(asset, event) => handleAssetLongPress(asset, event, item.index)"
-                  @double-click="(asset, event) => handleAssetDoubleClick(asset, event, item.index)"
+                  @double-click="
+                    (asset, event, inputType) =>
+                      handleAssetDoubleClick(asset, event, item.index, inputType)
+                  "
                   @context-menu="
                     (asset, event) => void handleAssetContextMenu(asset, event, item.index)
                   "

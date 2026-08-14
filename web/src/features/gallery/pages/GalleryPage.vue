@@ -9,7 +9,10 @@ import { Split } from '@/components/ui/split'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
 import { useGalleryData } from '../composables/useGalleryData'
-import { useGalleryOverlayHistory } from '../composables/useGalleryOverlayHistory'
+import {
+  isGalleryLightboxOverlay,
+  useGalleryOverlayHistory,
+} from '../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from '../components/shell/GallerySidebar.vue'
@@ -102,6 +105,20 @@ function syncCompactLayout(compact: boolean) {
     return
   }
 
+  const compactOverlay = overlayHistory.snapshot.value.overlay
+  if (
+    compactOverlay === 'filter' ||
+    compactOverlay === 'view-settings' ||
+    compactOverlay === 'preferences' ||
+    compactOverlay === 'selection'
+  ) {
+    // 紧凑布局专属面板不能带入桌面布局，避免切换窗口宽度后留下不可见历史层。
+    if (compactOverlay === 'preferences') {
+      galleryStore.setPreferencesDialogOpen(false)
+    }
+    void overlayHistory.closeTopOverlay()
+  }
+
   const snapshot = compactLayoutSnapshot.value
   if (!snapshot) {
     return
@@ -130,6 +147,20 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// 多选通过浏览器返回退出时，URL 是状态源；页面按钮则会先清 Store 再消费这层历史。
+watch(
+  () => overlayHistory.snapshot.value.overlay,
+  (overlay, previousOverlay) => {
+    if (
+      previousOverlay === 'selection' &&
+      overlay !== 'selection' &&
+      galleryStore.selection.mode === 'multi-select'
+    ) {
+      galleryStore.exitMultiSelectMode()
+    }
+  }
 )
 
 const leftMinSize = computed(() => (isSidebarOpen.value ? LEFT_MIN_SIZE : COLLAPSED_SIZE))
@@ -333,12 +364,24 @@ const galleryChangedHandler = () => {
   void scheduleGalleryRefresh()
 }
 
+function resetGalleryInteraction() {
+  galleryStore.exitMultiSelectMode()
+  galleryStore.clearSelection()
+  galleryStore.clearActiveAsset()
+  galleryStore.clearDetailsFocus()
+}
+
 onMounted(() => {
+  // 普通进入图库时从干净的浏览态开始；暗房直链由 Viewer 自己恢复资产位置。
+  if (!isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
+    resetGalleryInteraction()
+  }
   onRpc('gallery.changed', galleryChangedHandler)
 })
 
 onBeforeUnmount(() => {
   syncCompactLayout(false)
+  resetGalleryInteraction()
 })
 
 onUnmounted(() => {

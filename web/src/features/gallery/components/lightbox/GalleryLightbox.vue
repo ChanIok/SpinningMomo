@@ -68,8 +68,8 @@ const { width: lightboxWidth } = useElementSize(lightboxRootRef)
 const mobileDetailsOpen = computed(
   () => overlayHistory.snapshot.value.overlay === 'lightbox-details'
 )
-// 界面层显隐与沉浸模式分离；触摸轻点只切换 chrome，不改变沉浸模式状态。
-const isLightboxChromeVisible = ref(true)
+// 界面层显隐与沉浸模式分离；共享状态让全局 App Header 与暗房控件同步。
+const isLightboxChromeVisible = computed(() => store.lightbox.chromeVisible)
 let pendingTouchTapTimer: number | null = null
 // inputType 记录打开来源；这里单独记录会话内最近一次指针模态，支持混合触控设备切换。
 const activeInputType = ref<GalleryInputType>('mouse')
@@ -111,6 +111,8 @@ watch(
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
 const isTouchInput = computed(() => isGalleryTouchInput(activeInputType.value))
+// 只有窄屏触摸采用相册式“轻点切换界面”的沉浸交互；宽屏触摸保留工作区控件。
+const canToggleChromeByTap = computed(() => store.isCompactWindow && isTouchInput.value)
 // 底片栏属于窗口级布局；它必须跟随整个应用窗口，而不是暗房中间内容区。
 const showFilmstrip = computed(() => !store.isCompactWindow && store.lightbox.showFilmstrip)
 const fitMode = computed(() => store.lightbox.fitMode)
@@ -147,10 +149,16 @@ watch(
     }
 
     activeInputType.value = store.lightbox.inputType
-    isLightboxChromeVisible.value = true
   },
   { immediate: true }
 )
+
+watch(canToggleChromeByTap, (canToggle) => {
+  if (!canToggle && !store.lightbox.chromeVisible) {
+    // 离开窄屏触摸环境后恢复工作区控件，避免 Header 被永久留在隐藏状态。
+    store.setLightboxChromeVisible(true)
+  }
+})
 
 watch(
   () => overlayHistory.snapshot.value.overlay,
@@ -317,11 +325,12 @@ function animateClose() {
   }
 
   const delay = didReverseHero ? CLOSE_AFTER_REVERSE_HERO_MS : CLOSE_AFTER_NO_HERO_MS
-  const shouldClearSelection = store.isCompactWindow || isTouchInput.value
+  // 只有窄屏触摸直达暗房时没有显式选择；这时关闭后清除临时焦点。
+  // 鼠标、宽屏触摸以及多选进入暗房都应保留选择，方便继续操作或查看详情。
+  const shouldClearBrowseFocus = store.selectedCount === 0
   window.setTimeout(() => {
     lightbox.closeLightbox()
-    if (shouldClearSelection) {
-      gallerySelection.clearSelection()
+    if (shouldClearBrowseFocus) {
       store.clearActiveAsset()
     }
   }, delay)
@@ -405,8 +414,9 @@ function clearPendingTouchTap() {
 }
 
 function toggleLightboxChrome() {
-  isLightboxChromeVisible.value = !isLightboxChromeVisible.value
-  if (!isLightboxChromeVisible.value) {
+  const visible = !store.lightbox.chromeVisible
+  store.setLightboxChromeVisible(visible)
+  if (!visible) {
     closeMobileDetails()
   }
 }
@@ -415,7 +425,7 @@ function scheduleSingleTouchTap() {
   clearPendingTouchTap()
   pendingTouchTapTimer = window.setTimeout(() => {
     pendingTouchTapTimer = null
-    if (!store.lightbox.isOpen || isClosing.value) {
+    if (!store.lightbox.isOpen || isClosing.value || !canToggleChromeByTap.value) {
       return
     }
 
@@ -429,6 +439,11 @@ function handleTouchTap(isDoubleTap: boolean) {
     return
   }
 
+  if (!canToggleChromeByTap.value) {
+    clearPendingTouchTap()
+    return
+  }
+
   // 视频控件不参与双击缩放，保留其原有的即时单击响应。
   if (!isZoomableAsset.value) {
     clearPendingTouchTap()
@@ -438,7 +453,8 @@ function handleTouchTap(isDoubleTap: boolean) {
 
   if (isDoubleTap) {
     clearPendingTouchTap()
-    isLightboxChromeVisible.value = false
+    // Pager 已经完成双击缩放；双击在窄屏触摸下同时进入纯图片状态。
+    store.setLightboxChromeVisible(false)
     closeMobileDetails()
     return
   }

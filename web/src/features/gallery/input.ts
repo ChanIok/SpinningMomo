@@ -24,6 +24,14 @@ export function isGalleryTouchInput(inputType: GalleryInputType): boolean {
   return inputType === 'touch' || inputType === 'pen'
 }
 
+// 只有窄屏触摸浏览才把单击解释为“打开暗房”；其余输入仍保留选择/详情语义。
+export function shouldOpenAssetOnTap(
+  isCompactWindow: boolean,
+  inputType: GalleryInputType
+): boolean {
+  return isCompactWindow && isGalleryTouchInput(inputType)
+}
+
 export function markGalleryScroll(): void {
   lastGalleryScrollAt = performance.now()
 }

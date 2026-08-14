@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
@@ -12,8 +12,6 @@ import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
-import { CalendarDate } from '@internationalized/date'
-import type { DateRange, DateValue } from 'reka-ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,14 +28,10 @@ import {
   ChevronDown,
   Flag,
   Folder,
-  Grid3x3,
   Image,
   Images,
-  LayoutGrid,
-  List,
   Map,
   Palette,
-  Rows3,
   Search,
   Settings,
   Star,
@@ -50,19 +44,8 @@ import { useI18n } from '@/composables/useI18n'
 import { isLocalAccess } from '@/core/access'
 import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
-import { useGalleryStore } from '../../store'
 import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
-import type {
-  AssetFilter,
-  AssetType,
-  FolderTreeNode,
-  ReviewFlag,
-  SortBy,
-  TagTreeNode,
-  ViewMode,
-} from '../../types'
-
-type SourceType = 'all' | 'folder' | 'tag'
+import { useGalleryFilterControls, useGalleryViewControls } from '../../composables'
 
 const emit = defineEmits<{
   'open-preferences': []
@@ -71,7 +54,64 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 const router = useRouter()
 const settingsStore = useSettingsStore()
-const store = useGalleryStore()
+const filterControls = useGalleryFilterControls()
+const viewControls = useGalleryViewControls()
+
+const {
+  filter,
+  searchQuery,
+  activeColorHex,
+  selectedRatings,
+  typeFilterLabel,
+  ratingFilterLabel,
+  reviewFlagFilterLabel,
+  hasAttributeFilters,
+  colorPopoverOpen,
+  draftColorHex,
+  draftColorDistance,
+  datePopoverOpen,
+  draftDateRange,
+  displayDateFilterLabel,
+  hasDisplayDateRange,
+  onDateRangeChange,
+  applyDateFilter,
+  clearDateFilter,
+  keepDatePopoverForCalendarSelect,
+  updateSearchQuery,
+  clearSearch,
+  clearSearchFromTrigger,
+  onTypeFilterChange,
+  clearTypeFilter,
+  onReviewFlagChange,
+  clearReviewFlagFilter,
+  isRatingSelected,
+  toggleRatingFilter,
+  clearRatingFilter,
+  applyColorFilter,
+  clearColorFilter,
+  onColorDistanceChange,
+  clearAttributeFilters,
+  COLOR_DISTANCE_MIN,
+  COLOR_DISTANCE_MAX,
+  STARS,
+} = filterControls
+
+const {
+  viewMode,
+  sortBy,
+  sortOrder,
+  currentFolderOnly,
+  currentSliderPosition,
+  availableViewModes,
+  currentViewModeIcon,
+  currentSource,
+  sortOrderLabel,
+  onSortByChange,
+  toggleSortOrder,
+  onCurrentFolderOnlyChange,
+  setViewMode,
+  onViewSizeSliderChange,
+} = viewControls
 
 // 第三方地图会读取本机鉴权资源，因此只在 local 页面展示入口。
 const showMapEntry = computed(
@@ -93,33 +133,6 @@ const handleOpenPreferences = () => {
   emit('open-preferences')
 }
 
-const viewMode = computed(() =>
-  store.isCompactWindow && store.view.mode === 'list' ? 'grid' : store.view.mode
-)
-const sortBy = computed(() => store.sortBy)
-const sortOrder = computed(() => store.sortOrder)
-const currentFolderOnly = computed(() => !store.includeSubfolders)
-const filter = computed(() => store.filter)
-const searchQuery = computed(() => filter.value.searchQuery || '')
-const activeColorHex = computed(() => filter.value.colorHex)
-const activeColorDistance = computed(
-  () => (filter.value as AssetFilter & { colorDistance?: number }).colorDistance ?? 18
-)
-const activeDateFrom = computed(() => filter.value.createdAtFrom)
-const activeDateTo = computed(() => filter.value.createdAtTo)
-
-const COLOR_DISTANCE_MIN = 1
-const COLOR_DISTANCE_MAX = 40
-const COLOR_DISTANCE_DEFAULT = 18
-const STARS = [1, 2, 3, 4, 5] as const
-
-const currentSliderPosition = computed(() => store.getSliderPosition())
-const colorPopoverOpen = ref(false)
-const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
-const draftColorDistance = ref(activeColorDistance.value)
-const datePopoverOpen = ref(false)
-const draftDateRange = shallowRef<DateRange>({ start: undefined, end: undefined })
-
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
 const isWide = computed(() => toolbarWidth.value >= 720)
@@ -136,396 +149,6 @@ function handleFilterWheel(event: WheelEvent) {
   }
 }
 
-const hasAttributeFilters = computed(
-  () =>
-    Boolean(searchQuery.value) ||
-    activeDateFrom.value !== undefined ||
-    activeDateTo.value !== undefined ||
-    filter.value.type !== undefined ||
-    selectedRatings.value.length > 0 ||
-    filter.value.reviewFlag !== undefined ||
-    Boolean(filter.value.colorHex)
-)
-
-const viewModes = [
-  { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
-  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
-  { value: 'masonry' as ViewMode, icon: LayoutGrid, i18nKey: 'gallery.toolbar.viewMode.masonry' },
-  { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
-]
-
-const availableViewModes = computed(() =>
-  store.isCompactWindow ? viewModes.filter((mode) => mode.value !== 'list') : viewModes
-)
-
-const currentViewModeIcon = computed(() => {
-  const mode = availableViewModes.value.find((m) => m.value === viewMode.value)
-  return mode?.icon || Grid3x3
-})
-
-const currentSource = computed<{ type: SourceType; label: string }>(() => {
-  const folderId = filter.value.folderId ? Number(filter.value.folderId) : null
-  if (folderId !== null && Number.isFinite(folderId)) {
-    return {
-      type: 'folder',
-      label:
-        findFolderNameById(store.folders, folderId) ||
-        t('gallery.toolbar.browse.folderFallback', { id: folderId }),
-    }
-  }
-
-  const tagId = filter.value.tagIds?.[0]
-  if (tagId !== undefined) {
-    return {
-      type: 'tag',
-      label:
-        findTagNameById(store.tags, tagId) ||
-        t('gallery.toolbar.browse.tagFallback', { id: tagId }),
-    }
-  }
-
-  return { type: 'all', label: t('gallery.toolbar.browse.all') }
-})
-
-const selectedRatings = computed(() => normalizeRatings(filter.value.ratings))
-const typeFilterLabel = computed(() => getTypeLabel(filter.value.type))
-const ratingFilterLabel = computed(() => getRatingLabel(selectedRatings.value))
-const reviewFlagFilterLabel = computed(() => getReviewFlagLabel(filter.value.reviewFlag))
-const displayDateRangeMillis = computed(() => {
-  const draftStart = draftDateRange.value.start
-  if (draftStart) {
-    const draftEnd = draftDateRange.value.end ?? draftStart
-    const [rangeStart, rangeEnd] = orderRangeDates(draftStart, draftEnd)
-    return {
-      from: calendarDateToLocalStartMillis(rangeStart),
-      to: calendarDateToExclusiveEndMillis(rangeEnd),
-    }
-  }
-
-  return {
-    from: activeDateFrom.value,
-    to: activeDateTo.value,
-  }
-})
-const displayDateFilterLabel = computed(() =>
-  getDateFilterLabel(displayDateRangeMillis.value.from, displayDateRangeMillis.value.to)
-)
-const hasDisplayDateRange = computed(
-  () =>
-    displayDateRangeMillis.value.from !== undefined || displayDateRangeMillis.value.to !== undefined
-)
-const sortOrderLabel = computed(() =>
-  sortOrder.value === 'asc'
-    ? t('gallery.toolbar.sortOrder.asc')
-    : t('gallery.toolbar.sortOrder.desc')
-)
-
-watch(colorPopoverOpen, (open) => {
-  if (open) {
-    draftColorHex.value = activeColorHex.value || '#FFFFFF'
-    draftColorDistance.value = activeColorDistance.value
-  }
-})
-
-watch(datePopoverOpen, (open) => {
-  if (open) {
-    draftDateRange.value = {
-      start: millisToCalendarDate(activeDateFrom.value),
-      end: millisToCalendarDate(activeDateTo.value, true),
-    }
-  }
-})
-
-function findFolderNameById(nodes: FolderTreeNode[], id: number): string | null {
-  for (const node of nodes) {
-    if (node.id === id) {
-      return node.displayName || node.name
-    }
-    const childName = findFolderNameById(node.children, id)
-    if (childName) {
-      return childName
-    }
-  }
-  return null
-}
-
-function findTagNameById(nodes: TagTreeNode[], id: number): string | null {
-  for (const node of nodes) {
-    if (node.id === id) {
-      return node.name
-    }
-    const childName = findTagNameById(node.children, id)
-    if (childName) {
-      return childName
-    }
-  }
-  return null
-}
-
-function getTypeLabel(type?: AssetType): string {
-  if (type === 'photo') return t('gallery.toolbar.filter.type.photo')
-  if (type === 'video') return t('gallery.toolbar.filter.type.video')
-  return t('gallery.toolbar.filters.fileType')
-}
-
-function normalizeRatings(ratings?: number[]): number[] {
-  return [...new Set(ratings ?? [])]
-    .filter((rating) => Number.isInteger(rating) && rating >= 0 && rating <= 5)
-    .sort((a, b) => b - a)
-}
-
-function getRatingLabel(ratings: number[]): string {
-  if (ratings.length === 0) return t('gallery.toolbar.filters.rating')
-  if (ratings.length === 1) {
-    const rating = ratings[0]
-    if (rating === 0) return t('gallery.toolbar.filter.rating.unrated')
-    return t('gallery.toolbar.filters.ratingValue', { rating })
-  }
-
-  const positiveRatings = ratings.filter((rating) => rating > 0)
-  const includesUnrated = ratings.includes(0)
-  const maxRating = positiveRatings[0]
-  const minRating = positiveRatings[positiveRatings.length - 1]
-  const isContinuous =
-    !includesUnrated &&
-    positiveRatings.length === ratings.length &&
-    maxRating !== undefined &&
-    minRating !== undefined &&
-    maxRating - minRating === positiveRatings.length - 1
-
-  if (isContinuous) {
-    return t('gallery.toolbar.filters.ratingRange', {
-      min: minRating,
-      max: maxRating,
-    })
-  }
-
-  return t('gallery.toolbar.filters.ratingCount', { count: ratings.length })
-}
-
-function getReviewFlagLabel(reviewFlag?: ReviewFlag): string {
-  if (reviewFlag === 'none') return t('gallery.toolbar.filter.flag.none')
-  if (reviewFlag === 'picked') return t('gallery.toolbar.filter.flag.picked')
-  if (reviewFlag === 'rejected') return t('gallery.toolbar.filter.flag.rejected')
-  return t('gallery.toolbar.filters.reviewFlag')
-}
-
-function millisToCalendarDate(value?: number, exclusiveEnd = false): DateValue | undefined {
-  if (value === undefined) return undefined
-
-  const date = new Date(exclusiveEnd ? value - 1 : value)
-  if (!Number.isFinite(date.getTime())) return undefined
-
-  return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
-}
-
-function calendarDateToLocalStartMillis(date: DateValue): number {
-  return new Date(date.year, date.month - 1, date.day).getTime()
-}
-
-function calendarDateToExclusiveEndMillis(date: DateValue): number {
-  return new Date(date.year, date.month - 1, date.day + 1).getTime()
-}
-
-function orderRangeDates(start: DateValue, end: DateValue): [DateValue, DateValue] {
-  return start.compare(end) <= 0 ? [start, end] : [end, start]
-}
-
-function formatDateMillis(value?: number, exclusiveEnd = false): string {
-  if (value === undefined) return ''
-
-  const date = new Date(exclusiveEnd ? value - 1 : value)
-  if (!Number.isFinite(date.getTime())) return ''
-
-  return new Intl.DateTimeFormat(locale.value, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
-function getDateFilterLabel(from?: number, to?: number): string {
-  if (from === undefined && to === undefined) {
-    return t('gallery.toolbar.filters.date')
-  }
-
-  const fromLabel = formatDateMillis(from)
-  const toLabel = formatDateMillis(to, true)
-  if (fromLabel && toLabel && fromLabel === toLabel) {
-    return fromLabel
-  }
-  if (fromLabel && toLabel) {
-    return t('gallery.toolbar.dateFilter.rangeLabel', { from: fromLabel, to: toLabel })
-  }
-  if (fromLabel) {
-    return t('gallery.toolbar.dateFilter.fromLabel', { from: fromLabel })
-  }
-  return t('gallery.toolbar.dateFilter.toLabel', { to: toLabel })
-}
-
-function onDateRangeChange(value: DateRange) {
-  draftDateRange.value = value
-}
-
-function applyDateFilter() {
-  const start = draftDateRange.value.start
-  if (!start) {
-    clearDateFilter()
-    return
-  }
-
-  const end = draftDateRange.value.end ?? start
-  const [rangeStart, rangeEnd] = orderRangeDates(start, end)
-
-  store.setFilter({
-    createdAtFrom: calendarDateToLocalStartMillis(rangeStart),
-    createdAtTo: calendarDateToExclusiveEndMillis(rangeEnd),
-  })
-  datePopoverOpen.value = false
-}
-
-function clearDateFilter(event?: Event) {
-  event?.preventDefault()
-  event?.stopPropagation()
-  store.setFilter({
-    createdAtFrom: undefined,
-    createdAtTo: undefined,
-  })
-  draftDateRange.value = { start: undefined, end: undefined }
-  datePopoverOpen.value = false
-}
-
-function keepDatePopoverForCalendarSelect(event: CustomEvent<{ originalEvent?: Event }>) {
-  const originalEvent = event.detail?.originalEvent
-  const target = originalEvent?.target ?? event.target
-  if (!(target instanceof Element)) return
-
-  // 年月 Select 的焦点切换会被外层 Popover 识别为 outside，需要保留日期面板。
-  if (target.closest('[data-range-calendar-jump="true"]')) {
-    event.preventDefault()
-  }
-}
-
-function updateSearchQuery(query: string | number) {
-  store.setFilter({ searchQuery: String(query).trim() || undefined })
-}
-
-function clearSearch() {
-  store.setFilter({ searchQuery: undefined })
-}
-
-function clearSearchFromTrigger(event: Event) {
-  event.preventDefault()
-  event.stopPropagation()
-  clearSearch()
-}
-
-function onTypeFilterChange(value: string | number | bigint | Record<string, any> | null) {
-  const stringValue = String(value || 'all')
-  const type = stringValue === 'all' ? undefined : (stringValue as AssetType)
-  store.setFilter({ type })
-}
-
-function clearTypeFilter(event?: Event) {
-  event?.preventDefault()
-  event?.stopPropagation()
-  store.setFilter({ type: undefined })
-}
-
-function onReviewFlagChange(value: string | number | bigint | Record<string, any> | null) {
-  const stringValue = String(value || 'all')
-  store.setFilter({
-    reviewFlag: stringValue === 'all' ? undefined : (stringValue as ReviewFlag),
-  })
-}
-
-function clearReviewFlagFilter(event?: Event) {
-  event?.preventDefault()
-  event?.stopPropagation()
-  store.setFilter({ reviewFlag: undefined })
-}
-
-function isRatingSelected(value: number): boolean {
-  return selectedRatings.value.includes(value)
-}
-
-function setRatingFilters(values: number[]) {
-  const ratings = normalizeRatings(values)
-  store.setFilter({ ratings: ratings.length > 0 ? ratings : undefined })
-}
-
-function toggleRatingFilter(value: number) {
-  const current = selectedRatings.value
-  if (current.includes(value)) {
-    setRatingFilters(current.filter((rating) => rating !== value))
-    return
-  }
-
-  setRatingFilters([...current, value])
-}
-
-function clearRatingFilter(event?: Event) {
-  event?.preventDefault()
-  event?.stopPropagation()
-  store.setFilter({ ratings: undefined })
-}
-
-function onSortByChange(value: string | number | bigint | Record<string, any> | null) {
-  if (value) {
-    const newSortBy = String(value) as SortBy
-    store.setSorting(newSortBy, sortOrder.value)
-  }
-}
-
-function toggleSortOrder() {
-  store.setSorting(sortBy.value, sortOrder.value === 'asc' ? 'desc' : 'asc')
-}
-
-function onCurrentFolderOnlyChange(value: boolean) {
-  store.includeSubfolders = !value
-}
-
-function applyColorFilter() {
-  store.setFilter({
-    colorHex: draftColorHex.value,
-    colorDistance: draftColorDistance.value,
-  })
-}
-
-function clearColorFilter(event?: Event) {
-  event?.preventDefault()
-  event?.stopPropagation()
-  store.setFilter({
-    colorHex: undefined,
-    colorDistance: undefined,
-  })
-  draftColorHex.value = '#FFFFFF'
-  draftColorDistance.value = COLOR_DISTANCE_DEFAULT
-  colorPopoverOpen.value = false
-}
-
-function onColorDistanceChange(value: number[] | undefined) {
-  if (value && value.length > 0 && value[0] !== undefined) {
-    draftColorDistance.value = value[0]
-  }
-}
-
-function clearAttributeFilters() {
-  store.setFilter({
-    searchQuery: undefined,
-    createdAtFrom: undefined,
-    createdAtTo: undefined,
-    type: undefined,
-    ratings: undefined,
-    reviewFlag: undefined,
-    colorHex: undefined,
-    colorDistance: undefined,
-  })
-  draftColorHex.value = '#FFFFFF'
-  draftColorDistance.value = COLOR_DISTANCE_DEFAULT
-  draftDateRange.value = { start: undefined, end: undefined }
-}
-
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -540,29 +163,6 @@ function handleToolbarContextMenu(event: MouseEvent) {
   }
 
   event.preventDefault()
-}
-
-function setViewMode(
-  mode:
-    | string
-    | number
-    | bigint
-    | Record<string, any>
-    | null
-    | (string | number | bigint | Record<string, any> | null)[]
-) {
-  if (mode && typeof mode === 'string') {
-    if (store.isCompactWindow && mode === 'list') {
-      return
-    }
-    store.view.mode = mode as ViewMode
-  }
-}
-
-function onViewSizeSliderChange(value: number[] | undefined) {
-  if (value && value.length > 0 && value[0] !== undefined) {
-    store.setViewSizeFromSlider(value[0])
-  }
 }
 </script>
 

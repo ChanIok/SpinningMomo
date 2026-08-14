@@ -2,6 +2,7 @@
   "common.languageEnUs": "English",
   "common.languageLabelBilingual": "语言 / Language",
   "common.languageZhCn": "简体中文",
+  "common.done": "完成",
   "common.no": "否",
   "common.windowTitlePicker.empty": "未找到可用窗口",
   "common.windowTitlePicker.loadFailed": "获取窗口列表失败",

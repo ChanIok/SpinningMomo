@@ -210,23 +210,16 @@ export function useGalleryData() {
   }
 
   /**
-   * 结果集有数据但右侧仍为空白（未选文件夹/标签）时，默认选中第一项，与常见资源管理器行为一致。
-   * 不覆盖 folder/tag/batch 详情焦点。
+   * 桌面端保留原有的资源管理器式初始聚焦；紧凑布局必须从未选择的浏览态开始。
    */
   function tryFocusFirstResultWhenDetailsEmpty(requestVersion: number) {
-    if (!store.isQueryVersionCurrent(requestVersion)) {
+    if (store.isCompactWindow || !store.isQueryVersionCurrent(requestVersion)) {
       return
     }
-    if (store.totalCount <= 0) {
+    if (store.totalCount <= 0 || store.detailsPanel.type !== 'none') {
       return
     }
-    if (store.detailsPanel.type !== 'none') {
-      return
-    }
-    if (store.selection.activeAssetId !== undefined) {
-      return
-    }
-    if (store.selectedCount > 0) {
+    if (store.selection.activeAssetId !== undefined || store.selectedCount > 0) {
       return
     }
 

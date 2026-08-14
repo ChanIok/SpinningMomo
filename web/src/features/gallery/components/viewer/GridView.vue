@@ -18,7 +18,7 @@ import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import { useI18n } from '@/composables/useI18n'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
-import { isGalleryTouchInput, markGalleryScroll, type GalleryInputType } from '../../input'
+import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
@@ -119,7 +119,7 @@ function handleAssetClick(
     return
   }
 
-  if (isGalleryTouchInput(inputType)) {
+  if (shouldOpenAssetOnTap(store.isCompactWindow, inputType)) {
     openAssetLightbox(asset, event, index, inputType)
     return
   }
@@ -132,11 +132,22 @@ function handleAssetLongPress(asset: Asset, _event: PointerEvent, index: number)
     return
   }
 
+  if (!store.isCompactWindow) {
+    // 宽屏触摸保持桌面式选择语义；长按不额外切换到另一种模式。
+    void gallerySelection.selectOnlyIndex(index)
+    return
+  }
+
   gallerySelection.enterMultiSelectMode(asset, index)
 }
 
-function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
-  openAssetLightbox(asset, event, index, 'mouse')
+function handleAssetDoubleClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
+  openAssetLightbox(asset, event, index, inputType)
 }
 
 function openAssetLightbox(
@@ -237,7 +248,8 @@ defineExpose({ scrollToIndex, getCardRect })
                 "
                 @long-press="(a, e) => handleAssetLongPress(a, e, virtualRow.index * columns + idx)"
                 @double-click="
-                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                  (a, e, inputType) =>
+                    handleAssetDoubleClick(a, e, virtualRow.index * columns + idx, inputType)
                 "
                 @context-menu="
                   (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)

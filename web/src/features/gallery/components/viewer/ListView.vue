@@ -8,6 +8,7 @@ import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
+import type { GalleryInputType } from '../../input'
 import AssetListRow from '../asset/AssetListRow.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
@@ -90,7 +91,12 @@ onMounted(async () => {
   await listVirtualizer.init()
 })
 
-function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
+function handleAssetClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  _inputType: GalleryInputType
+) {
   if (store.selection.mode === 'multi-select') {
     void gallerySelection.toggleIndex(index, asset)
     return
@@ -99,7 +105,12 @@ function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
   void gallerySelection.handleAssetClick(asset, event, index)
 }
 
-function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
+function handleAssetDoubleClick(
+  asset: Asset,
+  event: MouseEvent,
+  index: number,
+  inputType: GalleryInputType
+) {
   const thumbnailEl = (event.target as HTMLElement).closest('[data-asset-thumbnail]')
   if (thumbnailEl) {
     const rect = thumbnailEl.getBoundingClientRect()
@@ -107,7 +118,7 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
 
-  void galleryLightbox.openLightbox(index)
+  void galleryLightbox.openLightbox(index, inputType)
 }
 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
@@ -218,9 +229,13 @@ defineExpose({ scrollToIndex, getCardRect })
               :row-height="rowHeight"
               :thumbnail-size="thumbnailSize"
               :columns-template="columnsTemplate"
-              @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
+              @click="
+                (asset, event, inputType) =>
+                  handleAssetClick(asset, event, virtualItem.index, inputType)
+              "
               @double-click="
-                (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
+                (asset, event, inputType) =>
+                  handleAssetDoubleClick(asset, event, virtualItem.index, inputType)
               "
               @context-menu="
                 (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)

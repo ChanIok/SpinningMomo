@@ -1,7 +1,14 @@
 import { computed } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
 
-export type GalleryOverlay = 'folder' | 'lightbox' | 'lightbox-details'
+export type GalleryOverlay =
+  | 'folder'
+  | 'filter'
+  | 'view-settings'
+  | 'preferences'
+  | 'selection'
+  | 'lightbox'
+  | 'lightbox-details'
 
 export interface GalleryOverlaySnapshot {
   overlay: GalleryOverlay | null
@@ -23,7 +30,15 @@ function readQueryValue(query: LocationQuery, key: string): string | undefined {
 
 function parseOverlay(query: LocationQuery): GalleryOverlay | null {
   const value = readQueryValue(query, OVERLAY_QUERY_KEY)
-  if (value === 'folder' || value === 'lightbox' || value === 'lightbox-details') {
+  if (
+    value === 'folder' ||
+    value === 'filter' ||
+    value === 'view-settings' ||
+    value === 'preferences' ||
+    value === 'selection' ||
+    value === 'lightbox' ||
+    value === 'lightbox-details'
+  ) {
     return value
   }
   return null
@@ -58,7 +73,7 @@ export function isGalleryLightboxOverlay(overlay: GalleryOverlay | null | undefi
   return overlay === 'lightbox' || overlay === 'lightbox-details'
 }
 
-// 统一管理图库抽屉和暗房的同页历史，保证手势返回、工具栏返回与页面按钮遵循同一层级。
+// 统一管理图库抽屉、临时面板和暗房的同页历史，保证手势返回、工具栏返回与页面按钮遵循同一层级。
 export function useGalleryOverlayHistory() {
   const route = useRoute()
   const router = useRouter()
@@ -100,6 +115,24 @@ export function useGalleryOverlayHistory() {
   // 打开文件夹抽屉时新增一层历史，让系统返回手势可以只关闭抽屉。
   function openFolderDrawer() {
     return navigateToSnapshot({ overlay: 'folder' }, false)
+  }
+
+  // 紧凑图库的筛选和显示设置同样是可返回的临时层，避免触摸返回手势直接离开图库。
+  function openFilterPanel() {
+    return navigateToSnapshot({ overlay: 'filter' }, false)
+  }
+
+  function openViewSettingsPanel() {
+    return navigateToSnapshot({ overlay: 'view-settings' }, false)
+  }
+
+  function openPreferencesPanel() {
+    return navigateToSnapshot({ overlay: 'preferences' }, false)
+  }
+
+  // 多选模式也是一个可返回的临时交互层，系统返回应先退出多选而不是离开图库。
+  function openSelectionMode() {
+    return navigateToSnapshot({ overlay: 'selection' }, false)
   }
 
   // 从 Vue Router 当前条目读取 back 指向的父级，用来判断是否可以安全消费一层历史。
@@ -148,6 +181,36 @@ export function useGalleryOverlayHistory() {
       // 直链打开或历史栈不匹配时没有可消费的父级，只能原地清除覆盖层参数。
       await navigateToSnapshot({ overlay: null }, true)
     }
+  }
+
+  async function closeTransientPanel(
+    expected: 'filter' | 'view-settings' | 'preferences' | 'selection'
+  ) {
+    if (snapshot.value.overlay !== expected) {
+      return
+    }
+
+    const parent = getHistoryParentSnapshot()
+    const consumed = parent ? await consumeHistoryEntry(parent.overlay) : false
+    if (!consumed || snapshot.value.overlay !== parent?.overlay) {
+      await navigateToSnapshot({ overlay: null }, true)
+    }
+  }
+
+  function closeFilterPanel() {
+    return closeTransientPanel('filter')
+  }
+
+  function closeViewSettingsPanel() {
+    return closeTransientPanel('view-settings')
+  }
+
+  function closePreferencesPanel() {
+    return closeTransientPanel('preferences')
+  }
+
+  function closeSelectionMode() {
+    return closeTransientPanel('selection')
   }
 
   // 打开暗房时记录当前资产，浏览器返回可以恢复到原图库位置。
@@ -233,6 +296,14 @@ export function useGalleryOverlayHistory() {
     switch (snapshot.value.overlay) {
       case 'folder':
         return closeFolderDrawer()
+      case 'filter':
+        return closeFilterPanel()
+      case 'view-settings':
+        return closeViewSettingsPanel()
+      case 'preferences':
+        return closePreferencesPanel()
+      case 'selection':
+        return closeSelectionMode()
       case 'lightbox-details':
         return closeLightboxDetails()
       case 'lightbox':
@@ -247,6 +318,14 @@ export function useGalleryOverlayHistory() {
     hasOverlay,
     openFolderDrawer,
     closeFolderDrawer,
+    openFilterPanel,
+    closeFilterPanel,
+    openViewSettingsPanel,
+    closeViewSettingsPanel,
+    openPreferencesPanel,
+    closePreferencesPanel,
+    openSelectionMode,
+    closeSelectionMode,
     openLightbox,
     closeLightbox,
     openLightboxDetails,

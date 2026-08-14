@@ -1,7 +1,11 @@
 import { computed } from 'vue'
 import { useGalleryData } from './useGalleryData'
+import { useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 import { useGalleryStore } from '../store'
 import type { Asset } from '../types'
+
+// 选择入口和紧凑 Header 是不同组件实例；共享这段 pending 状态，避免快速点击退出时遗留 selection URL。
+let selectionHistoryOpenPromise: Promise<void> | null = null
 
 /**
  * Gallery选择管理 Composable
@@ -10,6 +14,7 @@ import type { Asset } from '../types'
 export function useGallerySelection() {
   const store = useGalleryStore()
   const galleryData = useGalleryData()
+  const overlayHistory = useGalleryOverlayHistory()
 
   const selectedIds = computed(() => store.selection.selectedIds)
   const selectedCount = computed(() => store.selectedCount)
@@ -188,7 +193,33 @@ export function useGallerySelection() {
     store.setSelectionAnchor(normalizedIndex)
     store.setActiveAsset(asset.id, normalizedIndex)
     syncDetailsFocusFromSelection(asset)
+    selectionHistoryOpenPromise = overlayHistory
+      .openSelectionMode()
+      .then(async () => {
+        // 用户可能在 push 完成前就点了退出；不要让延迟完成的导航把 selection 层重新留在地址栏。
+        if (
+          store.selection.mode !== 'multi-select' &&
+          overlayHistory.snapshot.value.overlay === 'selection'
+        ) {
+          await overlayHistory.closeSelectionMode()
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to record selection history entry:', error)
+        store.exitMultiSelectMode()
+      })
     return asset
+  }
+
+  async function exitMultiSelectMode() {
+    store.exitMultiSelectMode()
+    if (selectionHistoryOpenPromise) {
+      await selectionHistoryOpenPromise
+      selectionHistoryOpenPromise = null
+    }
+    if (overlayHistory.snapshot.value.overlay === 'selection') {
+      await overlayHistory.closeSelectionMode()
+    }
   }
 
   async function rangeSelectToIndex(index: number) {
@@ -324,6 +355,7 @@ export function useGallerySelection() {
     selectOnlyIndex,
     toggleIndex,
     enterMultiSelectMode,
+    exitMultiSelectMode,
     rangeSelectToIndex,
     selectAllCurrentQuery,
     syncDetailsFocusFromSelection,

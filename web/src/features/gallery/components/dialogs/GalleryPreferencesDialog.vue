@@ -85,27 +85,41 @@ watch(
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent
-      class="flex h-[640px] max-h-[85vh] flex-row gap-0 overflow-hidden p-0 sm:max-w-3xl"
+      class="flex gap-0 overflow-hidden p-0"
+      :class="
+        store.isCompactWindow
+          ? 'h-full max-h-none max-w-none flex-col rounded-none'
+          : 'h-[640px] max-h-[85vh] flex-row sm:max-w-3xl'
+      "
     >
       <DialogTitle class="sr-only">{{ t('gallery.preferences.title') }}</DialogTitle>
       <DialogDescription class="sr-only">{{
         t('gallery.preferences.description')
       }}</DialogDescription>
 
-      <nav class="w-56 shrink-0 space-y-1.5 border-r border-border/40 bg-muted/15 p-5 pt-7">
+      <nav
+        class="shrink-0 border-border/40 bg-muted/15"
+        :class="
+          store.isCompactWindow
+            ? 'flex w-full items-center gap-1 overflow-x-auto border-b p-2 pr-12'
+            : 'w-56 space-y-1.5 border-r p-5 pt-7'
+        "
+      >
         <div
-          class="px-3 pb-2.5 text-xs font-semibold tracking-wider text-muted-foreground/70 uppercase"
+          class="text-xs font-semibold tracking-wider text-muted-foreground/70 uppercase"
+          :class="store.isCompactWindow ? 'sr-only' : 'px-3 pb-2.5'"
         >
           {{ t('gallery.preferences.title') }}
         </div>
         <button
           type="button"
-          class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-          :class="
+          class="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            store.isCompactWindow ? 'w-auto shrink-0 whitespace-nowrap' : 'w-full',
             activeTab === 'view'
               ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-          "
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          ]"
           @click="activeTab = 'view'"
         >
           <Palette class="h-4 w-4 shrink-0" />
@@ -113,12 +127,13 @@ watch(
         </button>
         <button
           type="button"
-          class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-          :class="
+          class="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            store.isCompactWindow ? 'w-auto shrink-0 whitespace-nowrap' : 'w-full',
             activeTab === 'deletion'
               ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-          "
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          ]"
           @click="activeTab = 'deletion'"
         >
           <Trash2 class="h-4 w-4 shrink-0" />
@@ -126,12 +141,13 @@ watch(
         </button>
         <button
           type="button"
-          class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-          :class="
+          class="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            store.isCompactWindow ? 'w-auto shrink-0 whitespace-nowrap' : 'w-full',
             activeTab === 'maintenance'
               ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-          "
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          ]"
           @click="activeTab = 'maintenance'"
         >
           <Database class="h-4 w-4 shrink-0" />
@@ -139,7 +155,10 @@ watch(
         </button>
       </nav>
 
-      <main class="flex min-w-0 flex-1 flex-col p-8 pt-7">
+      <main
+        class="flex min-w-0 flex-1 flex-col overflow-y-auto"
+        :class="store.isCompactWindow ? 'p-4 pt-5' : 'p-8 pt-7'"
+      >
         <div v-if="activeTab === 'view'" class="space-y-6">
           <div>
             <h3 class="text-base font-semibold text-foreground">

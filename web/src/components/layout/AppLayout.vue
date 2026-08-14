@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useGalleryStore } from '@/features/gallery/store'
 import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
 import { Toaster } from '@/components/ui/sonner'
@@ -11,11 +12,19 @@ import WindowResizeOverlay from './WindowResizeOverlay.vue'
 import 'vue-sonner/style.css'
 
 const route = useRoute()
+const galleryStore = useGalleryStore()
 const settingsStore = useSettingsStore()
 const isDev = import.meta.env.DEV
 const isWelcome = computed(() => route.name === 'welcome')
 const isHome = computed(() => route.name === 'home')
 const isGallery = computed(() => route.name === 'gallery')
+const shouldHideAppHeader = computed(
+  () =>
+    isGallery.value &&
+    galleryStore.isCompactWindow &&
+    galleryStore.lightbox.isOpen &&
+    !galleryStore.lightbox.chromeVisible
+)
 const hasBackgroundImage = computed(() =>
   Boolean(resolveBackgroundImageUrl(settingsStore.appSettings.ui.background))
 )
@@ -37,8 +46,8 @@ const hasBackgroundImage = computed(() =>
       class="relative z-10 flex h-full w-full min-w-0 flex-col rounded-lg text-foreground"
       :class="[!isHome && !isWelcome && !isGallery && 'surface-middle']"
     >
-      <!-- 窗口控制栏 -->
-      <AppHeader />
+      <!-- 窄屏触摸暗房进入纯图片状态时，整个应用 Header 一并移除，内容区填满窗口。 -->
+      <AppHeader v-if="!shouldHideAppHeader" />
       <!-- 主内容区域 -->
       <div class="relative z-10 min-h-0 flex-1 overflow-auto">
         <ContentArea />

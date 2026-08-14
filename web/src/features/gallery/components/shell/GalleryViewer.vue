@@ -50,7 +50,6 @@ const contentRef = ref<HTMLElement | null>(null)
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
-const preferencesOpen = ref(false)
 const isExternalDragActive = ref(false)
 const isDropImporting = ref(false)
 const lastInputType = ref<GalleryInputType>('mouse')
@@ -297,6 +296,34 @@ watch(
   { immediate: true }
 )
 
+// 紧凑布局中的设置也属于同页临时层；桌面端仍由原有 Dialog 状态直接控制。
+watch(
+  () => overlayHistory.snapshot.value.overlay,
+  (overlay) => {
+    if (store.isCompactWindow) {
+      store.setPreferencesDialogOpen(overlay === 'preferences')
+    }
+  },
+  { immediate: true }
+)
+
+function handlePreferencesDialogOpenChange(open: boolean) {
+  if (open) {
+    if (store.isCompactWindow) {
+      void overlayHistory.openPreferencesPanel()
+    } else {
+      store.setPreferencesDialogOpen(true)
+    }
+    return
+  }
+
+  if (overlayHistory.snapshot.value.overlay === 'preferences') {
+    void overlayHistory.closePreferencesPanel()
+  } else {
+    store.setPreferencesDialogOpen(false)
+  }
+}
+
 // 切换图片不增加历史层级，只更新当前条目的资产身份，保证前进时回到最后查看的图片。
 watch(
   () => store.selection.activeAssetId,
@@ -319,6 +346,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   isViewerUnmounted = true
+  store.setPreferencesDialogOpen(false)
   pendingGalleryScrollIndex = undefined
   if (heroRafId !== null) cancelAnimationFrame(heroRafId)
   if (reverseHeroRafId !== null) cancelAnimationFrame(reverseHeroRafId)
@@ -661,9 +689,12 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
-      <GalleryToolbar v-if="!isMultiSelectMode" @open-preferences="preferencesOpen = true" />
+      <GalleryToolbar
+        v-if="!isMultiSelectMode && !store.isCompactWindow"
+        @open-preferences="store.setPreferencesDialogOpen(true)"
+      />
       <div
-        v-else
+        v-else-if="isMultiSelectMode && !store.isCompactWindow"
         class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2"
       >
         <Button
@@ -671,7 +702,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
           size="icon"
           class="h-10 w-10"
           :aria-label="t('gallery.mobile.selection.exit')"
-          @click="store.exitMultiSelectMode"
+          @click="gallerySelection.exitMultiSelectMode"
         >
           <X class="size-5" />
         </Button>
@@ -731,7 +762,10 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       @request-reverse-hero="startReverseHero"
     />
 
-    <GalleryPreferencesDialog v-model:open="preferencesOpen" />
+    <GalleryPreferencesDialog
+      :open="store.preferencesDialogOpen"
+      @update:open="handlePreferencesDialogOpenChange"
+    />
 
     <!-- Hero overlay: 缩略图放大到 lightbox 的动画层 -->
     <Teleport to="body">

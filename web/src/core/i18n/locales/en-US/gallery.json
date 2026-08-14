@@ -376,6 +376,7 @@
   "gallery.toolbar.colorFilter.tooltip": "Color Filter",
   "gallery.toolbar.dateFilter.apply": "Apply",
   "gallery.toolbar.dateFilter.clear": "Clear",
+  "gallery.toolbar.dateFilter.none": "No date filter",
   "gallery.toolbar.dateFilter.fromLabel": "From {from}",
   "gallery.toolbar.dateFilter.rangeLabel": "{from} - {to}",
   "gallery.toolbar.dateFilter.title": "Date Range",
@@ -483,5 +484,9 @@
   "gallery.preferences.maintenance.confirmTitle": "Permanently remove all unavailable assets?",
   "gallery.preferences.maintenance.confirmDescription": "This permanently deletes indexes, ratings, tags, and related data for {count} assets. The data cannot be recovered if the original files return later.",
   "gallery.preferences.maintenance.cancel": "Cancel",
-  "gallery.preferences.maintenance.confirm": "Remove Permanently"
+  "gallery.preferences.maintenance.confirm": "Remove Permanently",
+  "gallery.mobile.toolbar.filter.title": "Filter",
+  "gallery.mobile.toolbar.filter.description": "Filter gallery content by keyword, date, color, type, rating, or flag.",
+  "gallery.mobile.toolbar.menu": "Open folders and tags",
+  "gallery.mobile.toolbar.viewSettings.title": "View & Sort"
 }

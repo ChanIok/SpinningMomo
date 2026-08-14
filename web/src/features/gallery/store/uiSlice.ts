@@ -34,6 +34,7 @@ export function createUiSlice() {
     target: 'background',
   })
   const moveToFolderDialogOpen = ref(false)
+  const preferencesDialogOpen = ref(false)
   const deleteAssetsDialog = reactive<DeleteAssetsDialogState>({
     open: false,
     ids: [],
@@ -79,6 +80,10 @@ export function createUiSlice() {
     moveToFolderDialogOpen.value = open
   }
 
+  function setPreferencesDialogOpen(open: boolean) {
+    preferencesDialogOpen.value = open
+  }
+
   function openDeleteAssetsDialog(options: Omit<DeleteAssetsDialogState, 'open'>) {
     Object.assign(deleteAssetsDialog, options, { open: true })
   }
@@ -116,6 +121,7 @@ export function createUiSlice() {
     contextMenuState.anchorY = 0
     contextMenuState.target = 'background'
     moveToFolderDialogOpen.value = false
+    preferencesDialogOpen.value = false
     deleteAssetsDialog.open = false
     deleteAssetsDialog.ids = []
     deleteAssetsDialog.mode = 'recycleBin'
@@ -132,6 +138,8 @@ export function createUiSlice() {
     setContextMenuOpen,
     moveToFolderDialogOpen,
     setMoveToFolderDialogOpen,
+    preferencesDialogOpen,
+    setPreferencesDialogOpen,
     deleteAssetsDialog: readonly(deleteAssetsDialog),
     openDeleteAssetsDialog,
     setDeleteAssetsDialogOpen,

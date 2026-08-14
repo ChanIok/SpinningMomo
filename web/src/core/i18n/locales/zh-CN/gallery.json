@@ -376,6 +376,7 @@
   "gallery.toolbar.colorFilter.tooltip": "颜色筛选",
   "gallery.toolbar.dateFilter.apply": "应用",
   "gallery.toolbar.dateFilter.clear": "清除",
+  "gallery.toolbar.dateFilter.none": "未筛选",
   "gallery.toolbar.dateFilter.fromLabel": "{from} 之后",
   "gallery.toolbar.dateFilter.rangeLabel": "{from} - {to}",
   "gallery.toolbar.dateFilter.title": "日期范围",
@@ -483,5 +484,9 @@
   "gallery.preferences.maintenance.confirmTitle": "永久清理全部失效文件记录？",
   "gallery.preferences.maintenance.confirmDescription": "将永久删除 {count} 个失效文件的索引、评分、标签及关联数据。即使原文件稍后恢复，这些数据也无法找回。",
   "gallery.preferences.maintenance.cancel": "取消",
-  "gallery.preferences.maintenance.confirm": "永久清理"
+  "gallery.preferences.maintenance.confirm": "永久清理",
+  "gallery.mobile.toolbar.filter.title": "筛选",
+  "gallery.mobile.toolbar.filter.description": "按关键词、日期、颜色、类型、评分或旗标筛选图库内容。",
+  "gallery.mobile.toolbar.menu": "打开文件夹和标签",
+  "gallery.mobile.toolbar.viewSettings.title": "显示与排序"
 }

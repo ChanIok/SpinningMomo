@@ -38,7 +38,7 @@ const props = withDefaults(defineProps<AssetCardProps>(), {
 // Emits 定义
 const emit = defineEmits<{
   click: [asset: Asset, event: MouseEvent, inputType: GalleryInputType]
-  'double-click': [asset: Asset, event: MouseEvent]
+  'double-click': [asset: Asset, event: MouseEvent, inputType: GalleryInputType]
   'long-press': [asset: Asset, event: PointerEvent]
   'context-menu': [asset: Asset, event: MouseEvent]
   'drag-start': [asset: Asset, event: DragEvent]
@@ -176,11 +176,13 @@ function handleClick(event: MouseEvent) {
 }
 
 function handleDoubleClick(event: MouseEvent) {
-  if (lastInputType !== 'mouse') {
+  // 窄屏触摸的单击已经打开暗房；不要让同一手势随后补发的 dblclick 再次触发。
+  // 宽屏触摸仍允许双击打开暗房，以便单击可以先更新详情面板。
+  if (store.isCompactWindow && isGalleryTouchInput(lastInputType)) {
     return
   }
 
-  emit('double-click', props.asset, event)
+  emit('double-click', props.asset, event, lastInputType)
 }
 
 function handlePointerDown(event: PointerEvent) {

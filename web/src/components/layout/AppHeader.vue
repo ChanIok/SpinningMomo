@@ -31,6 +31,7 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { backWithViewTransition } from '@/router/viewTransition'
+import GalleryCompactHeader from '@/features/gallery/components/mobile/GalleryCompactHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,6 +88,8 @@ const galleryStore = useGalleryStore()
 const overlayHistory = useGalleryOverlayHistory()
 const isSidebarOpen = computed(() => galleryStore.sidebarOpen)
 const isDetailsOpen = computed(() => galleryStore.detailsOpen)
+const isTouchLike = ref(false)
+let coarsePointerMediaQuery: MediaQueryList | null = null
 
 const handleMinimize = () => {
   call('webview.minimize').catch((err) => {
@@ -108,6 +111,15 @@ const handleClose = () => {
 
 // 页面级返回先消费图库当前覆盖层；只有图库回到基础状态后才切换到上一级页面。
 const handleBack = () => {
+  if (isGalleryPage.value && galleryStore.selection.mode === 'multi-select') {
+    if (overlayHistory.snapshot.value.overlay === 'selection') {
+      void overlayHistory.closeSelectionMode()
+    } else {
+      galleryStore.exitMultiSelectMode()
+    }
+    return
+  }
+
   if (isGalleryPage.value && overlayHistory.hasOverlay.value) {
     void overlayHistory.closeTopOverlay()
     return
@@ -141,6 +153,17 @@ const handleToggleSidebar = () => {
 
 const handleToggleDetails = () => {
   galleryStore.detailsOpen = !galleryStore.detailsOpen
+}
+
+function handlePointerDown(event: PointerEvent) {
+  isTouchLike.value =
+    event.pointerType === 'touch' ||
+    event.pointerType === 'pen' ||
+    Boolean(coarsePointerMediaQuery?.matches)
+}
+
+function handleCoarsePointerChange(event: MediaQueryListEvent) {
+  isTouchLike.value = event.matches
 }
 
 function resolveTaskTypeLabel(type: string): string {
@@ -321,108 +344,125 @@ watch(
 
 onMounted(() => {
   window.addEventListener('keydown', handleNavigationKeydown)
+  coarsePointerMediaQuery = window.matchMedia('(any-pointer: coarse)')
+  isTouchLike.value = coarsePointerMediaQuery.matches
+  coarsePointerMediaQuery.addEventListener('change', handleCoarsePointerChange)
+  window.addEventListener('pointerdown', handlePointerDown, { passive: true })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleNavigationKeydown)
+  coarsePointerMediaQuery?.removeEventListener('change', handleCoarsePointerChange)
+  window.removeEventListener('pointerdown', handlePointerDown)
+  coarsePointerMediaQuery = null
 })
 </script>
 
 <template>
   <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-1">
-    <!-- 导航与图库面板控制按钮 Tooltip 上下文 -->
-    <TooltipProvider>
-      <!-- 页面的返回与标题 -->
-      <div v-if="showPageNavigation" class="flex shrink-0 items-center gap-1">
-        <Tooltip :delay-duration="1500">
-          <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 max-w-48 gap-1.5 rounded-sm text-foreground/75 hover:bg-black/10 hover:text-foreground has-[>svg]:pr-6 has-[>svg]:pl-4 dark:hover:bg-white/10"
-              :aria-label="t('app.navigation.back')"
-              @click="handleBack"
-            >
-              <ChevronLeft class="h-4 w-4 shrink-0" :stroke-width="1.5" />
-              <span class="truncate text-xs font-medium">
-                {{ pageTitle }}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" :side-offset="0">
-            {{ t('app.navigation.back') }}
-          </TooltipContent>
-        </Tooltip>
-      </div>
+    <template v-if="isGalleryPage && galleryStore.isCompactWindow">
+      <GalleryCompactHeader
+        :page-title="pageTitle"
+        :touch-like="isTouchLike"
+        @back="handleBack"
+        @toggle-sidebar="handleToggleSidebar"
+      />
+    </template>
+    <template v-else>
+      <!-- 导航与图库面板控制按钮 Tooltip 上下文 -->
+      <TooltipProvider>
+        <!-- 页面的返回与标题 -->
+        <div v-if="showPageNavigation" class="flex shrink-0 items-center gap-1">
+          <Tooltip :delay-duration="1500">
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-8 max-w-48 gap-1.5 rounded-sm text-foreground/75 hover:bg-black/10 hover:text-foreground has-[>svg]:pr-6 has-[>svg]:pl-4 dark:hover:bg-white/10"
+                :aria-label="t('app.navigation.back')"
+                @click="handleBack"
+              >
+                <ChevronLeft class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+                <span class="truncate text-xs font-medium">
+                  {{ pageTitle }}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="0">
+              {{ t('app.navigation.back') }}
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-      <!-- 可拖动区域 -->
-      <div class="mt-1.5 h-full flex-1">
-        <div class="drag-region h-full" />
-      </div>
+        <!-- 可拖动区域 -->
+        <div class="mt-1.5 h-full flex-1">
+          <div class="drag-region h-full" />
+        </div>
 
-      <!-- 图库布局控制 -->
-      <div v-if="isGalleryPage" class="flex gap-1">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-              :class="[!isSidebarOpen && 'text-muted-foreground']"
-              :aria-label="
+        <!-- 图库布局控制 -->
+        <div v-if="isGalleryPage" class="flex gap-1">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
+                :class="[!isSidebarOpen && 'text-muted-foreground']"
+                :aria-label="
+                  isSidebarOpen
+                    ? t('app.header.gallery.toggleSidebar.hide')
+                    : t('app.header.gallery.toggleSidebar.show')
+                "
+                @click="handleToggleSidebar"
+              >
+                <component
+                  :is="isSidebarOpen ? PanelLeftClose : PanelLeftOpen"
+                  class="h-4 w-4"
+                  :stroke-width="1.5"
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="0">
+              {{
                 isSidebarOpen
                   ? t('app.header.gallery.toggleSidebar.hide')
                   : t('app.header.gallery.toggleSidebar.show')
-              "
-              @click="handleToggleSidebar"
-            >
-              <component
-                :is="isSidebarOpen ? PanelLeftClose : PanelLeftOpen"
-                class="h-4 w-4"
-                :stroke-width="1.5"
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" :side-offset="0">
-            {{
-              isSidebarOpen
-                ? t('app.header.gallery.toggleSidebar.hide')
-                : t('app.header.gallery.toggleSidebar.show')
-            }}
-          </TooltipContent>
-        </Tooltip>
+              }}
+            </TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-              :class="[!isDetailsOpen && 'text-muted-foreground']"
-              :aria-label="
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
+                :class="[!isDetailsOpen && 'text-muted-foreground']"
+                :aria-label="
+                  isDetailsOpen
+                    ? t('app.header.gallery.toggleDetails.hide')
+                    : t('app.header.gallery.toggleDetails.show')
+                "
+                @click="handleToggleDetails"
+              >
+                <component
+                  :is="isDetailsOpen ? PanelRightClose : PanelRightOpen"
+                  class="h-4 w-4"
+                  :stroke-width="1.5"
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="0">
+              {{
                 isDetailsOpen
                   ? t('app.header.gallery.toggleDetails.hide')
                   : t('app.header.gallery.toggleDetails.show')
-              "
-              @click="handleToggleDetails"
-            >
-              <component
-                :is="isDetailsOpen ? PanelRightClose : PanelRightOpen"
-                class="h-4 w-4"
-                :stroke-width="1.5"
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" :side-offset="0">
-            {{
-              isDetailsOpen
-                ? t('app.header.gallery.toggleDetails.hide')
-                : t('app.header.gallery.toggleDetails.show')
-            }}
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
+              }}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+    </template>
 
     <div v-if="hasTaskRecords" class="flex items-center">
       <DropdownMenu v-model:open="isTaskMenuOpen">

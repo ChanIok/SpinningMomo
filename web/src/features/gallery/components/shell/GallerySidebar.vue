@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -9,7 +10,15 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Split } from '@/components/ui/split'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ListChevronsDownUp, Images, Plus, ChevronDown, ChevronRight } from '@lucide/vue'
+import {
+  ChevronDown,
+  ChevronRight,
+  Images,
+  ListChevronsDownUp,
+  Map,
+  Plus,
+  Settings,
+} from '@lucide/vue'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +35,10 @@ import {
   useGalleryAssetActions,
   useGalleryFolderActions,
 } from '../../composables'
+import { useGalleryOverlayHistory } from '../../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../../store'
+import { useSettingsStore } from '@/features/settings/store'
+import { pushWithViewTransition } from '@/router/viewTransition'
 import type { FolderTreeNode } from '../../types'
 import FolderTreeItem from '../folders/FolderTreeItem.vue'
 import TagTreeItem from '../tags/TagTreeItem.vue'
@@ -45,11 +57,17 @@ const galleryData = useGalleryData()
 const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
 const galleryStore = useGalleryStore()
+const overlayHistory = useGalleryOverlayHistory()
+const settingsStore = useSettingsStore()
+const router = useRouter()
 const { sidebarFolderSplitSize } = storeToRefs(galleryStore)
 const { toast } = useToast()
 const { t } = useI18n()
 // 侧边栏仍展示图库树，但所有宿主机文件操作都由这个能力开关统一控制。
 const canUseLocalFileSystem = computed(() => isLocalAccess())
+const showMapEntry = computed(
+  () => isLocalAccess() && settingsStore.appSettings.extensions.infinityNikki.enable
+)
 
 const isFoldersCollapsed = ref(false)
 const isTagsCollapsed = ref(false)
@@ -448,6 +466,20 @@ function handleSidebarContextMenu(event: MouseEvent) {
   event.preventDefault()
 }
 
+async function openPreferences() {
+  if (overlayHistory.snapshot.value.overlay === 'folder') {
+    await overlayHistory.closeFolderDrawer()
+  }
+  await overlayHistory.openPreferencesPanel()
+}
+
+function openMap() {
+  if (!showMapEntry.value) {
+    return
+  }
+  void pushWithViewTransition(router, '/map')
+}
+
 onMounted(() => {
   galleryData.loadFolderTree()
   loadTagTree()
@@ -671,6 +703,29 @@ onMounted(() => {
           </div>
         </template>
       </Split>
+    </div>
+
+    <div
+      v-if="galleryStore.isCompactWindow"
+      class="shrink-0 space-y-1 border-t border-border/60 p-2"
+    >
+      <Button
+        v-if="showMapEntry"
+        variant="ghost"
+        class="h-10 w-full justify-start gap-3 px-3 text-sm"
+        @click="openMap"
+      >
+        <Map class="size-4" />
+        {{ t('app.navigation.map') }}
+      </Button>
+      <Button
+        variant="ghost"
+        class="h-10 w-full justify-start gap-3 px-3 text-sm"
+        @click="openPreferences"
+      >
+        <Settings class="size-4" />
+        {{ t('gallery.preferences.open') }}
+      </Button>
     </div>
 
     <GalleryScanDialog :open="showAddFolderDialog" @update:open="handleAddFolderDialogOpenChange" />

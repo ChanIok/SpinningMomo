@@ -48,6 +48,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     isClosing: false,
     inputType: 'mouse',
     isImmersive: false,
+    chromeVisible: true,
     showFilmstrip: true,
     zoom: 1.0,
     fitMode: 'contain',
@@ -246,6 +247,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     selection.mode = 'browse'
     selection.selectedIds.clear()
     selection.anchorIndex = undefined
+    clearActiveAsset()
     clearDetailsFocus()
   }
 
@@ -293,6 +295,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     resetLightboxView()
     lightbox.inputType = inputType
     lightbox.isClosing = false
+    lightbox.chromeVisible = true
     lightbox.isOpen = true
   }
 
@@ -304,6 +307,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
+    lightbox.chromeVisible = true
     lightbox.inputType = 'mouse'
     resetLightboxView()
   }
@@ -332,6 +336,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
 
   function setLightboxImmersive(immersive: boolean) {
     lightbox.isImmersive = immersive
+  }
+
+  function setLightboxChromeVisible(visible: boolean) {
+    lightbox.chromeVisible = visible
   }
 
   function toggleLightboxImmersive() {
@@ -377,6 +385,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
+    lightbox.chromeVisible = true
     lightbox.inputType = 'mouse'
     lightbox.showFilmstrip = true
     resetLightboxView()
@@ -422,6 +431,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     goToPreviousLightbox,
     goToNextLightbox,
     setLightboxImmersive,
+    setLightboxChromeVisible,
     toggleLightboxImmersive,
     toggleLightboxFilmstrip,
     setLightboxZoom,

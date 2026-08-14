@@ -1,14 +1,27 @@
 import { useGalleryStore } from '../store'
 import { useGallerySelection } from './useGallerySelection'
 import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
-import type { GalleryInputType } from '../input'
+import { isGalleryTouchInput, type GalleryInputType } from '../input'
 
 // 协调暗房的 Store 状态与 URL 历史，保证打开、切图和关闭由同一条状态链驱动。
 export function useGalleryLightbox() {
   const store = useGalleryStore()
   const gallerySelection = useGallerySelection()
   const overlayHistory = useGalleryOverlayHistory()
-  async function syncLightboxSelection(index: number) {
+  async function syncLightboxSelection(
+    index: number,
+    inputType: GalleryInputType = store.lightbox.inputType
+  ) {
+    // 窄屏触摸单击的职责只是进入暗房，不应在返回图库后留下“被选中”的假象。
+    // activeIndex 仍然保留给暗房导航和 hero 动画使用。
+    if (
+      store.isCompactWindow &&
+      isGalleryTouchInput(inputType) &&
+      store.selection.mode !== 'multi-select'
+    ) {
+      return gallerySelection.activateIndex(index)
+    }
+
     if (store.selectedCount > 1) {
       return gallerySelection.activateIndex(index, { syncDetails: true })
     }
@@ -18,7 +31,7 @@ export function useGalleryLightbox() {
 
   // 先同步选中资产，再同时打开暗房并写入可返回的历史层。
   async function openLightbox(index: number, inputType: GalleryInputType = 'mouse') {
-    const asset = await syncLightboxSelection(index)
+    const asset = await syncLightboxSelection(index, inputType)
     if (!asset) {
       return
     }

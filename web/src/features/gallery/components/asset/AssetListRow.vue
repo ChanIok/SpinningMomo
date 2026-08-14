@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Play } from '@lucide/vue'
 import { formatFileSize } from '@/lib/utils'
 import { useGalleryData } from '../../composables/useGalleryData'
+import { normalizeGalleryInputType, type GalleryInputType } from '../../input'
 import type { Asset } from '../../types'
 
 interface AssetListRowProps {
@@ -18,8 +19,8 @@ const props = withDefaults(defineProps<AssetListRowProps>(), {
 })
 
 const emit = defineEmits<{
-  click: [asset: Asset, event: MouseEvent]
-  'double-click': [asset: Asset, event: MouseEvent]
+  click: [asset: Asset, event: MouseEvent, inputType: GalleryInputType]
+  'double-click': [asset: Asset, event: MouseEvent, inputType: GalleryInputType]
   'context-menu': [asset: Asset, event: MouseEvent]
   'drag-start': [asset: Asset, event: DragEvent]
 }>()
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 const { getAssetThumbnailUrl } = useGalleryData()
 
 const imageError = ref(false)
+let lastInputType: GalleryInputType = 'mouse'
 
 const thumbnailUrl = computed(() => getAssetThumbnailUrl(props.asset))
 const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
@@ -68,11 +70,17 @@ function onImageError() {
 }
 
 function handleClick(event: MouseEvent) {
-  emit('click', props.asset, event)
+  emit('click', props.asset, event, event.detail === 0 ? 'keyboard' : lastInputType)
 }
 
 function handleDoubleClick(event: MouseEvent) {
-  emit('double-click', props.asset, event)
+  emit('double-click', props.asset, event, lastInputType)
+}
+
+function handlePointerDown(event: PointerEvent) {
+  if (event.isPrimary !== false) {
+    lastInputType = normalizeGalleryInputType(event.pointerType)
+  }
 }
 
 function handleContextMenu(event: MouseEvent) {
@@ -101,6 +109,7 @@ function handleDragStart(event: DragEvent) {
     }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
+    @pointerdown="handlePointerDown"
     @contextmenu="handleContextMenu"
     @dragstart="handleDragStart"
   >

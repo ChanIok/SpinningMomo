@@ -193,6 +193,8 @@ export interface LightboxState {
   inputType: GalleryInputType
   /** 沉浸模式：仅页面内 Teleport + 固定层铺满视口，不调用系统/浏览器全屏 */
   isImmersive: boolean
+  /** 暗房控件显隐：窄屏触摸手势的临时界面状态，不改变沉浸模式 */
+  chromeVisible: boolean
   showFilmstrip: boolean
   zoom: number
   fitMode: 'contain' | 'cover' | 'actual'
