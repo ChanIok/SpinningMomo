@@ -80,6 +80,11 @@ export function useGalleryOverlayHistory() {
   const snapshot = computed(() => snapshotFromQuery(route.query))
   const hasOverlay = computed(() => snapshot.value.overlay !== null)
 
+  // 返回当前覆盖层快照；await 后重新读取才能反映历史消费触发的导航结果。
+  function currentOverlay(): GalleryOverlay | null {
+    return snapshot.value.overlay
+  }
+
   function buildQuery(nextSnapshot: GalleryOverlaySnapshot): LocationQueryRaw {
     const query: LocationQueryRaw = { ...route.query }
     delete query[OVERLAY_QUERY_KEY]
@@ -227,7 +232,7 @@ export function useGalleryOverlayHistory() {
     if (snapshot.value.overlay === 'lightbox-details') {
       // 先从详情退回暗房，保持 Escape/系统返回的层级语义一致。
       const detailsConsumed = await consumeHistoryEntry('lightbox')
-      if (!detailsConsumed || snapshot.value.overlay !== 'lightbox') {
+      if (!detailsConsumed || currentOverlay() !== 'lightbox') {
         // 详情是直链或父级异常时，直接回到图库，避免卡在无效覆盖层地址。
         await navigateToSnapshot({ overlay: null }, true)
         return
@@ -264,7 +269,7 @@ export function useGalleryOverlayHistory() {
     }
 
     const consumed = await consumeHistoryEntry('lightbox')
-    if (!consumed || snapshot.value.overlay !== 'lightbox') {
+    if (!consumed || currentOverlay() !== 'lightbox') {
       // 详情地址可能是用户直接打开的，此时原地恢复暗房状态即可。
       await navigateToSnapshot(
         {

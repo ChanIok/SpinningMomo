@@ -99,7 +99,6 @@ const {
 const {
   viewMode,
   sortBy,
-  sortOrder,
   currentFolderOnly,
   currentSliderPosition,
   availableViewModes,

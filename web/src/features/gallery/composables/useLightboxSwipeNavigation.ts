@@ -696,7 +696,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     swipeStartOffset.value = swipeOffset.value
     swipeGestureOriginOffset.value = swipeOffset.value
     swipeGestureOriginIndex.value =
-      animationTargetIndex.value ?? baseIndex.value ?? store.selection.activeIndex
+      animationTargetIndex.value ?? baseIndex.value ?? store.selection.activeIndex ?? null
     swipeDirection.value = null
     panAxis.value = null
     pageSwipeStartedFromPan = false
