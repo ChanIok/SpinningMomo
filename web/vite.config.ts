@@ -30,6 +30,11 @@ export default defineConfig(({ command, mode }) => ({
         changeOrigin: true,
         secure: false,
       },
+      '/downloads': {
+        target: 'http://localhost:51206',
+        changeOrigin: true,
+        secure: false,
+      },
       '/sse': {
         target: 'http://localhost:51206',
         changeOrigin: true,

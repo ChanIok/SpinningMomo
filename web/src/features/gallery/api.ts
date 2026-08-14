@@ -36,6 +36,7 @@ import type {
   PurgeMissingAssetsResult,
   DeleteAssetsParams,
   DeleteAssetsResult,
+  PrepareDownloadResult,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
@@ -138,6 +139,11 @@ export function revealAssetInExplorer(assetId: number): Promise<OperationResult>
 export function copyAssetsToClipboard(assetIds: number[]): Promise<OperationResult> {
   requireLocalAccess('Copying assets to the clipboard')
   return call<OperationResult>('gallery.copyAssetsToClipboard', { ids: assetIds })
+}
+
+// 允许本机和 LAN 页面下载原始资产；多选时后端会先准备扁平 ZIP。
+export function prepareDownload(assetIds: number[]): Promise<PrepareDownloadResult> {
+  return call<PrepareDownloadResult>('gallery.prepareDownload', { ids: assetIds }, 0)
 }
 
 // 读取宿主机剪贴板文件并导入指定图库文件夹。
@@ -325,6 +331,7 @@ export const galleryApi = {
   openAssetDefault,
   revealAssetInExplorer,
   copyAssetsToClipboard,
+  prepareDownload,
   pasteClipboardToFolder,
   importDroppedFilesToFolder,
   deleteAssets,

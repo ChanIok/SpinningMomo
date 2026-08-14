@@ -208,6 +208,29 @@ export function useGalleryAssetActions() {
     }
   }
 
+  // 去重并校验下载 ID，再把准备失败转换为前端可显示的错误。
+  async function prepareDownload(assetIds: number[]) {
+    // 只过滤无效和重复 ID，数量限制由大批量确认提示而不是后端能力承担。
+    const ids = [...new Set(assetIds)].filter((assetId) => assetId > 0)
+    if (ids.length === 0) {
+      return
+    }
+
+    // 后端负责直链解析或 ZIP 准备，返回结果后再决定如何提示用户。
+    const result = await galleryApi.prepareDownload(ids)
+    if (!result.downloadUrl || !result.fileName) {
+      // 没有可用 URL 表示当前请求没有可交付的文件。
+      if (result.failedCount > 0) {
+        throw new Error(
+          t('gallery.mobile.download.failedDescription', { failed: result.failedCount })
+        )
+      }
+      throw new Error(t('gallery.mobile.download.unavailableDescription'))
+    }
+
+    return result
+  }
+
   async function moveAssetsToFolderByIds(folderId: number, assetIds: number[]) {
     const uniqueIds = [...new Set(assetIds)].filter((id) => id > 0)
     if (uniqueIds.length === 0) {
@@ -657,6 +680,7 @@ export function useGalleryAssetActions() {
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
     handleCopyAssetsToClipboard,
+    prepareDownload,
     requestDeleteAssets,
     confirmDeleteAssets,
     copySelectedAssetTags,

@@ -506,4 +506,10 @@ struct UpdateAssetsDescriptionParams {
 
 struct GetTagStatsParams {};
 
+// ============= 下载相关类型 =============
+
+struct PrepareDownloadParams {
+  std::vector<std::int64_t> ids;
+};
+
 }  // namespace features::gallery

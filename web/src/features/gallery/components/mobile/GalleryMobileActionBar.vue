@@ -1,16 +1,40 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Copy, ExternalLink, FolderOpen, MoreHorizontal, Star, Tag, Trash2, X } from '@lucide/vue'
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  FolderOpen,
+  LoaderCircle,
+  MoreHorizontal,
+  Star,
+  Tag,
+  Trash2,
+  X,
+} from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { isLocalAccess } from '@/core/access'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useGalleryAssetActions, useGalleryData } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { galleryApi } from '../../api'
 import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
+import { isWebView } from '@/core/env'
 
 const { t } = useI18n()
+const { toast } = useToast()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
 const galleryData = useGalleryData()
@@ -20,6 +44,11 @@ const tagSheetOpen = ref(false)
 const moreSheetOpen = ref(false)
 const tagIds = ref<number[]>([])
 const tagLoading = ref(false)
+const isDownloading = ref(false)
+const downloadConfirmationOpen = ref(false)
+const pendingDownloadIds = ref<number[]>([])
+
+const LARGE_DOWNLOAD_CONFIRMATION_THRESHOLD = 100
 
 const selectedCount = computed(() => store.selectedCount)
 const selectedAssets = computed(() => {
@@ -43,6 +72,14 @@ const allSelectedRejected = computed(
     selectedAssets.value.every((asset) => asset.reviewFlag === 'rejected')
 )
 const canUseLocalFileSystem = computed(() => isLocalAccess())
+const downloadAssetIds = computed(() => {
+  if (assetActions.selectedAssetIds.value.length > 0) {
+    return assetActions.selectedAssetIds.value
+  }
+
+  const activeAssetId = store.selection.activeAssetId
+  return activeAssetId === undefined ? [] : [activeAssetId]
+})
 
 function closeActionSheet() {
   ratingSheetOpen.value = false
@@ -154,6 +191,93 @@ function handleDelete() {
   closeActionSheet()
   void assetActions.requestDeleteAssets()
 }
+
+// 准备下载并触发浏览器附件请求；传入的 ID 已经是本次操作快照。
+async function startDownload(assetIds: number[]) {
+  if (isDownloading.value || assetIds.length === 0) {
+    return
+  }
+
+  // 准备阶段可能包含 ZIP 创建，保持按钮忙碌到下载请求发出。
+  isDownloading.value = true
+  try {
+    const result = await assetActions.prepareDownload(assetIds)
+    if (!result) {
+      return
+    }
+
+    // WebView 使用 HTTP 服务绝对地址，浏览器开发环境使用 Vite 代理相对地址。
+    const downloadUrl = isWebView() ? result.localDownloadUrl : result.downloadUrl
+    if (!downloadUrl) {
+      throw new Error(t('gallery.mobile.download.unavailableDescription'))
+    }
+
+    // 让浏览器接管附件下载，不把媒体内容读进前端内存。
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = result.fileName
+    link.rel = 'noopener'
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+
+    // 归档准备允许部分文件不可用，仍提示用户实际结果。
+    if (result.failedCount > 0) {
+      toast.warning(t('gallery.mobile.download.partialTitle'), {
+        description: t('gallery.mobile.download.partialDescription', {
+          failed: result.failedCount,
+        }),
+      })
+    } else {
+      toast.success(t('gallery.mobile.download.successTitle'))
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.mobile.download.failedTitle'), { description: message })
+  } finally {
+    isDownloading.value = false
+  }
+}
+
+function handleDownloadConfirmationOpenChange(open: boolean) {
+  downloadConfirmationOpen.value = open
+  if (!open) {
+    // 关闭确认框时丢弃尚未执行的下载快照。
+    pendingDownloadIds.value = []
+  }
+}
+
+// 使用确认框打开时保存的快照，不重新读取可能已经变化的当前选择。
+async function confirmLargeDownload() {
+  const assetIds = [...pendingDownloadIds.value]
+  if (assetIds.length === 0) {
+    downloadConfirmationOpen.value = false
+    return
+  }
+
+  // 先关闭确认框并释放待执行状态，再开始准备归档。
+  downloadConfirmationOpen.value = false
+  pendingDownloadIds.value = []
+  await startDownload(assetIds)
+}
+
+// 快照当前去重选择；超过阈值先确认，确认后仍使用这份快照。
+async function handleDownload() {
+  const assetIds = [...new Set(downloadAssetIds.value)].filter((assetId) => assetId > 0)
+  if (isDownloading.value || assetIds.length === 0) {
+    return
+  }
+
+  // 100 个只是防误操作阈值，后端仍允许无限量打包。
+  if (assetIds.length > LARGE_DOWNLOAD_CONFIRMATION_THRESHOLD) {
+    pendingDownloadIds.value = assetIds
+    downloadConfirmationOpen.value = true
+    return
+  }
+
+  await startDownload(assetIds)
+}
 </script>
 
 <template>
@@ -161,7 +285,19 @@ function handleDelete() {
     class="shrink-0 border-t border-border/70 bg-background/90 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md"
     @contextmenu.prevent.stop
   >
-    <div class="mx-auto grid w-full max-w-xl grid-cols-4 gap-1">
+    <div class="mx-auto grid w-full max-w-xl grid-cols-5 gap-1">
+      <Button
+        variant="ghost"
+        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
+        :disabled="downloadAssetIds.length === 0 || isDownloading || downloadConfirmationOpen"
+        :aria-busy="isDownloading"
+        @click="void handleDownload()"
+      >
+        <LoaderCircle v-if="isDownloading" class="size-5 animate-spin" />
+        <Download v-else class="size-5" />
+        <span>{{ t('gallery.mobile.actions.download') }}</span>
+      </Button>
+
       <Button
         variant="ghost"
         class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
@@ -210,6 +346,28 @@ function handleDelete() {
       </Button>
     </div>
   </div>
+
+  <!-- 大批量下载只做防误操作确认，不限制后端实际可打包数量。 -->
+  <AlertDialog :open="downloadConfirmationOpen" @update:open="handleDownloadConfirmationOpenChange">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('gallery.mobile.download.confirmTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{
+            t('gallery.mobile.download.confirmDescription', {
+              count: pendingDownloadIds.length,
+            })
+          }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('gallery.mobile.download.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click.prevent="void confirmLargeDownload()">
+          {{ t('gallery.mobile.download.continue') }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 
   <Sheet v-model:open="ratingSheetOpen">
     <SheetContent

@@ -160,6 +160,13 @@ export interface OperationResult {
   unchangedCount?: number
 }
 
+export interface PrepareDownloadResult {
+  downloadUrl: string
+  localDownloadUrl: string
+  fileName: string
+  failedCount: number
+}
+
 export type DeleteAssetsMode = 'recycle_where_possible' | 'permanent'
 
 export interface DeleteAssetsParams {

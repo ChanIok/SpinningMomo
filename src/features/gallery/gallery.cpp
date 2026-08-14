@@ -9,6 +9,7 @@
 #include "core/rpc/notification_hub.hpp"
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/thumbnail.hpp"
+#include "features/gallery/download/download.hpp"
 #include "features/gallery/folder/service.hpp"
 #include "features/gallery/root_availability.hpp"
 #include "features/gallery/scanner/common.hpp"
@@ -123,6 +124,9 @@ auto run_startup_task(core::AppState& app_state, std::function<void(core::AppSta
                       std::stop_token stop_token) -> void {
   try {
     Logger().info("Gallery startup initialization started");
+
+    // 归档只服务于上一次进程，正常传输完成后会立即删除；这里回收崩溃遗留物。
+    features::gallery::download::cleanup_stale_files();
 
     auto init_result = prepare_runtime_resources(app_state);
     if (!init_result) {

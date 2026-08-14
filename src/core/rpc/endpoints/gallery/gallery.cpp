@@ -6,6 +6,7 @@
 
 #include "core/async/async.hpp"
 #include "core/rpc/endpoints/gallery/asset.hpp"
+#include "core/rpc/endpoints/gallery/download.hpp"
 #include "core/rpc/endpoints/gallery/folder.hpp"
 #include "core/rpc/endpoints/gallery/tag.hpp"
 #include "core/rpc/notification_hub.hpp"
@@ -149,6 +150,7 @@ auto register_all(core::AppState& app_state) -> void {
   // 缩略图统计和清理只操作应用管理的数据，因此允许 LAN 调用。
   // 注册子模块的 RPC 方法
   asset::register_all(app_state);
+  download::register_all(app_state);
   tag::register_all(app_state);
   folder::register_all(app_state);
 

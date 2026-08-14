@@ -304,11 +304,18 @@ auto is_not_modified_request(auto* req, const CacheValidators& validators, bool 
 auto write_common_file_headers(auto* res, const std::string& mime_type,
                                std::string_view cache_control, const CacheValidators& validators,
                                std::optional<size_t> source_file_size = std::nullopt,
-                               std::optional<ByteRange> range = std::nullopt) -> void {
+                               std::optional<ByteRange> range = std::nullopt,
+                               std::optional<std::string_view> content_disposition = std::nullopt,
+                               bool allow_range = true) -> void {
   res->writeHeader("Content-Type", get_response_content_type(mime_type));
+  if (content_disposition.has_value()) {
+    res->writeHeader("Content-Disposition", std::string(*content_disposition));
+  }
   res->writeHeader("Cache-Control", std::string(cache_control));
   res->writeHeader("X-Content-Type-Options", "nosniff");
-  res->writeHeader("Accept-Ranges", "bytes");
+  if (allow_range) {
+    res->writeHeader("Accept-Ranges", "bytes");
+  }
   res->writeHeader("ETag", validators.etag);
   res->writeHeader("Last-Modified", validators.last_modified);
 
@@ -335,6 +342,29 @@ auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
   res->end();
 }
 
+// 关闭已完成的流，并执行一次性归档的完成回调。
+auto complete_stream(const std::shared_ptr<StreamContext>& ctx) -> void {
+  if (ctx->abort_flag->load() || ctx->completion_called) {
+    // 中止或已完成的流不再重复关闭文件和触发回调。
+    return;
+  }
+
+  ctx->completion_called = true;
+  // 先释放文件句柄，确保回调可以在 Windows 上删除归档。
+  std::error_code close_error;
+  ctx->file.close(close_error);
+  if (close_error) {
+    Logger().warn("Failed to close streamed file '{}': {}", ctx->file_path.string(),
+                  close_error.message());
+  }
+  if (ctx->on_complete) {
+    // 完整响应已经发送，通知归档所属功能回收临时文件。
+    auto on_complete = std::move(ctx->on_complete);
+    on_complete();
+  }
+  Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(), ctx->bytes_sent);
+}
+
 // 在 uWS 线程中发送数据块
 auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::string> chunk_data)
     -> void {
@@ -351,16 +381,15 @@ auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::
 
   if (done) {
     // tryEnd 已经完成响应；不要再访问响应对象或调度下一次读取。
+    // tryEnd 已确认整个响应体已交给 uWS，进入完成收尾。
     ctx->bytes_sent = ctx->response_size;
     ctx->file_offset = ctx->file_end_offset;
-    Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(), ctx->bytes_sent);
+    complete_stream(ctx);
     return;
   }
 
   if (!ok) {
     // 背压：缓冲区满，需要等待可写
-    Logger().debug("Backpressure detected, waiting for writable");
-
     ctx->res->onWritable([ctx, chunk_data, chunk_start_offset](size_t) -> bool {
       if (ctx->abort_flag->load()) {
         return false;  // 停止等待
@@ -388,10 +417,10 @@ auto send_chunk_to_uws(std::shared_ptr<StreamContext> ctx, std::shared_ptr<std::
 
       if (done2) {
         // tryEnd 已经完成响应；它会清除 onWritable。
+        // 分段背压恢复后也可能直接完成整个响应，统一走完成回调。
         ctx->bytes_sent = ctx->response_size;
         ctx->file_offset = ctx->file_end_offset;
-        Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
-                       ctx->bytes_sent);
+        complete_stream(ctx);
         return true;
       }
 
@@ -424,8 +453,12 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
   // 检查是否完成
   if (ctx->file_offset >= ctx->file_end_offset || ctx->abort_flag->load()) {
     if (!ctx->abort_flag->load()) {
-      Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
-                     ctx->bytes_sent);
+      if (ctx->bytes_sent == ctx->response_size) {
+        complete_stream(ctx);
+      } else {
+        Logger().error("Stream ended before the full response was sent: {}",
+                       ctx->file_path.string());
+      }
     }
     return;
   }
@@ -442,6 +475,7 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
         }
 
         if (ec || bytes_read == 0) {
+          // 文件读取失败时结束响应，但不触发“完整传输”的删除回调。
           Logger().error("Failed to read file {}: {}", ctx->file_path.string(),
                          ec ? ec.message() : "EOF");
           ctx->loop->defer([ctx]() {
@@ -467,11 +501,13 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
       });
 }
 
-// 流式传输文件
+// 按块异步读取大文件，并在完整发送后执行完成回调。
 auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                         std::string mime_type, std::string cache_control,
                         CacheValidators validators, size_t file_size,
-                        std::optional<ByteRange> range, auto* res) -> void {
+                        std::optional<ByteRange> range,
+                        std::optional<std::string> content_disposition, bool allow_range,
+                        std::move_only_function<void()> on_complete, auto* res) -> void {
   auto* loop = uWS::Loop::get();
   auto io_context = core::async::get_io_context(state);
 
@@ -487,18 +523,20 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
   });
 
   // 对于大文件或分片请求，始终按偏移流式发送，避免把整段视频先读进内存。
-  // 在 ASIO 线程中打开文件并初始化
+  // 切到 ASIO 线程打开文件并初始化流上下文。
   asio::post(*io_context, [abort_flag, res, file_path, mime_type,
                            cache_control = std::move(cache_control),
-                           validators = std::move(validators), loop, io_context, file_size, range,
-                           range_start, range_end, response_size]() {
+                           validators = std::move(validators),
+                           content_disposition = std::move(content_disposition), loop, io_context,
+                           file_size, range, range_start, range_end, response_size, allow_range,
+                           on_complete = std::move(on_complete)]() mutable {
     try {
-      // 打开文件
+      // 在异步线程打开文件，避免阻塞 uWS 事件循环。
       asio::random_access_file file(*io_context, file_path.string(), asio::file_base::read_only);
 
       Logger().debug("Starting stream for file: {}, size: {} bytes", file_path.string(), file_size);
 
-      // 创建流上下文
+      // 保存文件、响应和清理回调的共享状态，供后续读写步骤使用。
       auto ctx = std::make_shared<StreamContext>(StreamContext{
           .file = std::move(file),
           .file_path = file_path,
@@ -516,13 +554,17 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                                       ? std::optional<std::string>{std::format(
                                             "bytes {}-{}/{}", range_start, range_end, file_size)}
                                       : std::nullopt,
+          .content_disposition = std::move(content_disposition),
+          .accepts_ranges = allow_range,
           .loop = loop,
           .res = res,
           .buffer = std::vector<char>(STREAM_CHUNK_SIZE),
+          .on_complete = std::move(on_complete),
+          .completion_called = false,
           .abort_flag = abort_flag,
       });
 
-      // 在 uWS 线程中设置响应头并开始传输
+      // 回到 uWS 线程写响应头，再启动第一轮异步读取。
       loop->defer([ctx]() {
         if (ctx->abort_flag->load()) {
           return;
@@ -536,13 +578,18 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
             ctx->content_range_header.has_value()
                 ? std::optional<ByteRange>{ByteRange{.start = ctx->file_offset,
                                                      .end = ctx->file_end_offset - 1}}
-                : std::nullopt);
+                : std::nullopt,
+            ctx->content_disposition.has_value()
+                ? std::optional<std::string_view>{*ctx->content_disposition}
+                : std::nullopt,
+            ctx->accepts_ranges);
 
         // 开始读取并发送第一块
         read_and_send_next_chunk(ctx);
       });
 
     } catch (const std::exception& e) {
+      // 打开文件失败只能返回服务端错误，不能执行归档完成回调。
       Logger().error("Error opening file for stream {}: {}", file_path.string(), e.what());
       loop->defer([abort_flag, res]() {
         if (abort_flag->load()) {
@@ -556,11 +603,13 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
 }
 
 // 图库 /static 原文件与磁盘 web 根路径共用：统一处理 Range、HEAD/GET，并择流式或整读。
-auto serve_resolved_file_request(core::AppState& state, const std::filesystem::path& file_path,
-                                 std::string_view url_path,
-                                 std::optional<std::chrono::seconds> cache_duration_override,
-                                 std::optional<std::string> cache_control_override, auto* res,
-                                 auto* req, bool is_head) -> void {
+auto serve_resolved_file_request(
+    core::AppState& state, const std::filesystem::path& file_path, std::string_view url_path,
+    std::optional<std::chrono::seconds> cache_duration_override,
+    std::optional<std::string> cache_control_override, auto* res, auto* req, bool is_head,
+    std::optional<std::string> content_disposition_override = std::nullopt, bool allow_range = true,
+    std::move_only_function<void()> on_complete = {}) -> void {
+  // 先读取统一元数据，后续 Range、缓存和响应头都使用同一份快照。
   auto metadata_result = query_file_metadata(file_path);
   if (!metadata_result) {
     Logger().warn("Resolved file unavailable: {} ({})", file_path.string(),
@@ -588,13 +637,16 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
 
   auto validators = build_cache_validators(metadata);
 
-  auto range_parse = parse_range_header(req->getHeader("range"), file_size);
+  // 一次性归档忽略 Range，确保只有完整响应才会触发删除回调。
+  auto range_parse = allow_range ? parse_range_header(req->getHeader("range"), file_size)
+                                 : RangeHeaderParseResult{};
   if (!range_parse.valid) {
     write_range_not_satisfiable(res, file_size);
     return;
   }
 
-  if (is_not_modified_request(req, validators, range_parse.range.has_value())) {
+  // 临时归档必须真正发送完整内容，不走 304 短路。
+  if (allow_range && is_not_modified_request(req, validators, range_parse.range.has_value())) {
     write_not_modified(res, cache_control, validators);
     return;
   }
@@ -604,9 +656,14 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
                               : file_size;
 
   if (is_head) {
+    // HEAD 只返回元数据，不触发一次性归档的删除回调。
     res->writeStatus(range_parse.range.has_value() ? "206 Partial Content" : "200 OK");
     write_common_file_headers(res, mime_type, cache_control, validators, file_size,
-                              range_parse.range);
+                              range_parse.range,
+                              content_disposition_override.has_value()
+                                  ? std::optional<std::string_view>{*content_disposition_override}
+                                  : std::nullopt,
+                              allow_range);
     res->writeHeader("Content-Length", std::to_string(content_length));
     res->end();
     return;
@@ -617,27 +674,46 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
   if (content_length > STREAM_THRESHOLD || file_size > STREAM_THRESHOLD) {
     Logger().debug("Using stream for resolved file: {} bytes", file_size);
     handle_file_stream(state, file_path, mime_type, cache_control, validators, file_size,
-                       range_parse.range, res);
+                       range_parse.range, std::move(content_disposition_override), allow_range,
+                       std::move(on_complete), res);
     return;
   }
 
   Logger().debug("Using single-read for small resolved file: {} bytes", file_size);
 
-  // 获取当前的事件循环
+  // 小文件整读仍放到异步运行时，避免阻塞 HTTP 事件循环。
   auto* loop = uWS::Loop::get();
+  auto* io_context = core::async::get_io_context(state);
+  if (!io_context) {
+    res->writeStatus("500 Internal Server Error");
+    res->end("Internal server error");
+    return;
+  }
 
-  // 在异步运行时中处理文件读取
+  auto abort_flag = std::make_shared<std::atomic_bool>(false);
+  res->onAborted([abort_flag, file_path]() {
+    abort_flag->store(true);
+    Logger().debug("Single-read aborted for: {}", file_path.string());
+  });
+  // 让异步协程和 uWS 回调共享一次性的完成处理器。
+  auto completion = std::make_shared<std::move_only_function<void()>>(std::move(on_complete));
+
+  // 在异步运行时中读取文件，再回到 uWS 线程发送响应。
   asio::co_spawn(
-      *core::async::get_io_context(state),
+      *io_context,
       [res, file_path, mime_type, cache_control = std::move(cache_control),
-       validators = std::move(validators), loop, file_size,
-       range = range_parse.range]() -> asio::awaitable<void> {
+       validators = std::move(validators),
+       content_disposition = std::move(content_disposition_override), loop, file_size,
+       range = range_parse.range, allow_range, abort_flag, completion]() -> asio::awaitable<void> {
         try {
-          // 异步读取文件
+          // 读取整文件后再按请求的 Range 截取响应体。
           auto file_result = co_await utils::file::read_file(file_path, file_size);
           if (!file_result) {
             Logger().error("Failed to read custom file: {}", file_result.error());
-            loop->defer([res]() {
+            loop->defer([res, abort_flag]() {
+              if (abort_flag->load()) {
+                return;
+              }
               res->writeStatus("500 Internal Server Error");
               res->end("Internal server error");
             });
@@ -647,40 +723,115 @@ auto serve_resolved_file_request(core::AppState& state, const std::filesystem::p
           auto file_data = std::move(file_result.value());
           if (file_data.data.size() < file_size) {
             Logger().error("File changed while reading: {}", file_path.string());
-            loop->defer([res]() {
+            loop->defer([res, abort_flag]() {
+              if (abort_flag->load()) {
+                return;
+              }
               res->writeStatus("500 Internal Server Error");
               res->end("Internal server error");
             });
             co_return;
           }
 
-          size_t range_start = range.has_value() ? range->start : 0;
-          size_t range_end = range.has_value() ? range->end : (file_size - 1);
-          size_t content_length = range_end >= range_start ? (range_end - range_start + 1) : 0;
+          const size_t range_start = range.has_value() ? range->start : 0;
+          const size_t range_end =
+              file_size > 0 ? (range.has_value() ? range->end : file_size - 1) : 0;
+          const size_t content_length =
+              file_size > 0 && range_end >= range_start ? (range_end - range_start + 1) : 0;
 
-          std::string response_body(
-              reinterpret_cast<const char*>(file_data.data.data() + range_start), content_length);
+          std::string response_body;
+          if (content_length > 0) {
+            response_body.assign(reinterpret_cast<const char*>(file_data.data.data() + range_start),
+                                 content_length);
+          }
 
-          // 在事件循环线程中发送响应
+          // 只有响应成功结束后才执行一次性归档的完成回调。
           loop->defer([res, file_path, mime_type, cache_control, validators, file_size, range,
-                       response_body = std::move(response_body)]() mutable {
+                       content_disposition = std::move(content_disposition),
+                       response_body = std::move(response_body), allow_range, abort_flag,
+                       completion]() mutable {
+            if (abort_flag->load()) {
+              return;
+            }
             res->writeStatus(range.has_value() ? "206 Partial Content" : "200 OK");
-            write_common_file_headers(res, mime_type, cache_control, validators, file_size, range);
+            write_common_file_headers(res, mime_type, cache_control, validators, file_size, range,
+                                      content_disposition.has_value()
+                                          ? std::optional<std::string_view>{*content_disposition}
+                                          : std::nullopt,
+                                      allow_range);
             res->end(response_body);
+
+            if (*completion) {
+              // 移出回调再执行，避免同一响应重复触发删除。
+              auto on_complete = std::move(*completion);
+              on_complete();
+            }
 
             Logger().debug("Served resolved file: {}, size: {} bytes", file_path.string(),
                            response_body.size());
           });
 
         } catch (const std::exception& e) {
+          // 读取或组装响应失败时不认为文件已完成传输。
           Logger().error("Error serving resolved file {}: {}", file_path.string(), e.what());
-          loop->defer([res]() {
+          loop->defer([res, abort_flag]() {
+            if (abort_flag->load()) {
+              return;
+            }
             res->writeStatus("500 Internal Server Error");
             res->end("Internal server error");
           });
         }
       },
       core::async::log_completion("Static file request"));
+}
+
+// 构造兼容 ASCII 文件名和 UTF-8 filename* 的附件响应头。
+auto build_download_content_disposition(std::string_view download_name) -> std::string {
+  std::string fallback_name;
+  fallback_name.reserve(download_name.size());
+  for (const auto character : download_name) {
+    const auto byte = static_cast<unsigned char>(character);
+    if (byte >= 0x20 && byte <= 0x7E && character != '"' && character != '\\' && character != '/') {
+      fallback_name.push_back(character);
+    } else {
+      fallback_name.push_back('_');
+    }
+  }
+  if (fallback_name.empty()) {
+    fallback_name = "download";
+  }
+
+  constexpr char hex_digits[] = "0123456789ABCDEF";
+  std::string encoded_name;
+  encoded_name.reserve(download_name.size() * 3);
+  for (const auto character : download_name) {
+    const auto byte = static_cast<unsigned char>(character);
+    const bool unreserved = (byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
+                            (byte >= '0' && byte <= '9') || byte == '-' || byte == '.' ||
+                            byte == '_' || byte == '~';
+    if (unreserved) {
+      encoded_name.push_back(static_cast<char>(byte));
+    } else {
+      encoded_name.push_back('%');
+      encoded_name.push_back(hex_digits[(byte >> 4) & 0x0F]);
+      encoded_name.push_back(hex_digits[byte & 0x0F]);
+    }
+  }
+
+  return std::format("attachment; filename=\"{}\"; filename*=UTF-8''{}", fallback_name,
+                     encoded_name);
+}
+
+// 按下载策略发送附件文件，并把完成回调传给具体传输分支。
+auto serve_download_file_request(core::AppState& state, const std::filesystem::path& file_path,
+                                 std::string download_name, uWS::HttpResponse<false>* res,
+                                 uWS::HttpRequest* req, bool allow_range,
+                                 std::move_only_function<void()> on_complete) -> void {
+  serve_resolved_file_request(state, file_path, "/downloads/", std::chrono::seconds{0},
+                              std::string{"no-store"}, res, req, false,
+                              build_download_content_disposition(download_name), allow_range,
+                              std::move(on_complete));
 }
 
 // 处理静态文件请求

@@ -8,6 +8,7 @@
 #include "core/async/async.hpp"
 #include "core/build_config.hpp"
 #include "core/http_server/access.hpp"
+#include "core/http_server/downloads.hpp"
 #include "core/http_server/sse_manager.hpp"
 #include "core/http_server/state.hpp"
 #include "core/http_server/static.hpp"
@@ -241,6 +242,9 @@ auto register_routes(core::AppState& state, uWS::App& app) -> void {
     write_cors_headers(res, origin);
     res->end();
   });
+
+  // 下载路由必须在静态 fallback 前注册，避免临时归档被当作前端资源处理。
+  core::http_server::downloads::register_routes(state, app);
 
   // 静态文件服务（fallback路由）
   core::http_server::static_content::register_routes(state, app);

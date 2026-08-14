@@ -145,6 +145,7 @@ export interface AssetFilter {
 export type {
   // 扫描/可达性
   OperationResult,
+  PrepareDownloadResult,
   MissingAssetItem,
   MissingAssetsResponse,
   PurgeMissingAssetsParams,
