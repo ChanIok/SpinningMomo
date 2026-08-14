@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { useThrottleFn } from '@vueuse/core'
+import { useElementSize, useThrottleFn } from '@vueuse/core'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
 
 // 通用滚动轨道的数据模型。
@@ -37,6 +37,8 @@ const props = withDefaults(
 )
 
 const timelineRef = ref<HTMLElement | null>(null)
+const { height: timelineHeight } = useElementSize(timelineRef)
+const effectiveRailHeight = computed(() => timelineHeight.value || props.containerHeight)
 
 // 顶底各留一段安全区，避免年份标签和指示器紧贴边缘。
 const CONTENT_OFFSET_TOP = 24
@@ -47,7 +49,7 @@ const TIMELINE_LABEL_GAP = 4
 const MOBILE_COLLAPSE_DELAY = 3000
 
 const availableHeight = computed(() => {
-  return Math.max(0, props.containerHeight - CONTENT_OFFSET_TOP - CONTENT_OFFSET_BOTTOM)
+  return Math.max(0, effectiveRailHeight.value - CONTENT_OFFSET_TOP - CONTENT_OFFSET_BOTTOM)
 })
 
 const effectiveViewportHeight = computed(() => props.viewportHeight || props.containerHeight)
@@ -131,7 +133,7 @@ function contentToTimeline(contentY: number): number {
 
 const mobileRailTop = computed(() => CONTENT_OFFSET_TOP)
 const mobileRailBottom = computed(() =>
-  Math.max(mobileRailTop.value, props.containerHeight - CONTENT_OFFSET_BOTTOM)
+  Math.max(mobileRailTop.value, effectiveRailHeight.value - CONTENT_OFFSET_BOTTOM)
 )
 const mobileThumbTravel = computed(() =>
   Math.max(0, mobileRailBottom.value - mobileRailTop.value - MOBILE_HANDLE_HEIGHT)
@@ -579,10 +581,11 @@ onUnmounted(() => {
 @media (max-width: 639px) {
   .timeline-scrollbar {
     position: absolute;
-    top: 0;
+    top: 3.5rem;
     right: 0.25rem;
-    bottom: 0;
-    z-index: 30;
+    bottom: 0.5rem;
+    height: auto !important;
+    z-index: 10;
     width: 2.75rem;
     overflow: visible;
     touch-action: none;

@@ -35,6 +35,12 @@ export function createUiSlice() {
   })
   const moveToFolderDialogOpen = ref(false)
   const preferencesDialogOpen = ref(false)
+  const compactToolbarVisible = ref(true)
+  const compactToolbarWithBackground = ref(false)
+  let lastScrollTop = 0
+  let accumulatedScrollDelta = 0
+  const SCROLL_DELTA_THRESHOLD = 12
+  const SCROLL_TOP_RESET_THRESHOLD = 8
   const deleteAssetsDialog = reactive<DeleteAssetsDialogState>({
     open: false,
     ids: [],
@@ -114,6 +120,47 @@ export function createUiSlice() {
     tagClipboard.tagIds = []
   }
 
+  function handleCompactScroll(scrollTop: number) {
+    if (scrollTop <= SCROLL_TOP_RESET_THRESHOLD) {
+      compactToolbarVisible.value = true
+      compactToolbarWithBackground.value = false
+      accumulatedScrollDelta = 0
+      lastScrollTop = Math.max(0, scrollTop)
+      return
+    }
+
+    const delta = scrollTop - lastScrollTop
+    lastScrollTop = scrollTop
+
+    if (delta > 0) {
+      // 向下滚动（浏览内容）：隐藏工具栏
+      if (accumulatedScrollDelta < 0) {
+        accumulatedScrollDelta = 0
+      }
+      accumulatedScrollDelta += delta
+      if (accumulatedScrollDelta >= SCROLL_DELTA_THRESHOLD) {
+        compactToolbarVisible.value = false
+      }
+    } else if (delta < 0) {
+      // 向上滚动（交互意图）：显示工具栏并附带背景色
+      if (accumulatedScrollDelta > 0) {
+        accumulatedScrollDelta = 0
+      }
+      accumulatedScrollDelta += delta
+      if (accumulatedScrollDelta <= -SCROLL_DELTA_THRESHOLD) {
+        compactToolbarVisible.value = true
+        compactToolbarWithBackground.value = true
+      }
+    }
+  }
+
+  function resetCompactScrollState() {
+    compactToolbarVisible.value = true
+    compactToolbarWithBackground.value = false
+    lastScrollTop = 0
+    accumulatedScrollDelta = 0
+  }
+
   function resetUiState() {
     contextMenuState.isOpen = false
     contextMenuState.requestToken = 0
@@ -122,6 +169,7 @@ export function createUiSlice() {
     contextMenuState.target = 'background'
     moveToFolderDialogOpen.value = false
     preferencesDialogOpen.value = false
+    resetCompactScrollState()
     deleteAssetsDialog.open = false
     deleteAssetsDialog.ids = []
     deleteAssetsDialog.mode = 'recycleBin'
@@ -140,6 +188,10 @@ export function createUiSlice() {
     setMoveToFolderDialogOpen,
     preferencesDialogOpen,
     setPreferencesDialogOpen,
+    compactToolbarVisible: readonly(compactToolbarVisible),
+    compactToolbarWithBackground: readonly(compactToolbarWithBackground),
+    handleCompactScroll,
+    resetCompactScrollState,
     deleteAssetsDialog: readonly(deleteAssetsDialog),
     openDeleteAssetsDialog,
     setDeleteAssetsDialogOpen,

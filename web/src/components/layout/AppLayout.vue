@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useGalleryStore } from '@/features/gallery/store'
 import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
+import { isWebView } from '@/core/env'
 import { Toaster } from '@/components/ui/sonner'
 import AppHeader from './AppHeader.vue'
 import ContentArea from './ContentArea.vue'
@@ -18,13 +19,17 @@ const isDev = import.meta.env.DEV
 const isWelcome = computed(() => route.name === 'welcome')
 const isHome = computed(() => route.name === 'home')
 const isGallery = computed(() => route.name === 'gallery')
-const shouldHideAppHeader = computed(
-  () =>
-    isGallery.value &&
-    galleryStore.isCompactWindow &&
-    galleryStore.lightbox.isOpen &&
-    !galleryStore.lightbox.chromeVisible
-)
+const shouldHideAppHeader = computed(() => {
+  if (isGallery.value && galleryStore.isCompactWindow) {
+    if (!isWebView()) {
+      return true
+    }
+    if (galleryStore.lightbox.isOpen && !galleryStore.lightbox.chromeVisible) {
+      return true
+    }
+  }
+  return false
+})
 const hasBackgroundImage = computed(() =>
   Boolean(resolveBackgroundImageUrl(settingsStore.appSettings.ui.background))
 )

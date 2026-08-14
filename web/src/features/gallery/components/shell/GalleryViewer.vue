@@ -32,6 +32,7 @@ import {
   consumeReverseHero,
 } from '../../composables/useHeroTransition'
 import GalleryToolbar from './GalleryToolbar.vue'
+import GalleryCompactToolbar from '../mobile/GalleryCompactToolbar.vue'
 import GalleryContent from './GalleryContent.vue'
 import GalleryLightbox from '../lightbox/GalleryLightbox.vue'
 import GalleryPreferencesDialog from '../dialogs/GalleryPreferencesDialog.vue'
@@ -689,33 +690,41 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :class="galleryColumnClass"
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
-      <GalleryToolbar
-        v-if="!isMultiSelectMode && !store.isCompactWindow"
-        @open-preferences="store.setPreferencesDialogOpen(true)"
-      />
-      <div
-        v-else-if="isMultiSelectMode && !store.isCompactWindow"
-        class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2"
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-10 w-10"
-          :aria-label="t('gallery.mobile.selection.exit')"
-          @click="gallerySelection.exitMultiSelectMode"
-        >
-          <X class="size-5" />
-        </Button>
-        <span class="text-sm font-medium">
-          <template v-if="store.selectedCount > 0">
-            {{ t('gallery.mobile.selection.selectedCount', { count: store.selectedCount }) }}
-          </template>
-          <template v-else>
-            {{ t('gallery.mobile.selection.empty') }}
-          </template>
-        </span>
-        <div class="h-10 w-10" aria-hidden="true" />
+      <!-- 紧凑窗口下工具栏浮动层叠在顶部，不占用滚动区域高度 -->
+      <div v-if="store.isCompactWindow" class="absolute top-0 right-0 left-0 z-20">
+        <GalleryCompactToolbar />
       </div>
+
+      <!-- 桌面端工具栏与多选工具栏 -->
+      <template v-else>
+        <GalleryToolbar
+          v-if="!isMultiSelectMode"
+          @open-preferences="store.setPreferencesDialogOpen(true)"
+        />
+        <div
+          v-else
+          class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10"
+            :aria-label="t('gallery.mobile.selection.exit')"
+            @click="gallerySelection.exitMultiSelectMode"
+          >
+            <X class="size-5" />
+          </Button>
+          <span class="text-sm font-medium">
+            <template v-if="store.selectedCount > 0">
+              {{ t('gallery.mobile.selection.selectedCount', { count: store.selectedCount }) }}
+            </template>
+            <template v-else>
+              {{ t('gallery.mobile.selection.empty') }}
+            </template>
+          </span>
+          <div class="h-10 w-10" aria-hidden="true" />
+        </div>
+      </template>
       <div
         ref="contentRef"
         class="relative flex min-h-0 flex-1 flex-col overflow-hidden"

@@ -16,6 +16,7 @@ import { galleryApi } from '../../api'
 import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
+import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
 import { useI18n } from '@/composables/useI18n'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
@@ -76,6 +77,9 @@ function handleScroll(event: Event) {
   // 滚动热路径优先小批量缩略图，原图增强等空闲后再升级。
   cardImageScheduler.markScrolling()
   scrollTop.value = target.scrollTop
+  if (store.isCompactWindow) {
+    store.handleCompactScroll(target.scrollTop)
+  }
 }
 
 // 收集当前虚拟窗口内的卡片，让调度器自己过滤真实可见区域。
@@ -200,10 +204,11 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      :class="store.isCompactWindow ? 'px-0 py-0' : 'px-4 py-2 sm:pr-2'"
+      :class="store.isCompactWindow ? 'px-0 pt-12 pb-2' : 'px-4 py-2 sm:pr-2'"
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
+      <GalleryHeroHeader />
       <div
         :style="{
           height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
