@@ -49,6 +49,13 @@ interface PanSample {
   time: number
 }
 
+interface PanMoveResult {
+  /** 图片到达水平边界后仍未消费的手指位移。 */
+  residualX: number
+  /** 图片到达垂直边界后仍未消费的手指位移。 */
+  residualY: number
+}
+
 type TouchPointerPair = readonly [TouchPointer, TouchPointer]
 
 const { t } = useI18n()
@@ -1117,11 +1124,12 @@ function beginPan(event: PointerEvent) {
   recordPanSample(event)
 }
 
-function movePan(event: PointerEvent) {
+function movePan(event: PointerEvent): PanMoveResult {
   if (activePointerId.value !== event.pointerId || !viewportRef.value) {
-    return
+    return { residualX: 0, residualY: 0 }
   }
 
+  const viewport = viewportRef.value
   recordPanSample(event)
   const deltaX = event.clientX - dragStartX.value
   const deltaY = event.clientY - dragStartY.value
@@ -1129,7 +1137,18 @@ function movePan(event: PointerEvent) {
     dragMoved.value = true
   }
 
-  setViewportScroll(dragStartScrollLeft.value - deltaX, dragStartScrollTop.value - deltaY)
+  const maxScrollLeft = Math.max(viewport.scrollWidth - viewport.clientWidth, 0)
+  const maxScrollTop = Math.max(viewport.scrollHeight - viewport.clientHeight, 0)
+  const nextScrollLeft = clamp(dragStartScrollLeft.value - deltaX, 0, maxScrollLeft)
+  const nextScrollTop = clamp(dragStartScrollTop.value - deltaY, 0, maxScrollTop)
+
+  setViewportScroll(nextScrollLeft, nextScrollTop)
+
+  // 保留 clamp 丢弃的位移，让外层 Pager 在图片边界把同一次手势接走。
+  return {
+    residualX: deltaX + (nextScrollLeft - dragStartScrollLeft.value),
+    residualY: deltaY + (nextScrollTop - dragStartScrollTop.value),
+  }
 }
 
 // 正常抬指时根据最近轨迹启动惯性；Pager 负责把取消路径转给 cancelPan。

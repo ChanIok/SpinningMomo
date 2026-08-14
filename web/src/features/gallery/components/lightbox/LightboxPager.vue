@@ -8,6 +8,11 @@ import { heroAnimating } from '../../composables/useHeroTransition'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 
+interface PanMoveResult {
+  residualX: number
+  residualY: number
+}
+
 interface LightboxImageExposed {
   showFitMode: () => void
   showActualSize: () => void
@@ -15,7 +20,7 @@ interface LightboxImageExposed {
   zoomIn: () => void
   zoomOut: () => void
   beginPan: (event: PointerEvent) => void
-  movePan: (event: PointerEvent) => void
+  movePan: (event: PointerEvent) => PanMoveResult
   endPan: (event: PointerEvent) => void
   cancelPan: () => void
   beginPinch: (pointers: readonly [TouchPointer, TouchPointer]) => void
@@ -55,7 +60,7 @@ const isVideo = computed(() => currentAsset.value?.type === 'video')
 const isStillImage = computed(
   () => currentAsset.value?.type === 'photo' || currentAsset.value?.type === 'live_photo'
 )
-// 视频始终允许切图；放大图片时由同一个 Pager 把单指移动转发给 Image 平移。
+// 视频始终允许切图；放大图片时先由 Image 消费平移，触及水平边界后再交给 Pager 切图。
 const canSwipeGesture = computed(
   () => !heroAnimating.value && (isVideo.value || (isStillImage.value && !imagePannable.value))
 )
@@ -120,9 +125,7 @@ const {
     resetTouchTapTracking()
     imageRef.value?.beginPan(event)
   },
-  onPanMove: (event) => {
-    imageRef.value?.movePan(event)
-  },
+  onPanMove: (event) => imageRef.value?.movePan(event),
   onPanEnd: (event) => {
     imageRef.value?.endPan(event)
   },
@@ -146,7 +149,7 @@ function handleMediaReady(assetId: number) {
   completeNavigation(assetId)
 }
 
-// 图片放大到需要拖拽时，Pager 暂停自己的横向手势。
+// 图片放大到需要拖拽时，Pager 先转发平移；水平边界转交由手势状态机继续处理。
 function handleImagePannableChange(pannable: boolean) {
   imagePannable.value = pannable
 }

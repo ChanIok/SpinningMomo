@@ -19,6 +19,10 @@ const SWIPE_FLING_VELOCITY = 200
 const SWIPE_SETTLE_DURATION = 400
 // 所有触摸手势结束后的合成 click 都不能落到媒体或 chrome 上。
 const TOUCH_GESTURE_CLICK_SUPPRESS_DURATION = 350
+// 图片平移在水平边界外积累到这个距离后，才把同一次手势交给 Pager 切图。
+const PAN_EDGE_HANDOFF_THRESHOLD = 12
+// 图片平移开始时锁定主轴，避免竖向浏览时的轻微横向偏移误触切图。
+const PAN_HORIZONTAL_AXIS_RATIO = 1.2
 
 // 临时诊断开关：确认适屏状态下手势是在哪个状态被拦截或误分类的。
 const LIGHTBOX_GESTURE_DEBUG = true
@@ -33,6 +37,12 @@ type SwipePage = { index: number; asset: Asset }
 type TouchPointer = Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY'>
 type TouchPointerPair = [TouchPointer, TouchPointer]
 type TouchGestureMode = 'pending' | 'swiping' | 'panning' | 'pinching' | 'pinch-complete'
+type PanAxis = 'horizontal' | 'vertical'
+
+interface PanMoveResult {
+  residualX: number
+  residualY: number
+}
 
 interface UseLightboxSwipeNavigationOptions {
   gestureSurfaceRef: Ref<HTMLElement | null>
@@ -42,7 +52,7 @@ interface UseLightboxSwipeNavigationOptions {
   navigateToIndex: (index: number) => void
   onTouchTap?: (event: PointerEvent, startTarget: EventTarget | null) => boolean
   onPanStart?: (event: PointerEvent) => void
-  onPanMove?: (event: PointerEvent) => void
+  onPanMove?: (event: PointerEvent) => PanMoveResult | void
   onPanEnd?: (event: PointerEvent) => void
   onPanCancel?: () => void
   onPinchStart?: (pointers: TouchPointerPair) => void
@@ -86,12 +96,14 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   const swipeStartX = ref(0)
   const swipeStartY = ref(0)
   const swipeStartOffset = ref(0)
+  const swipeGestureOriginOffset = ref(0)
   const swipeGestureOriginIndex = ref<number | null>(null)
   const swipeDirection = ref<LightboxSwipeDirection | null>(null)
   const swipeOffset = ref(0)
   const swipePhase = ref<LightboxSwipePhase>('idle')
   const multiTouchActive = ref(false)
   const touchGestureMode = ref<TouchGestureMode | null>(null)
+  const panAxis = ref<PanAxis | null>(null)
   const animationTargetIndex = ref<number | null>(null)
   const pendingNavigationIndex = ref<number | null>(null)
   const navigationReadyIndex = ref<number | null>(null)
@@ -106,8 +118,9 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   const trackedTouchPointers = new Map<number, TouchPointer>()
   let touchStartTarget: EventTarget | null = null
   let swipeVelocityX = 0
+  let pageSwipeStartedFromPan = false
 
-  // 第一根指针先进入 pending；只有确认横向滑动后才升级为 dragging 并捕获指针。
+  // 第一根指针先进入 pending；确认需要接管手势后才升级为 dragging 并捕获指针。
   const canSwipeNavigate = computed(
     () =>
       enabled.value &&
@@ -433,12 +446,15 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     swipePhase.value = 'idle'
     swipeOffset.value = 0
     swipeStartOffset.value = 0
+    swipeGestureOriginOffset.value = 0
     swipeGestureOriginIndex.value = null
     swipeDirection.value = null
+    panAxis.value = null
     animationTargetIndex.value = null
     pendingNavigationIndex.value = null
     navigationReadyIndex.value = null
     interruptedSettling = false
+    pageSwipeStartedFromPan = false
   }
 
   function resetTouchTracking() {
@@ -678,9 +694,12 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     swipeStartX.value = event.clientX
     swipeStartY.value = event.clientY
     swipeStartOffset.value = swipeOffset.value
+    swipeGestureOriginOffset.value = swipeOffset.value
     swipeGestureOriginIndex.value =
       animationTargetIndex.value ?? baseIndex.value ?? store.selection.activeIndex
     swipeDirection.value = null
+    panAxis.value = null
+    pageSwipeStartedFromPan = false
     touchGestureMode.value = 'pending'
     swipePhase.value = 'pending'
     clearSwipeVelocity()
@@ -690,7 +709,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     logGesture('pending-started', event)
   }
 
-  function updateSwipeOffset(event: PointerEvent, deltaX: number) {
+  function setSwipeOffsetFromDesiredOffset(nextOffset: number) {
     const width = Math.max(availableWidth.value, 1)
     const currentIndex = baseIndex.value
     if (currentIndex === null) {
@@ -699,7 +718,6 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     const minOffset = -(store.totalCount - currentIndex - 1) * width
     const maxOffset = currentIndex * width
-    const nextOffset = swipeStartOffset.value + deltaX
     if (nextOffset < minOffset) {
       swipeOffset.value = minOffset + (nextOffset - minOffset) * 0.25
     } else if (nextOffset > maxOffset) {
@@ -707,6 +725,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     } else {
       swipeOffset.value = nextOffset
     }
+  }
+
+  function updateSwipeOffset(event: PointerEvent, deltaX: number) {
+    setSwipeOffsetFromDesiredOffset(swipeStartOffset.value + deltaX)
 
     const nextDirection: LightboxSwipeDirection = deltaX < 0 ? 'next' : 'previous'
     if (nextDirection !== swipeDirection.value) {
@@ -714,6 +736,34 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       prepareSwipePages(nextDirection, swipeGestureOriginIndex.value)
     }
 
+    event.preventDefault()
+  }
+
+  // 图片到达水平边界后，把剩余位移接到 Pager 的轨道上，避免视觉位置跳变。
+  function beginSwipeFromPanHandoff(event: PointerEvent, residualX: number) {
+    const direction: LightboxSwipeDirection = residualX < 0 ? 'next' : 'previous'
+    const currentTrackOffset = swipeOffset.value
+    const desiredTrackOffset = currentTrackOffset + residualX
+
+    pageSwipeStartedFromPan = true
+    touchGestureMode.value = 'swiping'
+    swipePhase.value = 'dragging'
+    swipeStartX.value = event.clientX
+    swipeStartOffset.value = desiredTrackOffset
+    swipeDirection.value = direction
+    clearSwipeVelocity()
+    recordSwipeSample(event)
+    setSwipeOffsetFromDesiredOffset(desiredTrackOffset)
+    captureTouchPointer(event.pointerId)
+
+    prepareSwipePages('next', swipeGestureOriginIndex.value)
+    prepareSwipePages('previous', swipeGestureOriginIndex.value)
+    prepareSwipePages(direction, swipeGestureOriginIndex.value)
+    logGesture('pan-handed-off-to-swiping', event, {
+      residualX,
+      direction,
+      desiredTrackOffset,
+    })
     event.preventDefault()
   }
 
@@ -741,7 +791,15 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     if (touchGestureMode.value === 'panning') {
       event.preventDefault()
-      onPanMove?.(event)
+      const panResult = onPanMove?.(event)
+      if (
+        panAxis.value === 'horizontal' &&
+        panResult &&
+        Math.abs(panResult.residualX) >= PAN_EDGE_HANDOFF_THRESHOLD
+      ) {
+        onPanCancel?.()
+        beginSwipeFromPanHandoff(event, panResult.residualX)
+      }
       return
     }
 
@@ -762,6 +820,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       if (pannable.value) {
         touchGestureMode.value = 'panning'
         swipePhase.value = 'dragging'
+        panAxis.value =
+          Math.abs(deltaX) > Math.abs(deltaY) * PAN_HORIZONTAL_AXIS_RATIO
+            ? 'horizontal'
+            : 'vertical'
         captureTouchPointer(event.pointerId)
         onPanStart?.(event)
         logGesture('classified-as-panning', event, { deltaX, deltaY })
@@ -880,7 +942,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     recordSwipeSample(event)
     const direction = swipeDirection.value
-    const rawDistance = Math.abs(event.clientX - swipeStartX.value)
+    const desiredSwipeOffset = swipeStartOffset.value + (event.clientX - swipeStartX.value)
+    const rawDistance = pageSwipeStartedFromPan
+      ? Math.abs(desiredSwipeOffset - swipeGestureOriginOffset.value)
+      : Math.abs(event.clientX - swipeStartX.value)
     const releaseDirection =
       event.clientX < swipeStartX.value
         ? 'next'
