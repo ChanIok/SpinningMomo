@@ -21,16 +21,16 @@ function main() {
   const licensePath = path.join(distDir, "LICENSE");
 
   if (!fs.existsSync(exePath)) {
-    console.error("dist/SpinningMomo.exe not found. Run 'npm run build' first.");
+    console.error("dist/SpinningMomo.exe not found. Run 'pnpm run build' first.");
     process.exit(1);
   }
 
   if (!fs.existsSync(resourcesDir)) {
-    console.error("dist/resources not found. Run 'npm run build' first.");
+    console.error("dist/resources not found. Run 'pnpm run build' first.");
     process.exit(1);
   }
   if (!fs.existsSync(licensePath)) {
-    console.error("dist/LICENSE not found. Run 'npm run build' first.");
+    console.error("dist/LICENSE not found. Run 'pnpm run build' first.");
     process.exit(1);
   }
 

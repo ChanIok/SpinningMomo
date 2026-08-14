@@ -19,7 +19,7 @@ function main() {
 
   if (files.length === 0) {
     console.error("No release files found in dist/");
-    console.error("Run 'npm run build:portable' and 'npm run build:installer' first.");
+    console.error("Run 'pnpm run build:portable' and 'pnpm run build:installer' first.");
     process.exit(1);
   }
 

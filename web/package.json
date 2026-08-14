@@ -33,6 +33,7 @@
     "@types/qrcode": "^1.5.5",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.0",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "~6.0.3",

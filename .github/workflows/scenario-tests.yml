@@ -12,9 +12,10 @@ on:
       - 'scripts/**'
       - 'web/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - 'web/package.json'
-      - 'web/package-lock.json'
+      - 'docs/package.json'
       - 'xmake.lua'
       - 'xmake-requires.lock'
       - 'version.json'
@@ -39,17 +40,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js and pnpm
+        uses: pnpm/setup@v1
+        with:
+          runtime: node@24
+          cache: true
+          install: false
+          cache-dependency-path: pnpm-lock.yaml
+
       - name: Fetch third-party dependencies
         run: node scripts/fetch-third-party.js
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            web/package-lock.json
 
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
@@ -57,9 +57,7 @@ jobs:
           xmake-version: latest
 
       - name: Install dependencies
-        run: |
-          npm ci
-          npm ci --prefix web
+        run: pnpm install --frozen-lockfile
 
       - name: Cache xmake/vcpkg dependencies
         id: cache_xmake_vcpkg
@@ -87,7 +85,7 @@ jobs:
         run: xmake build -y
 
       - name: Build Web frontend
-        run: npm run build:web
+        run: pnpm run build:web
 
       - name: Run C++ unit tests
         run: xmake test -y
@@ -96,7 +94,7 @@ jobs:
         run: xmake build -y SpinningMomoScenarioWindow
 
       - name: Run scenario tests
-        run: npm run test:scenarios
+        run: pnpm run test:scenarios
 
       - name: Collect preserved scenario sandboxes
         if: always()

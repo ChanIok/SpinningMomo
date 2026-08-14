@@ -2,25 +2,29 @@
   "name": "spinning-momo",
   "private": true,
   "license": "GPL-3.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "prepare": "husky",
-    "build": "npm run build:cpp && npm run build:web && npm run build:dist",
+    "build": "pnpm run build:cpp && pnpm run build:web && pnpm run build:dist",
     "build:cpp": "xmake config -m release && xmake build && xmake config -m debug",
-    "build:web": "npm run build --prefix web",
+    "build:web": "pnpm --filter web run build",
     "build:dist": "node scripts/prepare-dist.js",
     "build:portable": "node scripts/build-portable.js",
     "fetch:third-party": "node scripts/fetch-third-party.js",
     "build:installer": "node scripts/build-installer.js",
     "build:checksums": "node scripts/generate-checksums.js",
-    "dev:web": "npm run dev --prefix web",
+    "dev:web": "pnpm --filter web run dev",
     "test:scenarios": "node tests/scenarios/run.ts",
-    "release": "npm run build && npm run build:portable && npm run build:installer && npm run build:checksums",
+    "release": "pnpm run build && pnpm run build:portable && pnpm run build:installer && pnpm run build:checksums",
     "release:version": "node scripts/release-version.js",
     "format:cpp": "node scripts/format-cpp.js",
-    "format:web": "npm run format --prefix web"
+    "format:web": "pnpm --filter web exec prettier --write ."
   },
   "devDependencies": {
-    "esbuild": "^0.25.12",
+    "esbuild": "^0.28.2",
     "fast-glob": "^3.3.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.4"

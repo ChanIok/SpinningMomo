@@ -9,12 +9,12 @@ function main() {
   const licensePath = path.join(projectDir, "LICENSE");
 
   if (!fs.existsSync(webDist)) {
-    console.error("web/dist not found. Run 'npm run build:web' first.");
+    console.error("web/dist not found. Run 'pnpm run build:web' first.");
     process.exit(1);
   }
 
   if (!fs.existsSync(exePath)) {
-    console.error("SpinningMomo.exe not found. Run 'npm run build:cpp' first.");
+    console.error("SpinningMomo.exe not found. Run 'pnpm run build:cpp' first.");
     process.exit(1);
   }
   if (!fs.existsSync(licensePath)) {

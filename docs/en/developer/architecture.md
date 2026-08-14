@@ -7,7 +7,7 @@
 >
 > Pull requests are very welcome for issues with confirmed scope, clear bug fixes, documentation improvements, and technical challenges that have already been discussed. Unsolicited feature PRs may not be merged if they do not align with the project direction.
 
-This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. The backend uses self-contained `.hpp + .cpp` sources with a PCH used only for build acceleration. Project code includes external headers through exact facades under `src/vendor/`; Windows SDK facades map one-to-one to physical headers so domain aggregates do not couple unrelated call sites to the PCH. For the full design philosophy, component breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
+This project uses a hybrid architecture with a **C++23 native backend** and a **Vue 3 web frontend**. For the full design philosophy, component breakdown, and dependency graph, check the root-level **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
 | **xmake** | 3.1.0 | C++ build system |
-| **Node.js** | v20+ | Web frontend build and npm scripts |
+| **Node.js** | v22.13+ | Web frontend build and pnpm scripts |
 
 ### Install xmake
 
@@ -47,17 +47,14 @@ cd D:\dev\vcpkg
 ### 1. Third-party dependencies
 
 ```bash
-npm run fetch:third-party
+pnpm run fetch:third-party
 ```
 
-### 2. npm dependencies
+### 2. pnpm dependencies
 
 ```bash
-# Root (build script deps)
-npm install
-
-# Web frontend
-npm ci --prefix web
+# Install root and all workspace dependencies
+pnpm install
 ```
 
 ### 3. Initialize xmake dependencies and apply patches
@@ -103,7 +100,7 @@ vsxmake2026\SpinningMomo.sln
 
 ```bash
 # One command: C++ Release + Web frontend + assemble dist/
-npm run build
+pnpm run build
 ```
 
 Output goes to `dist/`.
@@ -119,10 +116,10 @@ xmake build
 xmake release    # automatically restores debug config after release build
 
 # Web frontend
-npm run build --prefix web
+pnpm --filter web run build
 
 # Assemble dist/ (exe + web resources)
-npm run build:dist
+pnpm run build:dist
 ```
 
 ### Build Output Paths
@@ -140,7 +137,7 @@ npm run build:dist
 ### Portable (ZIP)
 
 ```bash
-npm run build:portable
+pnpm run build:portable
 ```
 
 ### MSI Installer
@@ -156,7 +153,7 @@ wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 Then run:
 
 ```bash
-npm run build:installer
+pnpm run build:installer
 ```
 
 ---
@@ -166,7 +163,7 @@ npm run build:installer
 Start the dev server (C++ backend needs to be running):
 
 ```bash
-npm run dev:web
+pnpm run dev:web
 ```
 
 Vite dev server proxies `/rpc` and `/static` to the C++ backend (`localhost:51206`).

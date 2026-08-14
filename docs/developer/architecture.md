@@ -9,11 +9,7 @@
 
 ## 架构与代码规范说明
 
-本项目核心采用 C++23 原生后端与 Vue 3 Web 前端的混合双端架构。C++ 后端使用
-`.hpp + .cpp + PCH`，所有项目头保持自包含，PCH 只负责构建加速。
-项目代码通过 `src/vendor/` 下的精确门面引入外部头；Windows SDK 门面与物理头文件
-一一对应，避免领域聚合头把不相关调用点和 PCH 绑定在一起。
-关于详细的设计哲学、C++ 组件划分以及依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
+本项目核心采用 C++23 原生后端与 Vue 3 Web 前端的混合双端架构。关于详细的设计哲学、C++ 组件划分以及依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
 
 ## 环境要求
 
@@ -25,7 +21,7 @@ C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）进行日常开发，正
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
 | **xmake** | 3.1.0 | C++ 构建系统 |
-| **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
+| **Node.js** | v22.13+ | Web 前端构建及 pnpm 脚本 |
 
 ### 安装 xmake
 
@@ -53,17 +49,14 @@ cd D:\dev\vcpkg
 ### 1. 获取第三方依赖
 
 ```bash
-npm run fetch:third-party
+pnpm run fetch:third-party
 ```
 
-### 2. 安装 npm 依赖
+### 2. 安装 pnpm 依赖
 
 ```bash
-# 根目录（构建脚本依赖）
-npm install
-
-# Web 前端依赖
-npm ci --prefix web
+# 安装根项目及所有 workspace 项目依赖
+pnpm install
 ```
 
 ### 3. 初始化 xmake 依赖并应用补丁
@@ -108,7 +101,7 @@ vsxmake2026\SpinningMomo.sln
 
 ```bash
 # 一键完成：C++ Release + Web 前端 + 打包 dist/
-npm run build
+pnpm run build
 ```
 
 产物位于 `dist/` 目录。
@@ -124,10 +117,10 @@ xmake build
 xmake release    # 构建 release 后自动恢复 debug 配置
 
 # Web 前端
-npm run build --prefix web
+pnpm --filter web run build
 
 # 打包 dist/（汇总 exe + web 资源）
-npm run build:dist
+pnpm run build:dist
 ```
 
 ### 构建输出路径
@@ -156,7 +149,7 @@ xmake test -v
 ### 便携版（ZIP）
 
 ```bash
-npm run build:portable
+pnpm run build:portable
 ```
 
 ### MSI 安装包
@@ -172,7 +165,7 @@ wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 然后运行：
 
 ```bash
-npm run build:installer
+pnpm run build:installer
 ```
 
 ---
@@ -182,7 +175,7 @@ npm run build:installer
 启动开发服务器（需 C++ 后端同时运行）：
 
 ```bash
-npm run dev:web
+pnpm run dev:web
 ```
 
 Vite 开发服务器会将 `/rpc` 和 `/static` 代理到 C++ 后端（`localhost:51206`）。

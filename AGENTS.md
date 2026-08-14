@@ -29,7 +29,7 @@ xmake build
 xmake release
 
 # Web frontend
-npm run build --prefix web
+pnpm --filter web run build
 ```
 
 `web/` uses a Vite dev server and proxies `/rpc` and `/static` to the backend at `localhost:51206`.
@@ -120,7 +120,7 @@ The rough order is: core infrastructure first, then native UI, then feature serv
 - Distribution: `dist/` (exe + web resources)
 
 ## Installer
-Installers are built via `node scripts/build-installer.js` (or `npm run build:installer`). The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`. Use `--msi-only` to skip the bundle; use `--version X.Y.Z` to override `version.json`.
+Installers are built via `node scripts/build-installer.js` (or `pnpm run build:installer`). The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`. Use `--msi-only` to skip the bundle; use `--version X.Y.Z` to override `version.json`.
 
 ## Code Generation Scripts
 These must be re-run when their source files change:
@@ -144,7 +144,7 @@ These must be re-run when their source files change:
 
 Test Policy: Do not run tests automatically. Let the user confirm or run tests manually.
 
-- **Scenario Tests (TypeScript)**: End-to-end scenario tests live under `tests/scenarios/` (run via `npm run test:scenarios`). They test a compiled `SpinningMomo.exe` in isolated portable sandboxes via JSON-RPC. Close any running application instance before testing. The default gates the Release build (`build/windows/x64/release/`); content-hash semantics only hold in Release, so run `xmake release` before testing. Point at another build (e.g. Debug) via `--exe=<path>` / `SPINNING_MOMO_EXE`.
+- **Scenario Tests (TypeScript)**: End-to-end scenario tests live under `tests/scenarios/` (run via `pnpm run test:scenarios`). They test a compiled `SpinningMomo.exe` in isolated portable sandboxes via JSON-RPC. Close any running application instance before testing. The default gates the Release build (`build/windows/x64/release/`); content-hash semantics only hold in Release, so run `xmake release` before testing. Point at another build (e.g. Debug) via `--exe=<path>` / `SPINNING_MOMO_EXE`.
 - **Unit Tests (C++)**: Legacy doctest unit tests live under `tests/` (run via `xmake test`).
 - **Interactive Debugging**: Interactive RPC testing tools live in `web/src/features/playground/` and root `playground/`.
 

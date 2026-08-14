@@ -141,7 +141,7 @@ function main() {
   const exePath = path.join(distDir, "SpinningMomo.exe");
   if (!fs.existsSync(exePath)) {
     console.log("Building project...");
-    execSync("npm run build", { stdio: "inherit", cwd: projectDir });
+    execSync("pnpm run build", { stdio: "inherit", cwd: projectDir });
   }
 
   const outputMsi = path.join(distDir, `SpinningMomo-${version}-x64.msi`);

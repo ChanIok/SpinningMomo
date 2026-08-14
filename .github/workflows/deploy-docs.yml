@@ -1,13 +1,15 @@
 # 工作流名称
 name: Deploy VitePress Documentation
 
-# 触发条件：在 main 分支的 push 事件，且仅当 docs 目录有变更时
+# 触发条件：在 main 分支的 push 事件，且当文档或 workspace 依赖配置有变更时
 # 同时支持手动触发
 on:
   push:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
   # 添加手动触发
   workflow_dispatch:
     inputs:
@@ -37,25 +39,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Node.js and pnpm
+        uses: pnpm/setup@v1
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
+          runtime: node@24
+          cache: true
+          install: false
+          cache-dependency-path: pnpm-lock.yaml
           
       - name: Setup Pages
         uses: actions/configure-pages@v5
         
       - name: Install dependencies
-        run: |
-          cd docs
-          npm ci
+        run: pnpm install --frozen-lockfile
         
       - name: Build
-        run: |
-          cd docs
-          npm run build
+        run: pnpm --filter docs run build
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

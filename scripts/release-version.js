@@ -1,5 +1,5 @@
 // 运行此脚本更新版本号
-// npm run release:version -- 2.0.1
+// pnpm run release:version -- 2.0.1
 
 const fs = require("fs");
 const path = require("path");
@@ -69,8 +69,8 @@ function updateVersionTxt(filePath, version) {
 function main() {
   const rawVersion = process.argv[2];
   if (!rawVersion) {
-    console.error("Usage: npm run release:version -- <version>");
-    console.error("Example: npm run release:version -- 2.1.0");
+    console.error("Usage: pnpm run release:version -- <version>");
+    console.error("Example: pnpm run release:version -- 2.1.0");
     process.exit(1);
   }
 

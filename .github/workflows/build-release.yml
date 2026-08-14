@@ -32,17 +32,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js and pnpm
+        uses: pnpm/setup@v1
+        with:
+          runtime: node@24
+          cache: true
+          install: false
+          cache-dependency-path: pnpm-lock.yaml
+
       - name: Fetch third-party dependencies
         run: node scripts/fetch-third-party.js
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            web/package-lock.json
 
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
@@ -154,9 +153,7 @@ jobs:
           }
 
       - name: Install dependencies
-        run: |
-          npm ci
-          npm ci --prefix web
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare xmake release dependencies
         run: xmake f -m release --toolchain=msvc -y
@@ -165,10 +162,10 @@ jobs:
         run: xmake build -y
 
       - name: Build Web frontend
-        run: npm run build:web
+        run: pnpm run build:web
 
       - name: Assemble dist
-        run: npm run build:dist
+        run: pnpm run build:dist
 
       - name: Upload unsigned app executable
         if: ${{ inputs.code_signing }}
@@ -199,7 +196,7 @@ jobs:
           Copy-Item "signpath-output/app-exe/SpinningMomo.exe" "dist/SpinningMomo.exe" -Force
 
       - name: Create Portable ZIP
-        run: npm run build:portable
+        run: pnpm run build:portable
 
       - name: Build MSI package
         if: ${{ inputs.publish_release }}
@@ -281,7 +278,7 @@ jobs:
           Copy-Item "signpath-output/setup-exe/SpinningMomo-$version-x64-Setup.exe" "dist/SpinningMomo-$version-x64-Setup.exe" -Force
 
       - name: Generate checksums
-        run: npm run build:checksums
+        run: pnpm run build:checksums
 
       - name: Upload artifacts (for debugging)
         uses: actions/upload-artifact@v4

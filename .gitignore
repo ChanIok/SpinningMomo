@@ -66,6 +66,7 @@ tools/
 
 # Node.js dependencies
 node_modules/
+pnpm-debug.log*
 
 # Web App (Vite + React)
 web/node_modules/
