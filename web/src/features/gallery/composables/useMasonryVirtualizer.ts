@@ -31,6 +31,8 @@ export interface UseMasonryVirtualizerOptions {
   containerWidth: Ref<number>
   /** 初始测量尚未完成时使用的目标列宽。 */
   targetColumnSize: Ref<number>
+  /** 滚动容器顶部到虚拟列表起点的真实距离。 */
+  scrollMargin: Ref<number>
   /** 卡片间距（px），水平和垂直统一使用该值 */
   gap?: number
 }
@@ -94,6 +96,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     columns,
     containerWidth,
     targetColumnSize,
+    scrollMargin,
     gap = DEFAULT_MASONRY_GAP,
   } = options
 
@@ -164,6 +167,9 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     gap,
     get lanes() {
       return columns.value
+    },
+    get scrollMargin() {
+      return scrollMargin.value
     },
     paddingStart: 0,
     paddingEnd: 16,

@@ -8,6 +8,7 @@ import {
   useGalleryLightbox,
   useCardImageScheduler,
   useTimelineRail,
+  useGalleryVirtualScrollMargin,
   type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
@@ -28,9 +29,12 @@ const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const heroHeaderRef = ref<HTMLElement | null>(null)
+const virtualContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const targetRowHeight = computed(() => store.getEffectiveViewSize())
+const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
 
 // AdaptiveView 不再依赖 ScrollArea，避免第三方滚动容器内部测量语义干扰 thumb 尺寸。
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -39,6 +43,7 @@ const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerRef: scrollContainerRef,
   containerWidth,
   targetRowHeight,
+  scrollMargin,
   gap,
 })
 const cardImageScheduler = useCardImageScheduler(
@@ -56,7 +61,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
       return undefined
     }
 
-    return adaptiveVirtualizer.rows.value[rowIndex]?.start
+    const rowStart = adaptiveVirtualizer.rows.value[rowIndex]?.start
+    return rowStart === undefined ? undefined : scrollMargin.value + rowStart
   },
 })
 
@@ -203,9 +209,12 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <GalleryHeroHeader />
+      <div ref="heroHeaderRef">
+        <GalleryHeroHeader />
+      </div>
       <div class="pb-3">
         <div
+          ref="virtualContentRef"
           :style="{
             height: `${adaptiveVirtualizer.virtualizer.value.getTotalSize()}px`,
             position: 'relative',
@@ -220,7 +229,7 @@ defineExpose({ scrollToIndex, getCardRect })
               left: 0,
               width: '100%',
               height: `${virtualRow.size}px`,
-              transform: `translateY(${virtualRow.start}px)`,
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
               display: 'flex',
               gap: `${adaptiveVirtualizer.gap}px`,
             }"
@@ -271,6 +280,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
+      :content-element="virtualContentRef"
       :virtualizer="adaptiveVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

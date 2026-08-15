@@ -9,6 +9,8 @@ export interface UseGridVirtualizerOptions {
   containerRef: Ref<HTMLElement | null>
   columns: Ref<number>
   containerWidth: Ref<number>
+  /** 滚动容器顶部到虚拟列表起点的真实距离。 */
+  scrollMargin: Ref<number>
   gap?: number
 }
 
@@ -20,7 +22,7 @@ export interface VirtualRow {
 }
 
 export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
-  const { containerRef, columns, containerWidth, gap = GALLERY_CARD_GAP } = options
+  const { containerRef, columns, containerWidth, scrollMargin, gap = GALLERY_CARD_GAP } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -46,6 +48,9 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: () => estimatedRowHeight.value,
+    get scrollMargin() {
+      return scrollMargin.value
+    },
     paddingStart: 0,
     paddingEnd: 16,
     overscan: 10,

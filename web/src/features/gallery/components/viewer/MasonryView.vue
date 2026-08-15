@@ -8,6 +8,7 @@ import {
   useMasonryVirtualizer,
   useCardImageScheduler,
   useTimelineRail,
+  useGalleryVirtualScrollMargin,
   type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
@@ -28,9 +29,12 @@ const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const heroHeaderRef = ref<HTMLElement | null>(null)
+const virtualContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const targetColumnSize = computed(() => store.getEffectiveViewSize())
@@ -45,6 +49,7 @@ const masonryVirtualizer = useMasonryVirtualizer({
   columns,
   containerWidth,
   targetColumnSize,
+  scrollMargin,
   gap,
 })
 const cardImageScheduler = useCardImageScheduler(
@@ -57,7 +62,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   buckets: computed(() => store.timelineBuckets),
   locale,
   getOffsetByAssetIndex(assetIndex) {
-    return masonryVirtualizer.itemStartByIndex.value.get(assetIndex)
+    const itemStart = masonryVirtualizer.itemStartByIndex.value.get(assetIndex)
+    return itemStart === undefined ? undefined : scrollMargin.value + itemStart
   },
 })
 
@@ -216,9 +222,12 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <GalleryHeroHeader />
+      <div ref="heroHeaderRef">
+        <GalleryHeroHeader />
+      </div>
       <div>
         <div
+          ref="virtualContentRef"
           :style="{
             height: `${masonryVirtualizer.virtualizer.value.getTotalSize()}px`,
             position: 'relative',
@@ -235,7 +244,7 @@ defineExpose({ scrollToIndex, getCardRect })
               left: 0,
               width: `${masonryVirtualizer.columnWidth.value}px`,
               height: `${virtualItem.size}px`,
-              transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start}px)`,
+              transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start - scrollMargin}px)`,
             }"
           >
             <AssetCard
@@ -287,6 +296,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
+      :content-element="virtualContentRef"
       :virtualizer="masonryVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

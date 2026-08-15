@@ -23,6 +23,7 @@ const props = withDefaults(
     scrollTop: number
     viewportHeight: number
     scrollContainer?: HTMLElement | null
+    contentElement: HTMLElement | null
     virtualizer: {
       getTotalSize: () => number
       scrollToOffset: (offset: number, options?: { behavior?: 'auto' | 'smooth' }) => void
@@ -75,16 +76,16 @@ watch(
 )
 
 watch(
-  () => props.scrollContainer,
-  (container) => {
+  () => [props.scrollContainer, props.contentElement],
+  ([container, contentElement]) => {
     scrollResizeObserver?.disconnect()
     scrollResizeObserver = null
 
     if (container && typeof ResizeObserver !== 'undefined') {
       scrollResizeObserver = new ResizeObserver(syncScrollRange)
       scrollResizeObserver.observe(container)
-      if (container.firstElementChild) {
-        scrollResizeObserver.observe(container.firstElementChild)
+      if (contentElement && contentElement !== container) {
+        scrollResizeObserver.observe(contentElement)
       }
     }
 

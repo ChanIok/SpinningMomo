@@ -9,6 +9,7 @@ import {
   useGridVirtualizer,
   useCardImageScheduler,
   useTimelineRail,
+  useGalleryVirtualScrollMargin,
   type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
@@ -28,8 +29,11 @@ const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const heroHeaderRef = ref<HTMLElement | null>(null)
+const virtualContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
 
 const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -48,6 +52,7 @@ const gridVirtualizer = useGridVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
+  scrollMargin,
   gap,
 })
 const cardImageScheduler = useCardImageScheduler(
@@ -61,7 +66,7 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   locale,
   getOffsetByAssetIndex(assetIndex) {
     const rowIndex = Math.floor(assetIndex / Math.max(columns.value, 1))
-    return rowIndex * gridVirtualizer.estimatedRowHeight.value
+    return scrollMargin.value + rowIndex * gridVirtualizer.estimatedRowHeight.value
   },
 })
 
@@ -208,8 +213,11 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <GalleryHeroHeader />
+      <div ref="heroHeaderRef">
+        <GalleryHeroHeader />
+      </div>
       <div
+        ref="virtualContentRef"
         :style="{
           height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
           position: 'relative',
@@ -225,7 +233,7 @@ defineExpose({ scrollToIndex, getCardRect })
             left: 0,
             width: '100%',
             height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start}px)`,
+            transform: `translateY(${virtualRow.start - scrollMargin}px)`,
           }"
         >
           <div
@@ -279,6 +287,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
+      :content-element="virtualContentRef"
       :virtualizer="gridVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"
