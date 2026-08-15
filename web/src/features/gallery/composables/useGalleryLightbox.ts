@@ -1,29 +1,18 @@
 import { useGalleryStore } from '../store'
 import { useGallerySelection } from './useGallerySelection'
 import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
-import { isGalleryTouchInput, type GalleryInputType } from '../input'
+import type { GalleryInputType } from '../input'
 
 // 协调暗房的 Store 状态与 URL 历史，保证打开、切图和关闭由同一条状态链驱动。
 export function useGalleryLightbox() {
   const store = useGalleryStore()
   const gallerySelection = useGallerySelection()
   const overlayHistory = useGalleryOverlayHistory()
-  async function syncLightboxSelection(
-    index: number,
-    inputType: GalleryInputType = store.lightbox.inputType
-  ) {
-    // 窄屏触摸单击的职责只是进入暗房，不应在返回图库后留下“被选中”的假象。
-    // activeIndex 仍然保留给暗房导航和 hero 动画使用。
-    if (
-      store.isCompactWindow &&
-      isGalleryTouchInput(inputType) &&
-      store.selection.mode !== 'multi-select'
-    ) {
-      return gallerySelection.activateIndex(index)
-    }
-
-    if (store.selectedCount > 1) {
-      return gallerySelection.activateIndex(index, { syncDetails: true })
+  async function syncLightboxSelection(index: number) {
+    // 普通浏览状态下，暗房当前资产就是单选目标；这让暗房内的操作和详情沿用图库选择语义。
+    // 多选状态下保留用户已经建立的集合，暗房导航只改变当前浏览位置。
+    if (store.selection.mode === 'multi-select') {
+      return gallerySelection.activateIndex(index, { syncDetails: store.selectedCount > 1 })
     }
 
     return gallerySelection.selectOnlyIndex(index)
@@ -31,7 +20,7 @@ export function useGalleryLightbox() {
 
   // 先同步选中资产，再同时打开暗房并写入可返回的历史层。
   async function openLightbox(index: number, inputType: GalleryInputType = 'mouse') {
-    const asset = await syncLightboxSelection(index, inputType)
+    const asset = await syncLightboxSelection(index)
     if (!asset) {
       return
     }

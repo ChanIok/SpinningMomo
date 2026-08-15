@@ -173,7 +173,7 @@ export type {
 
 // ============= UI状态类型 =============
 
-// 图库选择模式；browse 沿用桌面端 Ctrl/Shift 选择语义，multi-select 由触摸长按进入。
+// 图库选择模式；browse 保持单项/Ctrl/Shift 选择语义，multi-select 由触摸长按进入。
 export type GalleryInteractionMode = 'browse' | 'multi-select'
 
 // 选择状态

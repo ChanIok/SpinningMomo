@@ -96,6 +96,10 @@ const hasThumbnail = computed(() => scheduledThumbnailUrl.value.length > 0)
 const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
 const enableHoverScale = computed(() => !useOriginalImagesForCards.value && !store.isCompactWindow)
 const isVideoAsset = computed(() => props.asset.type === 'video')
+// 紧凑普通浏览仍保留单选状态供暗房操作使用，但只有多选模式才展示选中视觉。
+const showSelectionVisual = computed(
+  () => props.isSelected && (!store.isCompactWindow || store.selection.mode === 'multi-select')
+)
 
 const showPlaceholder = computed(
   () => imageError.value || !hasThumbnail.value || !hasThumbnailRendered.value
@@ -496,7 +500,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     class="group transition-ring relative w-full overflow-hidden bg-background duration-200 contain-[layout_size_paint] select-none"
     :class="[
       store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-sm',
-      isSelected
+      showSelectionVisual
         ? store.isCompactWindow
           ? 'ring-2 ring-primary ring-inset'
           : 'shadow-lg ring-4 ring-primary'
@@ -590,8 +594,8 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         data-selection-mask
         class="absolute inset-0 bg-black/0 transition-all duration-200"
         :class="{
-          'bg-black/30': isSelected,
-          'group-hover:bg-black/10': !isSelected,
+          'bg-black/30': showSelectionVisual,
+          'group-hover:bg-black/10': !showSelectionVisual,
         }"
       />
 
@@ -623,7 +627,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 
       <!-- 选择指示器 -->
       <div
-        v-if="isSelected"
+        v-if="showSelectionVisual"
         data-selection-indicator
         class="absolute flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
         :class="store.isCompactWindow ? 'top-1 right-1 h-5 w-5' : 'top-2 right-2 h-6 w-6'"

@@ -325,8 +325,7 @@ function animateClose() {
   }
 
   const delay = didReverseHero ? CLOSE_AFTER_REVERSE_HERO_MS : CLOSE_AFTER_NO_HERO_MS
-  // 只有窄屏触摸直达暗房时没有显式选择；这时关闭后清除临时焦点。
-  // 鼠标、宽屏触摸以及多选进入暗房都应保留选择，方便继续操作或查看详情。
+  // 暗房关闭后保留当前选择，方便用户回到图库继续操作或查看详情；没有选择时才清理临时焦点。
   const shouldClearBrowseFocus = store.selectedCount === 0
   window.setTimeout(() => {
     lightbox.closeLightbox()

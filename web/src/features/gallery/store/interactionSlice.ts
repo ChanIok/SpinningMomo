@@ -28,7 +28,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   const { totalCount, paginatedAssets, bumpPaginatedAssetsVersion } = args
 
   // selection 的语义分层：
-  // - selectedIds: 多选集合
+  // - selectedIds: 当前选择集合（browse 通常为单项，multi-select 可多项）
   // - anchorIndex: 范围选择锚点
   // - activeIndex: 当前结果集位置（可能随查询变化失效）
   // - activeAssetId: 当前聚焦资产身份（跨查询变化保持语义）
