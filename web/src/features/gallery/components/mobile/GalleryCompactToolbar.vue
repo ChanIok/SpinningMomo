@@ -101,7 +101,7 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="h-9 w-9 shrink-0 rounded-full text-foreground/80 transition-colors hover:bg-black/10 hover:text-foreground active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+          class="h-9 w-9 shrink-0 rounded-full text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
           :aria-label="t('gallery.mobile.selection.exit')"
           @click="exitMultiSelectMode"
         >
@@ -127,7 +127,7 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="h-10 w-10 text-foreground/80 transition-colors hover:bg-black/10 hover:text-foreground active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+          class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
           :aria-label="t('gallery.mobile.toolbar.menu')"
           @click="openFolderDrawer"
         >
@@ -143,7 +143,7 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="relative h-9 w-11 shrink-0 rounded-full text-foreground/80 transition-colors hover:bg-black/10 hover:text-foreground active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+          class="relative h-9 w-11 shrink-0 rounded-full text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
           :class="activeFilterCount > 0 ? 'text-primary hover:text-primary' : ''"
           :aria-label="t('gallery.mobile.toolbar.filter.title')"
           @click="openFilterPanel"
@@ -160,7 +160,7 @@ function exitMultiSelectMode() {
         <Button
           variant="ghost"
           size="icon"
-          class="h-9 w-11 shrink-0 rounded-full text-foreground/80 transition-colors hover:bg-black/10 hover:text-foreground active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+          class="h-9 w-11 shrink-0 rounded-full text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
           :aria-label="t('gallery.mobile.toolbar.viewSettings.title')"
           @click="openViewSettingsPanel"
         >

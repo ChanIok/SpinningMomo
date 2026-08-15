@@ -53,7 +53,11 @@ const LARGE_DOWNLOAD_CONFIRMATION_THRESHOLD = 100
 const selectedCount = computed(() => store.selectedCount)
 const selectedAssets = computed(() => {
   const selectedIdSet = store.selection.selectedIds
-  const assets = [] as { id: number; reviewFlag: 'none' | 'picked' | 'rejected' }[]
+  const assets = [] as {
+    id: number
+    reviewFlag?: 'none' | 'picked' | 'rejected'
+    rating?: number
+  }[]
 
   store.paginatedAssets.forEach((pageAssets) => {
     pageAssets.forEach((asset) => {
@@ -64,6 +68,17 @@ const selectedAssets = computed(() => {
   })
 
   return assets
+})
+const currentAssetRating = computed(() => {
+  if (selectedAssets.value.length === 1) {
+    return selectedAssets.value[0]?.rating ?? 0
+  }
+  const activeIndex = store.selection.activeIndex
+  if (activeIndex !== undefined) {
+    const activeAsset = store.getAssetsInRange(activeIndex, activeIndex)[0]
+    return activeAsset?.rating ?? 0
+  }
+  return 0
 })
 const allSelectedRejected = computed(
   () =>
@@ -282,40 +297,44 @@ async function handleDownload() {
 
 <template>
   <div
-    class="shrink-0 border-t border-border/70 bg-background/90 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md"
+    class="shrink-0 bg-gradient-to-t from-background/60 via-background/40 to-transparent px-2 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-foreground"
     @contextmenu.prevent.stop
   >
     <div class="mx-auto grid w-full max-w-xl grid-cols-5 gap-1">
       <Button
         variant="ghost"
-        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
+        class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="downloadAssetIds.length === 0 || isDownloading || downloadConfirmationOpen"
         :aria-busy="isDownloading"
         @click="void handleDownload()"
       >
-        <LoaderCircle v-if="isDownloading" class="size-5 animate-spin" />
-        <Download v-else class="size-5" />
+        <LoaderCircle v-if="isDownloading" class="size-5 animate-spin" :stroke-width="1.5" />
+        <Download v-else class="size-5" :stroke-width="1.5" />
         <span>{{ t('gallery.mobile.actions.download') }}</span>
       </Button>
 
       <Button
         variant="ghost"
-        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
+        class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
         @click="ratingSheetOpen = true"
       >
-        <Star class="size-5" />
+        <Star
+          class="size-5 transition-colors"
+          :stroke-width="1.5"
+          :class="currentAssetRating > 0 ? 'fill-amber-400 text-amber-400' : ''"
+        />
         <span>{{ t('gallery.mobile.actions.rating') }}</span>
       </Button>
 
       <Button
         variant="ghost"
-        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
-        :class="allSelectedRejected ? 'text-rose-500' : ''"
+        class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
+        :class="allSelectedRejected ? 'text-rose-500 hover:text-rose-600' : ''"
         :disabled="selectedCount === 0"
         @click="handleRejected"
       >
-        <X class="size-5" />
+        <X class="size-5" :stroke-width="1.5" />
         <span>
           {{
             allSelectedRejected
@@ -327,21 +346,21 @@ async function handleDownload() {
 
       <Button
         variant="ghost"
-        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
+        class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
         @click="void openTagSheet()"
       >
-        <Tag class="size-5" />
+        <Tag class="size-5" :stroke-width="1.5" />
         <span>{{ t('gallery.mobile.actions.tags') }}</span>
       </Button>
 
       <Button
         variant="ghost"
-        class="h-14 min-w-0 flex-col gap-1 rounded-lg px-1 text-xs"
+        class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
         @click="moreSheetOpen = true"
       >
-        <MoreHorizontal class="size-5" />
+        <MoreHorizontal class="size-5" :stroke-width="1.5" />
         <span>{{ t('gallery.mobile.actions.more') }}</span>
       </Button>
     </div>

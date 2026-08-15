@@ -4,8 +4,8 @@ import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { cn } from '@/lib/utils'
 import {
+  ChevronLeft,
   Flag,
-  MoreHorizontal,
   Film,
   RotateCw,
   Minimize,
@@ -16,13 +16,6 @@ import {
 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
@@ -114,22 +107,26 @@ function handleToolbarContextMenu(event: MouseEvent) {
 
 <template>
   <div
-    class="@container flex items-center justify-between px-2 py-2"
+    class="@container flex w-full items-center justify-between px-2.5 text-foreground transition-colors"
+    :class="
+      props.compressed
+        ? 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent pt-1 pb-4'
+        : 'h-12 bg-transparent'
+    "
     @contextmenu="handleToolbarContextMenu"
   >
     <TooltipProvider :delay-duration="300">
-      <div class="flex min-w-0 items-center gap-3 text-foreground">
+      <!-- 左侧区域 -->
+      <div class="flex min-w-0 items-center gap-3">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="sidebarGhost" size="icon-sm" class="shrink-0" @click="emit('back')">
-              <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10 shrink-0 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              @click="emit('back')"
+            >
+              <ChevronLeft class="size-5" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -138,20 +135,66 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <div class="flex min-w-0 items-center gap-3">
+        <!-- 宽屏模式下保留计数与模式信息 -->
+        <div v-if="!props.compressed" class="flex min-w-0 items-center gap-3">
           <span class="shrink-0 text-xs font-medium"
             >{{ currentIndex + 1 }} / {{ totalCount }}</span
           >
           <span class="truncate text-xs text-muted-foreground">{{ lightboxMode }}</span>
-          <span v-if="!props.compressed && selectedCount > 0" class="shrink-0 text-xs text-primary">
+          <span v-if="selectedCount > 0" class="shrink-0 text-xs text-primary">
             {{ t('gallery.lightbox.toolbar.selected') }} {{ selectedCount }}
           </span>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <!-- 宽屏缩放控制 -->
-        <div class="mr-2 hidden items-center gap-1 @[640px]:flex">
+      <!-- 右侧控制区 -->
+      <!-- 紧凑模式右侧：仅保留详情与沉浸/全屏按钮 -->
+      <div v-if="props.compressed" class="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              :class="props.detailsOpen ? 'text-primary hover:text-primary' : ''"
+              @click="emit('toggleDetails')"
+            >
+              <Info class="size-5" :stroke-width="1.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {{ t('gallery.lightbox.toolbar.detailsTitle') }}
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              @click="emit('toggleImmersive')"
+            >
+              <Minimize v-if="isImmersive" class="size-5" :stroke-width="1.5" />
+              <Maximize v-else class="size-5" :stroke-width="1.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" class="flex items-center gap-2">
+            <span>
+              {{
+                isImmersive
+                  ? t('gallery.lightbox.toolbar.exitImmersiveTitle')
+                  : t('gallery.lightbox.toolbar.immersiveTitle')
+              }}
+            </span>
+            <Kbd>F</Kbd>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      <!-- 宽屏模式右侧：保留缩放、旋转、筛选、胶片栏与全屏控件 -->
+      <div v-else class="flex items-center gap-2">
+        <div class="mr-2 flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -207,14 +250,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 :class="!supportsZoom && 'cursor-not-allowed'"
                 @click="emit('zoomOut')"
               >
-                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M20 12H4"
-                  />
-                </svg>
+                <ZoomOut class="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -232,14 +268,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 :class="!supportsZoom && 'cursor-not-allowed'"
                 @click="emit('zoomIn')"
               >
-                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                <ZoomIn class="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -251,12 +280,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
 
         <Tooltip v-if="supportsRotate">
           <TooltipTrigger as-child>
-            <Button
-              variant="sidebarGhost"
-              size="icon-sm"
-              class="mr-2 hidden @[640px]:inline-flex"
-              @click="handleRotateClick"
-            >
+            <Button variant="sidebarGhost" size="icon-sm" class="mr-2" @click="handleRotateClick">
               <RotateCw class="size-4" />
             </Button>
           </TooltipTrigger>
@@ -270,64 +294,8 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <!-- 窄屏缩放控制 (折叠菜单) -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span class="inline-flex">
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="sidebarGhost" size="icon-sm" class="mr-2 flex @[640px]:hidden">
-                    <MoreHorizontal class="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="w-40">
-                  <DropdownMenuItem
-                    :disabled="!supportsZoom"
-                    :class="
-                      supportsZoom && isFitMode ? 'font-medium text-primary focus:text-primary' : ''
-                    "
-                    @click="emit('fit')"
-                  >
-                    <Minimize class="mr-2 size-4" />
-                    {{ t('gallery.lightbox.toolbar.fit') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    :disabled="!supportsZoom"
-                    :class="
-                      supportsZoom && isActualSize
-                        ? 'font-medium text-primary focus:text-primary'
-                        : ''
-                    "
-                    @click="emit('actual')"
-                  >
-                    <Maximize class="mr-2 size-4" />
-                    100%
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem :disabled="!supportsZoom" @click="emit('zoomOut')">
-                    <ZoomOut class="mr-2 size-4" />
-                    {{ t('gallery.lightbox.toolbar.zoomOutTitle') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="!supportsZoom" @click="emit('zoomIn')">
-                    <ZoomIn class="mr-2 size-4" />
-                    {{ t('gallery.lightbox.toolbar.zoomInTitle') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator v-if="supportsRotate" />
-                  <DropdownMenuItem v-if="supportsRotate" @click="emit('rotate', 90)">
-                    <RotateCw class="mr-2 size-4" />
-                    {{ t('gallery.lightbox.toolbar.rotateTitle') }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {{ t('gallery.toolbar.viewMode.label') }}
-          </TooltipContent>
-        </Tooltip>
-
         <!-- 评分与标记筛选 -->
-        <Tooltip v-if="!props.compressed">
+        <Tooltip>
           <TooltipTrigger as-child>
             <span class="inline-flex">
               <Popover>
@@ -356,7 +324,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip v-if="!props.compressed">
+        <Tooltip>
           <TooltipTrigger as-child>
             <Button
               variant="sidebarGhost"
@@ -382,45 +350,13 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="sidebarGhost"
-              size="icon-sm"
-              class="flex @[640px]:hidden"
-              :class="props.detailsOpen ? toggleActiveClass : ''"
-              @click="emit('toggleDetails')"
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              @click="emit('toggleImmersive')"
             >
-              <Info class="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {{ t('gallery.lightbox.toolbar.detailsTitle') }}
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="sidebarGhost" size="icon-sm" @click="emit('toggleImmersive')">
-              <svg
-                v-if="isImmersive"
-                class="size-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3m-1-7l4-4m0 0h-3m3 0v3m-8 1l4-4m0 0v3m0-3H8"
-                />
-              </svg>
-              <svg v-else class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                />
-              </svg>
+              <Minimize v-if="isImmersive" class="size-5" :stroke-width="1.5" />
+              <Maximize v-else class="size-5" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
