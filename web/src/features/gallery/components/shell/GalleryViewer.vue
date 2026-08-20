@@ -559,8 +559,7 @@ function handleContentContextMenu(event: MouseEvent) {
     return
   }
 
-  // 背景右键切换到当前文件夹上下文，与素材右键的选区动作明确分离。
-  gallerySelection.clearSelection()
+  // 背景右键只切换菜单上下文，不改变当前选区；“选择”子菜单需要基于现有选区执行反选。
   store.openContextMenuForBackground(event)
 }
 

@@ -13,6 +13,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import type { SortBy, SortOrder, ViewMode } from '../../types'
 import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
+import GallerySelectionDropdownMenu from './GallerySelectionDropdownMenu.vue'
 
 const { t } = useI18n()
 const store = useGalleryStore()
@@ -44,6 +45,8 @@ function setSortOrder(value: SortOrder) {
 </script>
 
 <template>
+  <GallerySelectionDropdownMenu />
+  <DropdownMenuSeparator />
   <GalleryPasteDropdownMenuItem />
   <DropdownMenuSeparator />
 

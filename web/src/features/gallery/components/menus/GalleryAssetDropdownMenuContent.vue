@@ -14,6 +14,7 @@ import {
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { useGalleryAssetActions } from '../../composables'
 import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
+import GallerySelectionDropdownMenu from './GallerySelectionDropdownMenu.vue'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
@@ -23,6 +24,8 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
 </script>
 
 <template>
+  <GallerySelectionDropdownMenu />
+  <DropdownMenuSeparator />
   <!-- 远端隐藏文件打开、资源管理器和系统剪贴板入口。 -->
   <template v-if="canUseLocalFileSystem">
     <DropdownMenuItem

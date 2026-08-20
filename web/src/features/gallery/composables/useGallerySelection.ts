@@ -260,32 +260,54 @@ export function useGallerySelection() {
     return targetAsset
   }
 
-  async function selectAllCurrentQuery() {
-    const ids = await galleryData.queryCurrentAssetIds()
-    if (ids.length === 0) {
+  async function applyCurrentQuerySelection(queryIds: number[], selectedIds: number[]) {
+    if (selectedIds.length === 0) {
       clearSelection()
       store.clearActiveAsset()
       return
     }
 
-    store.replaceSelection(ids)
+    store.replaceSelection(selectedIds)
 
+    const selectedIdSet = new Set(selectedIds)
     const currentActiveAssetId = store.selection.activeAssetId
     const activeIndex =
-      currentActiveAssetId === undefined ? -1 : ids.findIndex((id) => id === currentActiveAssetId)
-    const targetIndex = activeIndex >= 0 ? activeIndex : 0
-    const targetAssetId = ids[targetIndex]!
+      currentActiveAssetId === undefined
+        ? -1
+        : queryIds.findIndex((id) => id === currentActiveAssetId && selectedIdSet.has(id))
+    const targetIndex =
+      activeIndex >= 0 ? activeIndex : queryIds.findIndex((id) => selectedIdSet.has(id))
+
+    if (targetIndex < 0) {
+      clearSelection()
+      store.clearActiveAsset()
+      return
+    }
+
+    const targetAssetId = queryIds[targetIndex]!
 
     store.setSelectionAnchor(targetIndex)
     store.setActiveAsset(targetAssetId, targetIndex)
 
-    if (ids.length === 1) {
+    if (selectedIds.length === 1) {
       const asset = await getAssetByIndex(targetIndex)
       syncDetailsFocusFromSelection(asset)
       return
     }
 
     syncDetailsFocusFromSelection()
+  }
+
+  async function selectAllCurrentQuery() {
+    const ids = await galleryData.queryCurrentAssetIds()
+    await applyCurrentQuerySelection(ids, ids)
+  }
+
+  async function invertCurrentQuery() {
+    const ids = await galleryData.queryCurrentAssetIds()
+    const selectedIdSet = store.selection.selectedIds
+    const invertedIds = ids.filter((id) => !selectedIdSet.has(id))
+    await applyCurrentQuerySelection(ids, invertedIds)
   }
 
   async function handleAssetClick(_asset: Asset, event: MouseEvent, index: number) {
@@ -358,6 +380,7 @@ export function useGallerySelection() {
     exitMultiSelectMode,
     rangeSelectToIndex,
     selectAllCurrentQuery,
+    invertCurrentQuery,
     syncDetailsFocusFromSelection,
     prepareContextMenuForIndex,
 
