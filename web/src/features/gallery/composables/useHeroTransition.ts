@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
-const LIGHTBOX_VIEWPORT_PADDING = 1
+// 暗房根节点使用 px-[1px]；真实媒体 viewport 已经是内容盒，不应重复扣除这层边距。
+export const LIGHTBOX_VIEWPORT_PADDING = 1
 
 interface HeroSource {
   rect: DOMRect
@@ -37,10 +38,11 @@ export function prepareReverseHero(fromRect: DOMRect, toRect: DOMRect, thumbnail
 export function computeLightboxHeroRect(
   containerRect: DOMRect | DOMRectReadOnly,
   width: number,
-  height: number
+  height: number,
+  viewportPadding = LIGHTBOX_VIEWPORT_PADDING
 ) {
-  const contentWidth = Math.max(containerRect.width - LIGHTBOX_VIEWPORT_PADDING * 2, 1)
-  const contentHeight = Math.max(containerRect.height - LIGHTBOX_VIEWPORT_PADDING * 2, 1)
+  const contentWidth = Math.max(containerRect.width - viewportPadding * 2, 1)
+  const contentHeight = Math.max(containerRect.height - viewportPadding * 2, 1)
   const imageWidth = Math.max(width, 1)
   const imageHeight = Math.max(height, 1)
   const scale = Math.min(contentWidth / imageWidth, contentHeight / imageHeight, 1)

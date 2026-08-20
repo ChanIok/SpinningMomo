@@ -854,12 +854,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
       </ScrollArea>
 
       <div v-if="hasAttributeFilters" class="ml-2 shrink-0">
-        <Button
-          variant="default"
-          size="sm"
-          class="h-8 shrink-0 px-2.5 text-xs"
-          @click="clearAttributeFilters"
-        >
+        <Button variant="toolbarFilter" size="filter-sm" @click="clearAttributeFilters">
           <X class="h-4 w-4" />
           {{ t('gallery.toolbar.filters.clear') }}
         </Button>

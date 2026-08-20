@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
 import { LoaderCircle, Upload, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ const gallerySelection = useGallerySelection()
 const { t } = useI18n()
 const viewerRef = ref<HTMLElement | null>(null)
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
+const galleryLightboxRef = ref<InstanceType<typeof GalleryLightbox> | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
@@ -230,8 +231,23 @@ watch(
 
     const viewerEl = viewerRef.value
     if (!viewerEl) return
-    const containerRect = viewerEl.getBoundingClientRect()
-    const toRect = computeLightboxHeroRect(containerRect, hero.width, hero.height)
+
+    // 暗房刚通过 v-if 挂载时，等待 DOM 更新让普通桌面模式的上下 chrome 完成布局，
+    // Hero 才能以实际媒体 viewport 作为目标；紧凑/沉浸模式由子组件返回完整区域。
+    await nextTick()
+    if (isViewerUnmounted || !store.lightbox.isOpen) {
+      endHeroAnimation()
+      return
+    }
+
+    const heroViewport = galleryLightboxRef.value?.getHeroViewport()
+    const containerRect = heroViewport?.rect ?? viewerEl.getBoundingClientRect()
+    const toRect = computeLightboxHeroRect(
+      containerRect,
+      hero.width,
+      hero.height,
+      heroViewport?.padding
+    )
 
     heroOverlay.value = { thumbnailUrl: hero.thumbnailUrl, toRect }
     heroOverlayStyle.value = rectToFixedStyle(hero.rect, 'none')
@@ -767,6 +783,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
     <!-- lightbox 按需挂载/销毁，绝对定位覆盖在 gallery 上层 -->
     <GalleryLightbox
       v-if="store.lightbox.isOpen"
+      ref="galleryLightboxRef"
       :gallery-content-ref="galleryContentRef"
       @request-reverse-hero="startReverseHero"
     />

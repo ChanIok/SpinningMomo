@@ -4,7 +4,7 @@ import { GALLERY_WINDOW_COMPACT_BREAKPOINT } from '../constants'
 /**
  * 窗口级响应式状态。
  *
- * 这里的宽度指应用窗口，而不是图库中间栏或暗房内容区；内容区的局部压缩由组件自行判断。
+ * 这里的宽度指应用窗口，而不是图库中间栏；图库工具栏等局部容器压缩由组件自行判断。
  */
 export function createViewportSlice() {
   const windowWidth = ref(0)

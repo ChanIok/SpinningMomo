@@ -140,7 +140,9 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <span class="shrink-0 text-xs font-medium"
             >{{ currentIndex + 1 }} / {{ totalCount }}</span
           >
-          <span class="truncate text-xs text-muted-foreground">{{ lightboxMode }}</span>
+          <span class="hidden truncate text-xs text-muted-foreground @min-[600px]:inline">{{
+            lightboxMode
+          }}</span>
           <span v-if="selectedCount > 0" class="shrink-0 text-xs text-primary">
             {{ t('gallery.lightbox.toolbar.selected') }} {{ selectedCount }}
           </span>
@@ -192,55 +194,59 @@ function handleToolbarContextMenu(event: MouseEvent) {
         </Tooltip>
       </div>
 
-      <!-- 宽屏模式右侧：保留缩放、旋转、筛选、胶片栏与全屏控件 -->
+      <!-- 桌面模式右侧：三阶渐进响应（>=600px 完整、420px~599px 图标、<420px 仅底片栏与全屏） -->
       <div v-else class="flex items-center gap-2">
-        <div class="mr-2 flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="sidebarGhost"
-                class="h-8 px-2.5 text-xs"
-                :disabled="!supportsZoom"
-                :class="
-                  cn(
-                    !supportsZoom && 'cursor-not-allowed',
-                    supportsZoom && isFitMode && toggleActiveClass
-                  )
-                "
-                @click="emit('fit')"
-              >
-                {{ t('gallery.lightbox.toolbar.fit') }}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" class="flex items-center gap-2">
-              <span>{{ t('gallery.lightbox.toolbar.fitTitle') }}</span>
-              <Kbd>Z</Kbd>
-            </TooltipContent>
-          </Tooltip>
+        <div class="mr-2 hidden items-center gap-1 @min-[420px]:flex">
+          <!-- 适屏与 1:1 文字按钮：>= 600px 显示 -->
+          <div class="hidden items-center gap-1 @min-[600px]:flex">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="sidebarGhost"
+                  class="h-8 px-2.5 text-xs"
+                  :disabled="!supportsZoom"
+                  :class="
+                    cn(
+                      !supportsZoom && 'cursor-not-allowed',
+                      supportsZoom && isFitMode && toggleActiveClass
+                    )
+                  "
+                  @click="emit('fit')"
+                >
+                  {{ t('gallery.lightbox.toolbar.fit') }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" class="flex items-center gap-2">
+                <span>{{ t('gallery.lightbox.toolbar.fitTitle') }}</span>
+                <Kbd>Z</Kbd>
+              </TooltipContent>
+            </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="sidebarGhost"
-                class="h-8 px-2.5 text-xs"
-                :disabled="!supportsZoom"
-                :class="
-                  cn(
-                    !supportsZoom && 'cursor-not-allowed',
-                    supportsZoom && isActualSize && toggleActiveClass
-                  )
-                "
-                @click="emit('actual')"
-              >
-                {{ t('gallery.lightbox.toolbar.actual') }}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" class="flex items-center gap-2">
-              <span>{{ t('gallery.lightbox.toolbar.actualTitle') }}</span>
-              <Kbd>Z</Kbd>
-            </TooltipContent>
-          </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="sidebarGhost"
+                  class="h-8 px-2.5 text-xs"
+                  :disabled="!supportsZoom"
+                  :class="
+                    cn(
+                      !supportsZoom && 'cursor-not-allowed',
+                      supportsZoom && isActualSize && toggleActiveClass
+                    )
+                  "
+                  @click="emit('actual')"
+                >
+                  {{ t('gallery.lightbox.toolbar.actual') }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" class="flex items-center gap-2">
+                <span>{{ t('gallery.lightbox.toolbar.actualTitle') }}</span>
+                <Kbd>Z</Kbd>
+              </TooltipContent>
+            </Tooltip>
+          </div>
 
+          <!-- 缩小与放大按钮：>= 420px 显示 -->
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -278,9 +284,15 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </Tooltip>
         </div>
 
+        <!-- 旋转按钮：>= 420px 显示 -->
         <Tooltip v-if="supportsRotate">
           <TooltipTrigger as-child>
-            <Button variant="sidebarGhost" size="icon-sm" class="mr-2" @click="handleRotateClick">
+            <Button
+              variant="sidebarGhost"
+              size="icon-sm"
+              class="mr-2 hidden @min-[420px]:inline-flex"
+              @click="handleRotateClick"
+            >
               <RotateCw class="size-4" />
             </Button>
           </TooltipTrigger>
@@ -294,10 +306,10 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <!-- 评分与标记筛选 -->
+        <!-- 评分与标记筛选：>= 420px 显示 -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="inline-flex">
+            <span class="hidden @min-[420px]:inline-flex">
               <Popover>
                 <PopoverTrigger as-child>
                   <Button
@@ -324,6 +336,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
+        <!-- 胶片栏：始终保留 -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -347,6 +360,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
+        <!-- 沉浸/全屏：始终保留 -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button

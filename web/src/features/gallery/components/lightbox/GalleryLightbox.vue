@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { useElementSize, useEventListener, useThrottleFn } from '@vueuse/core'
+import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
 } from '../../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../../store'
-import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
-import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
+import {
+  computeLightboxHeroRect,
+  LIGHTBOX_VIEWPORT_PADDING,
+  prepareReverseHero,
+} from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../menus/GalleryAssetContextMenuContent.vue'
 import GalleryDetails from '../shell/GalleryDetails.vue'
@@ -48,6 +51,11 @@ type GalleryContentRef = {
   getCardRect: (index: number) => DOMRect | null
 } | null
 
+type HeroViewport = {
+  rect: DOMRect
+  padding: number
+}
+
 const props = defineProps<{
   galleryContentRef: GalleryContentRef
 }>()
@@ -63,7 +71,7 @@ const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
 const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
-const { width: lightboxWidth } = useElementSize(lightboxRootRef)
+const mediaViewportRef = ref<HTMLElement | null>(null)
 // 详情抽屉是否打开由历史快照决定，浏览器返回和界面按钮都能驱动同一个状态。
 const mobileDetailsOpen = computed(
   () => overlayHistory.snapshot.value.overlay === 'lightbox-details'
@@ -75,10 +83,8 @@ let pendingTouchTapTimer: number | null = null
 const activeInputType = ref<GalleryInputType>('mouse')
 const preloadingAssetIds = new Set<number>()
 const preloadedAssetIds = new Set<number>()
-// 暗房内部宽度只决定顶部工具栏如何压缩，以及详情抽屉是否可用。
-const isToolbarCompressed = computed(
-  () => lightboxWidth.value > 0 && lightboxWidth.value < GALLERY_TOOLBAR_COMPACT_BREAKPOINT
-)
+// 暗房工具栏紧凑模式与窗口级紧凑状态保持一致。
+const isToolbarCompressed = computed(() => store.isCompactWindow)
 const { t } = useI18n()
 
 watch(isToolbarCompressed, (compressed) => {
@@ -110,6 +116,8 @@ watch(
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
+// 普通桌面模式给工具栏和底片栏留出真实布局空间；紧凑/沉浸模式继续覆盖媒体。
+const isReservedDesktopLayout = computed(() => !store.isCompactWindow && !isImmersive.value)
 const isTouchInput = computed(() => isGalleryTouchInput(activeInputType.value))
 // 只有窄屏触摸采用相册式“轻点切换界面”的沉浸交互；宽屏触摸保留工作区控件。
 const canToggleChromeByTap = computed(() => store.isCompactWindow && isTouchInput.value)
@@ -314,9 +322,14 @@ function animateClose() {
     if (galleryContent) {
       const cardRect = galleryContent.getCardRect(activeIndex)
       const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
-      const containerRect = lightboxRootRef.value?.getBoundingClientRect()
-      if (cardRect && asset && containerRect) {
-        const fromRect = computeLightboxHeroRect(containerRect, asset.width ?? 1, asset.height ?? 1)
+      const heroViewport = getHeroViewport()
+      if (cardRect && asset && heroViewport) {
+        const fromRect = computeLightboxHeroRect(
+          heroViewport.rect,
+          asset.width ?? 1,
+          asset.height ?? 1,
+          heroViewport.padding
+        )
         prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         emit('requestReverseHero')
         didReverseHero = true
@@ -333,6 +346,21 @@ function animateClose() {
       store.clearActiveAsset()
     }
   }, delay)
+}
+
+// Hero 的目标区域必须和图片实际可见的 viewport 一致，避免普通桌面模式落到上下 chrome 下方。
+function getHeroViewport(): HeroViewport | null {
+  const mediaViewport = mediaViewportRef.value
+  const root = lightboxRootRef.value
+  const element = isReservedDesktopLayout.value ? (mediaViewport ?? root) : root
+  if (!element) {
+    return null
+  }
+
+  return {
+    rect: element.getBoundingClientRect(),
+    padding: element === mediaViewport ? 0 : LIGHTBOX_VIEWPORT_PADDING,
+  }
 }
 
 // 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
@@ -639,6 +667,8 @@ function handleKeydown(event: KeyboardEvent) {
 
 useEventListener(window, 'keydown', handleKeydown)
 onUnmounted(clearPendingTouchTap)
+
+defineExpose({ getHeroViewport })
 </script>
 
 <template>
@@ -651,7 +681,10 @@ onUnmounted(clearPendingTouchTap)
       @click.self="requestClose"
       @pointerdown.capture="handleLightboxPointerDown"
     >
-      <div class="relative h-full min-h-0 w-full">
+      <div
+        class="relative h-full min-h-0 w-full"
+        :class="isReservedDesktopLayout ? 'flex flex-col' : ''"
+      >
         <Transition
           appear
           enter-active-class="transition-opacity duration-[200ms] ease-out"
@@ -663,7 +696,8 @@ onUnmounted(clearPendingTouchTap)
         >
           <div
             v-if="isLightboxChromeVisible && !isClosing"
-            class="pointer-events-auto absolute inset-x-0 top-0 z-30"
+            class="pointer-events-auto z-30"
+            :class="isReservedDesktopLayout ? 'relative shrink-0' : 'absolute inset-x-0 top-0'"
           >
             <LightboxToolbar
               :compressed="isToolbarCompressed"
@@ -681,46 +715,59 @@ onUnmounted(clearPendingTouchTap)
           </div>
         </Transition>
 
-        <ContextMenu v-if="currentAsset">
-          <ContextMenuTrigger as-child :disabled="isTouchInput">
-            <div
-              class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
-              :class="isClosing ? 'opacity-0' : 'opacity-100'"
-              @contextmenu.capture="handleMediaContextMenu"
-              @wheel="handleMediaWheel"
-            >
-              <!-- Pager 负责媒体轨道，按钮保持在轨道外，避免随页面一起移动。 -->
-              <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
-              <LightboxNavigationButtons
-                :can-previous="canGoToPrevious"
-                :can-next="canGoToNext"
-                @previous="throttledPrevious"
-                @next="throttledNext"
-              />
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent class="w-56">
-            <GalleryAssetContextMenuContent />
-          </ContextMenuContent>
-        </ContextMenu>
         <div
-          v-else
-          class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
-          :class="isClosing ? 'opacity-0' : 'opacity-100'"
-          @contextmenu.prevent.stop
-          @wheel="handleMediaWheel"
+          ref="mediaViewportRef"
+          class="min-h-0 min-w-0"
+          :class="
+            isReservedDesktopLayout
+              ? 'relative flex-1 overflow-hidden'
+              : 'absolute inset-0 overflow-hidden'
+          "
         >
-          <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
-          <LightboxNavigationButtons
-            :can-previous="canGoToPrevious"
-            :can-next="canGoToNext"
-            @previous="throttledPrevious"
-            @next="throttledNext"
-          />
+          <ContextMenu v-if="currentAsset">
+            <ContextMenuTrigger as-child :disabled="isTouchInput">
+              <div
+                class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
+                :class="isClosing ? 'opacity-0' : 'opacity-100'"
+                @contextmenu.capture="handleMediaContextMenu"
+                @wheel="handleMediaWheel"
+              >
+                <!-- Pager 负责媒体轨道，按钮保持在轨道外，避免随页面一起移动。 -->
+                <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
+                <LightboxNavigationButtons
+                  :can-previous="canGoToPrevious"
+                  :can-next="canGoToNext"
+                  @previous="throttledPrevious"
+                  @next="throttledNext"
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent class="w-56">
+              <GalleryAssetContextMenuContent />
+            </ContextMenuContent>
+          </ContextMenu>
+          <div
+            v-else
+            class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
+            :class="isClosing ? 'opacity-0' : 'opacity-100'"
+            @contextmenu.prevent.stop
+            @wheel="handleMediaWheel"
+          >
+            <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
+            <LightboxNavigationButtons
+              :can-previous="canGoToPrevious"
+              :can-next="canGoToNext"
+              @previous="throttledPrevious"
+              @next="throttledNext"
+            />
+          </div>
         </div>
 
-        <!-- 底部 chrome 叠放在媒体上；触摸操作栏位于最底部，胶片栏位于其上方。 -->
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col-reverse">
+        <!-- 普通桌面模式让底部 chrome 占据空间；紧凑/沉浸模式仍将其覆盖在媒体上。 -->
+        <div
+          class="pointer-events-none z-30 flex flex-col-reverse"
+          :class="isReservedDesktopLayout ? 'relative shrink-0' : 'absolute inset-x-0 bottom-0'"
+        >
           <Transition
             appear
             enter-active-class="transition-all duration-300"
