@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryLightbox, useLightboxSwipeNavigation } from '../../composables'
+import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
 import { useGalleryStore } from '../../store'
 import { heroAnimating } from '../../composables/useHeroTransition'
 import LightboxImage from './LightboxImage.vue'
@@ -28,19 +29,32 @@ interface LightboxImageExposed {
   endPinch: () => void
 }
 
+interface LightboxVideoExposed {
+  isInNativeControlZone: (clientX: number, clientY: number) => boolean
+}
+
 type TouchPointer = Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY'>
 
 const TOUCH_DOUBLE_TAP_WINDOW_MS = 300
+
+const props = defineProps<{
+  verticalGestureEnabled: boolean
+  touchChromeEnabled: boolean
+}>()
 
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const pagerRef = ref<HTMLElement | null>(null)
 const imageRef = ref<LightboxImageExposed | null>(null)
+const videoRef = ref<LightboxVideoExposed | null>(null)
 const imagePannable = ref(false)
-const { width } = useElementSize(pagerRef)
+const { width, height } = useElementSize(pagerRef)
 
 const emit = defineEmits<{
   'touch-tap': [isDoubleTap: boolean]
+  'vertical-gesture-move': [offsetY: number, progress: number]
+  'vertical-gesture-cancel': [offsetY: number]
+  'vertical-gesture-commit': [action: LightboxVerticalGestureAction, offsetY: number]
 }>()
 
 let lastTouchTapAt = Number.NEGATIVE_INFINITY
@@ -64,19 +78,42 @@ const isStillImage = computed(
 const canSwipeGesture = computed(
   () => !heroAnimating.value && (isVideo.value || (isStillImage.value && !imagePannable.value))
 )
+const canUseVerticalGesture = computed(
+  () => props.verticalGestureEnabled && !heroAnimating.value && !imagePannable.value
+)
+
+function canStartVerticalGesture(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return true
+  }
+
+  // 明确的控件必须保留原生点击/拖动语义；媒体画面本身参与暗房纵向导航。
+  return !target.closest('button, a, input, textarea, select, [role="button"], [role="slider"]')
+}
+
+function isInNativeVideoControlZone(event: PointerEvent): boolean {
+  return (
+    isVideo.value && videoRef.value?.isInNativeControlZone(event.clientX, event.clientY) === true
+  )
+}
+
+// 原生视频控制条所在的安全带不应被 Pager 接管，否则播放/进度拖动会变成切图或暗房手势。
+function canStartPagerGesture(event: PointerEvent): boolean {
+  return !isInNativeVideoControlZone(event)
+}
 
 function resetTouchTapTracking() {
   lastTouchTapAt = Number.NEGATIVE_INFINITY
   lastTouchTapAssetId = null
 }
 
-function handleTouchTap(event: PointerEvent, startTarget: EventTarget | null): boolean {
-  if (
-    isVideo.value &&
-    (startTarget instanceof HTMLVideoElement || event.target instanceof HTMLVideoElement)
-  ) {
-    // 视频控件的触摸 click 仍交给原生播放器，不切换图库 chrome。
+function handleTouchTap(event: PointerEvent, _startTarget: EventTarget | null): boolean {
+  if (isVideo.value) {
     resetTouchTapTracking()
+    if (!isInNativeVideoControlZone(event)) {
+      // 视频画面单击切换图库 chrome，但不抑制原生 click，让正中播放按钮仍可工作。
+      emit('touch-tap', false)
+    }
     return false
   }
 
@@ -117,9 +154,13 @@ const {
 } = useLightboxSwipeNavigation({
   gestureSurfaceRef: pagerRef,
   availableWidth: width,
+  availableHeight: height,
   enabled: canSwipeGesture,
   pannable: computed(() => !heroAnimating.value && imagePannable.value),
+  verticalGestureEnabled: canUseVerticalGesture,
   navigateToIndex: (index) => lightbox.goToIndex(index),
+  canStartGesture: canStartPagerGesture,
+  canStartVerticalGesture,
   onTouchTap: handleTouchTap,
   onPanStart: (event) => {
     resetTouchTapTracking()
@@ -131,6 +172,15 @@ const {
   },
   onPanCancel: () => {
     imageRef.value?.cancelPan()
+  },
+  onVerticalGestureMove: (offsetY, progress) => {
+    emit('vertical-gesture-move', offsetY, progress)
+  },
+  onVerticalGestureCancel: (offsetY) => {
+    emit('vertical-gesture-cancel', offsetY)
+  },
+  onVerticalGestureCommit: (action, offsetY) => {
+    emit('vertical-gesture-commit', action, offsetY)
   },
   onPinchStart: (pointers) => {
     resetTouchTapTracking()
@@ -216,7 +266,12 @@ defineExpose({
         @ready="handleMediaReady"
         @pannable-change="handleImagePannableChange"
       />
-      <LightboxVideo v-else @ready="handleMediaReady" />
+      <LightboxVideo
+        v-else
+        ref="videoRef"
+        :touch-chrome-enabled="props.touchChromeEnabled"
+        @ready="handleMediaReady"
+      />
     </div>
   </div>
 </template>

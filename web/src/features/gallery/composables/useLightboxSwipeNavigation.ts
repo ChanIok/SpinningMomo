@@ -23,20 +23,30 @@ const TOUCH_GESTURE_CLICK_SUPPRESS_DURATION = 350
 const PAN_EDGE_HANDOFF_THRESHOLD = 12
 // 图片平移开始时锁定主轴，避免竖向浏览时的轻微横向偏移误触切图。
 const PAN_HORIZONTAL_AXIS_RATIO = 1.2
+// 纵向手势同样需要明显的主轴优势，避免斜向拖动在切图和抽屉之间摇摆。
+const VERTICAL_AXIS_RATIO = 1.2
+// 纵向慢拖按视口高度比例提交，同时设置上下限避免小窗口阈值过低。
+const VERTICAL_COMMIT_DISTANCE_RATIO = 0.18
+const VERTICAL_COMMIT_DISTANCE_MIN = 72
+const VERTICAL_COMMIT_DISTANCE_MAX = 160
+// 纵向快速甩动沿用抽屉的触感：速度足够时不要求跨过完整距离。
+const VERTICAL_FLING_VELOCITY = 700
 
-// 临时诊断开关：确认适屏状态下手势是在哪个状态被拦截或误分类的。
-const LIGHTBOX_GESTURE_DEBUG = true
+// 触摸状态机不应在生产环境逐 pointer 事件写日志；需要诊断时再临时打开。
+const LIGHTBOX_GESTURE_DEBUG = false
 
 export type LightboxSwipeDirection = 'previous' | 'next'
 export type LightboxSwipePhase = 'idle' | 'pending' | 'dragging' | 'settling'
+export type LightboxVerticalGestureAction = 'dismiss' | 'details'
 
 type ReadonlyNumberRef = Readonly<Ref<number>>
 type ReadonlyBooleanRef = Readonly<Ref<boolean>>
-type SwipeSample = { x: number; time: number }
+type SwipeSample = { x: number; y: number; time: number }
 type SwipePage = { index: number; asset: Asset }
 type TouchPointer = Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY'>
 type TouchPointerPair = [TouchPointer, TouchPointer]
-type TouchGestureMode = 'pending' | 'swiping' | 'panning' | 'pinching' | 'pinch-complete'
+type TouchGestureMode =
+  'pending' | 'swiping' | 'panning' | 'vertical' | 'pinching' | 'pinch-complete'
 type PanAxis = 'horizontal' | 'vertical'
 
 interface PanMoveResult {
@@ -47,14 +57,21 @@ interface PanMoveResult {
 interface UseLightboxSwipeNavigationOptions {
   gestureSurfaceRef: Ref<HTMLElement | null>
   availableWidth: ReadonlyNumberRef
+  availableHeight: ReadonlyNumberRef
   enabled: ReadonlyBooleanRef
   pannable: ReadonlyBooleanRef
+  verticalGestureEnabled: ReadonlyBooleanRef
   navigateToIndex: (index: number) => void
+  canStartGesture?: (event: PointerEvent) => boolean
+  canStartVerticalGesture?: (target: EventTarget | null) => boolean
   onTouchTap?: (event: PointerEvent, startTarget: EventTarget | null) => boolean
   onPanStart?: (event: PointerEvent) => void
   onPanMove?: (event: PointerEvent) => PanMoveResult | void
   onPanEnd?: (event: PointerEvent) => void
   onPanCancel?: () => void
+  onVerticalGestureMove?: (offsetY: number, progress: number) => void
+  onVerticalGestureCancel?: (offsetY: number) => void
+  onVerticalGestureCommit?: (action: LightboxVerticalGestureAction, offsetY: number) => void
   onPinchStart?: (pointers: TouchPointerPair) => void
   onPinchMove?: (pointers: TouchPointerPair) => void
   onPinchEnd?: () => void
@@ -75,14 +92,21 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   const {
     gestureSurfaceRef,
     availableWidth,
+    availableHeight,
     enabled,
     pannable,
+    verticalGestureEnabled,
     navigateToIndex,
+    canStartGesture,
+    canStartVerticalGesture,
     onTouchTap,
     onPanStart,
     onPanMove,
     onPanEnd,
     onPanCancel,
+    onVerticalGestureMove,
+    onVerticalGestureCancel,
+    onVerticalGestureCommit,
     onPinchStart,
     onPinchMove,
     onPinchEnd,
@@ -118,12 +142,14 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   const trackedTouchPointers = new Map<number, TouchPointer>()
   let touchStartTarget: EventTarget | null = null
   let swipeVelocityX = 0
+  let swipeVelocityY = 0
   let pageSwipeStartedFromPan = false
+  let verticalGestureOffset = 0
 
   // 第一根指针先进入 pending；确认需要接管手势后才升级为 dragging 并捕获指针。
   const canSwipeNavigate = computed(
     () =>
-      enabled.value &&
+      (enabled.value || verticalGestureEnabled.value) &&
       (swipePhase.value === 'idle' || swipePhase.value === 'settling') &&
       swipePointerId.value === null &&
       !multiTouchActive.value
@@ -155,6 +181,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       baseIndex: baseIndex.value,
       enabled: enabled.value,
       pannable: pannable.value,
+      verticalGestureEnabled: verticalGestureEnabled.value,
       canSwipeNavigate: canSwipeNavigate.value,
       phase: swipePhase.value,
       mode: touchGestureMode.value,
@@ -183,8 +210,9 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
   // 暗房是全屏查看器，触摸始终由 Pager 仲裁，避免浏览器接管水平滑动或原生 pinch。
   const swipeGestureSurfaceStyle = computed<CSSProperties>(() => ({
-    touchAction: enabled.value || pannable.value ? 'none' : 'auto',
-    overscrollBehaviorX: enabled.value || pannable.value ? 'none' : 'auto',
+    touchAction: enabled.value || pannable.value || verticalGestureEnabled.value ? 'none' : 'auto',
+    overscrollBehaviorX:
+      enabled.value || pannable.value || verticalGestureEnabled.value ? 'none' : 'auto',
   }))
 
   // 相邻页按“索引差 × 屏宽”排布，和当前媒体页共享同一个 swipeOffset。
@@ -344,12 +372,13 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   function clearSwipeVelocity() {
     swipeSamples.length = 0
     swipeVelocityX = 0
+    swipeVelocityY = 0
   }
 
-  // 记录最近 100ms 的横向位移，用于区分快扫和慢拖。
+  // 记录最近 100ms 的二维位移，横向切图和纵向动作共用同一段轨迹。
   function recordSwipeSample(event: PointerEvent) {
     const time = Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now()
-    swipeSamples.push({ x: event.clientX, time })
+    swipeSamples.push({ x: event.clientX, y: event.clientY, time })
 
     const cutoff = time - SWIPE_VELOCITY_WINDOW_MS
     // 保留窗口前最后一个采样点，让速度在窗口边界处仍然连续。
@@ -365,7 +394,14 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     const first = swipeSamples[0]
     const last = swipeSamples[swipeSamples.length - 1]
     const elapsed = last.time - first.time
-    swipeVelocityX = elapsed > 0 ? ((last.x - first.x) / elapsed) * 1000 : 0
+    if (elapsed <= 0) {
+      swipeVelocityX = 0
+      swipeVelocityY = 0
+      return
+    }
+
+    swipeVelocityX = ((last.x - first.x) / elapsed) * 1000
+    swipeVelocityY = ((last.y - first.y) / elapsed) * 1000
   }
 
   // 根据屏宽计算慢拖需要跨过的距离。
@@ -382,6 +418,38 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
   function getSwipeVelocityInDirection(direction: LightboxSwipeDirection): number {
     const velocityInDirection = direction === 'next' ? -swipeVelocityX : swipeVelocityX
     return Math.max(velocityInDirection, 0)
+  }
+
+  function getVerticalCommitDistance(): number {
+    const height = Math.max(availableHeight.value, 1)
+    return clamp(
+      height * VERTICAL_COMMIT_DISTANCE_RATIO,
+      VERTICAL_COMMIT_DISTANCE_MIN,
+      VERTICAL_COMMIT_DISTANCE_MAX
+    )
+  }
+
+  function getVerticalVelocityInDirection(action: LightboxVerticalGestureAction): number {
+    return action === 'dismiss' ? Math.max(swipeVelocityY, 0) : Math.max(-swipeVelocityY, 0)
+  }
+
+  function getVerticalGestureOffset(deltaY: number): number {
+    const maxDistance = Math.max(availableHeight.value * 0.85, VERTICAL_COMMIT_DISTANCE_MAX)
+    const distance = Math.abs(deltaY)
+    if (distance <= maxDistance) {
+      return deltaY
+    }
+
+    // 超过视口后增加阻尼，避免拖动时把媒体完全甩出后继续扩大布局范围。
+    const dampedDistance = maxDistance + (distance - maxDistance) * 0.2
+    return Math.sign(deltaY) * dampedDistance
+  }
+
+  function updateVerticalGesture(event: PointerEvent, deltaY: number) {
+    verticalGestureOffset = getVerticalGestureOffset(deltaY)
+    const progress = clamp(Math.abs(deltaY) / getVerticalCommitDistance(), 0, 1)
+    onVerticalGestureMove?.(verticalGestureOffset, progress)
+    event.preventDefault()
   }
 
   function isTouchPointer(event: PointerEvent): boolean {
@@ -455,6 +523,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     navigationReadyIndex.value = null
     interruptedSettling = false
     pageSwipeStartedFromPan = false
+    verticalGestureOffset = 0
   }
 
   function resetTouchTracking() {
@@ -632,6 +701,9 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     logGesture('multi-touch-started', event)
     onPanCancel?.()
+    if (touchGestureMode.value === 'vertical') {
+      onVerticalGestureCancel?.(verticalGestureOffset)
+    }
 
     multiTouchActive.value = true
     event.preventDefault()
@@ -656,6 +728,11 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
     logGesture('pointerdown', event)
 
+    if (canStartGesture?.(event) === false) {
+      logGesture('pointerdown-ignored', event, { reason: 'native-media-control' })
+      return
+    }
+
     if (trackedTouchPointers.size > 0) {
       if (!trackedTouchPointers.has(event.pointerId) && trackedTouchPointers.size >= 2) {
         logGesture('pointerdown-ignored', event, { reason: 'too-many-pointers' })
@@ -676,10 +753,10 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     if (store.selection.activeIndex === undefined) {
       ignoredReasons.push('missing-active-index')
     }
-    if (!enabled.value && !pannable.value) {
+    if (!enabled.value && !pannable.value && !verticalGestureEnabled.value) {
       ignoredReasons.push('gesture-disabled-and-not-pannable')
     }
-    if (!canSwipeNavigate.value && !pannable.value) {
+    if (!canSwipeNavigate.value && !pannable.value && !verticalGestureEnabled.value) {
       ignoredReasons.push('swipe-navigation-unavailable')
     }
     if (ignoredReasons.length > 0) {
@@ -803,6 +880,13 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       return
     }
 
+    if (touchGestureMode.value === 'vertical') {
+      recordSwipeSample(event)
+      const deltaY = event.clientY - swipeStartY.value
+      updateVerticalGesture(event, deltaY)
+      return
+    }
+
     if (touchGestureMode.value === 'pinch-complete') {
       event.preventDefault()
       return
@@ -832,7 +916,30 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
         return
       }
 
-      if (Math.abs(deltaX) <= Math.abs(deltaY) * 1.2) {
+      const isVerticalIntent = Math.abs(deltaY) > Math.abs(deltaX) * VERTICAL_AXIS_RATIO
+      if (isVerticalIntent) {
+        const canStartVertical = canStartVerticalGesture?.(touchStartTarget) !== false
+        if (verticalGestureEnabled.value && !canStartVertical) {
+          // 视频和控件目标不参与暗房纵向导航，交还原生指针事件。
+          releaseSwipePointer(event.pointerId)
+          finishSwipeTracking()
+          resetTouchTracking()
+          return
+        }
+
+        if (verticalGestureEnabled.value) {
+          touchGestureMode.value = 'vertical'
+          swipePhase.value = 'dragging'
+          captureTouchPointer(event.pointerId)
+          suppressClick.value = true
+          scheduleSuppressClickReset()
+          verticalGestureOffset = 0
+          onVerticalGestureMove?.(0, 0)
+          logGesture('classified-as-vertical-action', event, { deltaX, deltaY })
+          updateVerticalGesture(event, deltaY)
+          return
+        }
+
         touchGestureMode.value = 'pinch-complete'
         swipePhase.value = 'dragging'
         captureTouchPointer(event.pointerId)
@@ -919,6 +1026,36 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       suppressClick.value = true
       scheduleSuppressClickReset()
       logGesture('pan-completed', event)
+      finishSwipeTracking()
+      resetTouchTracking()
+      return
+    }
+
+    if (mode === 'vertical') {
+      recordSwipeSample(event)
+      const deltaY = event.clientY - swipeStartY.value
+      const action: LightboxVerticalGestureAction | null =
+        deltaY > 0 ? 'dismiss' : deltaY < 0 ? 'details' : null
+      const rawDistance = Math.abs(deltaY)
+      const isFastFling =
+        action !== null && getVerticalVelocityInDirection(action) >= VERTICAL_FLING_VELOCITY
+      const isSlowDrag = rawDistance >= getVerticalCommitDistance()
+      const shouldCommit = action !== null && (isFastFling || isSlowDrag)
+      const committedOffset = verticalGestureOffset
+
+      releaseSwipePointer(event.pointerId)
+      suppressClick.value = true
+      scheduleSuppressClickReset()
+      resetTouchTracking()
+      interruptedSettling = false
+
+      if (shouldCommit && action !== null) {
+        onVerticalGestureCommit?.(action, committedOffset)
+        resetSwipeGesture()
+        return
+      }
+
+      onVerticalGestureCancel?.(committedOffset)
       finishSwipeTracking()
       resetTouchTracking()
       return
@@ -1020,6 +1157,9 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
     trackedTouchPointers.delete(event.pointerId)
     if (mode === 'panning') {
       onPanCancel?.()
+    }
+    if (mode === 'vertical') {
+      onVerticalGestureCancel?.(verticalGestureOffset)
     }
     releaseSwipePointer(event.pointerId)
     if (mode !== 'pending') {

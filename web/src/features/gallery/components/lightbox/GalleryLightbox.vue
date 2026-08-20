@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
+import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -24,6 +25,7 @@ import LightboxToolbar from './LightboxToolbar.vue'
 import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { X } from '@lucide/vue'
@@ -41,6 +43,10 @@ const CLOSE_AFTER_REVERSE_HERO_MS = 260
 const CLOSE_AFTER_NO_HERO_MS = 180
 /** 静态图单击先等待双击窗口，避免双击时 chrome 先闪一次。 */
 const TOUCH_SINGLE_TAP_DELAY_MS = 300
+/** 抽屉进入动画完成后再挂载详情树，避免重组件参与首帧位移动画。 */
+const DETAILS_CONTENT_DELAY_MS = 260
+/** 下拉未提交时让媒体表面回到原位的动画时长。 */
+const VERTICAL_GESTURE_SNAPBACK_MS = 220
 
 type LightboxPagerExposed = {
   showFitMode: () => Promise<void>
@@ -58,6 +64,8 @@ type HeroViewport = {
   padding: number
 }
 
+type VerticalGesturePhase = 'idle' | 'dragging' | 'settling'
+
 const props = defineProps<{
   galleryContentRef: GalleryContentRef
 }>()
@@ -70,10 +78,21 @@ const assetActions = useGalleryAssetActions()
 const lightboxPagerRef = ref<LightboxPagerExposed | null>(null)
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const mediaViewportRef = ref<HTMLElement | null>(null)
+// 纵向拖拽只直接更新媒体表面，避免每个 pointermove 触发整个 GalleryLightbox 重渲染。
+const mediaGestureSurfaceRef = ref<HTMLElement | null>(null)
 // 详情抽屉是否打开由历史快照决定，浏览器返回和界面按钮都能驱动同一个状态。
 const mobileDetailsOpen = computed(
   () => overlayHistory.snapshot.value.overlay === 'lightbox-details'
 )
+const detailsContentReady = ref(false)
+let detailsContentTimer: number | null = null
+let verticalGestureOffset = 0
+let verticalGesturePhase: VerticalGesturePhase = 'idle'
+let verticalGestureRafId: number | null = null
+let pendingVerticalGestureOffset: number | null = null
+let verticalGestureResetTimer: number | null = null
+// 下拉关闭会先消费暗房历史，再异步启动退场动画；这里暂存松手时的视觉偏移。
+let pendingExitGestureOffset: number | null = null
 // 界面层显隐与沉浸模式分离；共享状态让全局 App Header 与暗房控件同步。
 const isLightboxChromeVisible = computed(() => store.lightbox.chromeVisible)
 let pendingTouchTapTimer: number | null = null
@@ -119,6 +138,15 @@ const isReservedDesktopLayout = computed(() => !store.isCompactWindow && !isImme
 const isTouchInput = computed(() => isGalleryTouchInput(activeInputType.value))
 // 只有窄屏触摸采用相册式“轻点切换界面”的沉浸交互；宽屏触摸保留工作区控件。
 const canToggleChromeByTap = computed(() => store.isCompactWindow && isTouchInput.value)
+// 纵向相册手势只在紧凑触摸暗房且详情层未覆盖媒体时启用。
+const canUseVerticalGesture = computed(
+  () =>
+    store.isCompactWindow &&
+    isTouchInput.value &&
+    !isClosing.value &&
+    !mobileDetailsOpen.value &&
+    store.lightbox.isOpen
+)
 // 底片栏属于窗口级布局；它必须跟随整个应用窗口，而不是暗房中间内容区。
 const showFilmstrip = computed(() => !store.isCompactWindow && store.lightbox.showFilmstrip)
 const fitMode = computed(() => store.lightbox.fitMode)
@@ -146,11 +174,48 @@ const lightboxRootClass = computed(() => {
   return cls
 })
 
+function clearDetailsContentTimer() {
+  if (detailsContentTimer !== null) {
+    window.clearTimeout(detailsContentTimer)
+    detailsContentTimer = null
+  }
+}
+
+function scheduleDetailsContentMount() {
+  clearDetailsContentTimer()
+  detailsContentReady.value = false
+
+  if (!mobileDetailsOpen.value || isClosing.value) {
+    return
+  }
+
+  detailsContentTimer = window.setTimeout(() => {
+    detailsContentTimer = null
+    if (mobileDetailsOpen.value && !isClosing.value) {
+      detailsContentReady.value = true
+    }
+  }, DETAILS_CONTENT_DELAY_MS)
+}
+
+watch(
+  mobileDetailsOpen,
+  (open) => {
+    if (open) {
+      scheduleDetailsContentMount()
+    } else {
+      clearDetailsContentTimer()
+      detailsContentReady.value = false
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => store.lightbox.isOpen,
   (isOpen) => {
     clearPendingTouchTap()
     if (!isOpen) {
+      resetVerticalGestureSurface()
       return
     }
 
@@ -309,7 +374,13 @@ function exitImmersive() {
 function animateClose() {
   clearPendingTouchTap()
 
-  if (store.lightbox.isClosing) return
+  if (store.lightbox.isClosing) {
+    pendingExitGestureOffset = null
+    return
+  }
+
+  const exitGestureOffset = pendingExitGestureOffset
+  pendingExitGestureOffset = null
   store.setLightboxClosing(true)
 
   let didReverseHero = false
@@ -322,12 +393,15 @@ function animateClose() {
       const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
       const heroViewport = getHeroViewport()
       if (cardRect && asset && heroViewport) {
-        const fromRect = computeLightboxHeroRect(
+        let fromRect = computeLightboxHeroRect(
           heroViewport.rect,
           asset.width ?? 1,
           asset.height ?? 1,
           heroViewport.padding
         )
+        if (exitGestureOffset !== null) {
+          fromRect = transformHeroRectForVerticalGesture(fromRect, exitGestureOffset)
+        }
         startExitReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         didReverseHero = true
       }
@@ -359,6 +433,174 @@ function getHeroViewport(): HeroViewport | null {
     padding: element === mediaViewport ? 0 : LIGHTBOX_VIEWPORT_PADDING,
   }
 }
+
+function getVerticalGestureViewportHeight(): number {
+  return Math.max(
+    mediaViewportRef.value?.clientHeight ??
+      (typeof window !== 'undefined' ? window.innerHeight : 1),
+    1
+  )
+}
+
+function getVerticalGestureFadeProgress(offsetY: number): number {
+  const positiveOffset = Math.max(offsetY, 0)
+  return Math.min(positiveOffset / Math.max(getVerticalGestureViewportHeight() * 0.65, 240), 1)
+}
+
+function getVerticalGestureScale(offsetY: number): number {
+  return 1 - getVerticalGestureFadeProgress(offsetY) * 0.04
+}
+
+function transformHeroRectForVerticalGesture(rect: DOMRect, offsetY: number): DOMRect {
+  const positiveOffset = Math.max(offsetY, 0)
+  const scale = getVerticalGestureScale(positiveOffset)
+  const width = rect.width * scale
+  const height = rect.height * scale
+
+  // mediaGestureSurface 的 transform-origin 是中心点；Hero 起点同步应用同一组缩放和下移。
+  return new DOMRect(
+    rect.left + (rect.width - width) / 2,
+    rect.top + positiveOffset + (rect.height - height) / 2,
+    width,
+    height
+  )
+}
+
+function clearVerticalGestureFrame() {
+  if (verticalGestureRafId !== null) {
+    cancelAnimationFrame(verticalGestureRafId)
+    verticalGestureRafId = null
+  }
+  pendingVerticalGestureOffset = null
+}
+
+function applyVerticalGestureSurfaceStyle(offsetY: number, phase: VerticalGesturePhase) {
+  const surface = mediaGestureSurfaceRef.value
+  if (!surface) {
+    return
+  }
+
+  const positiveOffset = Math.max(offsetY, 0)
+  const scale = getVerticalGestureScale(positiveOffset)
+  const fadeProgress = getVerticalGestureFadeProgress(positiveOffset)
+
+  surface.style.transform = `translate3d(0, ${positiveOffset}px, 0) scale(${scale})`
+  surface.style.opacity = isClosing.value ? '0' : String(1 - fadeProgress * 0.28)
+  surface.style.transition = isClosing.value
+    ? 'none'
+    : phase === 'dragging'
+      ? 'none'
+      : `transform ${VERTICAL_GESTURE_SNAPBACK_MS}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${VERTICAL_GESTURE_SNAPBACK_MS}ms ease-out`
+  surface.style.willChange = phase === 'idle' ? 'auto' : 'transform, opacity'
+}
+
+function clearVerticalGestureSurfaceStyles() {
+  const surface = mediaGestureSurfaceRef.value
+  if (!surface) {
+    return
+  }
+
+  surface.style.removeProperty('transform')
+  surface.style.removeProperty('opacity')
+  surface.style.removeProperty('transition')
+  surface.style.removeProperty('will-change')
+}
+
+function queueVerticalGestureSurfaceUpdate(offsetY: number) {
+  pendingVerticalGestureOffset = offsetY
+  if (verticalGestureRafId !== null) {
+    return
+  }
+
+  verticalGestureRafId = requestAnimationFrame(() => {
+    verticalGestureRafId = null
+    const pendingOffset = pendingVerticalGestureOffset
+    pendingVerticalGestureOffset = null
+    if (pendingOffset !== null && verticalGesturePhase === 'dragging') {
+      applyVerticalGestureSurfaceStyle(pendingOffset, 'dragging')
+    }
+  })
+}
+
+function clearVerticalGestureResetTimer() {
+  if (verticalGestureResetTimer !== null) {
+    window.clearTimeout(verticalGestureResetTimer)
+    verticalGestureResetTimer = null
+  }
+}
+
+function resetVerticalGestureSurface() {
+  clearVerticalGestureResetTimer()
+  clearVerticalGestureFrame()
+  pendingExitGestureOffset = null
+  verticalGestureOffset = 0
+  verticalGesturePhase = 'idle'
+  clearVerticalGestureSurfaceStyles()
+}
+
+function settleVerticalGestureBack(offsetY: number) {
+  clearVerticalGestureResetTimer()
+  clearVerticalGestureFrame()
+  verticalGestureOffset = offsetY
+  verticalGesturePhase = 'settling'
+  applyVerticalGestureSurfaceStyle(offsetY, 'settling')
+
+  verticalGestureRafId = requestAnimationFrame(() => {
+    verticalGestureRafId = null
+    if (verticalGesturePhase !== 'settling') {
+      return
+    }
+
+    verticalGestureOffset = 0
+    applyVerticalGestureSurfaceStyle(0, 'settling')
+    verticalGestureResetTimer = window.setTimeout(() => {
+      verticalGestureResetTimer = null
+      if (verticalGestureOffset === 0 && verticalGesturePhase === 'settling') {
+        verticalGesturePhase = 'idle'
+        clearVerticalGestureSurfaceStyles()
+      }
+    }, VERTICAL_GESTURE_SNAPBACK_MS)
+  })
+}
+
+function handleVerticalGestureMove(offsetY: number) {
+  clearVerticalGestureResetTimer()
+  verticalGestureOffset = offsetY
+  verticalGesturePhase = 'dragging'
+  queueVerticalGestureSurfaceUpdate(offsetY)
+}
+
+function handleVerticalGestureCancel(offsetY: number) {
+  settleVerticalGestureBack(offsetY)
+}
+
+function handleVerticalGestureCommit(action: LightboxVerticalGestureAction, offsetY: number) {
+  clearVerticalGestureResetTimer()
+
+  if (action === 'details') {
+    // 上滑打开详情时先让媒体回到原位，抽屉由 MobileDrawer 自己执行进入动画。
+    settleVerticalGestureBack(offsetY)
+    handleToolbarToggleDetails()
+    return
+  }
+
+  pendingExitGestureOffset = Math.max(offsetY, 0)
+  // 保留松手时的媒体位置，等退场 Hero 以同一个几何状态接管，避免中间再发生一次位移。
+  clearVerticalGestureFrame()
+  verticalGesturePhase = 'settling'
+  verticalGestureOffset = Math.max(offsetY, 0)
+  applyVerticalGestureSurfaceStyle(verticalGestureOffset, 'settling')
+  requestClose()
+}
+
+watch(isClosing, (closing) => {
+  if (!closing || (verticalGesturePhase === 'idle' && verticalGestureOffset === 0)) {
+    return
+  }
+
+  // 只有垂直手势触发的关闭才需要用内联透明度覆盖媒体容器的 opacity-0 class。
+  applyVerticalGestureSurfaceStyle(verticalGestureOffset, 'settling')
+})
 
 // 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
 function requestClose() {
@@ -422,7 +664,8 @@ function handleToolbarToggleDetails() {
   }
 
   // 未打开时新增详情层，让系统返回手势只关闭详情抽屉。
-  void overlayHistory.openLightboxDetails(store.selection.activeAssetId)
+  const assetId = currentAsset.value?.id ?? store.selection.activeAssetId
+  void overlayHistory.openLightboxDetails(assetId)
 }
 
 // 详情关闭只消费详情层，不直接关闭暗房。
@@ -457,6 +700,19 @@ function scheduleSingleTouchTap() {
   }, TOUCH_SINGLE_TAP_DELAY_MS)
 }
 
+// 视频画面单击仍需先让原生播放按钮完成 click，再切换图库 chrome，避免 controls 提前卸载。
+function scheduleVideoChromeToggle() {
+  clearPendingTouchTap()
+  pendingTouchTapTimer = window.setTimeout(() => {
+    pendingTouchTapTimer = null
+    if (!store.lightbox.isOpen || isClosing.value || !canToggleChromeByTap.value) {
+      return
+    }
+
+    toggleLightboxChrome()
+  }, 0)
+}
+
 function handleTouchTap(isDoubleTap: boolean) {
   if (isClosing.value) {
     clearPendingTouchTap()
@@ -468,10 +724,9 @@ function handleTouchTap(isDoubleTap: boolean) {
     return
   }
 
-  // 视频控件不参与双击缩放，保留其原有的即时单击响应。
+  // 视频不参与双击缩放；单击先让原生播放器处理，再切换图库 chrome。
   if (!isZoomableAsset.value) {
-    clearPendingTouchTap()
-    toggleLightboxChrome()
+    scheduleVideoChromeToggle()
     return
   }
 
@@ -728,6 +983,11 @@ onMounted(async () => {
 useEventListener(window, 'keydown', handleKeydown)
 onUnmounted(() => {
   clearPendingTouchTap()
+  clearDetailsContentTimer()
+  clearVerticalGestureResetTimer()
+  clearVerticalGestureFrame()
+  pendingExitGestureOffset = null
+  clearVerticalGestureSurfaceStyles()
   endHeroAnimation()
   if (heroRafId !== null) cancelAnimationFrame(heroRafId)
   if (reverseHeroRafId !== null) cancelAnimationFrame(reverseHeroRafId)
@@ -810,13 +1070,22 @@ onUnmounted(() => {
           <ContextMenu v-if="currentAsset">
             <ContextMenuTrigger as-child :disabled="isTouchInput">
               <div
+                ref="mediaGestureSurfaceRef"
                 class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
                 :class="isClosing ? 'opacity-0' : 'opacity-100'"
                 @contextmenu.capture="handleMediaContextMenu"
                 @wheel="handleMediaWheel"
               >
                 <!-- Pager 负责媒体轨道，按钮保持在轨道外，避免随页面一起移动。 -->
-                <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
+                <LightboxPager
+                  ref="lightboxPagerRef"
+                  :vertical-gesture-enabled="canUseVerticalGesture"
+                  :touch-chrome-enabled="canToggleChromeByTap"
+                  @touch-tap="handleTouchTap"
+                  @vertical-gesture-move="handleVerticalGestureMove"
+                  @vertical-gesture-cancel="handleVerticalGestureCancel"
+                  @vertical-gesture-commit="handleVerticalGestureCommit"
+                />
                 <LightboxNavigationButtons
                   :can-previous="canGoToPrevious"
                   :can-next="canGoToNext"
@@ -831,12 +1100,21 @@ onUnmounted(() => {
           </ContextMenu>
           <div
             v-else
+            ref="mediaGestureSurfaceRef"
             class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
             :class="isClosing ? 'opacity-0' : 'opacity-100'"
             @contextmenu.prevent.stop
             @wheel="handleMediaWheel"
           >
-            <LightboxPager ref="lightboxPagerRef" @touch-tap="handleTouchTap" />
+            <LightboxPager
+              ref="lightboxPagerRef"
+              :vertical-gesture-enabled="canUseVerticalGesture"
+              :touch-chrome-enabled="canToggleChromeByTap"
+              @touch-tap="handleTouchTap"
+              @vertical-gesture-move="handleVerticalGestureMove"
+              @vertical-gesture-cancel="handleVerticalGestureCancel"
+              @vertical-gesture-commit="handleVerticalGestureCommit"
+            />
             <LightboxNavigationButtons
               :can-previous="canGoToPrevious"
               :can-next="canGoToNext"
@@ -886,69 +1164,46 @@ onUnmounted(() => {
           </Transition>
         </div>
 
-        <Transition name="gallery-mobile-details">
-          <div
-            v-if="isToolbarCompressed && mobileDetailsOpen && !isClosing"
-            class="absolute inset-0 z-40 flex items-end"
-            role="dialog"
-            aria-modal="true"
-            :aria-label="t('gallery.details.title')"
-          >
-            <button
-              type="button"
-              class="absolute inset-0 cursor-default bg-black/55"
+        <MobileDrawer
+          :open="isToolbarCompressed && mobileDetailsOpen && !isClosing"
+          side="bottom"
+          :z-index="110"
+          :close-on-escape="false"
+          class="h-[82vh] max-h-[720px] rounded-t-2xl border-t border-border bg-background pb-[env(safe-area-inset-bottom)] text-sidebar-foreground"
+          @close="closeMobileDetails"
+        >
+          <div class="flex h-11 shrink-0 items-center justify-between border-b px-4">
+            <h2 class="text-sm font-medium text-foreground">{{ t('gallery.details.title') }}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-10 w-10"
               :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
               @click="closeMobileDetails"
-            />
-
-            <section
-              class="relative z-10 flex h-[82vh] max-h-[720px] w-full flex-col rounded-t-2xl border-t border-border bg-background shadow-2xl"
             >
-              <div class="shrink-0 border-b px-4 pt-2 pb-3">
-                <div class="mx-auto mb-2 h-1 w-10 rounded-full bg-muted-foreground/30" />
-                <div class="flex items-center justify-between">
-                  <h2 class="text-sm font-medium">{{ t('gallery.details.title') }}</h2>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-10 w-10"
-                    :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-                    @click="closeMobileDetails"
-                  >
-                    <X class="h-5 w-5" />
-                  </Button>
+              <X class="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div class="min-h-0 flex-1">
+            <div
+              v-if="!detailsContentReady"
+              class="flex h-full items-center justify-center p-6"
+              aria-live="polite"
+            >
+              <div class="w-full max-w-sm space-y-3" aria-hidden="true">
+                <div class="h-5 w-1/3 animate-pulse rounded bg-muted" />
+                <div class="h-40 animate-pulse rounded-lg bg-muted/70" />
+                <div class="space-y-2">
+                  <div class="h-3 animate-pulse rounded bg-muted/70" />
+                  <div class="h-3 w-4/5 animate-pulse rounded bg-muted/70" />
                 </div>
               </div>
-
-              <div class="min-h-0 flex-1">
-                <GalleryDetails />
-              </div>
-            </section>
+            </div>
+            <GalleryDetails v-else :defer-secondary-details="true" />
           </div>
-        </Transition>
+        </MobileDrawer>
       </div>
     </div>
   </Teleport>
 </template>
-
-<style scoped>
-.gallery-mobile-details-enter-active,
-.gallery-mobile-details-leave-active {
-  transition: opacity 180ms ease-out;
-}
-
-.gallery-mobile-details-enter-from,
-.gallery-mobile-details-leave-to {
-  opacity: 0;
-}
-
-.gallery-mobile-details-enter-active section,
-.gallery-mobile-details-leave-active section {
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.gallery-mobile-details-enter-from section,
-.gallery-mobile-details-leave-to section {
-  transform: translateY(100%);
-}
-</style>

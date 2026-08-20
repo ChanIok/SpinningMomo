@@ -24,12 +24,18 @@ interface MobileDrawerProps {
   open: boolean
   side?: 'bottom' | 'right' | 'left' | 'top'
   class?: HTMLAttributes['class']
+  /** Teleport 后的层级；沉浸式暗房需要覆盖自身的 z-index。 */
+  zIndex?: number
+  /** 是否由抽屉自身消费 Escape；需要由外层历史协调器处理时关闭。 */
+  closeOnEscape?: boolean
   showHandle?: boolean
   dismissible?: boolean
 }
 
 const props = withDefaults(defineProps<MobileDrawerProps>(), {
   side: 'bottom',
+  zIndex: 50,
+  closeOnEscape: true,
   showHandle: true,
   dismissible: true,
 })
@@ -58,7 +64,7 @@ function handleClose() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && props.open) {
+  if (event.key === 'Escape' && props.open && props.closeOnEscape) {
     event.stopPropagation()
     handleClose()
   }
@@ -80,7 +86,7 @@ function isInteractiveTarget(target: HTMLElement | null): boolean {
   if (!target) return false
   return Boolean(
     target.closest(
-      'input, textarea, select, [role="slider"], [data-no-drawer-drag="true"], .reka-slider-root, .color-picker-spectrum'
+      'button, a, input, textarea, select, [role="button"], [role="slider"], [data-no-drawer-drag="true"], .reka-slider-root, .color-picker-spectrum'
     )
   )
 }
@@ -234,13 +240,17 @@ function handleTouchEnd() {
 }
 
 watch(
-  () => props.open,
-  (isOpen) => {
+  () => [props.open, props.closeOnEscape] as const,
+  ([isOpen, closeOnEscape]) => {
     if (typeof window === 'undefined') {
       return
     }
     if (isOpen) {
-      window.addEventListener('keydown', handleKeydown)
+      if (closeOnEscape) {
+        window.addEventListener('keydown', handleKeydown)
+      } else {
+        window.removeEventListener('keydown', handleKeydown)
+      }
       isDismissingByDrag.value = false
       isSnappingBack.value = false
       isDragging.value = false
@@ -371,6 +381,7 @@ const overlayDynamicStyle = computed(() => {
         v-if="open"
         class="pointer-events-auto fixed inset-0 z-50 flex"
         :class="containerPlacementClass"
+        :style="{ zIndex: props.zIndex }"
         role="dialog"
         aria-modal="true"
       >

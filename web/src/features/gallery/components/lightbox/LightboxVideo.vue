@@ -11,6 +11,9 @@ import { useI18n } from '@/composables/useI18n'
 
 const store = useGalleryStore()
 const { t } = useI18n()
+const props = defineProps<{
+  touchChromeEnabled: boolean
+}>()
 const emit = defineEmits<{
   ready: [assetId: number]
 }>()
@@ -18,8 +21,10 @@ const videoError = ref(false)
 const autoRecovering = ref(false)
 const videoReady = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
+const stageRef = ref<HTMLElement | null>(null)
 
 const VIEWPORT_PADDING = 0
+const NATIVE_CONTROLS_SAFE_HEIGHT = 64
 
 const { width, height } = useElementSize(viewportRef)
 const availableWidth = computed(() => width.value)
@@ -37,6 +42,34 @@ const currentAsset = computed(() => {
 
   return store.getAssetsInRange(currentIdx, currentIdx)[0] ?? null
 })
+
+// 只有紧凑触摸模式需要在图库底栏和视频原生控制条之间切换；其他模式保留原生 controls。
+const galleryChromeExclusiveVisible = computed(
+  () => props.touchChromeEnabled && store.lightbox.chromeVisible
+)
+const nativeVideoControlsVisible = computed(() => !galleryChromeExclusiveVisible.value)
+
+function isInNativeControlZone(clientX: number, clientY: number): boolean {
+  if (!nativeVideoControlsVisible.value) {
+    return false
+  }
+
+  const stage = stageRef.value
+  if (!stage) {
+    return false
+  }
+
+  const rect = stage.getBoundingClientRect()
+  const safeHeight = Math.min(NATIVE_CONTROLS_SAFE_HEIGHT, rect.height)
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.bottom - safeHeight &&
+    clientY <= rect.bottom
+  )
+}
+
+defineExpose({ isInNativeControlZone })
 
 const assetUrl = computed(() => {
   if (!currentAsset.value) {
@@ -166,6 +199,7 @@ function handleVideoLoadedData() {
         <div
           v-if="currentAsset && !videoError"
           :key="currentAsset.id"
+          ref="stageRef"
           class="relative overflow-hidden"
           :style="stageStyle"
         >
@@ -184,7 +218,7 @@ function handleVideoLoadedData() {
             :style="{ opacity: videoReady ? 1 : 0 }"
             class="absolute inset-0 h-full w-full object-contain transition-opacity duration-200"
             autoplay
-            controls
+            :controls="nativeVideoControlsVisible"
             playsinline
             preload="metadata"
             @loadeddata="handleVideoLoadedData"
