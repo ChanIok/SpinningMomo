@@ -37,6 +37,23 @@ interface StagePoint {
   y: number
 }
 
+interface TouchZoomTransition {
+  startScale: number
+  targetScale: number
+  startPosition: StagePoint
+  targetPosition: StagePoint
+}
+
+// 复原代理以缩略图的自然像素为基准，避免把缩略图也布局成原图的 8K 尺寸。
+interface ThumbnailRestoreTransition {
+  startScale: number
+  targetScale: number
+  startCenter: StagePoint
+  targetCenter: StagePoint
+  thumbnailWidth: number
+  thumbnailHeight: number
+}
+
 interface TouchPointer {
   pointerId: number
   clientX: number
@@ -69,14 +86,22 @@ const emit = defineEmits<{
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
-// 仅在同一张图原图 load 完成淡入时启用；切图隐藏原图时不做过渡，避免叠帧。
+// 仅在同一张图原图 load 完成时启用淡入；切图和复原交接不做过渡，避免叠帧。
 const originalOpacityTransition = ref(false)
+// 复原动画期间用缩略图托底，避免原图重新栅格化时露出空白块。
+const touchZoomRestoreFallback = ref(false)
 const autoRecovering = ref(false)
 // 实际渲染的资产 id；切图时滞后于 selection，直到目标缩略图 decode 完成再切换。
 const displayAssetId = ref<number | null>(null)
 let displaySwapToken = 0
+const lightboxRootRef = ref<HTMLElement | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
+const thumbnailImageRef = ref<HTMLImageElement | null>(null)
+const originalImageRef = ref<HTMLImageElement | null>(null)
+// 代理层独立于可滚动 stage，只有缩小复原时才挂载并接管画面。
+const restoreThumbnailRef = ref<HTMLImageElement | null>(null)
+const restoreThumbnailActive = ref(false)
 const activePointerId = ref<number | null>(null)
 const dragStartX = ref(0)
 const dragStartY = ref(0)
@@ -100,7 +125,7 @@ let pinchFinishing = false
 let pinchPointerPair: TouchPointerPair | null = null
 let touchZoomAnimationFrame: number | null = null
 let touchZoomAnimationToken = 0
-const touchZoomStageOffset = ref<StagePoint | null>(null)
+let touchZoomTransition: TouchZoomTransition | null = null
 
 const { width, height } = useElementSize(viewportRef)
 
@@ -255,10 +280,106 @@ const stageStyle = computed(() => ({
   width: `${renderWidth.value}px`,
   height: `${renderHeight.value}px`,
   cursor: stageCursor.value,
-  transform: touchZoomStageOffset.value
-    ? `translate3d(${touchZoomStageOffset.value.x}px, ${touchZoomStageOffset.value.y}px, 0)`
-    : undefined,
+  // 代理层显示时保留 stage 的布局尺寸，但不让它的巨大图层参与绘制。
+  visibility: restoreThumbnailActive.value ? 'hidden' : undefined,
 }))
+
+function buildTouchZoomTransform(transition: TouchZoomTransition, easedProgress: number): string {
+  const currentScale =
+    transition.startScale + (transition.targetScale - transition.startScale) * easedProgress
+  const currentX =
+    transition.startPosition.x +
+    (transition.targetPosition.x - transition.startPosition.x) * easedProgress
+  const currentY =
+    transition.startPosition.y +
+    (transition.targetPosition.y - transition.startPosition.y) * easedProgress
+  const visualScale = transition.startScale > 0 ? currentScale / transition.startScale : 1
+
+  return `matrix(${visualScale}, 0, 0, ${visualScale}, ${currentX - transition.startPosition.x}, ${currentY - transition.startPosition.y})`
+}
+
+// 双击动画只改变视觉层；冻结布局期间关闭内部滚动，避免缩放过程触发浏览器的滚动边界裁剪。
+function applyTouchZoomTransform(transition: TouchZoomTransition, easedProgress: number) {
+  const viewport = viewportRef.value
+  const stage = stageRef.value
+  if (!viewport || !stage) {
+    return
+  }
+
+  viewport.style.overflow = 'hidden'
+  stage.style.transformOrigin = '0 0'
+  stage.style.willChange = 'transform'
+  stage.style.transform = buildTouchZoomTransform(transition, easedProgress)
+}
+
+function clearTouchZoomAnimationStyles() {
+  viewportRef.value?.style.removeProperty('overflow')
+  stageRef.value?.style.removeProperty('transform')
+  stageRef.value?.style.removeProperty('transform-origin')
+  stageRef.value?.style.removeProperty('will-change')
+}
+
+function getRootRelativePoint(point: StagePoint): StagePoint {
+  // 动画目标使用 viewport 坐标，代理层却挂在外层 root，需要先消除两者的坐标原点差异。
+  const root = lightboxRootRef.value
+  const viewport = viewportRef.value
+  if (!root || !viewport) {
+    return point
+  }
+
+  const rootRect = root.getBoundingClientRect()
+  const viewportRect = viewport.getBoundingClientRect()
+  return {
+    x: point.x + viewportRect.left - rootRect.left,
+    y: point.y + viewportRect.top - rootRect.top,
+  }
+}
+
+function applyThumbnailRestoreTransform(
+  transition: ThumbnailRestoreTransition,
+  easedProgress: number
+) {
+  const image = restoreThumbnailRef.value
+  if (!image) {
+    return
+  }
+
+  viewportRef.value?.style.setProperty('overflow', 'hidden')
+
+  const currentScale =
+    transition.startScale + (transition.targetScale - transition.startScale) * easedProgress
+  const currentCenter = {
+    x:
+      transition.startCenter.x +
+      (transition.targetCenter.x - transition.startCenter.x) * easedProgress,
+    y:
+      transition.startCenter.y +
+      (transition.targetCenter.y - transition.startCenter.y) * easedProgress,
+  }
+  const scaleX =
+    (imageWidth.value * currentScale) / Math.max(transition.thumbnailWidth, Number.EPSILON)
+  const scaleY =
+    (imageHeight.value * currentScale) / Math.max(transition.thumbnailHeight, Number.EPSILON)
+
+  // 代理图的盒子尺寸固定为缩略图原生尺寸；每一帧只更新合成 transform，避免触发布局重算。
+  image.style.left = `${currentCenter.x}px`
+  image.style.top = `${currentCenter.y}px`
+  image.style.transform = `translate3d(-50%, -50%, 0) rotate(${normalizedRotationDegrees.value}deg) scale(${scaleX}, ${scaleY})`
+}
+
+function clearThumbnailRestoreStyles() {
+  // 先恢复正常 stage，再由 Vue 在下一次 DOM 更新中移除代理节点，避免交接时出现空白帧。
+  restoreThumbnailActive.value = false
+  const image = restoreThumbnailRef.value
+  image?.style.removeProperty('left')
+  image?.style.removeProperty('top')
+  image?.style.removeProperty('width')
+  image?.style.removeProperty('height')
+  image?.style.removeProperty('transform')
+  image?.style.removeProperty('transform-origin')
+  image?.style.removeProperty('will-change')
+  image?.style.removeProperty('opacity')
+}
 
 const imageLayerStyle = computed(() => {
   const layerWidth = hasImageDimensions.value
@@ -277,9 +398,68 @@ const imageLayerStyle = computed(() => {
 
 const originalLayerStyle = computed(() => ({
   ...imageLayerStyle.value,
-  opacity: originalLoaded.value ? 1 : 0,
-  transition: originalOpacityTransition.value ? 'opacity 200ms' : 'none',
+  opacity: originalLoaded.value && !touchZoomRestoreFallback.value ? 1 : 0,
+  transition:
+    touchZoomRestoreFallback.value || !originalOpacityTransition.value
+      ? 'none'
+      : 'opacity 200ms',
 }))
+
+// 等待图片可以被浏览器绘制；不重新请求资源，也不人为延长显示时间。
+async function waitForImageReady(image: HTMLImageElement | null): Promise<boolean> {
+  if (!image) {
+    return false
+  }
+
+  const source = image.currentSrc || image.src
+  if (!image.complete) {
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const settle = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        image.removeEventListener('load', settle)
+        image.removeEventListener('error', settle)
+        resolve()
+      }
+
+      image.addEventListener('load', settle)
+      image.addEventListener('error', settle)
+      // 监听器注册和检查 complete 之间可能已经完成，避免遗漏 load 事件。
+      if (image.complete) {
+        settle()
+      }
+    })
+  }
+
+  if (image.naturalWidth <= 0 || (image.currentSrc || image.src) !== source) {
+    return false
+  }
+
+  try {
+    // decode 只等待当前资源完成解码，不修改 src，也不会重新发起网络请求。
+    await image.decode()
+  } catch {
+    // load 已经成功且有像素时，decode 的拒绝不应阻止当前图片显示。
+  }
+
+  return image.naturalWidth > 0 && (image.currentSrc || image.src) === source
+}
+
+function waitForOriginalImageReady(): Promise<boolean> {
+  return waitForImageReady(originalImageRef.value)
+}
+
+// 给缩略图留出一个实际绘制帧；这是渲染同步点，不是人为添加的动画延时。
+function waitForThumbnailPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}
 
 const zoomIndicator = computed(() => {
   if (fitMode.value === 'contain') {
@@ -310,6 +490,7 @@ function preloadThumbnailForAsset(asset: Asset): Promise<void> {
 // 切换当前渲染资产，并在 DOM 更新后通知 Pager 媒体已经可接管中心位置。
 async function commitDisplayAsset(assetId: number) {
   originalOpacityTransition.value = false
+  touchZoomRestoreFallback.value = false
   displayAssetId.value = assetId
   originalLoaded.value = false
   imageError.value = false
@@ -379,6 +560,11 @@ watch(
 watch(
   [availableWidth, availableHeight],
   async () => {
+    if (touchZoomTransition) {
+      // 尺寸变化会改变目标适屏矩形；取消旧过渡，等待下一次手势重新计算。
+      cancelTouchZoomAnimation()
+    }
+
     // 窗口尺寸变化后重新计算适屏位置或裁剪放大后的滚动范围。
     await nextTick()
     if (fitMode.value === 'contain') {
@@ -639,32 +825,29 @@ function getStageViewportPosition(): StagePoint | null {
   }
 }
 
+// 在 stage 没有自身 transform 时，读取它在 viewport 内容坐标中的位置。
+function getStageContentPosition(): StagePoint | null {
+  const viewport = viewportRef.value
+  const stage = stageRef.value
+  if (!viewport || !stage) {
+    return null
+  }
+
+  const viewportRect = viewport.getBoundingClientRect()
+  const stageRect = stage.getBoundingClientRect()
+  return {
+    x: viewport.scrollLeft + stageRect.left - viewportRect.left,
+    y: viewport.scrollTop + stageRect.top - viewportRect.top,
+  }
+}
+
 function getZoomLayout(scale: number) {
   const renderWidth = Math.max(visualImageWidth.value * scale, 1)
   const renderHeight = Math.max(visualImageHeight.value * scale, 1)
-  const canvasContentWidth = Math.max(renderWidth, viewportInnerWidth.value)
-  const canvasContentHeight = Math.max(renderHeight, viewportInnerHeight.value)
 
   return {
     renderWidth,
     renderHeight,
-    stageOffsetLeft: VIEWPORT_PADDING + (canvasContentWidth - renderWidth) / 2,
-    stageOffsetTop: VIEWPORT_PADDING + (canvasContentHeight - renderHeight) / 2,
-    maxScrollLeft: Math.max(canvasContentWidth - viewportInnerWidth.value, 0),
-    maxScrollTop: Math.max(canvasContentHeight - viewportInnerHeight.value, 0),
-  }
-}
-
-function getNormalStageViewportPosition(scale: number): StagePoint | null {
-  const viewport = viewportRef.value
-  if (!viewport) {
-    return null
-  }
-
-  const layout = getZoomLayout(scale)
-  return {
-    x: layout.stageOffsetLeft - viewport.scrollLeft,
-    y: layout.stageOffsetTop - viewport.scrollTop,
   }
 }
 
@@ -690,14 +873,6 @@ function getTouchZoomTargetPosition(anchor: ZoomAnchor, scale: number): StagePoi
       layout.renderHeight,
       availableHeight.value
     ),
-  }
-}
-
-function getScrollForStagePosition(position: StagePoint, scale: number) {
-  const layout = getZoomLayout(scale)
-  return {
-    left: clamp(layout.stageOffsetLeft - position.x, 0, layout.maxScrollLeft),
-    top: clamp(layout.stageOffsetTop - position.y, 0, layout.maxScrollTop),
   }
 }
 
@@ -771,7 +946,10 @@ function cancelTouchZoomAnimation() {
 
   touchZoomAnimationToken += 1
   zoomRenderToken += 1
-  touchZoomStageOffset.value = null
+  touchZoomTransition = null
+  touchZoomRestoreFallback.value = false
+  clearThumbnailRestoreStyles()
+  clearTouchZoomAnimationStyles()
 }
 
 // 清除图片缩放手势的异步帧和基准，切图或组件卸载时不能把旧缩放带到下一张图。
@@ -882,13 +1060,18 @@ async function endPinch() {
   pinchFinishing = false
 }
 
+// 将内部 viewport 归零；双击过渡完成时保留临时视觉变换直到这里完成。
+async function commitFitMode() {
+  lightbox.showFitMode()
+  await nextTick()
+  syncViewportPosition()
+}
+
 // 切回适屏模式并把内部 viewport 归零。
 async function showFitMode() {
   cancelPanInertia()
   cancelTouchZoomAnimation()
-  lightbox.showFitMode()
-  await nextTick()
-  syncViewportPosition()
+  await commitFitMode()
 }
 
 // 以指定屏幕坐标为锚点缩放，保证锚点下的图像内容不跳动。
@@ -952,6 +1135,15 @@ async function showActualSizeAtPoint(clientX: number, clientY: number) {
   await zoomToScaleAtPoint(1, clientX, clientY, { snapToFit: false })
 }
 
+// 计算没有有效锚点时的居中目标；只用于一次性的双击过渡兜底。
+function getCenteredStagePosition(scale: number): StagePoint {
+  const layout = getZoomLayout(scale)
+  return {
+    x: VIEWPORT_PADDING + (viewportInnerWidth.value - layout.renderWidth) / 2,
+    y: VIEWPORT_PADDING + (viewportInnerHeight.value - layout.renderHeight) / 2,
+  }
+}
+
 // 触摸双击专用的平滑缩放；桌面点击继续使用上面的即时切换路径。
 async function animateTouchZoomAtPoint(clientX: number, clientY: number) {
   if (!displayAsset.value || imageError.value || !hasImageDimensions.value) {
@@ -960,35 +1152,128 @@ async function animateTouchZoomAtPoint(clientX: number, clientY: number) {
     return
   }
 
+  // 一次只允许一个视觉过渡；新的触摸手势会由 beginPinch/beginPan 负责取消它。
+  if (touchZoomTransition) {
+    return
+  }
+
   const isFitting = fitMode.value === 'contain'
-  const startScale = clampActualZoom(getCurrentScale())
-  const targetScale = clampActualZoom(isFitting ? 1 : fitScale.value)
-  const anchor = getZoomAnchor(clientX, clientY, startScale)
+  const startScale = Math.max(getCurrentScale(), Number.EPSILON)
+  const targetScale = Math.max(isFitting ? 1 : fitScale.value, Number.EPSILON)
   const startPosition = getStageViewportPosition()
+  if (!startPosition) {
+    if (isFitting) {
+      lightbox.setActualZoom(targetScale)
+      await nextTick()
+      syncViewportPosition()
+    } else {
+      await showFitMode()
+    }
+    return
+  }
 
   cancelPanInertia()
   cancelTouchZoomAnimation()
 
   const animationToken = ++touchZoomAnimationToken
-  const renderToken = ++zoomRenderToken
-  const targetPosition = anchor ? getTouchZoomTargetPosition(anchor, targetScale) : null
-
-  if (isFitting) {
-    // 先切到 actual 但沿用适屏比例，动画开始时不会发生跳变。
-    lightbox.setActualZoom(startScale)
-  }
+  const anchor = getZoomAnchor(clientX, clientY, startScale)
+  const targetPosition = anchor
+    ? getTouchZoomTargetPosition(anchor, targetScale)
+    : getCenteredStagePosition(targetScale)
 
   if (Math.abs(targetScale - startScale) < 0.001) {
     if (isFitting) {
       lightbox.setActualZoom(targetScale)
       await nextTick()
-      if (animationToken === touchZoomAnimationToken && renderToken === zoomRenderToken) {
+      if (animationToken === touchZoomAnimationToken) {
         syncViewportPosition()
       }
     } else {
       await showFitMode()
     }
     return
+  }
+
+  const transition: TouchZoomTransition = {
+    startScale,
+    targetScale,
+    startPosition,
+    targetPosition,
+  }
+  touchZoomTransition = transition
+
+  let restoreTransition: ThumbnailRestoreTransition | null = null
+  if (isFitting) {
+    // 放大分支继续使用原有 stage transform，保留原图的渐进式显示效果。
+    applyTouchZoomTransform(transition, 0)
+  } else {
+    // 复原从第一帧开始只显示缩略图；先确认缩略图已解码，避免代理层接管后反而出现空白。
+    if (!(await waitForImageReady(thumbnailImageRef.value))) {
+      touchZoomTransition = null
+      return
+    }
+    if (animationToken !== touchZoomAnimationToken) {
+      return
+    }
+
+    touchZoomRestoreFallback.value = true
+    originalOpacityTransition.value = false
+    // stage 仍保留真实布局，但由独立代理层显示画面，避免 8K stage 被 transform 合成。
+    restoreThumbnailActive.value = true
+    await nextTick()
+    if (animationToken !== touchZoomAnimationToken) {
+      return
+    }
+
+    const image = restoreThumbnailRef.value
+    if (!image) {
+      clearThumbnailRestoreStyles()
+      touchZoomRestoreFallback.value = false
+      touchZoomTransition = null
+      return
+    }
+    if (!(await waitForImageReady(image))) {
+      clearThumbnailRestoreStyles()
+      touchZoomRestoreFallback.value = false
+      touchZoomTransition = null
+      return
+    }
+    if (animationToken !== touchZoomAnimationToken) {
+      return
+    }
+
+    const thumbnailWidth = image?.naturalWidth ?? 0
+    const thumbnailHeight = image?.naturalHeight ?? 0
+    if (thumbnailWidth <= 0 || thumbnailHeight <= 0) {
+      clearThumbnailRestoreStyles()
+      touchZoomRestoreFallback.value = false
+      touchZoomTransition = null
+      return
+    }
+
+    const startLayout = getZoomLayout(startScale)
+    const targetLayout = getZoomLayout(targetScale)
+    // 代理以自然尺寸渲染，再用 scaleX/scaleY 映射回原图元数据尺寸；这也是 object-fill 的等价处理。
+    image.style.width = `${thumbnailWidth}px`
+    image.style.height = `${thumbnailHeight}px`
+    image.style.transformOrigin = '50% 50%'
+    image.style.willChange = 'transform'
+    image.style.opacity = '1'
+    restoreTransition = {
+      startScale,
+      targetScale,
+      startCenter: getRootRelativePoint({
+        x: startPosition.x + startLayout.renderWidth / 2,
+        y: startPosition.y + startLayout.renderHeight / 2,
+      }),
+      targetCenter: getRootRelativePoint({
+        x: targetPosition.x + targetLayout.renderWidth / 2,
+        y: targetPosition.y + targetLayout.renderHeight / 2,
+      }),
+      thumbnailWidth,
+      thumbnailHeight,
+    }
+    applyThumbnailRestoreTransform(restoreTransition, 0)
   }
 
   const startedAt = performance.now()
@@ -999,39 +1284,10 @@ async function animateTouchZoomAtPoint(clientX: number, clientY: number) {
 
     const progress = clamp((now - startedAt) / TOUCH_ZOOM_ANIMATION_DURATION_MS, 0, 1)
     const easedProgress = 1 - Math.pow(1 - progress, 3)
-    const scale = startScale + (targetScale - startScale) * easedProgress
-    const position =
-      startPosition && targetPosition
-        ? {
-            x: startPosition.x + (targetPosition.x - startPosition.x) * easedProgress,
-            y: startPosition.y + (targetPosition.y - startPosition.y) * easedProgress,
-          }
-        : null
-
-    lightbox.setActualZoom(scale)
-    await nextTick()
-    if (renderToken !== zoomRenderToken) {
-      return
-    }
-
-    if (position) {
-      const normalPosition = getNormalStageViewportPosition(scale)
-      if (!normalPosition) {
-        return
-      }
-
-      // 动画期间用视觉位移覆盖 Grid 的居中布局，缩放和位移沿同一进度运行。
-      touchZoomStageOffset.value = {
-        x: position.x - normalPosition.x,
-        y: position.y - normalPosition.y,
-      }
-    } else {
-      touchZoomStageOffset.value = null
-      syncViewportPosition()
-    }
-
-    if (animationToken !== touchZoomAnimationToken || renderToken !== zoomRenderToken) {
-      return
+    if (isFitting) {
+      applyTouchZoomTransform(transition, easedProgress)
+    } else if (restoreTransition) {
+      applyThumbnailRestoreTransform(restoreTransition, easedProgress)
     }
 
     if (progress < 1) {
@@ -1040,17 +1296,67 @@ async function animateTouchZoomAtPoint(clientX: number, clientY: number) {
     }
 
     touchZoomAnimationFrame = null
+    // 先让最后一帧视觉位置落地，再提交真实布局状态。
+    await nextTick()
+    if (animationToken !== touchZoomAnimationToken) {
+      return
+    }
+
     if (isFitting) {
-      if (targetPosition) {
-        const finalScroll = getScrollForStagePosition(targetPosition, targetScale)
-        setViewportScroll(finalScroll.left, finalScroll.top)
+      // 真实 zoom 更新后，保留 transform 并等待目标布局完成。
+      lightbox.setActualZoom(targetScale)
+      await nextTick()
+      if (animationToken !== touchZoomAnimationToken) {
+        return
+      }
+
+      // 清掉动画 transform 只用于读取真实 Grid 位置；这一轮 JS 执行结束前不会产生可见帧。
+      stageRef.value?.style.removeProperty('transform')
+      const contentPosition = getStageContentPosition()
+      if (contentPosition) {
+        setViewportScroll(
+          contentPosition.x - targetPosition.x,
+          contentPosition.y - targetPosition.y
+        )
       } else {
         syncViewportPosition()
       }
-      // 把动画中的视觉位置提交给正常滚动状态，再移除临时位移。
-      touchZoomStageOffset.value = null
     } else {
-      await showFitMode()
+      // 缩略图已经覆盖了整个动画；这里继续托底，直到适屏布局和原图 decode 完成。
+      const originalReadyPromise = waitForOriginalImageReady()
+      await commitFitMode()
+      if (animationToken !== touchZoomAnimationToken) {
+        return
+      }
+
+      // 先恢复适屏 stage 的真实布局，再给普通缩略图一个实际绘制帧，确保它覆盖布局交接过程。
+      touchZoomTransition = null
+      clearTouchZoomAnimationStyles()
+      clearThumbnailRestoreStyles()
+      await nextTick()
+      await waitForThumbnailPaint()
+      if (animationToken !== touchZoomAnimationToken) {
+        return
+      }
+
+      if (await originalReadyPromise) {
+        if (animationToken !== touchZoomAnimationToken) {
+          return
+        }
+
+        // 原图已可绘制后直接切回，不复用首次加载的淡入过渡。
+        originalLoaded.value = true
+        originalOpacityTransition.value = false
+        touchZoomRestoreFallback.value = false
+        await nextTick()
+      } else {
+        touchZoomRestoreFallback.value = false
+      }
+    }
+
+    if (animationToken === touchZoomAnimationToken) {
+      touchZoomTransition = null
+      clearTouchZoomAnimationStyles()
     }
   }
 
@@ -1375,7 +1681,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full overflow-hidden">
+  <div ref="lightboxRootRef" class="relative h-full w-full overflow-hidden">
     <!-- Pager 仲裁触摸手势；viewport 只负责承载图片滚动和桌面滚轮。 -->
     <div
       ref="viewportRef"
@@ -1398,6 +1704,7 @@ onUnmounted(() => {
         >
           <!-- 盒子由元数据宽高决定；object-fill 避免缩略图像素比例与元数据不一致时在切换原图时跳动 -->
           <img
+            ref="thumbnailImageRef"
             :src="thumbnailUrl"
             :alt="displayAsset.name"
             :style="imageLayerStyle"
@@ -1407,6 +1714,7 @@ onUnmounted(() => {
           />
 
           <img
+            ref="originalImageRef"
             :src="originalUrl"
             :alt="displayAsset.name"
             :style="originalLayerStyle"
@@ -1435,6 +1743,18 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 仅缩小复原使用；保持缩略图自身尺寸，避免把 8K 图片盒子作为动画图层。 -->
+    <img
+      v-if="restoreThumbnailActive && displayAsset && !imageError"
+      ref="restoreThumbnailRef"
+      :src="thumbnailUrl"
+      :alt="displayAsset.name"
+      class="pointer-events-none absolute top-0 left-0 z-20 max-w-none object-fill select-none"
+      style="opacity: 0"
+      draggable="false"
+      @dragstart.prevent
+    />
   </div>
 </template>
 
