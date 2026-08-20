@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
 import { LoaderCircle, Upload, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -25,12 +25,6 @@ import {
   normalizeGalleryInputType,
   type GalleryInputType,
 } from '../../input'
-import {
-  computeLightboxHeroRect,
-  consumeHero,
-  endHeroAnimation,
-  consumeReverseHero,
-} from '../../composables/useHeroTransition'
 import GalleryToolbar from './GalleryToolbar.vue'
 import GalleryCompactToolbar from '../mobile/GalleryCompactToolbar.vue'
 import GalleryContent from './GalleryContent.vue'
@@ -45,9 +39,7 @@ const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const { t } = useI18n()
-const viewerRef = ref<HTMLElement | null>(null)
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
-const galleryLightboxRef = ref<InstanceType<typeof GalleryLightbox> | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
@@ -81,16 +73,6 @@ const galleryColumnClass = computed(() => {
   ].filter(Boolean)
 })
 
-// Hero overlay 动画状态
-interface HeroOverlayState {
-  thumbnailUrl: string
-  toRect: DOMRect
-}
-
-const heroOverlay = ref<HeroOverlayState | null>(null)
-const heroOverlayStyle = ref<Record<string, string>>({})
-const heroActive = ref(false)
-let heroRafId: number | null = null
 // lightbox 打开期间，gallery 背景只做低优先级“预对齐”；连续切图时只追最后一张。
 let pendingGalleryScrollIndex: number | undefined
 let galleryScrollRafId: number | null = null
@@ -173,12 +155,6 @@ async function restoreLightboxFromQuery() {
   }
 }
 
-// 反向 hero overlay 动画状态
-const reverseHeroOverlay = ref<{ thumbnailUrl: string } | null>(null)
-const reverseHeroOverlayStyle = ref<Record<string, string>>({})
-const reverseHeroActive = ref(false)
-let reverseHeroRafId: number | null = null
-
 // 吸收一小段时间内的连续 activeIndex 变化，并把背景滚动放到下一帧，避免与前景切图争抢同一拍。
 const flushGalleryScrollSync = useDebounceFn(() => {
   const targetIndex = pendingGalleryScrollIndex
@@ -214,52 +190,14 @@ watch(
 
 watch(
   () => store.lightbox.isOpen,
-  async (isOpen) => {
+  (isOpen) => {
     if (!isOpen) {
       pendingGalleryScrollIndex = undefined
       if (galleryScrollRafId !== null) {
         cancelAnimationFrame(galleryScrollRafId)
         galleryScrollRafId = null
       }
-      return
     }
-
-    const hero = consumeHero()
-    if (!hero) {
-      return
-    }
-
-    const viewerEl = viewerRef.value
-    if (!viewerEl) return
-
-    // 暗房刚通过 v-if 挂载时，等待 DOM 更新让普通桌面模式的上下 chrome 完成布局，
-    // Hero 才能以实际媒体 viewport 作为目标；紧凑/沉浸模式由子组件返回完整区域。
-    await nextTick()
-    if (isViewerUnmounted || !store.lightbox.isOpen) {
-      endHeroAnimation()
-      return
-    }
-
-    const heroViewport = galleryLightboxRef.value?.getHeroViewport()
-    const containerRect = heroViewport?.rect ?? viewerEl.getBoundingClientRect()
-    const toRect = computeLightboxHeroRect(
-      containerRect,
-      hero.width,
-      hero.height,
-      heroViewport?.padding
-    )
-
-    heroOverlay.value = { thumbnailUrl: hero.thumbnailUrl, toRect }
-    heroOverlayStyle.value = rectToFixedStyle(hero.rect, 'none')
-    heroActive.value = false
-
-    // 双 rAF：先让 overlay 以初始样式挂载，再在下一拍切到目标 rect，确保浏览器稳定触发 transition。
-    heroRafId = requestAnimationFrame(() => {
-      heroRafId = requestAnimationFrame(() => {
-        heroActive.value = true
-        heroOverlayStyle.value = rectToFixedStyle(toRect, 'enter')
-      })
-    })
   }
 )
 
@@ -365,70 +303,12 @@ onUnmounted(() => {
   isViewerUnmounted = true
   store.setPreferencesDialogOpen(false)
   pendingGalleryScrollIndex = undefined
-  if (heroRafId !== null) cancelAnimationFrame(heroRafId)
-  if (reverseHeroRafId !== null) cancelAnimationFrame(reverseHeroRafId)
   if (galleryScrollRafId !== null) cancelAnimationFrame(galleryScrollRafId)
 })
 
 const resetWheelZoomDelta = useDebounceFn(() => {
   wheelZoomDelta = 0
 }, 140)
-
-function rectToFixedStyle(
-  rect: DOMRect,
-  animation: 'none' | 'enter' | 'exit'
-): Record<string, string> {
-  // 进入更柔和，退出更利落；这里只过渡几何属性，避免 transition: all 带来不必要的副作用。
-  const transition =
-    animation === 'enter'
-      ? 'left 260ms cubic-bezier(0.22, 1, 0.36, 1), top 260ms cubic-bezier(0.22, 1, 0.36, 1), width 260ms cubic-bezier(0.22, 1, 0.36, 1), height 260ms cubic-bezier(0.22, 1, 0.36, 1)'
-      : animation === 'exit'
-        ? 'left 220ms cubic-bezier(0.4, 0, 0.2, 1), top 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1), height 220ms cubic-bezier(0.4, 0, 0.2, 1)'
-        : 'none'
-
-  return {
-    position: 'fixed',
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    transition,
-    zIndex: '9999',
-    objectFit: 'cover',
-    borderRadius: '4px',
-    pointerEvents: 'none',
-  }
-}
-
-function onHeroTransitionEnd() {
-  heroOverlay.value = null
-  heroActive.value = false
-  endHeroAnimation()
-}
-
-function onReverseHeroTransitionEnd() {
-  reverseHeroOverlay.value = null
-  reverseHeroActive.value = false
-}
-
-// 由 GalleryLightbox 在关闭序列中触发反向 hero 飞回
-async function startReverseHero() {
-  const rh = consumeReverseHero()
-  if (!rh) return
-
-  reverseHeroOverlay.value = { thumbnailUrl: rh.thumbnailUrl }
-  reverseHeroOverlayStyle.value = rectToFixedStyle(rh.fromRect, 'none')
-  reverseHeroActive.value = false
-
-  reverseHeroRafId = requestAnimationFrame(() => {
-    reverseHeroRafId = requestAnimationFrame(() => {
-      reverseHeroActive.value = true
-      reverseHeroOverlayStyle.value = rectToFixedStyle(rh.toRect, 'exit')
-    })
-  })
-}
-
-defineExpose({ startReverseHero })
 
 function toggleSelectedAssetsRejected() {
   const activeIndex = store.selection.activeIndex
@@ -699,7 +579,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 </script>
 
 <template>
-  <div ref="viewerRef" class="relative h-full">
+  <div class="relative h-full">
     <!-- gallery 始终渲染；打开时用 opacity 隐藏以便过渡，关闭阶段 isClosing 时与 lightbox 同步淡入 -->
     <div
       :class="galleryColumnClass"
@@ -780,35 +660,12 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
     </div>
 
     <!-- lightbox 按需挂载/销毁，绝对定位覆盖在 gallery 上层 -->
-    <GalleryLightbox
-      v-if="store.lightbox.isOpen"
-      ref="galleryLightboxRef"
-      :gallery-content-ref="galleryContentRef"
-      @request-reverse-hero="startReverseHero"
-    />
+    <GalleryLightbox v-if="store.lightbox.isOpen" :gallery-content-ref="galleryContentRef" />
 
     <GalleryPreferencesDialog
       :open="store.preferencesDialogOpen"
       @update:open="handlePreferencesDialogOpenChange"
     />
-
-    <!-- Hero overlay: 缩略图放大到 lightbox 的动画层 -->
-    <Teleport to="body">
-      <img
-        v-if="heroOverlay"
-        :src="heroOverlay.thumbnailUrl"
-        :style="heroOverlayStyle"
-        alt=""
-        @transitionend="onHeroTransitionEnd"
-      />
-      <img
-        v-if="reverseHeroOverlay"
-        :src="reverseHeroOverlay.thumbnailUrl"
-        :style="reverseHeroOverlayStyle"
-        alt=""
-        @transitionend="onReverseHeroTransitionEnd"
-      />
-    </Teleport>
   </div>
 </template>
 

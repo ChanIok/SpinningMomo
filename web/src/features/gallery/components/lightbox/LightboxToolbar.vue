@@ -107,23 +107,24 @@ function handleToolbarContextMenu(event: MouseEvent) {
 
 <template>
   <div
-    class="@container flex w-full items-center justify-between px-2.5 text-foreground transition-colors"
+    class="@container flex w-full items-start justify-between px-2.5 text-foreground transition-colors"
     :class="
       props.compressed
-        ? 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent pt-1 pb-4'
+        ? 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent'
         : 'h-12 bg-transparent'
     "
     @contextmenu="handleToolbarContextMenu"
   >
     <TooltipProvider :delay-duration="300">
       <!-- 左侧区域 -->
-      <div class="flex min-w-0 items-center gap-3">
+      <div class="flex h-12 min-w-0 items-center gap-3">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
               variant="ghost"
               size="icon"
               class="h-10 w-10 shrink-0 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              :aria-label="t('gallery.lightbox.toolbar.backTitle')"
               @click="emit('back')"
             >
               <ChevronLeft class="size-5" :stroke-width="1.5" />
@@ -150,8 +151,8 @@ function handleToolbarContextMenu(event: MouseEvent) {
       </div>
 
       <!-- 右侧控制区 -->
-      <!-- 紧凑模式右侧：仅保留详情与沉浸/全屏按钮 -->
-      <div v-if="props.compressed" class="flex items-center gap-1">
+      <!-- 紧凑模式右侧：保持原本 h-10 w-10 按钮与 hover 外观，通过几何间距精准对齐中心 -->
+      <div v-if="props.compressed" class="flex h-12 items-center gap-1.5 pr-1">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -159,6 +160,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
               size="icon"
               class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
               :class="props.detailsOpen ? 'text-primary hover:text-primary' : ''"
+              :aria-label="t('gallery.lightbox.toolbar.detailsTitle')"
               @click="emit('toggleDetails')"
             >
               <Info class="size-5" :stroke-width="1.5" />
@@ -175,6 +177,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               variant="ghost"
               size="icon"
               class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              :aria-label="
+                isImmersive
+                  ? t('gallery.lightbox.toolbar.exitImmersiveTitle')
+                  : t('gallery.lightbox.toolbar.immersiveTitle')
+              "
               @click="emit('toggleImmersive')"
             >
               <Minimize v-if="isImmersive" class="size-5" :stroke-width="1.5" />

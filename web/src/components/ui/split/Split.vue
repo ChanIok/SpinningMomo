@@ -12,7 +12,7 @@ export interface SplitProps {
   /**
    * 默认大小（非受控）
    * - 数字：百分比 0-1
-   * - 字符串：像素值 "200px"
+   * - 字符串：像素值 "200px" 或百分比 "50%"
    * @default 0.5
    */
   defaultSize?: number | string
@@ -25,7 +25,7 @@ export interface SplitProps {
   /**
    * 最小尺寸
    * - 数字：百分比 0-1
-   * - 字符串：像素值 "100px"
+   * - 字符串：像素值 "100px" 或百分比 "20%"
    * @default 0
    */
   min?: number | string
@@ -33,7 +33,7 @@ export interface SplitProps {
   /**
    * 最大尺寸
    * - 数字：百分比 0-1
-   * - 字符串：像素值 "500px"
+   * - 字符串：像素值 "500px" 或百分比 "80%"
    * @default 1
    */
   max?: number | string
@@ -47,7 +47,7 @@ export interface SplitProps {
   /**
    * 分隔条命中区域宽度（像素）
    * - 覆盖式，不占布局；仅影响拖拽命中区
-   * @default 4
+   * @default 5
    */
   dividerSize?: number
 
@@ -85,6 +85,12 @@ export interface SplitProps {
    * @default false
    */
   reverse?: boolean
+
+  /**
+   * 是否显示微型把手指示条
+   * @default false
+   */
+  showHandle?: boolean
 }
 
 const props = withDefaults(defineProps<SplitProps>(), {
@@ -100,13 +106,14 @@ const props = withDefaults(defineProps<SplitProps>(), {
   pane1Class: '',
   pane2Class: '',
   reverse: false,
+  showHandle: false,
 })
 
 const emit = defineEmits<{
   'update:size': [size: number | string]
-  drag: [e: MouseEvent]
-  'drag-start': [e: MouseEvent]
-  'drag-end': [e: MouseEvent]
+  drag: [e: MouseEvent | TouchEvent]
+  'drag-start': [e: MouseEvent | TouchEvent]
+  'drag-end': [e: MouseEvent | TouchEvent]
 }>()
 
 // 同时支持受控和非受控两种用法：
@@ -159,7 +166,7 @@ const secondPaneStyle = computed(() => getSecondPaneStyle(internalSize.value))
 const slots = useSlots()
 
 const dividerClasses = computed(() => [
-  'group absolute z-999 flex-shrink-0',
+  'group absolute z-999 flex-shrink-0 touch-none select-none',
   props.direction === 'horizontal'
     ? 'top-0 left-1/2 h-full -translate-x-1/2'
     : 'top-1/2 left-0 w-full -translate-y-1/2',
@@ -202,6 +209,11 @@ const onMouseDown = (e: MouseEvent) => {
   if (props.disabled) return
   splitResize.handleMouseDown(e, internalSize.value)
 }
+
+const onTouchStart = (e: TouchEvent) => {
+  if (props.disabled) return
+  splitResize.handleTouchStart(e, internalSize.value)
+}
 </script>
 
 <template>
@@ -220,9 +232,23 @@ const onMouseDown = (e: MouseEvent) => {
         :ref="splitResize.dividerRef"
         :class="dividerClasses"
         :style="dividerStyle"
+        data-no-drawer-drag="true"
         @mousedown="onMouseDown"
+        @touchstart.stop="onTouchStart"
       >
         <div v-if="!hasDividerSlot" :class="dividerLineClasses" :style="dividerLineStyle" />
+        <div
+          v-if="showHandle"
+          class="pointer-events-none absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+        >
+          <div
+            :class="[
+              'rounded-full transition-colors duration-200',
+              direction === 'vertical' ? 'h-1 w-8' : 'h-8 w-1',
+              isDragging ? 'bg-primary' : 'bg-muted-foreground/35 group-hover:bg-primary/60',
+            ]"
+          />
+        </div>
         <slot name="divider" />
       </div>
     </div>

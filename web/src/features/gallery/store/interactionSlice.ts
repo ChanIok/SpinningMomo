@@ -6,7 +6,7 @@ import type {
   DetailsPanelFocus,
   BatchSelectionSummary,
 } from '../types'
-import type { GalleryInputType } from '../input'
+import { isGalleryTouchInput, type GalleryInputType } from '../input'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
 
 interface InteractionSliceArgs {
@@ -55,6 +55,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     rotationDegrees: 0,
   })
 
+  // 最近一次输入用于图库级触摸交互提示；灯箱的 inputType 只记录打开入口，不作为全局模式。
+  const recentInputType = ref<GalleryInputType>('mouse')
+  const isTouchMode = computed(() => isGalleryTouchInput(recentInputType.value))
+
   // detailsPanel 只保存右侧详情的焦点身份，不复制资产/树节点数据。
   const detailsPanel = ref<DetailsPanelFocus>({ type: 'none' })
 
@@ -63,6 +67,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   const batchSummary = ref<BatchSelectionSummary | null>(null)
   const batchSummaryLoading = ref(false)
   const batchSummaryRequestVersion = ref(0)
+
+  function setRecentInputType(inputType: GalleryInputType) {
+    recentInputType.value = inputType
+  }
 
   function patchAssetsReviewState(
     assetIds: number[],
@@ -382,6 +390,8 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     selection.activeIndex = undefined
     selection.activeAssetId = undefined
 
+    recentInputType.value = 'mouse'
+
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
@@ -397,9 +407,12 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   return {
     selection,
     lightbox,
+    recentInputType,
+    isTouchMode,
     detailsPanel,
     selectedCount,
     hasSelection,
+    setRecentInputType,
     batchSummary,
     batchSummaryLoading,
     batchSummaryRequestVersion,

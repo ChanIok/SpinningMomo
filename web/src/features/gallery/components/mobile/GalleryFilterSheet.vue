@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import {
-  CalendarClock,
-  ChevronDown,
-  Image,
-  Palette,
-  Search,
-  Square,
-  Star,
-  Video,
-  X,
-} from '@lucide/vue'
+import { CalendarClock, ChevronDown, Palette, RotateCcw, Search, Star, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -108,10 +98,9 @@ function toggleColorSection() {
   colorExpanded.value = !colorExpanded.value
 }
 
-interface MediaTypeOption {
+interface FilterOption {
   value: string
   label: string
-  icon?: typeof Image
 }
 
 interface ReviewFlagOption {
@@ -120,13 +109,13 @@ interface ReviewFlagOption {
   activeClass: string
 }
 
-const mediaTypeOptions = computed<MediaTypeOption[]>(() => [
+const mediaTypeOptions = computed<FilterOption[]>(() => [
   { value: 'all', label: t('gallery.toolbar.filter.type.all') },
-  { value: 'photo', label: t('gallery.toolbar.filter.type.photo'), icon: Image },
-  { value: 'video', label: t('gallery.toolbar.filter.type.video'), icon: Video },
+  { value: 'photo', label: t('gallery.toolbar.filter.type.photo') },
+  { value: 'video', label: t('gallery.toolbar.filter.type.video') },
 ])
 
-const shapeOptions = computed(() => [
+const shapeOptions = computed<FilterOption[]>(() => [
   { value: 'all', label: t('gallery.toolbar.filter.shape.all') },
   { value: 'landscape', label: t('gallery.toolbar.filter.shape.landscape') },
   { value: 'portrait', label: t('gallery.toolbar.filter.shape.portrait') },
@@ -161,41 +150,12 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
   <MobileDrawer
     :open="open"
     side="right"
-    class="flex h-full w-[88vw] max-w-[360px] flex-col gap-0 border-l border-border/40 bg-background text-sidebar-foreground shadow-2xl"
+    class="flex h-full w-[80vw] max-w-[360px] flex-col gap-0 border-l border-border/40 bg-background text-sidebar-foreground shadow-2xl"
     @close="close"
   >
-    <!-- 抽屉头部 -->
-    <header
-      class="flex h-12 shrink-0 items-center justify-between border-b border-border/40 px-4 pt-[env(safe-area-inset-top)]"
-    >
-      <span class="text-sm font-medium text-foreground">
-        {{ t('gallery.mobile.toolbar.filter.title') }}
-      </span>
-      <div class="flex items-center gap-1">
-        <Button
-          v-if="hasAttributeFilters"
-          variant="ghost"
-          size="sm"
-          class="h-7 px-2 text-xs font-normal text-primary hover:bg-sidebar-hover hover:text-primary"
-          @click="clearAttributeFilters"
-        >
-          {{ t('gallery.toolbar.filters.clear') }}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-7 w-7 rounded-md text-sidebar-foreground/80 hover:bg-sidebar-hover hover:text-sidebar-accent-foreground"
-          :aria-label="t('common.close')"
-          @click="close"
-        >
-          <X class="size-4" />
-        </Button>
-      </div>
-    </header>
-
     <!-- 滚动内容区 -->
     <ScrollArea class="min-h-0 flex-1">
-      <div class="space-y-5 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      <div class="space-y-4.5 p-4">
         <!-- 关键词搜索 -->
         <div class="space-y-2">
           <label class="text-sm font-medium text-foreground">
@@ -223,7 +183,7 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
           </div>
         </div>
 
-        <!-- 媒体类型（胶囊分段控制器） -->
+        <!-- 媒体类型（3 联分段控制器） -->
         <div class="space-y-2">
           <label class="text-sm font-medium text-foreground">
             {{ t('gallery.toolbar.filters.fileType') }}
@@ -235,24 +195,22 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
               v-for="opt in mediaTypeOptions"
               :key="opt.value"
               type="button"
-              class="flex h-8.5 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors duration-150"
+              class="flex h-8.5 items-center justify-center rounded-md text-xs font-medium transition-colors duration-150"
               :class="
                 (filter.type || 'all') === opt.value
-                  ? 'bg-sidebar-accent font-medium text-primary shadow-xs [&_svg]:text-primary'
+                  ? 'bg-sidebar-accent font-medium text-primary shadow-xs'
                   : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               "
               @click="setType(opt.value)"
             >
-              <component :is="opt.icon" v-if="opt.icon" class="size-3.5" />
               <span>{{ opt.label }}</span>
             </button>
           </div>
         </div>
 
-        <!-- 形状（按素材宽高方向单选） -->
+        <!-- 形状（4 联分段控制器） -->
         <div class="space-y-2">
-          <label class="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <Square class="size-3.5 text-muted-foreground" />
+          <label class="text-sm font-medium text-foreground">
             {{ t('gallery.toolbar.filters.shape') }}
           </label>
           <div
@@ -275,7 +233,7 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
           </div>
         </div>
 
-        <!-- 标记状态（语义化分段胶囊） -->
+        <!-- 标记状态（4 联分段控制器） -->
         <div class="space-y-2">
           <label class="text-sm font-medium text-foreground">
             {{ t('gallery.toolbar.filters.reviewFlag') }}
@@ -300,11 +258,11 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
           </div>
         </div>
 
-        <!-- 评分筛选（精简 6 联星级胶囊） -->
+        <!-- 评分（6 联星级胶囊） -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-foreground">
-              {{ t('gallery.toolbar.filter.rating.label') }}
+              {{ t('gallery.toolbar.filters.rating') }}
             </label>
             <button
               v-if="selectedRatings.length > 0"
@@ -322,7 +280,7 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
               v-for="rating in [5, 4, 3, 2, 1, 0]"
               :key="rating"
               type="button"
-              class="flex h-8.5 items-center justify-center gap-1 rounded-md text-xs font-medium transition-colors duration-150"
+              class="flex h-8.5 items-center justify-center gap-0.5 rounded-md text-xs font-medium transition-colors duration-150"
               :class="
                 isRatingSelected(rating)
                   ? 'bg-sidebar-accent font-medium text-primary shadow-xs'
@@ -335,141 +293,156 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
               </template>
               <template v-else>
                 <Star
-                  class="size-3.5"
+                  class="size-3"
                   :class="
                     isRatingSelected(rating)
                       ? 'fill-amber-400 text-amber-400'
                       : 'text-muted-foreground/40'
                   "
                 />
-                <span class="font-mono">{{ rating }}</span>
+                <span class="font-mono text-xs">{{ rating }}</span>
               </template>
             </button>
           </div>
         </div>
 
-        <!-- 日期范围（轻量单行折叠卡片） -->
-        <div
-          class="rounded-lg border border-border/40 bg-sidebar-hover/30 p-3 transition-colors duration-150 hover:bg-sidebar-hover/50"
-        >
-          <button
-            type="button"
-            class="flex w-full items-center justify-between text-left"
-            @click="toggleDateSection"
+        <!-- 日期筛选（统一标题 + 触发卡片） -->
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-foreground">
+            {{ t('gallery.toolbar.filters.date') }}
+          </label>
+          <div
+            class="rounded-lg border border-border/30 bg-sidebar-hover/50 transition-colors duration-150"
           >
-            <div class="flex min-w-0 items-center gap-2">
-              <CalendarClock class="size-4 shrink-0 text-muted-foreground" />
-              <span class="text-sm font-medium text-foreground">
-                {{ t('gallery.toolbar.dateFilter.title') }}
-              </span>
-            </div>
-            <div class="flex min-w-0 items-center gap-1.5">
-              <span
-                class="truncate text-xs"
-                :class="hasActiveDateFilter ? 'font-medium text-primary' : 'text-muted-foreground'"
-              >
-                {{ dateFilterSummary }}
-              </span>
+            <button
+              type="button"
+              class="flex h-9.5 w-full items-center justify-between px-3 text-left"
+              @click="toggleDateSection"
+            >
+              <div class="flex min-w-0 items-center gap-2">
+                <CalendarClock class="size-3.5 shrink-0 text-muted-foreground" />
+                <span
+                  class="truncate text-xs"
+                  :class="
+                    hasActiveDateFilter ? 'font-medium text-primary' : 'text-muted-foreground'
+                  "
+                >
+                  {{ dateFilterSummary }}
+                </span>
+              </div>
               <ChevronDown
                 class="size-3.5 text-muted-foreground transition-transform duration-200"
                 :class="dateExpanded ? 'rotate-180' : ''"
               />
-            </div>
-          </button>
+            </button>
 
-          <div v-if="dateExpanded" class="mt-2.5 space-y-2.5 border-t border-border/40 pt-2.5">
-            <RangeCalendar
-              :model-value="draftDateRange"
-              :locale="locale"
-              class="mx-auto w-fit origin-top scale-95 p-0"
-              @update:model-value="onDateRangeChange"
-            />
-            <div class="flex justify-end gap-1.5 pt-1">
-              <Button
-                v-if="hasActiveDateFilter"
-                variant="ghost"
-                size="sm"
-                class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
-                @click="clearDateFilter"
-              >
-                {{ t('gallery.toolbar.dateFilter.clear') }}
-              </Button>
-              <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyDateFilter">
-                {{ t('gallery.toolbar.dateFilter.apply') }}
-              </Button>
+            <div v-if="dateExpanded" class="space-y-2.5 border-t border-border/30 p-3 pt-2.5">
+              <RangeCalendar
+                :model-value="draftDateRange"
+                :locale="locale"
+                class="mx-auto w-fit origin-top scale-95 p-0"
+                @update:model-value="onDateRangeChange"
+              />
+              <div class="flex justify-end gap-1.5 pt-1">
+                <Button
+                  v-if="hasActiveDateFilter"
+                  variant="ghost"
+                  size="sm"
+                  class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
+                  @click="clearDateFilter"
+                >
+                  {{ t('gallery.toolbar.dateFilter.clear') }}
+                </Button>
+                <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyDateFilter">
+                  {{ t('gallery.toolbar.dateFilter.apply') }}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 色彩筛选（轻量单行折叠卡片） -->
-        <div
-          class="rounded-lg border border-border/40 bg-sidebar-hover/30 p-3 transition-colors duration-150 hover:bg-sidebar-hover/50"
-        >
-          <button
-            type="button"
-            class="flex w-full items-center justify-between text-left"
-            @click="toggleColorSection"
+        <!-- 颜色筛选（统一标题 + 触发卡片） -->
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-foreground">
+            {{ t('gallery.toolbar.filters.color') }}
+          </label>
+          <div
+            class="rounded-lg border border-border/30 bg-sidebar-hover/50 transition-colors duration-150"
           >
-            <div class="flex min-w-0 items-center gap-2">
-              <Palette class="size-4 shrink-0 text-muted-foreground" />
-              <span class="text-sm font-medium text-foreground">
-                {{ t('gallery.toolbar.colorFilter.title') }}
-              </span>
-            </div>
-            <div class="flex min-w-0 items-center gap-1.5">
-              <span
-                v-if="activeColorHex"
-                class="size-3 shrink-0 rounded-full border border-border/80 shadow-xs"
-                :style="{ backgroundColor: activeColorHex }"
-              />
-              <span
-                class="truncate text-xs"
-                :class="activeColorHex ? 'font-medium text-primary' : 'text-muted-foreground'"
-              >
-                {{ colorFilterSummary }}
-              </span>
+            <button
+              type="button"
+              class="flex h-9.5 w-full items-center justify-between px-3 text-left"
+              @click="toggleColorSection"
+            >
+              <div class="flex min-w-0 items-center gap-2">
+                <Palette class="size-3.5 shrink-0 text-muted-foreground" />
+                <span
+                  v-if="activeColorHex"
+                  class="size-2.5 shrink-0 rounded-full border border-border/80 shadow-xs"
+                  :style="{ backgroundColor: activeColorHex }"
+                />
+                <span
+                  class="truncate text-xs"
+                  :class="activeColorHex ? 'font-medium text-primary' : 'text-muted-foreground'"
+                >
+                  {{ colorFilterSummary }}
+                </span>
+              </div>
               <ChevronDown
                 class="size-3.5 text-muted-foreground transition-transform duration-200"
                 :class="colorExpanded ? 'rotate-180' : ''"
               />
-            </div>
-          </button>
+            </button>
 
-          <div v-if="colorExpanded" class="mt-2.5 space-y-3 border-t border-border/40 pt-2.5">
-            <ColorPicker
-              :model-value="draftColorHex"
-              @update:model-value="(color) => (draftColorHex = color)"
-            />
-            <div class="space-y-1.5 px-0.5">
-              <div class="flex items-center justify-between text-xs text-sidebar-foreground">
-                <span>{{ t('gallery.toolbar.colorFilter.distance.label') }}</span>
-                <span class="font-mono font-medium text-primary">{{ draftColorDistance }}</span>
-              </div>
-              <Slider
-                :model-value="[draftColorDistance]"
-                :min="COLOR_DISTANCE_MIN"
-                :max="COLOR_DISTANCE_MAX"
-                :step="1"
-                @update:model-value="onColorDistanceChange"
+            <div v-if="colorExpanded" class="space-y-3 border-t border-border/30 p-3 pt-2.5">
+              <ColorPicker
+                :model-value="draftColorHex"
+                @update:model-value="(color) => (draftColorHex = color)"
               />
-            </div>
-            <div class="flex justify-end gap-1.5 pt-1">
-              <Button
-                v-if="activeColorHex"
-                variant="ghost"
-                size="sm"
-                class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
-                @click="clearColorFilter"
-              >
-                {{ t('gallery.toolbar.colorFilter.clear') }}
-              </Button>
-              <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyColorFilter">
-                {{ t('gallery.toolbar.colorFilter.apply') }}
-              </Button>
+              <div class="space-y-1.5 px-0.5">
+                <div class="flex items-center justify-between text-xs text-sidebar-foreground">
+                  <span>{{ t('gallery.toolbar.colorFilter.distance.label') }}</span>
+                  <span class="font-mono font-medium text-primary">{{ draftColorDistance }}</span>
+                </div>
+                <Slider
+                  :model-value="[draftColorDistance]"
+                  :min="COLOR_DISTANCE_MIN"
+                  :max="COLOR_DISTANCE_MAX"
+                  :step="1"
+                  @update:model-value="onColorDistanceChange"
+                />
+              </div>
+              <div class="flex justify-end gap-1.5 pt-1">
+                <Button
+                  v-if="activeColorHex"
+                  variant="ghost"
+                  size="sm"
+                  class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
+                  @click="clearColorFilter"
+                >
+                  {{ t('gallery.toolbar.colorFilter.clear') }}
+                </Button>
+                <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyColorFilter">
+                  {{ t('gallery.toolbar.colorFilter.apply') }}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </ScrollArea>
+
+    <!-- 底部固定操作栏 -->
+    <div class="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+      <Button
+        variant="outline"
+        class="h-10 w-full justify-center gap-2 text-sm font-medium"
+        :disabled="!hasAttributeFilters"
+        @click="clearAttributeFilters"
+      >
+        <RotateCcw class="size-4" />
+        {{ t('gallery.toolbar.filters.clear') }}
+      </Button>
+    </div>
   </MobileDrawer>
 </template>

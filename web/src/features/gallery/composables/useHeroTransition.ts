@@ -10,14 +10,7 @@ interface HeroSource {
   height: number
 }
 
-interface ReverseHeroSource {
-  fromRect: DOMRect
-  toRect: DOMRect
-  thumbnailUrl: string
-}
-
 let pendingHero: HeroSource | null = null
-let pendingReverseHero: ReverseHeroSource | null = null
 export const heroAnimating = ref(false)
 
 export function prepareHero(rect: DOMRect, thumbnailUrl: string, width: number, height: number) {
@@ -29,10 +22,6 @@ export function consumeHero(): HeroSource | null {
   const h = pendingHero
   pendingHero = null
   return h
-}
-
-export function prepareReverseHero(fromRect: DOMRect, toRect: DOMRect, thumbnailUrl: string) {
-  pendingReverseHero = { fromRect, toRect, thumbnailUrl }
 }
 
 export function computeLightboxHeroRect(
@@ -54,12 +43,26 @@ export function computeLightboxHeroRect(
   return new DOMRect(targetX, targetY, targetWidth, targetHeight)
 }
 
-export function consumeReverseHero(): ReverseHeroSource | null {
-  const h = pendingReverseHero
-  pendingReverseHero = null
-  return h
-}
-
 export function endHeroAnimation() {
   heroAnimating.value = false
+}
+
+export function rectToFixedStyle(
+  rect: DOMRect,
+  animation: 'none' | 'enter' | 'exit'
+): Record<string, string> {
+  const transition =
+    animation === 'enter'
+      ? 'left 260ms cubic-bezier(0.22, 1, 0.36, 1), top 260ms cubic-bezier(0.22, 1, 0.36, 1), width 260ms cubic-bezier(0.22, 1, 0.36, 1), height 260ms cubic-bezier(0.22, 1, 0.36, 1)'
+      : animation === 'exit'
+        ? 'left 220ms cubic-bezier(0.4, 0, 0.2, 1), top 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1), height 220ms cubic-bezier(0.4, 0, 0.2, 1)'
+        : 'none'
+
+  return {
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    transition,
+  }
 }

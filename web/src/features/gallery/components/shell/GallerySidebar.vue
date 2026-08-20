@@ -34,6 +34,7 @@ import {
   useGalleryData,
   useGalleryAssetActions,
   useGalleryFolderActions,
+  useGallerySplitPresentation,
 } from '../../composables'
 import { useGalleryOverlayHistory } from '../../composables/useGalleryOverlayHistory'
 import { useGalleryStore } from '../../store'
@@ -63,6 +64,7 @@ const router = useRouter()
 const { sidebarFolderSplitSize } = storeToRefs(galleryStore)
 const { toast } = useToast()
 const { t } = useI18n()
+const { showHandle: showSplitHandle, dividerSize: splitDividerSize } = useGallerySplitPresentation()
 // 侧边栏仍展示图库树，但所有宿主机文件操作都由这个能力开关统一控制。
 const canUseLocalFileSystem = computed(() => isLocalAccess())
 const showMapEntry = computed(
@@ -546,6 +548,8 @@ onMounted(() => {
         :min="effectiveMin"
         :max="effectiveMax"
         :disabled="isSplitDisabled"
+        :divider-size="splitDividerSize"
+        :show-handle="showSplitHandle"
         divider-line-class="bg-transparent"
       >
         <!-- 文件夹区域 -->

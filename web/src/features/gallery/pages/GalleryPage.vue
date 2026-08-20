@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDebounceFn, useWindowSize } from '@vueuse/core'
+import { useDebounceFn, useEventListener, useWindowSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
-import { Button } from '@/components/ui/button'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { Split } from '@/components/ui/split'
-import { useI18n } from '@/composables/useI18n'
-import { X } from '@lucide/vue'
 import { useGalleryData } from '../composables/useGalleryData'
+import { useGallerySplitPresentation } from '../composables/useGallerySplitPresentation'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
 } from '../composables/useGalleryOverlayHistory'
+import { normalizeGalleryInputType } from '../input'
 import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from '../components/shell/GallerySidebar.vue'
@@ -42,10 +41,26 @@ const {
 } = storeToRefs(galleryStore)
 const galleryData = useGalleryData()
 const settingsStore = useSettingsStore()
-const { t } = useI18n()
 const { width: windowWidth } = useWindowSize()
+const { showHandle: showSplitHandle, dividerSize: splitDividerSize } = useGallerySplitPresentation()
 
 watch(windowWidth, (width) => galleryStore.setWindowWidth(width), { immediate: true })
+
+function handleGalleryPointerDown(event: PointerEvent) {
+  if (event.isPrimary === false) {
+    return
+  }
+
+  galleryStore.setRecentInputType(normalizeGalleryInputType(event.pointerType))
+}
+
+function handleGalleryKeydown() {
+  galleryStore.setRecentInputType('keyboard')
+}
+
+// 在图库根页面统一记录最近一次输入，覆盖桌面三栏、移动抽屉和 Teleport 内容。
+useEventListener(window, 'pointerdown', handleGalleryPointerDown, { capture: true })
+useEventListener(window, 'keydown', handleGalleryKeydown, { capture: true })
 
 // 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
@@ -61,6 +76,7 @@ let refreshInFlight = false
 let refreshQueued = false
 
 type SplitSize = number | string
+type SplitDragEvent = MouseEvent | TouchEvent
 
 const compactLayoutSnapshot = ref<{ sidebarOpen: boolean; detailsOpen: boolean } | null>(null)
 
@@ -87,6 +103,14 @@ function isAtMinSize(size: SplitSize, minPx: number): boolean {
     return false
   }
   return px <= minPx + 0.5
+}
+
+function getSplitClientX(event: SplitDragEvent): number | undefined {
+  if ('touches' in event) {
+    return event.touches[0]?.clientX ?? event.changedTouches[0]?.clientX
+  }
+
+  return event.clientX
 }
 
 // 在窗口模式切换时保存/恢复桌面布局，同时让紧凑窗口的文件夹历史成为显隐来源。
@@ -241,18 +265,24 @@ const rightDragStartX = ref<number | null>(null)
 const rightDragStartSizePx = ref<number | null>(null)
 const rightCollapsedByDrag = ref(false)
 
-function handleLeftDragStart(e: MouseEvent) {
-  leftDragStartX.value = e.clientX
+function handleLeftDragStart(e: SplitDragEvent) {
+  const clientX = getSplitClientX(e)
+  if (clientX === undefined) return
+
+  leftDragStartX.value = clientX
   leftDragStartSizePx.value = parsePixelSize(leftSidebarSize.value)
   leftCollapsedByDrag.value = false
 }
 
-function handleLeftDrag(e: MouseEvent) {
+function handleLeftDrag(e: SplitDragEvent) {
   if (leftDragStartX.value === null || leftDragStartSizePx.value === null) {
     return
   }
 
-  const moveToCollapseDirection = leftDragStartX.value - e.clientX
+  const clientX = getSplitClientX(e)
+  if (clientX === undefined) return
+
+  const moveToCollapseDirection = leftDragStartX.value - clientX
   const distanceToMin = Math.max(0, leftDragStartSizePx.value - LEFT_MIN_PX)
   const overshoot = moveToCollapseDirection - distanceToMin
   const currentDragSizePx = leftDragStartSizePx.value - moveToCollapseDirection
@@ -279,18 +309,24 @@ function handleLeftDrag(e: MouseEvent) {
   }
 }
 
-function handleRightDragStart(e: MouseEvent) {
-  rightDragStartX.value = e.clientX
+function handleRightDragStart(e: SplitDragEvent) {
+  const clientX = getSplitClientX(e)
+  if (clientX === undefined) return
+
+  rightDragStartX.value = clientX
   rightDragStartSizePx.value = parsePixelSize(rightDetailsSize.value)
   rightCollapsedByDrag.value = false
 }
 
-function handleRightDrag(e: MouseEvent) {
+function handleRightDrag(e: SplitDragEvent) {
   if (rightDragStartX.value === null || rightDragStartSizePx.value === null) {
     return
   }
 
-  const moveToCollapseDirection = e.clientX - rightDragStartX.value
+  const clientX = getSplitClientX(e)
+  if (clientX === undefined) return
+
+  const moveToCollapseDirection = clientX - rightDragStartX.value
   const distanceToMin = Math.max(0, rightDragStartSizePx.value - RIGHT_MIN_PX)
   const overshoot = moveToCollapseDirection - distanceToMin
   const currentDragSizePx = rightDragStartSizePx.value - moveToCollapseDirection
@@ -366,6 +402,7 @@ const galleryChangedHandler = () => {
 }
 
 function resetGalleryInteraction() {
+  galleryStore.setRecentInputType('mouse')
   galleryStore.exitMultiSelectMode()
   galleryStore.clearSelection()
   galleryStore.clearActiveAsset()
@@ -404,25 +441,10 @@ onUnmounted(() => {
         <MobileDrawer
           :open="isSidebarOpen"
           side="left"
-          class="w-[88vw] max-w-[360px]"
+          class="w-[80vw] max-w-[360px]"
           @close="closeFolderDrawer"
         >
-          <div class="flex h-12 shrink-0 items-center justify-between border-b px-3">
-            <span class="text-sm font-medium">{{ t('app.navigation.gallery') }}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-10 w-10"
-              :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-              @click="closeFolderDrawer"
-            >
-              <X class="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div class="min-h-0 flex-1">
-            <GallerySidebar />
-          </div>
+          <GallerySidebar />
         </MobileDrawer>
       </template>
 
@@ -434,6 +456,8 @@ onUnmounted(() => {
         :min="leftMinSize"
         :max="0.3"
         :disabled="!isSidebarOpen"
+        :divider-size="splitDividerSize"
+        :show-handle="showSplitHandle"
         divider-line-class="bg-transparent"
         pane1-class="surface-middle"
         @drag-start="handleLeftDragStart"
@@ -455,6 +479,8 @@ onUnmounted(() => {
             :min="rightMinSize"
             :max="0.5"
             :disabled="!isDetailsOpen"
+            :divider-size="splitDividerSize"
+            :show-handle="showSplitHandle"
             divider-line-class="bg-transparent"
             pane1-class="surface-middle [--surface-opacity-scale:0.56]"
             pane2-class="surface-middle"

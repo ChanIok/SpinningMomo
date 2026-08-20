@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import {
@@ -9,8 +9,10 @@ import {
 import { useGalleryStore } from '../../store'
 import {
   computeLightboxHeroRect,
+  consumeHero,
+  endHeroAnimation,
   LIGHTBOX_VIEWPORT_PADDING,
-  prepareReverseHero,
+  rectToFixedStyle,
 } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../menus/GalleryAssetContextMenuContent.vue'
@@ -58,10 +60,6 @@ type HeroViewport = {
 
 const props = defineProps<{
   galleryContentRef: GalleryContentRef
-}>()
-
-const emit = defineEmits<{
-  requestReverseHero: []
 }>()
 
 const store = useGalleryStore()
@@ -330,8 +328,7 @@ function animateClose() {
           asset.height ?? 1,
           heroViewport.padding
         )
-        prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
-        emit('requestReverseHero')
+        startExitReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         didReverseHero = true
       }
     }
@@ -665,10 +662,76 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-useEventListener(window, 'keydown', handleKeydown)
-onUnmounted(clearPendingTouchTap)
+const heroOverlay = ref<{ thumbnailUrl: string } | null>(null)
+const heroOverlayStyle = ref<Record<string, string>>({})
+let heroRafId: number | null = null
 
-defineExpose({ getHeroViewport })
+const reverseHeroOverlay = ref<{ thumbnailUrl: string } | null>(null)
+const reverseHeroOverlayStyle = ref<Record<string, string>>({})
+let reverseHeroRafId: number | null = null
+
+function startEnterHero() {
+  const hero = consumeHero()
+  if (!hero) {
+    endHeroAnimation()
+    return
+  }
+
+  const heroViewport = getHeroViewport()
+  if (!heroViewport) {
+    endHeroAnimation()
+    return
+  }
+
+  const toRect = computeLightboxHeroRect(
+    heroViewport.rect,
+    hero.width,
+    hero.height,
+    heroViewport.padding
+  )
+
+  heroOverlay.value = { thumbnailUrl: hero.thumbnailUrl }
+  heroOverlayStyle.value = rectToFixedStyle(hero.rect, 'none')
+
+  heroRafId = requestAnimationFrame(() => {
+    heroRafId = requestAnimationFrame(() => {
+      heroOverlayStyle.value = rectToFixedStyle(toRect, 'enter')
+    })
+  })
+}
+
+function onHeroTransitionEnd() {
+  heroOverlay.value = null
+  endHeroAnimation()
+}
+
+function startExitReverseHero(fromRect: DOMRect, toRect: DOMRect, thumbnailUrl: string) {
+  reverseHeroOverlay.value = { thumbnailUrl }
+  reverseHeroOverlayStyle.value = rectToFixedStyle(fromRect, 'none')
+
+  reverseHeroRafId = requestAnimationFrame(() => {
+    reverseHeroRafId = requestAnimationFrame(() => {
+      reverseHeroOverlayStyle.value = rectToFixedStyle(toRect, 'exit')
+    })
+  })
+}
+
+function onReverseHeroTransitionEnd() {
+  reverseHeroOverlay.value = null
+}
+
+onMounted(async () => {
+  await nextTick()
+  startEnterHero()
+})
+
+useEventListener(window, 'keydown', handleKeydown)
+onUnmounted(() => {
+  clearPendingTouchTap()
+  endHeroAnimation()
+  if (heroRafId !== null) cancelAnimationFrame(heroRafId)
+  if (reverseHeroRafId !== null) cancelAnimationFrame(reverseHeroRafId)
+})
 </script>
 
 <template>
@@ -724,6 +787,26 @@ defineExpose({ getHeroViewport })
               : 'absolute inset-0 overflow-hidden'
           "
         >
+          <!-- Enter hero overlay 正在放大的图片处于媒体视口内 (z-10)，处于上下渐变栏下方 -->
+          <img
+            v-if="heroOverlay"
+            :src="heroOverlay.thumbnailUrl"
+            :style="heroOverlayStyle"
+            class="pointer-events-none fixed z-10 rounded-[4px] object-cover"
+            alt=""
+            @transitionend="onHeroTransitionEnd"
+          />
+
+          <!-- Exit reverse hero overlay 正在飞回缩略图的图片也处于媒体视口内 (z-10)，处于上下渐变栏下方 -->
+          <img
+            v-if="reverseHeroOverlay"
+            :src="reverseHeroOverlay.thumbnailUrl"
+            :style="reverseHeroOverlayStyle"
+            class="pointer-events-none fixed z-10 rounded-[4px] object-cover"
+            alt=""
+            @transitionend="onReverseHeroTransitionEnd"
+          />
+
           <ContextMenu v-if="currentAsset">
             <ContextMenuTrigger as-child :disabled="isTouchInput">
               <div
@@ -770,12 +853,12 @@ defineExpose({ getHeroViewport })
         >
           <Transition
             appear
-            enter-active-class="transition-all duration-300"
-            enter-from-class="translate-y-full opacity-0"
-            enter-to-class="translate-y-0 opacity-100"
-            leave-active-class="transition-all duration-300"
-            leave-from-class="translate-y-0 opacity-100"
-            leave-to-class="translate-y-full opacity-0"
+            enter-active-class="transition-opacity duration-[200ms] ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition-opacity duration-[160ms] ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
           >
             <div
               v-if="isLightboxChromeVisible && isTouchInput && !isClosing"
