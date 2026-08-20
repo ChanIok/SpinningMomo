@@ -45,7 +45,7 @@ const gridCardSize = computed(() => {
   const totalGap = Math.max(0, columns.value - 1) * gap
   const availableWidth = containerWidth.value || scrollContainerRef.value?.clientWidth || 0
 
-  return Math.max(1, Math.floor((availableWidth - totalGap) / Math.max(columns.value, 1)))
+  return Math.max(1, (availableWidth - totalGap) / Math.max(columns.value, 1))
 })
 
 const gridVirtualizer = useGridVirtualizer({
@@ -239,7 +239,7 @@ defineExpose({ scrollToIndex, getCardRect })
           <div
             class="grid"
             :style="{
-              gridTemplateColumns: `repeat(${columns}, ${gridCardSize}px)`,
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
               gap: `${gap}px`,
               justifyContent: 'start',
             }"

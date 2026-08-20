@@ -115,7 +115,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     if (width <= 0) return targetColumnSize.value
 
     const totalGap = Math.max(0, columns.value - 1) * gap
-    return Math.max(1, Math.floor((width - totalGap) / Math.max(columns.value, 1)))
+    return Math.max(1, (width - totalGap) / Math.max(columns.value, 1))
   })
 
   const itemStartByIndex = computed(() => {

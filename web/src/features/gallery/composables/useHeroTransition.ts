@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-// 暗房根节点使用 px-[1px]；真实媒体 viewport 已经是内容盒，不应重复扣除这层边距。
+// PC 暗房根节点使用 px-[1px]；紧凑模式不保留这层边距。真实媒体 viewport 已经是内容盒，不应重复扣除。
 export const LIGHTBOX_VIEWPORT_PADDING = 1
 
 interface HeroSource {

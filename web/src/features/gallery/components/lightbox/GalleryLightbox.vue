@@ -166,8 +166,11 @@ const lightboxRootClass = computed(() => {
   const immersive = isImmersive.value
   const closing = store.lightbox.isClosing
   let cls = immersive
-    ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl px-[1px]'
-    : 'absolute inset-0 z-10 flex h-full w-full overflow-hidden px-[1px]'
+    ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
+    : 'absolute inset-0 z-10 flex h-full w-full overflow-hidden'
+  if (!store.isCompactWindow) {
+    cls += ' px-[1px]'
+  }
   if (immersive && closing) {
     cls += ' pointer-events-none opacity-0 transition-opacity duration-[280ms] ease-out'
   }
@@ -428,9 +431,11 @@ function getHeroViewport(): HeroViewport | null {
     return null
   }
 
+  const rootViewportPadding = store.isCompactWindow ? 0 : LIGHTBOX_VIEWPORT_PADDING
+
   return {
     rect: element.getBoundingClientRect(),
-    padding: element === mediaViewport ? 0 : LIGHTBOX_VIEWPORT_PADDING,
+    padding: element === mediaViewport ? 0 : rootViewportPadding,
   }
 }
 
