@@ -56,6 +56,10 @@ auto is_valid_review_flag(const std::string& review_flag) -> bool {
   return review_flag == "none" || review_flag == "picked" || review_flag == "rejected";
 }
 
+auto is_valid_shape(const std::string& shape) -> bool {
+  return shape == "landscape" || shape == "portrait" || shape == "square";
+}
+
 auto build_query_order_config(std::optional<std::string> sort_by_param,
                               std::optional<std::string> sort_order_param) -> QueryOrderConfig {
   QueryOrderConfig config{
@@ -125,6 +129,8 @@ auto build_unified_where_clause(const features::gallery::QueryAssetsFilters& fil
   const auto created_at_expr =
       std::format("COALESCE({}, {})", file_created_at_column, created_at_column);
   const auto type_column = qualify_asset_column("type", asset_table_alias);
+  const auto width_column = qualify_asset_column("width", asset_table_alias);
+  const auto height_column = qualify_asset_column("height", asset_table_alias);
   const auto name_column = qualify_asset_column("name", asset_table_alias);
   const auto id_column = qualify_asset_column("id", asset_table_alias);
   const auto rating_column = qualify_asset_column("rating", asset_table_alias);
@@ -187,6 +193,24 @@ auto build_unified_where_clause(const features::gallery::QueryAssetsFilters& fil
   if (filters.type.has_value() && !filters.type->empty()) {
     conditions.push_back(type_column + " = ?");
     params.push_back(filters.type.value());
+  }
+
+  if (filters.shape.has_value() && !filters.shape->empty()) {
+    if (!is_valid_shape(filters.shape.value())) {
+      return std::unexpected("Shape filter must be one of landscape, portrait, square");
+    }
+
+    const auto dimensions_known = std::format("{} > 0 AND {} > 0", width_column, height_column);
+    if (filters.shape.value() == "landscape") {
+      conditions.push_back(
+          std::format("{} AND {} > {}", dimensions_known, width_column, height_column));
+    } else if (filters.shape.value() == "portrait") {
+      conditions.push_back(
+          std::format("{} AND {} < {}", dimensions_known, width_column, height_column));
+    } else {
+      conditions.push_back(
+          std::format("{} AND {} = {}", dimensions_known, width_column, height_column));
+    }
   }
 
   if (filters.search.has_value() && !filters.search->empty()) {

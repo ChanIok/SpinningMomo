@@ -1,4 +1,4 @@
-import type { Asset, AssetType, ReviewFlag, SortBy, SortOrder, Tag } from '../types'
+import type { Asset, AssetShape, AssetType, ReviewFlag, SortBy, SortOrder, Tag } from '../types'
 
 // =========================
 // Gallery API DTO (RPC types)
@@ -248,6 +248,7 @@ export interface QueryAssetsFilters {
   createdAtFrom?: number
   createdAtTo?: number
   type?: AssetType // photo, video, live_photo
+  shape?: AssetShape
   search?: string // 搜索关键词
   ratings?: number[]
   reviewFlag?: ReviewFlag
@@ -319,6 +320,7 @@ export interface GetTimelineBucketsParams {
   createdAtFrom?: number
   createdAtTo?: number
   type?: AssetType
+  shape?: AssetShape
   search?: string
   ratings?: number[]
   reviewFlag?: ReviewFlag
@@ -343,6 +345,7 @@ export interface GetAssetsByMonthParams {
   createdAtFrom?: number
   createdAtTo?: number
   type?: AssetType
+  shape?: AssetShape
   search?: string
   ratings?: number[]
   reviewFlag?: ReviewFlag

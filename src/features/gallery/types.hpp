@@ -358,6 +358,7 @@ struct TimelineBucketsParams {
   std::optional<std::int64_t> created_at_from;
   std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;
+  std::optional<std::string> shape;  // "landscape" | "portrait" | "square"
   std::optional<std::string> search;
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星
   std::optional<std::string> review_flag;
@@ -382,6 +383,7 @@ struct GetAssetsByMonthParams {
   std::optional<std::int64_t> created_at_from;
   std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;
+  std::optional<std::string> shape;  // "landscape" | "portrait" | "square"
   std::optional<std::string> search;
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星
   std::optional<std::string> review_flag;
@@ -408,6 +410,7 @@ struct QueryAssetsFilters {
   std::optional<std::int64_t> created_at_from;
   std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;          // "photo" | "video" | "live_photo"
+  std::optional<std::string> shape;         // "landscape" | "portrait" | "square"
   std::optional<std::string> search;        // 搜索关键词
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星
   std::optional<std::string> review_flag;   // "none" | "picked" | "rejected"

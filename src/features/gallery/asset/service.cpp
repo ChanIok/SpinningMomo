@@ -220,6 +220,7 @@ auto get_timeline_buckets(core::AppState& app_state, const TimelineBucketsParams
   filters.created_at_from = params.created_at_from;
   filters.created_at_to = params.created_at_to;
   filters.type = params.type;
+  filters.shape = params.shape;
   filters.search = params.search;
   filters.ratings = params.ratings;
   filters.review_flag = params.review_flag;
@@ -294,6 +295,7 @@ auto get_assets_by_month(core::AppState& app_state, const GetAssetsByMonthParams
   query_params.filters.created_at_from = params.created_at_from;
   query_params.filters.created_at_to = params.created_at_to;
   query_params.filters.type = params.type;
+  query_params.filters.shape = params.shape;
   query_params.filters.search = params.search;
   query_params.filters.ratings = params.ratings;
   query_params.filters.review_flag = params.review_flag;

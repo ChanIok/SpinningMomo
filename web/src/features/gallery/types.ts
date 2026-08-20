@@ -36,6 +36,8 @@ export interface Asset {
 // 资产类型枚举
 export type AssetType = 'photo' | 'video' | 'live_photo' | 'unknown'
 
+export type AssetShape = 'landscape' | 'portrait' | 'square'
+
 export type ReviewFlag = 'none' | 'picked' | 'rejected'
 
 // 文件夹类型
@@ -130,6 +132,7 @@ export type SortOrder = 'asc' | 'desc'
 // 筛选器
 export interface AssetFilter {
   type?: AssetType // photo, video, live_photo, unknown
+  shape?: AssetShape
   searchQuery?: string
   folderId?: string
   createdAtFrom?: number

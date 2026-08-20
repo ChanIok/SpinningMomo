@@ -7,6 +7,7 @@ export function hasActiveAssetFilter(filter: AssetFilter): boolean {
     filter.createdAtFrom !== undefined ||
     filter.createdAtTo !== undefined ||
     filter.type !== undefined ||
+    filter.shape !== undefined ||
     (filter.ratings?.length ?? 0) > 0 ||
     filter.reviewFlag !== undefined ||
     (filter.tagIds?.length ?? 0) > 0 ||
@@ -24,6 +25,7 @@ export function toQueryAssetsFilters(
     createdAtFrom: filter.createdAtFrom,
     createdAtTo: filter.createdAtTo,
     type: filter.type,
+    shape: filter.shape,
     search: filter.searchQuery,
     ratings: filter.ratings,
     reviewFlag: filter.reviewFlag,

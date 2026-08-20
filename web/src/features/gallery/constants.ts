@@ -2,7 +2,7 @@
 export const GALLERY_WINDOW_COMPACT_BREAKPOINT = 640
 
 /** 图库内部工具栏开始压缩的内容宽度边界；它不参与窗口级布局切换。 */
-export const GALLERY_TOOLBAR_COMPACT_BREAKPOINT = 640
+export const GALLERY_TOOLBAR_COMPACT_BREAKPOINT = 768
 
 /** 缩略图卡片在常规布局下的几何间距。 */
 export const GALLERY_CARD_GAP = 12

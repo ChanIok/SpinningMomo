@@ -303,6 +303,7 @@ export function useGalleryData() {
         createdAtFrom: filters.createdAtFrom,
         createdAtTo: filters.createdAtTo,
         type: filters.type,
+        shape: filters.shape,
         search: filters.search,
         ratings: filters.ratings,
         reviewFlag: filters.reviewFlag,

@@ -34,6 +34,7 @@ import {
   Palette,
   Search,
   Settings,
+  Square,
   Star,
   Tag,
   Type,
@@ -82,6 +83,9 @@ const {
   clearSearchFromTrigger,
   onTypeFilterChange,
   clearTypeFilter,
+  shapeFilterLabel,
+  onShapeFilterChange,
+  clearShapeFilter,
   onReviewFlagChange,
   clearReviewFlagFilter,
   isRatingSelected,
@@ -503,6 +507,61 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Tooltip>
               <TooltipTrigger as-child>
                 <span class="inline-flex">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button
+                        :variant="filter.shape ? 'toolbarFilterActive' : 'toolbarFilter'"
+                        :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                      >
+                        <Square class="h-4 w-4" />
+                        <template v-if="!isFilterCompact">
+                          <span class="min-w-0 truncate">{{ shapeFilterLabel }}</span>
+                          <span
+                            v-if="filter.shape"
+                            class="-mr-1 rounded p-0.5 hover:text-foreground"
+                            @pointerdown.stop.prevent
+                            @click="clearShapeFilter"
+                          >
+                            <X class="h-3.5 w-3.5" />
+                          </span>
+                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                        </template>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" class="w-40">
+                      <DropdownMenuRadioGroup
+                        :model-value="filter.shape || 'all'"
+                        @update:model-value="onShapeFilterChange"
+                      >
+                        <DropdownMenuRadioItem value="all">
+                          {{ t('gallery.toolbar.filter.shape.all') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="landscape">
+                          {{ t('gallery.toolbar.filter.shape.landscape') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="portrait">
+                          {{ t('gallery.toolbar.filter.shape.portrait') }}
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="square">
+                          {{ t('gallery.toolbar.filter.shape.square') }}
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent v-if="isFilterCompact" side="bottom">
+                {{
+                  filter.shape
+                    ? `${t('gallery.toolbar.filters.shape')}: ${shapeFilterLabel}`
+                    : t('gallery.toolbar.filters.shape')
+                }}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex">
                   <Popover v-model:open="colorPopoverOpen">
                     <PopoverTrigger as-child>
                       <Button
@@ -771,11 +830,9 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           {{ t('gallery.toolbar.filter.flag.all') }}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="rejected">
-                          <X class="mr-2 h-4 w-4" />
                           {{ t('gallery.toolbar.filter.flag.rejected') }}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="none">
-                          <Flag class="mr-2 h-4 w-4" />
                           {{ t('gallery.toolbar.filter.flag.none') }}
                         </DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>

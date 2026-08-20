@@ -3,7 +3,7 @@ import { CalendarDate } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
-import type { AssetFilter, AssetType, ReviewFlag } from '../types'
+import type { AssetFilter, AssetShape, AssetType, ReviewFlag } from '../types'
 
 export const COLOR_DISTANCE_MIN = 1
 export const COLOR_DISTANCE_MAX = 40
@@ -43,6 +43,7 @@ export function useGalleryFilterControls() {
       Boolean(searchQuery.value),
       activeDateFrom.value !== undefined || activeDateTo.value !== undefined,
       filter.value.type !== undefined,
+      filter.value.shape !== undefined,
       selectedRatings.value.length > 0,
       filter.value.reviewFlag !== undefined,
       Boolean(filter.value.colorHex),
@@ -51,6 +52,7 @@ export function useGalleryFilterControls() {
   const hasAttributeFilters = computed(() => activeFilterCount.value > 0)
 
   const typeFilterLabel = computed(() => getTypeLabel(filter.value.type))
+  const shapeFilterLabel = computed(() => getShapeLabel(filter.value.shape))
   const ratingFilterLabel = computed(() => getRatingLabel(selectedRatings.value))
   const reviewFlagFilterLabel = computed(() => getReviewFlagLabel(filter.value.reviewFlag))
 
@@ -104,6 +106,13 @@ export function useGalleryFilterControls() {
     if (type === 'photo') return t('gallery.toolbar.filter.type.photo')
     if (type === 'video') return t('gallery.toolbar.filter.type.video')
     return t('gallery.toolbar.filters.fileType')
+  }
+
+  function getShapeLabel(shape?: AssetShape): string {
+    if (shape === 'landscape') return t('gallery.toolbar.filter.shape.landscape')
+    if (shape === 'portrait') return t('gallery.toolbar.filter.shape.portrait')
+    if (shape === 'square') return t('gallery.toolbar.filter.shape.square')
+    return t('gallery.toolbar.filters.shape')
   }
 
   function getRatingLabel(ratings: number[]): string {
@@ -260,6 +269,18 @@ export function useGalleryFilterControls() {
     store.setFilter({ type: undefined })
   }
 
+  function onShapeFilterChange(value: string | number | bigint | Record<string, any> | null) {
+    const stringValue = String(value || 'all')
+    const shape = stringValue === 'all' ? undefined : (stringValue as AssetShape)
+    store.setFilter({ shape })
+  }
+
+  function clearShapeFilter(event?: Event) {
+    event?.preventDefault()
+    event?.stopPropagation()
+    store.setFilter({ shape: undefined })
+  }
+
   function onReviewFlagChange(value: string | number | bigint | Record<string, any> | null) {
     const stringValue = String(value || 'all')
     store.setFilter({ reviewFlag: stringValue === 'all' ? undefined : (stringValue as ReviewFlag) })
@@ -321,6 +342,7 @@ export function useGalleryFilterControls() {
       createdAtFrom: undefined,
       createdAtTo: undefined,
       type: undefined,
+      shape: undefined,
       ratings: undefined,
       reviewFlag: undefined,
       colorHex: undefined,
@@ -340,6 +362,7 @@ export function useGalleryFilterControls() {
     activeDateTo,
     selectedRatings,
     typeFilterLabel,
+    shapeFilterLabel,
     ratingFilterLabel,
     reviewFlagFilterLabel,
     activeFilterCount,
@@ -361,6 +384,8 @@ export function useGalleryFilterControls() {
     clearSearchFromTrigger,
     onTypeFilterChange,
     clearTypeFilter,
+    onShapeFilterChange,
+    clearShapeFilter,
     onReviewFlagChange,
     clearReviewFlagFilter,
     isRatingSelected,

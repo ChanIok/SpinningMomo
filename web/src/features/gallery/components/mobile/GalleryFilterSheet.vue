@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { CalendarClock, ChevronDown, Image, Palette, Search, Star, Video, X } from '@lucide/vue'
+import {
+  CalendarClock,
+  ChevronDown,
+  Image,
+  Palette,
+  Search,
+  Square,
+  Star,
+  Video,
+  X,
+} from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -32,6 +42,7 @@ const {
   updateSearchQuery,
   clearSearch,
   onTypeFilterChange,
+  onShapeFilterChange,
   onReviewFlagChange,
   isRatingSelected,
   toggleRatingFilter,
@@ -81,6 +92,10 @@ function setType(value: string) {
   onTypeFilterChange(value)
 }
 
+function setShape(value: string) {
+  onShapeFilterChange(value)
+}
+
 function setReviewFlag(value: string) {
   onReviewFlagChange(value)
 }
@@ -109,6 +124,13 @@ const mediaTypeOptions = computed<MediaTypeOption[]>(() => [
   { value: 'all', label: t('gallery.toolbar.filter.type.all') },
   { value: 'photo', label: t('gallery.toolbar.filter.type.photo'), icon: Image },
   { value: 'video', label: t('gallery.toolbar.filter.type.video'), icon: Video },
+])
+
+const shapeOptions = computed(() => [
+  { value: 'all', label: t('gallery.toolbar.filter.shape.all') },
+  { value: 'landscape', label: t('gallery.toolbar.filter.shape.landscape') },
+  { value: 'portrait', label: t('gallery.toolbar.filter.shape.portrait') },
+  { value: 'square', label: t('gallery.toolbar.filter.shape.square') },
 ])
 
 const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
@@ -222,6 +244,32 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
               @click="setType(opt.value)"
             >
               <component :is="opt.icon" v-if="opt.icon" class="size-3.5" />
+              <span>{{ opt.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 形状（按素材宽高方向单选） -->
+        <div class="space-y-2">
+          <label class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <Square class="size-3.5 text-muted-foreground" />
+            {{ t('gallery.toolbar.filters.shape') }}
+          </label>
+          <div
+            class="grid grid-cols-4 gap-1 rounded-lg border border-border/30 bg-sidebar-hover/50 p-1"
+          >
+            <button
+              v-for="opt in shapeOptions"
+              :key="opt.value"
+              type="button"
+              class="flex h-8.5 items-center justify-center rounded-md text-xs font-medium transition-colors duration-150"
+              :class="
+                (filter.shape || 'all') === opt.value
+                  ? 'bg-sidebar-accent font-medium text-primary shadow-xs'
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+              "
+              @click="setShape(opt.value)"
+            >
               <span>{{ opt.label }}</span>
             </button>
           </div>
