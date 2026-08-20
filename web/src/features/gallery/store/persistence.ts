@@ -82,9 +82,6 @@ export function applySettingsDefaults<T>(stored: unknown, defaults: T): T {
   ) as T
 }
 
-export const LIGHTBOX_MIN_ZOOM = 0.05
-export const LIGHTBOX_MAX_ZOOM = 5
-
 export function collectTreeIds<T extends { id: number; children: T[] }>(nodes: T[]): number[] {
   const ids: number[] = []
 

@@ -17,3 +17,7 @@ export const GALLERY_VIEW_SIZE_MAX = 768
 /** 紧凑图库使用更小的下限，并将尺寸上限控制在紧凑布局的有效宽度内。 */
 export const GALLERY_COMPACT_VIEW_SIZE_MIN = 80
 export const GALLERY_COMPACT_VIEW_SIZE_MAX = 480
+
+/** 暗房实际缩放比例的统一边界；交互层和视图层共用同一份定义。 */
+export const LIGHTBOX_MIN_ZOOM = 0.05
+export const LIGHTBOX_MAX_ZOOM = 5

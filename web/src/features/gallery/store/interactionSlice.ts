@@ -7,7 +7,7 @@ import type {
   BatchSelectionSummary,
 } from '../types'
 import { isGalleryTouchInput, type GalleryInputType } from '../input'
-import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
+import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from '../constants'
 
 interface InteractionSliceArgs {
   // interaction 依赖 query 结果集做局部 patch 与 lightbox 边界裁剪。
