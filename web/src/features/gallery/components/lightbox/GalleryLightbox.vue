@@ -43,8 +43,6 @@ const CLOSE_AFTER_REVERSE_HERO_MS = 260
 const CLOSE_AFTER_NO_HERO_MS = 180
 /** 静态图单击先等待双击窗口，避免双击时 chrome 先闪一次。 */
 const TOUCH_SINGLE_TAP_DELAY_MS = 300
-/** 抽屉进入动画完成后再挂载详情树，避免重组件参与首帧位移动画。 */
-const DETAILS_CONTENT_DELAY_MS = 260
 /** 下拉未提交时让媒体表面回到原位的动画时长。 */
 const VERTICAL_GESTURE_SNAPBACK_MS = 220
 
@@ -84,8 +82,6 @@ const mediaGestureSurfaceRef = ref<HTMLElement | null>(null)
 const mobileDetailsOpen = computed(
   () => overlayHistory.snapshot.value.overlay === 'lightbox-details'
 )
-const detailsContentReady = ref(false)
-let detailsContentTimer: number | null = null
 let verticalGestureOffset = 0
 let verticalGesturePhase: VerticalGesturePhase = 'idle'
 let verticalGestureRafId: number | null = null
@@ -176,42 +172,6 @@ const lightboxRootClass = computed(() => {
   }
   return cls
 })
-
-function clearDetailsContentTimer() {
-  if (detailsContentTimer !== null) {
-    window.clearTimeout(detailsContentTimer)
-    detailsContentTimer = null
-  }
-}
-
-function scheduleDetailsContentMount() {
-  clearDetailsContentTimer()
-  detailsContentReady.value = false
-
-  if (!mobileDetailsOpen.value || isClosing.value) {
-    return
-  }
-
-  detailsContentTimer = window.setTimeout(() => {
-    detailsContentTimer = null
-    if (mobileDetailsOpen.value && !isClosing.value) {
-      detailsContentReady.value = true
-    }
-  }, DETAILS_CONTENT_DELAY_MS)
-}
-
-watch(
-  mobileDetailsOpen,
-  (open) => {
-    if (open) {
-      scheduleDetailsContentMount()
-    } else {
-      clearDetailsContentTimer()
-      detailsContentReady.value = false
-    }
-  },
-  { immediate: true }
-)
 
 watch(
   () => store.lightbox.isOpen,
@@ -988,7 +948,6 @@ onMounted(async () => {
 useEventListener(window, 'keydown', handleKeydown)
 onUnmounted(() => {
   clearPendingTouchTap()
-  clearDetailsContentTimer()
   clearVerticalGestureResetTimer()
   clearVerticalGestureFrame()
   pendingExitGestureOffset = null
@@ -1191,21 +1150,7 @@ onUnmounted(() => {
           </div>
 
           <div class="min-h-0 flex-1">
-            <div
-              v-if="!detailsContentReady"
-              class="flex h-full items-center justify-center p-6"
-              aria-live="polite"
-            >
-              <div class="w-full max-w-sm space-y-3" aria-hidden="true">
-                <div class="h-5 w-1/3 animate-pulse rounded bg-muted" />
-                <div class="h-40 animate-pulse rounded-lg bg-muted/70" />
-                <div class="space-y-2">
-                  <div class="h-3 animate-pulse rounded bg-muted/70" />
-                  <div class="h-3 w-4/5 animate-pulse rounded bg-muted/70" />
-                </div>
-              </div>
-            </div>
-            <GalleryDetails v-else :defer-secondary-details="true" />
+            <GalleryDetails />
           </div>
         </MobileDrawer>
       </div>

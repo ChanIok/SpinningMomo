@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -30,14 +30,6 @@ import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
 import type { Asset, AssetMainColor, FolderTreeNode, Tag, TagTreeNode } from '../../types'
 import type { InfinityNikkiDetails } from '@/extensions/infinity_nikki/types'
 
-const props = withDefaults(
-  defineProps<{
-    /** 暗房抽屉先完成位移动画，再挂载非首屏扩展内容。 */
-    deferSecondaryDetails?: boolean
-  }>(),
-  { deferSecondaryDetails: false }
-)
-
 const store = useGalleryStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
@@ -46,7 +38,6 @@ const assetActions = useGalleryAssetActions()
 
 const ROOT_FOLDER_ID = -1
 const ROOT_TAG_ID = -1
-const SECONDARY_DETAILS_DELAY_MS = 180
 
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
@@ -112,36 +103,10 @@ const activeAsset = computed(() => {
   const focus = detailsFocus.value
   return focus.type === 'asset' ? findLoadedAssetById(focus.assetId) : null
 })
+const activeAssetId = computed(() => activeAsset.value?.id)
 
-const secondaryDetailsReady = ref(!props.deferSecondaryDetails)
-let secondaryDetailsTimer: number | null = null
 let assetDetailsRequestToken = 0
 let infinityNikkiRequestToken = 0
-
-function clearSecondaryDetailsTimer() {
-  if (secondaryDetailsTimer !== null) {
-    window.clearTimeout(secondaryDetailsTimer)
-    secondaryDetailsTimer = null
-  }
-}
-
-function scheduleSecondaryDetails() {
-  clearSecondaryDetailsTimer()
-  secondaryDetailsReady.value = !props.deferSecondaryDetails
-
-  if (!props.deferSecondaryDetails || !activeAsset.value) {
-    return
-  }
-
-  secondaryDetailsTimer = window.setTimeout(() => {
-    secondaryDetailsTimer = null
-    secondaryDetailsReady.value = true
-  }, SECONDARY_DETAILS_DELAY_MS)
-}
-
-const shouldRenderSecondaryDetails = computed(
-  () => !props.deferSecondaryDetails || secondaryDetailsReady.value
-)
 
 // 使用gallery数据composable
 const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
@@ -313,18 +278,18 @@ async function reloadBatchSummary() {
   }
 }
 
-// 资产切换时先加载首屏标签和主色；扩展详情与直方图等非首屏内容另起一拍。
+// 资产切换时保留上一份异步详情，等当前资产结果返回后再替换，避免详情布局跳动。
 watch(
-  activeAsset,
-  async (asset) => {
+  activeAssetId,
+  async () => {
+    const asset = activeAsset.value
     const requestToken = ++assetDetailsRequestToken
     infinityNikkiRequestToken += 1
-    scheduleSecondaryDetails()
     assetTags.value = []
-    assetMainColors.value = []
-    infinityNikkiDetails.value = null
 
     if (!asset) {
+      assetMainColors.value = []
+      infinityNikkiDetails.value = null
       return
     }
 
@@ -343,6 +308,7 @@ watch(
       if (requestToken !== assetDetailsRequestToken) {
         return
       }
+      assetMainColors.value = []
       console.error('Failed to load asset details:', error)
     }
   },
@@ -350,10 +316,11 @@ watch(
 )
 
 watch(
-  [activeAsset, infinityNikkiEnabled, secondaryDetailsReady],
-  async ([asset, nikkiEnabled, secondaryReady]) => {
+  [activeAssetId, infinityNikkiEnabled],
+  async ([assetId, nikkiEnabled]) => {
+    const asset = activeAsset.value
     const requestToken = ++infinityNikkiRequestToken
-    if (!asset || !nikkiEnabled || !secondaryReady) {
+    if (assetId === undefined || !asset || !nikkiEnabled) {
       infinityNikkiDetails.value = null
       return
     }
@@ -377,17 +344,6 @@ watch(
   },
   { immediate: true }
 )
-
-watch(
-  () => props.deferSecondaryDetails,
-  () => {
-    scheduleSecondaryDetails()
-  }
-)
-
-onBeforeUnmount(() => {
-  clearSecondaryDetailsTimer()
-})
 
 watch(
   () => store.assetTagsVersion,
@@ -902,18 +858,13 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
           <template #after-info>
             <AssetInfinityNikkiDetails
-              v-if="
-                shouldRenderSecondaryDetails &&
-                infinityNikkiEnabled &&
-                infinityNikkiDetails &&
-                activeAsset
-              "
+              v-if="infinityNikkiEnabled && infinityNikkiDetails && activeAsset"
               :asset-id="activeAsset.id"
               :details="infinityNikkiDetails"
               @updated="handleInfinityNikkiDetailsUpdated"
             />
 
-            <template v-if="shouldRenderSecondaryDetails && shouldShowAssetHistogram">
+            <template v-if="shouldShowAssetHistogram">
               <AssetHistogram :cache-key="assetHistogramCacheKey" :image-url="thumbnailUrl" />
             </template>
           </template>

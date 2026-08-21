@@ -62,8 +62,6 @@ interface PanSample {
 interface PanMoveResult {
   /** 图片到达水平边界后仍未消费的手指位移。 */
   residualX: number
-  /** 图片到达垂直边界后仍未消费的手指位移。 */
-  residualY: number
 }
 
 type TouchPointerPair = readonly [TouchPointer, TouchPointer]
@@ -1249,7 +1247,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
 
   function movePan(event: PointerEvent): PanMoveResult {
     if (activePointerId.value !== event.pointerId || !viewportRef.value) {
-      return { residualX: 0, residualY: 0 }
+      return { residualX: 0 }
     }
 
     const viewport = viewportRef.value
@@ -1270,7 +1268,6 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     // 保留 clamp 丢弃的位移，让外层 Pager 在图片边界把同一次手势接走。
     return {
       residualX: deltaX + (nextScrollLeft - dragStartScrollLeft.value),
-      residualY: deltaY + (nextScrollTop - dragStartScrollTop.value),
     }
   }
 

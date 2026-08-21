@@ -51,7 +51,6 @@ type PanAxis = 'horizontal' | 'vertical'
 
 interface PanMoveResult {
   residualX: number
-  residualY: number
 }
 
 interface UseLightboxSwipeNavigationOptions {
@@ -69,7 +68,7 @@ interface UseLightboxSwipeNavigationOptions {
   onPanMove?: (event: PointerEvent) => PanMoveResult | void
   onPanEnd?: (event: PointerEvent) => void
   onPanCancel?: () => void
-  onVerticalGestureMove?: (offsetY: number, progress: number) => void
+  onVerticalGestureMove?: (offsetY: number) => void
   onVerticalGestureCancel?: (offsetY: number) => void
   onVerticalGestureCommit?: (action: LightboxVerticalGestureAction, offsetY: number) => void
   onPinchStart?: (pointers: TouchPointerPair) => void
@@ -447,8 +446,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
   function updateVerticalGesture(event: PointerEvent, deltaY: number) {
     verticalGestureOffset = getVerticalGestureOffset(deltaY)
-    const progress = clamp(Math.abs(deltaY) / getVerticalCommitDistance(), 0, 1)
-    onVerticalGestureMove?.(verticalGestureOffset, progress)
+    onVerticalGestureMove?.(verticalGestureOffset)
     event.preventDefault()
   }
 
@@ -934,7 +932,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
           suppressClick.value = true
           scheduleSuppressClickReset()
           verticalGestureOffset = 0
-          onVerticalGestureMove?.(0, 0)
+          onVerticalGestureMove?.(0)
           logGesture('classified-as-vertical-action', event, { deltaX, deltaY })
           updateVerticalGesture(event, deltaY)
           return

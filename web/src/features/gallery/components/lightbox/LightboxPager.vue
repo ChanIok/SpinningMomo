@@ -11,7 +11,6 @@ import LightboxVideo from './LightboxVideo.vue'
 
 interface PanMoveResult {
   residualX: number
-  residualY: number
 }
 
 interface LightboxImageExposed {
@@ -52,7 +51,7 @@ const { width, height } = useElementSize(pagerRef)
 
 const emit = defineEmits<{
   'touch-tap': [isDoubleTap: boolean]
-  'vertical-gesture-move': [offsetY: number, progress: number]
+  'vertical-gesture-move': [offsetY: number]
   'vertical-gesture-cancel': [offsetY: number]
   'vertical-gesture-commit': [action: LightboxVerticalGestureAction, offsetY: number]
 }>()
@@ -173,8 +172,8 @@ const {
   onPanCancel: () => {
     imageRef.value?.cancelPan()
   },
-  onVerticalGestureMove: (offsetY, progress) => {
-    emit('vertical-gesture-move', offsetY, progress)
+  onVerticalGestureMove: (offsetY) => {
+    emit('vertical-gesture-move', offsetY)
   },
   onVerticalGestureCancel: (offsetY) => {
     emit('vertical-gesture-cancel', offsetY)
