@@ -10,6 +10,7 @@ const CARD_IMAGE_LOAD_IDLE_MS = 100
 const THUMBNAIL_BATCH_SIZE = 6
 const THUMBNAIL_PRELOAD_VIEWPORT_RATIO = 0.5
 const ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO = 0.5
+const COMPACT_ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO = 1
 
 export interface CardImageScheduleItem {
   assetId: number
@@ -22,7 +23,8 @@ export interface CardImageScheduleItem {
 // 控制卡片缩略图与原图覆盖层的加载许可，避免滚动热路径一次启动大量图片管线。
 export function useCardImageScheduler(
   containerRef: Ref<HTMLElement | null>,
-  originalEnabled: Ref<boolean>
+  originalEnabled: Ref<boolean>,
+  isCompactWindow: Ref<boolean>
 ) {
   const isScrollIdle = ref(true)
   const allowedThumbnailAssetIds = ref<Set<number>>(new Set())
@@ -68,6 +70,12 @@ export function useCardImageScheduler(
     allowedThumbnailAssetIds.value = nextAllowedIds
   }
 
+  function getOriginalPreloadViewportRatio(): number {
+    return isCompactWindow.value
+      ? COMPACT_ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO
+      : ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO
+  }
+
   // 只保留当前原图预热范围内的许可，避免滚动时重复取消仍然相关的卡片。
   function pruneOriginalPermissions() {
     const container = containerRef.value
@@ -81,7 +89,7 @@ export function useCardImageScheduler(
     for (const item of latestItems) {
       if (
         currentAllowedIds.has(item.assetId) &&
-        isItemInViewport(item, ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO)
+        isItemInViewport(item, getOriginalPreloadViewportRatio())
       ) {
         nextAllowedIds.add(item.assetId)
       }
@@ -153,7 +161,7 @@ export function useCardImageScheduler(
       if (
         seenAssetIds.has(item.assetId) ||
         allowedOriginalAssetIds.value.has(item.assetId) ||
-        !isItemInViewport(item, ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO) ||
+        !isItemInViewport(item, getOriginalPreloadViewportRatio()) ||
         !isItemWorthOriginalLoad(item)
       ) {
         continue
@@ -251,7 +259,7 @@ export function useCardImageScheduler(
       if (
         signal.aborted ||
         runVersion !== originalScheduleVersion ||
-        !isItemInViewport(item, ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO)
+        !isItemInViewport(item, getOriginalPreloadViewportRatio())
       ) {
         return
       }
@@ -261,7 +269,7 @@ export function useCardImageScheduler(
           if (
             signal.aborted ||
             runVersion !== originalScheduleVersion ||
-            !isItemInViewport(item, ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO)
+            !isItemInViewport(item, getOriginalPreloadViewportRatio())
           ) {
             return
           }
@@ -350,6 +358,15 @@ export function useCardImageScheduler(
     },
     { immediate: true }
   )
+
+  watch(isCompactWindow, () => {
+    cancelOriginalSchedule()
+    pruneOriginalPermissions()
+
+    if (originalEnabled.value && isScrollIdle.value) {
+      void runOriginalSchedule()
+    }
+  })
 
   onBeforeUnmount(() => {
     if (scrollIdleTimer !== null) {

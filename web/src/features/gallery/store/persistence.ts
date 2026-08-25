@@ -38,7 +38,7 @@ export function createDefaultGallerySettings(): GallerySettings {
     view: {
       size: 256,
       mode: 'grid' satisfies ViewMode,
-      useOriginalImagesForCards: false,
+      useOriginalImagesForCards: true,
       showRatingBadge: true,
       showDyeCodeBadge: true,
       showTagBadges: true,

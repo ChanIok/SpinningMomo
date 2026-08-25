@@ -57,7 +57,8 @@ const gridVirtualizer = useGridVirtualizer({
 })
 const cardImageScheduler = useCardImageScheduler(
   scrollContainerRef,
-  computed(() => store.view.useOriginalImagesForCards)
+  computed(() => store.view.useOriginalImagesForCards),
+  computed(() => store.isCompactWindow)
 )
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({

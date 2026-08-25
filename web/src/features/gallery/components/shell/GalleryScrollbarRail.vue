@@ -604,6 +604,11 @@ onUnmounted(() => {
     pointer-events: none;
   }
 
+  /* 轨道隐藏时让透明悬浮层穿透；可见滑块在下方规则中恢复接收事件。 */
+  .timeline-scrollbar:not(.timeline-scrollbar-track-active) {
+    pointer-events: none;
+  }
+
   .timeline-desktop-marker,
   .timeline-desktop-position-line,
   .timeline-desktop-hover-indicator,
