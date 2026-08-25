@@ -61,6 +61,7 @@ pnpm install
 
 ```bash
 node scripts/patch-xmake-clang-cl-cxx23.js
+node scripts/patch-xmake-clang-cl-deps.js
 
 # Clang-cl + LLD (default)
 xmake f --toolchain="clang-cl[llvm]" -y
