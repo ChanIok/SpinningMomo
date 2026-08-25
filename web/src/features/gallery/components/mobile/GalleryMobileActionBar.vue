@@ -33,6 +33,22 @@ import { galleryApi } from '../../api'
 import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
 import { isWebView } from '@/core/env'
 
+const props = withDefaults(
+  defineProps<{
+    variant?: 'solid' | 'immersive'
+  }>(),
+  {
+    variant: 'solid',
+  }
+)
+
+const containerClass = computed(() => {
+  if (props.variant === 'immersive') {
+    return 'shrink-0 bg-gradient-to-t from-background/60 via-background/40 to-transparent px-2 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-foreground'
+  }
+  return 'w-full  bg-background/95 dark:bg-popover/95 px-2 pt-2 pb-4 text-foreground'
+})
+
 const { t } = useI18n()
 const { toast } = useToast()
 const store = useGalleryStore()
@@ -296,10 +312,7 @@ async function handleDownload() {
 </script>
 
 <template>
-  <div
-    class="shrink-0 bg-gradient-to-t from-background/60 via-background/40 to-transparent px-2 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-foreground"
-    @contextmenu.prevent.stop
-  >
+  <div :class="containerClass" @contextmenu.prevent.stop>
     <div class="mx-auto grid w-full max-w-xl grid-cols-5 gap-1">
       <Button
         variant="ghost"
@@ -461,22 +474,10 @@ async function handleDownload() {
   <MobileDrawer
     :open="moreSheetOpen"
     side="bottom"
-    class="max-h-[86vh] overflow-y-auto rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    class="max-h-[86vh] overflow-y-auto rounded-t-2xl px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
     @close="moreSheetOpen = false"
   >
-    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
-      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.moreTitle') }}</h2>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
-        :aria-label="t('common.close')"
-        @click="moreSheetOpen = false"
-      >
-        <X class="size-4" />
-      </Button>
-    </div>
-    <div class="grid gap-1 pt-1">
+    <div class="grid gap-1">
       <Button
         v-if="canUseLocalFileSystem"
         variant="ghost"

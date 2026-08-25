@@ -135,11 +135,21 @@ function exitMultiSelectMode() {
         </Button>
       </div>
 
-      <!-- 右侧：筛选与排序/视图设置聚合药丸胶囊 -->
+      <!-- 右侧：视图设置/筛选与排序聚合药丸胶囊 -->
       <div
         class="pointer-events-auto flex h-10 items-center gap-0.5 rounded-full p-0.5 transition-all"
         :class="surfaceClass"
       >
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-9 w-11 shrink-0 rounded-full text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+          :aria-label="t('gallery.mobile.toolbar.viewSettings.title')"
+          @click="openViewSettingsPanel"
+        >
+          <SlidersHorizontal class="size-4.5" :stroke-width="1.5" />
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"
@@ -155,16 +165,6 @@ function exitMultiSelectMode() {
           >
             {{ activeFilterCount > 9 ? '9+' : activeFilterCount }}
           </span>
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-9 w-11 shrink-0 rounded-full text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
-          :aria-label="t('gallery.mobile.toolbar.viewSettings.title')"
-          @click="openViewSettingsPanel"
-        >
-          <SlidersHorizontal class="size-4.5" :stroke-width="1.5" />
         </Button>
       </div>
     </template>

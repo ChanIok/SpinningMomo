@@ -35,6 +35,7 @@ const scrollTop = ref(0)
 
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
+const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const targetColumnSize = computed(() => store.getEffectiveViewSize())
@@ -219,7 +220,10 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      :class="store.isCompactWindow ? 'px-0 pt-12 pb-2' : 'px-4 py-2 sm:pr-2'"
+      :class="[
+        store.isCompactWindow ? 'px-0 pt-12' : 'px-4 py-2 sm:pr-2',
+        isMultiSelectMode ? 'pb-24' : store.isCompactWindow ? 'pb-2' : '',
+      ]"
       class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"
     >

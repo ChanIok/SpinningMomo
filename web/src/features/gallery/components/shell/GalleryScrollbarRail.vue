@@ -459,6 +459,13 @@ onUnmounted(() => {
     @wheel="handleWheel"
   >
     <div class="relative h-full">
+      <!-- 轨道隐藏时为滑块保留独立的触摸热区，避免透明区域拦截图库操作。 -->
+      <div
+        v-if="hasScrollableContent"
+        class="timeline-mobile-handle-hit-area absolute"
+        :style="{ top: `${mobileHandleTop}px`, height: `${MOBILE_HANDLE_HEIGHT}px` }"
+      />
+
       <div class="timeline-rail-layer">
         <div
           v-if="hasScrollableContent"
@@ -569,7 +576,8 @@ onUnmounted(() => {
 .timeline-mobile-handle,
 .timeline-mobile-active-label,
 .timeline-mobile-marker,
-.timeline-mobile-label {
+.timeline-mobile-label,
+.timeline-mobile-handle-hit-area {
   display: none;
 }
 
@@ -680,6 +688,17 @@ onUnmounted(() => {
     left: 0;
     width: auto;
     background-color: var(--timeline-thumb-surface);
+  }
+
+  .timeline-mobile-handle-hit-area {
+    display: block;
+    right: 0;
+    width: 2.25rem;
+    pointer-events: none;
+  }
+
+  .timeline-scrollbar-handle-active .timeline-mobile-handle-hit-area {
+    pointer-events: auto;
   }
 
   .timeline-mobile-handle {

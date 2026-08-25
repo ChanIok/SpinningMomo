@@ -48,7 +48,7 @@ export function useGalleryViewControls() {
   )
   const sortBy = computed(() => store.sortBy)
   const sortOrder = computed(() => store.sortOrder)
-  const currentFolderOnly = computed(() => !store.includeSubfolders)
+  const includeSubfolders = computed(() => store.includeSubfolders)
   const currentSliderPosition = computed(() => store.getSliderPosition())
   const availableViewModes = computed(() =>
     store.isCompactWindow ? viewModes.filter((mode) => mode.value !== 'list') : viewModes
@@ -96,8 +96,8 @@ export function useGalleryViewControls() {
     store.setSorting(sortBy.value, sortOrder.value === 'asc' ? 'desc' : 'asc')
   }
 
-  function onCurrentFolderOnlyChange(value: boolean) {
-    store.includeSubfolders = !value
+  function setIncludeSubfolders(value: boolean) {
+    store.includeSubfolders = value
   }
 
   function setViewMode(
@@ -128,7 +128,8 @@ export function useGalleryViewControls() {
     viewMode,
     sortBy,
     sortOrder,
-    currentFolderOnly,
+    includeSubfolders,
+    setIncludeSubfolders,
     currentSliderPosition,
     availableViewModes,
     currentViewModeIcon,
@@ -136,7 +137,6 @@ export function useGalleryViewControls() {
     sortOrderLabel,
     onSortByChange,
     toggleSortOrder,
-    onCurrentFolderOnlyChange,
     setViewMode,
     onViewSizeSliderChange,
   }

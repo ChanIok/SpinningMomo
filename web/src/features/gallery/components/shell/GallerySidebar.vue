@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   ChevronDown,
   ChevronRight,
+  House,
   Images,
   ListChevronsDownUp,
   Map,
@@ -475,6 +476,10 @@ async function openPreferences() {
   await overlayHistory.openPreferencesPanel()
 }
 
+function openHome() {
+  void pushWithViewTransition(router, { name: 'home' })
+}
+
 function openMap() {
   if (!showMapEntry.value) {
     return
@@ -713,6 +718,14 @@ onMounted(() => {
       v-if="galleryStore.isCompactWindow"
       class="shrink-0 space-y-1 border-t border-border/60 p-2"
     >
+      <Button
+        variant="ghost"
+        class="h-10 w-full justify-start gap-3 px-3 text-sm"
+        @click="openHome"
+      >
+        <House class="size-4" />
+        {{ t('app.navigation.home') }}
+      </Button>
       <Button
         v-if="showMapEntry"
         variant="ghost"

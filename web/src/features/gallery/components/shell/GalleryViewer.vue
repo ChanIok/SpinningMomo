@@ -655,7 +655,24 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
           </div>
         </div>
 
-        <GalleryMobileActionBar v-if="isMultiSelectMode" />
+        <!-- 悬浮多选底栏 -->
+        <Transition
+          enter-active-class="transition-transform duration-200 ease-out"
+          enter-from-class="translate-y-full"
+          enter-to-class="translate-y-0"
+          leave-active-class="transition-transform duration-150 ease-in"
+          leave-from-class="translate-y-0"
+          leave-to-class="translate-y-full"
+        >
+          <div
+            v-if="isMultiSelectMode"
+            class="pointer-events-none absolute inset-x-0 bottom-0 z-20"
+          >
+            <div class="pointer-events-auto">
+              <GalleryMobileActionBar variant="solid" />
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 

@@ -35,6 +35,7 @@ const scrollTop = ref(0)
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const targetRowHeight = computed(() => store.getEffectiveViewSize())
 const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
+const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
 // AdaptiveView 不再依赖 ScrollArea，避免第三方滚动容器内部测量语义干扰 thumb 尺寸。
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -206,7 +207,10 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="relative flex h-full">
     <div
       ref="scrollContainerRef"
-      :class="store.isCompactWindow ? 'px-0 pt-12 pb-2' : 'px-4 py-2 sm:pr-2'"
+      :class="[
+        store.isCompactWindow ? 'px-0 pt-12' : 'px-4 py-2 sm:pr-2',
+        isMultiSelectMode ? 'pb-24' : store.isCompactWindow ? 'pb-2' : '',
+      ]"
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >

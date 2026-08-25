@@ -1106,7 +1106,7 @@ onUnmounted(() => {
               v-if="isLightboxChromeVisible && isTouchInput && !isClosing"
               class="pointer-events-auto shrink-0"
             >
-              <GalleryMobileActionBar />
+              <GalleryMobileActionBar variant="immersive" />
             </div>
           </Transition>
 

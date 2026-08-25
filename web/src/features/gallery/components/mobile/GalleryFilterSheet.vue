@@ -433,7 +433,7 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
     </ScrollArea>
 
     <!-- 底部固定操作栏 -->
-    <div class="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+    <div class="shrink-0 px-4 pt-2 pb-6">
       <Button
         variant="outline"
         class="h-10 w-full justify-center gap-2 text-sm font-medium"

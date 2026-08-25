@@ -103,7 +103,8 @@ const {
 const {
   viewMode,
   sortBy,
-  currentFolderOnly,
+  includeSubfolders,
+  setIncludeSubfolders,
   currentSliderPosition,
   availableViewModes,
   currentViewModeIcon,
@@ -111,7 +112,6 @@ const {
   sortOrderLabel,
   onSortByChange,
   toggleSortOrder,
-  onCurrentFolderOnlyChange,
   setViewMode,
   onViewSizeSliderChange,
 } = viewControls
@@ -213,15 +213,15 @@ function handleToolbarContextMenu(event: MouseEvent) {
             />
           </div>
 
-          <Tooltip v-if="currentSource.type === 'folder'">
+          <Tooltip>
             <TooltipTrigger as-child>
               <div class="inline-flex">
                 <Toggle
                   size="sm"
-                  :model-value="currentFolderOnly"
+                  :model-value="!includeSubfolders"
                   :aria-label="t('gallery.toolbar.folderOptions.currentFolderOnly')"
                   class="text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 data-[state=on]:bg-sidebar-accent data-[state=on]:text-sidebar-foreground data-[state=on]:hover:bg-sidebar-accent data-[state=on]:hover:text-sidebar-foreground"
-                  @update:model-value="onCurrentFolderOnlyChange"
+                  @update:model-value="(val) => setIncludeSubfolders(!val)"
                 >
                   <Folder class="h-4 w-4" />
                 </Toggle>
