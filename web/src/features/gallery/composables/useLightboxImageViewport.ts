@@ -1,4 +1,4 @@
-import { computed, nextTick, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties, type Ref } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from '../constants'
 import { isGalleryTouchInput, normalizeGalleryInputType } from '../input'
@@ -67,6 +67,12 @@ interface PanMoveResult {
 type TouchPointerPair = readonly [TouchPointer, TouchPointer]
 
 interface UseLightboxImageViewportOptions {
+  lightboxRootRef: Ref<HTMLElement | null>
+  viewportRef: Ref<HTMLElement | null>
+  stageRef: Ref<HTMLElement | null>
+  thumbnailImageRef: Ref<HTMLImageElement | null>
+  originalImageRef: Ref<HTMLImageElement | null>
+  restoreThumbnailRef: Ref<HTMLImageElement | null>
   displayAsset: Readonly<Ref<Asset | null>>
   imageError: Readonly<Ref<boolean>>
   fitMode: Readonly<Ref<LightboxState['fitMode']>>
@@ -87,6 +93,12 @@ interface UseLightboxImageViewportOptions {
  */
 export function useLightboxImageViewport(options: UseLightboxImageViewportOptions) {
   const {
+    lightboxRootRef,
+    viewportRef,
+    stageRef,
+    thumbnailImageRef,
+    originalImageRef,
+    restoreThumbnailRef,
     displayAsset,
     imageError,
     fitMode,
@@ -97,13 +109,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     lightbox,
   } = options
 
-  const lightboxRootRef = ref<HTMLElement | null>(null)
-  const viewportRef = ref<HTMLElement | null>(null)
-  const stageRef = ref<HTMLElement | null>(null)
-  const thumbnailImageRef = ref<HTMLImageElement | null>(null)
-  const originalImageRef = ref<HTMLImageElement | null>(null)
   // 代理层独立于可滚动 stage，只有缩小复原时才挂载并接管画面。
-  const restoreThumbnailRef = ref<HTMLImageElement | null>(null)
   const restoreThumbnailActive = ref(false)
   const touchZoomRestoreFallback = ref(false)
 
@@ -206,7 +212,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
 
   const isDragging = computed(() => activePointerId.value !== null)
 
-  const stageCursor = computed(() => {
+  const stageCursor = computed<CSSProperties['cursor']>(() => {
     if (!displayAsset.value || imageError.value) {
       return 'default'
     }
@@ -222,7 +228,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     return 'zoom-out'
   })
 
-  const stageStyle = computed(() => ({
+  const stageStyle = computed<CSSProperties>(() => ({
     width: `${renderWidth.value}px`,
     height: `${renderHeight.value}px`,
     cursor: stageCursor.value,
@@ -1451,12 +1457,6 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
   })
 
   return {
-    lightboxRootRef,
-    viewportRef,
-    stageRef,
-    thumbnailImageRef,
-    originalImageRef,
-    restoreThumbnailRef,
     restoreThumbnailActive,
     fitScale,
     isPannable,

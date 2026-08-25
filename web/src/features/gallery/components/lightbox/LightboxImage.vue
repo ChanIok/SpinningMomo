@@ -24,6 +24,14 @@ const autoRecovering = ref(false)
 const displayAssetId = ref<number | null>(null)
 let displaySwapToken = 0
 
+// DOM 引用由组件持有，再交给视口 composable 处理交互和测量。
+const lightboxRootRef = ref<HTMLElement | null>(null)
+const viewportRef = ref<HTMLElement | null>(null)
+const stageRef = ref<HTMLElement | null>(null)
+const thumbnailImageRef = ref<HTMLImageElement | null>(null)
+const originalImageRef = ref<HTMLImageElement | null>(null)
+const restoreThumbnailRef = ref<HTMLImageElement | null>(null)
+
 // 从 Pinia 当前索引读取业务资产；displayAsset 负责跟随加载进度实际渲染。
 const currentAsset = computed(() => {
   const currentIdx = store.selection.activeIndex
@@ -67,12 +75,6 @@ const actualZoom = computed(() => store.lightbox.zoom)
 const rotationDegrees = computed(() => store.lightbox.rotationDegrees)
 
 const {
-  lightboxRootRef,
-  viewportRef,
-  stageRef,
-  thumbnailImageRef,
-  originalImageRef,
-  restoreThumbnailRef,
   restoreThumbnailActive,
   fitScale,
   isPannable,
@@ -102,6 +104,12 @@ const {
   updatePinch,
   endPinch,
 } = useLightboxImageViewport({
+  lightboxRootRef,
+  viewportRef,
+  stageRef,
+  thumbnailImageRef,
+  originalImageRef,
+  restoreThumbnailRef,
   displayAsset,
   imageError,
   fitMode,
