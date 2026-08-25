@@ -7,6 +7,7 @@ import { useOriginalPreviewWorker } from '../../composables/useOriginalPreviewWo
 import { useGalleryStore } from '../../store'
 import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../../types'
+import { MIN_ORIGINAL_CARD_SHORT_EDGE_PX } from '../../constants'
 import {
   isGalleryTouchContextMenu,
   isGalleryTouchInput,
@@ -83,6 +84,12 @@ const supportsOriginalCardImage = computed(
   () =>
     useOriginalImagesForCards.value && props.asset.type === 'photo' && originalUrl.value.length > 0
 )
+const suppressHoverMask = computed(
+  () =>
+    supportsOriginalCardImage.value &&
+    props.originalPreviewShortEdge * (window.devicePixelRatio || 1) >=
+      MIN_ORIGINAL_CARD_SHORT_EDGE_PX
+)
 const canStartOriginalUpgrade = computed(
   () =>
     supportsOriginalCardImage.value &&
@@ -94,7 +101,7 @@ const canStartOriginalUpgrade = computed(
 )
 const hasThumbnail = computed(() => scheduledThumbnailUrl.value.length > 0)
 const hasOriginalPreviewShortEdge = computed(() => props.originalPreviewShortEdge > 0)
-const enableHoverScale = computed(() => !useOriginalImagesForCards.value && !store.isCompactWindow)
+const enableHoverScale = computed(() => !store.isCompactWindow)
 const isVideoAsset = computed(() => props.asset.type === 'video')
 // 紧凑普通浏览仍保留单选状态供暗房操作使用，但只有多选模式才展示选中视觉。
 const showSelectionVisual = computed(
@@ -595,7 +602,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         class="absolute inset-0 bg-black/0 transition-all duration-200"
         :class="{
           'bg-black/30': showSelectionVisual,
-          'group-hover:bg-black/10': !showSelectionVisual,
+          'group-hover:bg-black/10': !showSelectionVisual && !suppressHoverMask,
         }"
       />
 

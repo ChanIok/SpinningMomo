@@ -4,12 +4,12 @@ import {
   postBrowserTask,
   yieldToBrowser,
 } from './browserTaskScheduler'
+import { MIN_ORIGINAL_CARD_SHORT_EDGE_PX } from '../constants'
 
 const CARD_IMAGE_LOAD_IDLE_MS = 100
 const THUMBNAIL_BATCH_SIZE = 6
 const THUMBNAIL_PRELOAD_VIEWPORT_RATIO = 0.5
 const ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO = 0.5
-const MIN_ORIGINAL_CARD_SHORT_EDGE_PX = 360
 
 export interface CardImageScheduleItem {
   assetId: number
@@ -42,11 +42,15 @@ export function useCardImageScheduler(
     thumbnailTaskController = createBrowserTaskController('user-visible')
   }
 
-  // 中止未派发的原图任务，并清空增强层许可。
+  // 中止未派发的原图调度任务；已有许可由调用方按当前预热范围决定是否保留。
   function cancelOriginalSchedule() {
     originalScheduleVersion += 1
     originalTaskController.abort()
     originalTaskController = createBrowserTaskController('background')
+  }
+
+  // 完全清空原图许可，用于关闭原图模式或销毁调度器。
+  function clearOriginalPermissions() {
     allowedOriginalAssetIds.value = new Set()
   }
 
@@ -62,6 +66,35 @@ export function useCardImageScheduler(
     }
 
     allowedThumbnailAssetIds.value = nextAllowedIds
+  }
+
+  // 只保留当前原图预热范围内的许可，避免滚动时重复取消仍然相关的卡片。
+  function pruneOriginalPermissions() {
+    const container = containerRef.value
+    if (!container || container.clientHeight <= 0) {
+      return
+    }
+
+    const currentAllowedIds = allowedOriginalAssetIds.value
+    const nextAllowedIds = new Set<number>()
+
+    for (const item of latestItems) {
+      if (
+        currentAllowedIds.has(item.assetId) &&
+        isItemInViewport(item, ORIGINAL_CARD_PRELOAD_VIEWPORT_RATIO)
+      ) {
+        nextAllowedIds.add(item.assetId)
+      }
+    }
+
+    if (
+      nextAllowedIds.size === currentAllowedIds.size &&
+      Array.from(nextAllowedIds).every((assetId) => currentAllowedIds.has(assetId))
+    ) {
+      return
+    }
+
+    allowedOriginalAssetIds.value = nextAllowedIds
   }
 
   // 判断虚拟项是否落在指定预热范围内。
@@ -133,6 +166,32 @@ export function useCardImageScheduler(
     return pendingItems
   }
 
+  // 让当前视口内的卡片先进入原图队列，并按视口中心距离排序。
+  function prioritizeOriginalItems(items: CardImageScheduleItem[]) {
+    const visibleItems = items.filter((item) => isItemInViewport(item, 0))
+    const nearbyItems = items.filter((item) => !isItemInViewport(item, 0))
+    const compareDistanceToViewportCenter = (
+      left: CardImageScheduleItem,
+      right: CardImageScheduleItem
+    ) => getItemDistanceToViewportCenter(left) - getItemDistanceToViewportCenter(right)
+
+    visibleItems.sort(compareDistanceToViewportCenter)
+    nearbyItems.sort(compareDistanceToViewportCenter)
+
+    return [...visibleItems, ...nearbyItems]
+  }
+
+  function getItemDistanceToViewportCenter(item: CardImageScheduleItem): number {
+    const container = containerRef.value
+    if (!container) {
+      return 0
+    }
+
+    const viewportCenter = container.scrollTop + container.clientHeight / 2
+    const itemCenter = item.start + item.size / 2
+    return Math.abs(itemCenter - viewportCenter)
+  }
+
   // 分批授予半屏范围内的缩略图加载许可，让基础图片始终保持连续预热。
   async function runThumbnailSchedule() {
     cancelThumbnailSchedule()
@@ -175,17 +234,18 @@ export function useCardImageScheduler(
     }
   }
 
-  // 逐个授予原图加载许可，让增强层只在滚动空闲后以 background 优先级推进。
+  // 逐个授予原图加载许可；视口内卡片先排队，其余候选项继续后台推进。
   async function runOriginalSchedule() {
     if (!originalEnabled.value || !isScrollIdle.value) {
       return
     }
 
     cancelOriginalSchedule()
+    pruneOriginalPermissions()
 
     const runVersion = originalScheduleVersion
     const signal = originalTaskController.signal
-    const pendingItems = getPendingOriginalItems()
+    const pendingItems = prioritizeOriginalItems(getPendingOriginalItems())
 
     for (const item of pendingItems) {
       if (
@@ -224,10 +284,11 @@ export function useCardImageScheduler(
     }
   }
 
-  // 记录一次滚动输入：缩略图继续小批量推进，原图等空闲后再升级。
+  // 记录一次滚动输入：缩略图继续小批量推进，原图保留范围内许可并等空闲后补充新卡片。
   function markScrolling() {
     isScrollIdle.value = false
     cancelOriginalSchedule()
+    pruneOriginalPermissions()
 
     // 滚动中也按同一策略推进半屏缩略图，响应性由小批次和 yield 保证。
     void runThumbnailSchedule()
@@ -250,6 +311,7 @@ export function useCardImageScheduler(
   function scheduleVisibleItems(items: CardImageScheduleItem[]) {
     latestItems = items
     pruneThumbnailPermissions()
+    pruneOriginalPermissions()
 
     // 虚拟窗口变化后先保证半屏缩略图进入分批加载队列。
     void runThumbnailSchedule()
@@ -277,6 +339,7 @@ export function useCardImageScheduler(
     originalEnabled,
     (isEnabled) => {
       cancelOriginalSchedule()
+      clearOriginalPermissions()
 
       if (!isEnabled) {
         return
@@ -295,6 +358,7 @@ export function useCardImageScheduler(
 
     cancelThumbnailSchedule()
     cancelOriginalSchedule()
+    clearOriginalPermissions()
   })
 
   return {

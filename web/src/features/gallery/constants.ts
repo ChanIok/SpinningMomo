@@ -18,6 +18,9 @@ export const GALLERY_VIEW_SIZE_MAX = 768
 export const GALLERY_COMPACT_VIEW_SIZE_MIN = 80
 export const GALLERY_COMPACT_VIEW_SIZE_MAX = 480
 
+/** 卡片短边达到该物理像素尺寸后才值得加载原图增强。 */
+export const MIN_ORIGINAL_CARD_SHORT_EDGE_PX = 360
+
 /** 暗房实际缩放比例的统一边界；交互层和视图层共用同一份定义。 */
 export const LIGHTBOX_MIN_ZOOM = 0.05
 export const LIGHTBOX_MAX_ZOOM = 5
