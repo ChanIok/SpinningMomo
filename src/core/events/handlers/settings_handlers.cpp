@@ -192,17 +192,16 @@ auto handle_settings_changed(core::AppState& state,
       }
     }
 
-    if (webview_host_mode_changed) {
-      if (auto recreate_result = ui::webview_window::recreate_webview_host(state);
-          !recreate_result) {
-        Logger().warn("Failed to recreate WebView host after settings change: {}",
-                      recreate_result.error());
-      }
-    } else if (webview_theme_mode_changed) {
+    if (!webview_host_mode_changed && webview_theme_mode_changed) {
       core::webview::apply_background_mode_from_settings(state);
     }
 
     core::rpc::notification_hub::send_notification(state, "settings.changed");
+
+    // 先完成当前事件批次中的设置响应和变更通知，再重建 WebView 宿主。
+    if (webview_host_mode_changed) {
+      ui::webview_window::request_recreate_webview_host(state);
+    }
 
     Logger().debug("Settings change processing completed");
 

@@ -10,6 +10,7 @@ namespace ui::webview_window {
 
 // 窗口初始化和清理
 auto initialize(core::AppState& state) -> std::expected<void, std::string>;
+auto request_recreate_webview_host(core::AppState& state) -> void;
 auto recreate_webview_host(core::AppState& state) -> std::expected<void, std::string>;
 auto cleanup(core::AppState& state) -> void;
 

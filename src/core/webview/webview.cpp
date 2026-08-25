@@ -45,6 +45,8 @@ auto to_mouse_event_kind(UINT msg) -> std::optional<COREWEBVIEW2_MOUSE_EVENT_KIN
   switch (msg) {
     case WM_MOUSEMOVE:
       return COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE;
+    case WM_MOUSELEAVE:
+      return COREWEBVIEW2_MOUSE_EVENT_KIND_LEAVE;
     case WM_LBUTTONDOWN:
       return COREWEBVIEW2_MOUSE_EVENT_KIND_LEFT_BUTTON_DOWN;
     case WM_LBUTTONUP:
@@ -209,16 +211,32 @@ auto navigate_to_url(core::AppState& state, const std::wstring& url)
 
 auto shutdown(core::AppState& state) -> void {
   auto& webview_state = *state.webview;
+  auto& resources = webview_state.resources;
 
-  if (webview_state.resources.controller) {
-    webview_state.resources.controller.get()->Close();
+  if (resources.composition_controller && resources.cursor_changed_token.value != 0) {
+    auto hr =
+        resources.composition_controller->remove_CursorChanged(resources.cursor_changed_token);
+    if (FAILED(hr)) {
+      Logger().warn("Failed to remove WebView composition cursor handler: {}", hr);
+    }
+  }
+  resources.cursor_changed_token = {};
+
+  if (resources.composition_cursor) {
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    DestroyCursor(resources.composition_cursor);
+    resources.composition_cursor = nullptr;
   }
 
-  webview_state.resources.webview.reset();
-  webview_state.resources.composition_controller4.reset();
-  webview_state.resources.composition_controller.reset();
-  webview_state.resources.controller.reset();
-  webview_state.resources.environment.reset();
+  if (resources.controller) {
+    resources.controller.get()->Close();
+  }
+
+  resources.webview.reset();
+  resources.composition_controller4.reset();
+  resources.composition_controller.reset();
+  resources.controller.reset();
+  resources.environment.reset();
   detail::clear_applied_virtual_host_folder_mappings(state);
   core::webview::host::reset_host_runtime(state);
 
@@ -438,9 +456,12 @@ auto forward_mouse_message(core::AppState& state, HWND hwnd, UINT msg, WPARAM wp
     mouse_data = static_cast<UINT32>(GET_XBUTTON_WPARAM(wparam));
   }
 
-  POINT point;
-  point.x = GET_X_LPARAM(lparam);
-  point.y = GET_Y_LPARAM(lparam);
+  POINT point{};
+  // Leave 消息不携带坐标，WebView2 按约定接收零点。
+  if (msg != WM_MOUSELEAVE) {
+    point.x = GET_X_LPARAM(lparam);
+    point.y = GET_Y_LPARAM(lparam);
+  }
   if (msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL) {
     ScreenToClient(hwnd, &point);
   }

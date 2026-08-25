@@ -2,6 +2,7 @@
 
 #include "vendor/std.hpp"
 
+#include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 #include "vendor/windows/dwmapi.hpp"
 #include "vendor/windows/shellapi.hpp"
@@ -164,6 +165,38 @@ auto make_webview_url(core::AppState& state, std::wstring_view route) -> std::ws
 auto make_browser_url(core::AppState& state, std::wstring_view route) -> std::wstring {
   std::string url = std::format("http://localhost:{}/", state.http_server->port);
   return append_hash_route(std::wstring(url.begin(), url.end()), route);
+}
+
+// 重建宿主前保留当前应用 URL，使 Vue Router 的 hash 路由在新 WebView 中恢复。
+auto preserve_current_webview_url(core::AppState& state) -> void {
+  auto& webview_state = *state.webview;
+  webview_state.pending_initial_url.clear();
+
+  if (!webview_state.is_ready || !webview_state.resources.webview) {
+    return;
+  }
+
+  wil::unique_cotaskmem_string source;
+  auto hr = webview_state.resources.webview->get_Source(&source);
+  if (FAILED(hr) || !source || source.get()[0] == L'\0') {
+    Logger().debug("Skipped preserving WebView URL: current source is unavailable");
+    return;
+  }
+
+  std::wstring app_url_prefix;
+  if (core::build_config::is_debug_build()) {
+    app_url_prefix = webview_state.config.dev_server_url;
+  } else {
+    app_url_prefix = L"https://" + webview_state.config.virtual_host_name + L"/";
+  }
+
+  if (!std::wstring_view(source.get()).starts_with(std::wstring_view(app_url_prefix))) {
+    Logger().debug("Skipped preserving non-application WebView URL");
+    return;
+  }
+
+  webview_state.pending_initial_url = source.get();
+  Logger().debug("Preserving current WebView URL across host recreation");
 }
 
 // WebView2 不可用时退回浏览器开发入口。
@@ -513,6 +546,17 @@ auto window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
       return 0;
     }
 
+    case core::webview::kWM_APP_RECREATE_WEBVIEW_HOST: {
+      if (!state) {
+        return 0;
+      }
+
+      if (auto result = recreate_webview_host(*state); !result) {
+        Logger().warn("Failed to recreate WebView host after settings change: {}", result.error());
+      }
+      return 0;
+    }
+
     case WM_GETMINMAXINFO: {
       MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
 
@@ -564,6 +608,15 @@ auto window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
         }
       }
       return HTCLIENT;
+    }
+
+    case WM_SETCURSOR: {
+      if (state && core::webview::is_composition_active(*state) && LOWORD(lparam) == HTCLIENT &&
+          state->webview->resources.composition_cursor) {
+        SetCursor(state->webview->resources.composition_cursor);
+        return TRUE;
+      }
+      break;
     }
 
     case WM_SIZE: {
@@ -645,6 +698,7 @@ auto window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
     }
 
     case WM_MOUSEMOVE:
+    case WM_MOUSELEAVE:
     case WM_MOUSEWHEEL:
     case WM_MOUSEHWHEEL:
     case WM_LBUTTONDOWN:
@@ -660,7 +714,14 @@ auto window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
     case WM_XBUTTONUP:
     case WM_XBUTTONDBLCLK: {
       if (state && core::webview::is_composition_active(*state)) {
+        if (msg == WM_MOUSEMOVE) {
+          TRACKMOUSEEVENT track_mouse_event{sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd, 0};
+          TrackMouseEvent(&track_mouse_event);
+        }
         core::webview::forward_mouse_message(*state, hwnd, msg, wparam, lparam);
+        if (msg == WM_MOUSELEAVE) {
+          SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+        }
       }
       break;
     }
@@ -795,6 +856,7 @@ auto recreate_webview_host(core::AppState& state) -> std::expected<void, std::st
     return {};
   }
 
+  preserve_current_webview_url(state);
   bool was_visible = IsWindowVisible(hwnd) == TRUE;
 
   // 透明背景模式切换需要重建 controller，单纯改背景色不够。
@@ -806,6 +868,18 @@ auto recreate_webview_host(core::AppState& state) -> std::expected<void, std::st
   state.webview->window.is_visible = was_visible;
   Logger().info("WebView host recreated successfully");
   return {};
+}
+
+auto request_recreate_webview_host(core::AppState& state) -> void {
+  if (!state.webview || !state.webview->window.webview_hwnd) {
+    Logger().debug("Skipped WebView host recreation request: window is not ready");
+    return;
+  }
+
+  auto hwnd = state.webview->window.webview_hwnd;
+  if (!PostMessageW(hwnd, core::webview::kWM_APP_RECREATE_WEBVIEW_HOST, 0, 0)) {
+    Logger().warn("Failed to post WebView host recreation request: {}", GetLastError());
+  }
 }
 
 // 清理 WebView 主窗口，并把可恢复的窗口位置写回设置。

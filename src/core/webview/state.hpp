@@ -16,6 +16,8 @@ constexpr UINT kWM_APP_BEGIN_RESIZE = WM_APP + 2;
 // WM_APP + 3：通知 WebView 窗口线程对虚拟主机映射进行协调同步
 // 由 register/unregister_virtual_host_folder_mapping 触发，实际执行在窗口消息循环中
 constexpr UINT kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS = WM_APP + 3;
+// WM_APP + 4：延迟重建 WebView 宿主，确保当前事件批次中的 RPC 响应先完成投递
+constexpr UINT kWM_APP_RECREATE_WEBVIEW_HOST = WM_APP + 4;
 
 // Composition Hosting 运行时资源
 struct HostRuntime {
@@ -70,7 +72,11 @@ struct CoreResources {
   EventRegistrationToken navigation_completed_token{};
   EventRegistrationToken new_window_requested_token{};
   EventRegistrationToken web_message_received_token{};
+  EventRegistrationToken cursor_changed_token{};
   std::vector<EventRegistrationToken> webresource_requested_tokens;
+
+  // Composition Hosting 下由 WebView2 计算、宿主窗口实际应用的光标。
+  HCURSOR composition_cursor = nullptr;
 
   std::wstring user_data_folder;
   std::wstring current_url;

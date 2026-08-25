@@ -693,6 +693,69 @@ auto setup_composition_non_client_support(
   Logger().info("Composition non-client region interface enabled");
 }
 
+auto replace_composition_cursor(core::webview::CoreResources& resources, HCURSOR source_cursor)
+    -> HRESULT {
+  HCURSOR copied_cursor = nullptr;
+  if (source_cursor) {
+    copied_cursor = CopyCursor(source_cursor);
+    if (!copied_cursor) {
+      Logger().warn("Failed to copy WebView composition cursor: {}", GetLastError());
+      return E_OUTOFMEMORY;
+    }
+  }
+
+  if (resources.composition_cursor) {
+    DestroyCursor(resources.composition_cursor);
+  }
+  resources.composition_cursor = copied_cursor;
+  return S_OK;
+}
+
+auto setup_composition_cursor_support(core::AppState* state,
+                                      ICoreWebView2CompositionController* composition_controller,
+                                      core::webview::CoreResources& resources) -> void {
+  resources.cursor_changed_token = {};
+
+  if (!state || !composition_controller) {
+    return;
+  }
+
+  auto handler = Microsoft::WRL::Callback<ICoreWebView2CursorChangedEventHandler>(
+      [state](ICoreWebView2CompositionController* sender, IUnknown*) -> HRESULT {
+        if (!state || !state->webview || !sender) {
+          return S_OK;
+        }
+
+        HCURSOR webview_cursor = nullptr;
+        auto hr = sender->get_Cursor(&webview_cursor);
+        if (FAILED(hr)) {
+          Logger().warn("Failed to get WebView composition cursor: {}", hr);
+          return hr;
+        }
+
+        auto& resources = state->webview->resources;
+        hr = replace_composition_cursor(resources, webview_cursor);
+        if (FAILED(hr)) {
+          return hr;
+        }
+
+        // 立即刷新当前指针；后续 WM_SETCURSOR 会继续从状态中应用同一个句柄。
+        SetCursor(resources.composition_cursor ? resources.composition_cursor
+                                               : LoadCursorW(nullptr, IDC_ARROW));
+        return S_OK;
+      });
+
+  auto hr =
+      composition_controller->add_CursorChanged(handler.Get(), &resources.cursor_changed_token);
+  if (FAILED(hr)) {
+    resources.cursor_changed_token = {};
+    Logger().warn("Failed to enable WebView composition cursor synchronization: {}", hr);
+    return;
+  }
+
+  Logger().info("WebView composition cursor synchronization enabled");
+}
+
 auto initialize_navigation(ICoreWebView2* webview, const std::wstring& initial_url) -> HRESULT {
   HRESULT hr = webview->Navigate(initial_url.c_str());
   if (FAILED(hr)) {
@@ -729,6 +792,7 @@ auto finalize_controller_initialization(core::AppState* state, ICoreWebView2Cont
   resources.navigation_completed_token = {};
   resources.new_window_requested_token = {};
   resources.web_message_received_token = {};
+  resources.cursor_changed_token = {};
   resources.webresource_requested_tokens.clear();
   resources.webview.reset();
 
@@ -816,6 +880,7 @@ auto finalize_controller_initialization(core::AppState* state, ICoreWebView2Cont
   } else {
     resources.composition_controller4.reset();
   }
+  setup_composition_cursor_support(state, composition_controller, resources);
 
   hr = initialize_navigation(webview, webview_state.config.initial_url);
   if (FAILED(hr)) return hr;
