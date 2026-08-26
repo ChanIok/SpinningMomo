@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Copy,
   Download,
@@ -65,6 +65,7 @@ const downloadConfirmationOpen = ref(false)
 const pendingDownloadIds = ref<number[]>([])
 
 const LARGE_DOWNLOAD_CONFIRMATION_THRESHOLD = 100
+const RATING_OPTIONS = [0, 1, 2, 3, 4, 5] as const
 
 const selectedCount = computed(() => store.selectedCount)
 const selectedAssets = computed(() => {
@@ -85,17 +86,100 @@ const selectedAssets = computed(() => {
 
   return assets
 })
-const currentAssetRating = computed(() => {
-  if (selectedAssets.value.length === 1) {
-    return selectedAssets.value[0]?.rating ?? 0
+const batchRatingSummary = ref<number | null | undefined>(undefined)
+const batchRatingSummaryLoading = ref(false)
+let batchRatingSummaryRequestVersion = 0
+
+const singleSelectedAssetRating = computed<number | undefined>(() => {
+  if (selectedCount.value !== 1) {
+    return undefined
   }
+
+  const selectedAsset = selectedAssets.value[0]
+  if (selectedAsset) {
+    return selectedAsset.rating ?? 0
+  }
+
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
-    const activeAsset = store.getAssetsInRange(activeIndex, activeIndex)[0]
-    return activeAsset?.rating ?? 0
+    return store.getAssetsInRange(activeIndex, activeIndex)[0]?.rating ?? 0
   }
-  return 0
+
+  return undefined
 })
+
+const currentRating = computed<number | null | undefined>(() => {
+  if (selectedCount.value === 1) {
+    return singleSelectedAssetRating.value
+  }
+  if (selectedCount.value > 1) {
+    return batchRatingSummary.value
+  }
+  return undefined
+})
+const isRatingMixed = computed(
+  () =>
+    selectedCount.value > 1 && !batchRatingSummaryLoading.value && batchRatingSummary.value === null
+)
+const ratingDisplayLabel = computed(() => {
+  if (batchRatingSummaryLoading.value && selectedCount.value > 1) {
+    return t('gallery.sidebar.common.loading')
+  }
+  if (isRatingMixed.value) {
+    return t('gallery.mobile.actions.ratingMixed')
+  }
+  if (typeof currentRating.value === 'number') {
+    return currentRating.value > 0
+      ? t('gallery.mobile.actions.ratingValue', { rating: currentRating.value })
+      : t('gallery.mobile.actions.ratingUnrated')
+  }
+  return t('gallery.mobile.actions.rating')
+})
+
+async function refreshBatchRatingSummary(assetIds: number[]) {
+  const requestVersion = ++batchRatingSummaryRequestVersion
+  batchRatingSummary.value = undefined
+  batchRatingSummaryLoading.value = false
+
+  if (assetIds.length <= 1) {
+    return
+  }
+
+  batchRatingSummaryLoading.value = true
+  try {
+    const summary = await galleryApi.getBatchSelectionSummary(assetIds)
+    if (requestVersion !== batchRatingSummaryRequestVersion) {
+      return
+    }
+    batchRatingSummary.value = summary.rating
+  } catch (error) {
+    if (requestVersion === batchRatingSummaryRequestVersion) {
+      console.warn('Failed to load mobile gallery rating summary:', error)
+    }
+  } finally {
+    if (requestVersion === batchRatingSummaryRequestVersion) {
+      batchRatingSummaryLoading.value = false
+    }
+  }
+}
+
+watch(
+  () => [...assetActions.selectedAssetIds.value],
+  (assetIds) => {
+    void refreshBatchRatingSummary(assetIds)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => store.paginatedAssetsVersion,
+  () => {
+    if (assetActions.selectedAssetIds.value.length > 1) {
+      void refreshBatchRatingSummary(assetActions.selectedAssetIds.value)
+    }
+  }
+)
+
 const allSelectedRejected = computed(
   () =>
     selectedCount.value > 0 &&
@@ -118,11 +202,47 @@ function closeActionSheet() {
   moreSheetOpen.value = false
 }
 
-function handleRating(rating: number) {
+function openRatingSheet() {
   closeActionSheet()
-  void (rating === 0
-    ? assetActions.clearSelectedAssetsRating()
-    : assetActions.setSelectedAssetsRating(rating))
+  ratingSheetOpen.value = true
+}
+
+async function handleRating(rating: number) {
+  const assetIds = [...assetActions.selectedAssetIds.value]
+  closeActionSheet()
+
+  // 使正在返回的旧批量摘要失效，避免用旧结果覆盖刚提交的评分。
+  ++batchRatingSummaryRequestVersion
+  batchRatingSummaryLoading.value = false
+
+  try {
+    if (rating === 0) {
+      await assetActions.clearSelectedAssetsRating()
+    } else {
+      await assetActions.setSelectedAssetsRating(rating)
+    }
+
+    if (assetIds.length > 1 && isSameSelection(assetIds, assetActions.selectedAssetIds.value)) {
+      batchRatingSummary.value = rating
+    }
+  } catch {
+    if (assetActions.selectedAssetIds.value.length > 1) {
+      void refreshBatchRatingSummary(assetActions.selectedAssetIds.value)
+    }
+  }
+}
+
+function isRatingSelected(rating: number): boolean {
+  return typeof currentRating.value === 'number' && currentRating.value === rating
+}
+
+function isSameSelection(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const rightIds = new Set(right)
+  return left.every((id) => rightIds.has(id))
 }
 
 function handleRejected() {
@@ -135,6 +255,7 @@ function handleRejected() {
 }
 
 async function openTagSheet() {
+  closeActionSheet()
   tagSheetOpen.value = true
   tagLoading.value = true
 
@@ -330,14 +451,21 @@ async function handleDownload() {
         variant="ghost"
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
-        @click="ratingSheetOpen = true"
+        :aria-label="`${t('gallery.mobile.actions.rating')}: ${ratingDisplayLabel}`"
+        @click="openRatingSheet"
       >
         <Star
           class="size-5 transition-colors"
           :stroke-width="1.5"
-          :class="currentAssetRating > 0 ? 'fill-amber-400 text-amber-400' : ''"
+          :class="
+            typeof currentRating === 'number' && currentRating > 0
+              ? 'fill-amber-400 text-amber-400'
+              : isRatingMixed
+                ? 'text-amber-400'
+                : ''
+          "
         />
-        <span>{{ t('gallery.mobile.actions.rating') }}</span>
+        <span>{{ ratingDisplayLabel }}</span>
       </Button>
 
       <Button
@@ -347,7 +475,7 @@ async function handleDownload() {
         :disabled="selectedCount === 0"
         @click="handleRejected"
       >
-        <X class="size-5" :stroke-width="1.5" />
+        <X class="size-5 scale-110" :stroke-width="1.5" />
         <span>
           {{
             allSelectedRejected
@@ -404,36 +532,41 @@ async function handleDownload() {
   <MobileDrawer
     :open="ratingSheetOpen"
     side="bottom"
-    class="rounded-t-2xl pt-3"
+    :aria-label="t('gallery.mobile.sheet.ratingTitle')"
+    class="rounded-t-2xl"
     @close="ratingSheetOpen = false"
   >
-    <div class="px-4 pb-4">
-      <div class="flex h-10 shrink-0 items-center justify-between pb-1">
-        <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.ratingTitle') }}</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
-          :aria-label="t('common.close')"
-          @click="ratingSheetOpen = false"
-        >
-          <X class="size-4" />
-        </Button>
+    <div class="px-4 pt-2 pb-4">
+      <div class="mb-2 px-1 text-xs text-muted-foreground" aria-live="polite">
+        {{ ratingDisplayLabel }}
       </div>
-      <div class="grid grid-cols-6 gap-2 pt-2">
+      <div class="grid grid-cols-6 gap-2">
         <Button
-          v-for="rating in [0, 1, 2, 3, 4, 5]"
+          v-for="rating in RATING_OPTIONS"
           :key="rating"
           variant="outline"
           class="h-12 flex-col gap-1 px-1"
+          :class="
+            isRatingSelected(rating)
+              ? 'border-primary bg-sidebar-accent text-primary shadow-xs hover:bg-sidebar-accent'
+              : ''
+          "
+          :aria-pressed="isRatingSelected(rating)"
           @click="handleRating(rating)"
         >
           <template v-if="rating === 0">
             <X class="size-4" />
-            <span class="text-[11px]">{{ t('gallery.mobile.sheet.clearRating') }}</span>
+            <span class="text-[11px]">{{ t('gallery.toolbar.filter.rating.unrated') }}</span>
           </template>
           <template v-else>
-            <Star class="size-4 fill-amber-400 text-amber-400" />
+            <Star
+              class="size-4"
+              :class="
+                isRatingSelected(rating)
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-muted-foreground/50'
+              "
+            />
             <span class="text-xs">{{ rating }}</span>
           </template>
         </Button>
@@ -444,22 +577,11 @@ async function handleDownload() {
   <MobileDrawer
     :open="tagSheetOpen"
     side="bottom"
-    class="max-h-[82vh] overflow-y-auto rounded-t-2xl pt-3 supports-[height:100dvh]:max-h-[82dvh]"
+    :aria-label="t('gallery.mobile.sheet.tagsTitle')"
+    class="max-h-[82vh] overflow-y-auto rounded-t-2xl supports-[height:100dvh]:max-h-[82dvh]"
     @close="tagSheetOpen = false"
   >
     <div class="px-4 pb-4">
-      <div class="flex h-10 shrink-0 items-center justify-between pb-1">
-        <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.tagsTitle') }}</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
-          :aria-label="t('common.close')"
-          @click="tagSheetOpen = false"
-        >
-          <X class="size-4" />
-        </Button>
-      </div>
       <div
         v-if="tagLoading && store.tags.length === 0"
         class="py-8 text-center text-sm text-muted-foreground"

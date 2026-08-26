@@ -23,12 +23,10 @@ import LightboxNavigationButtons from './LightboxNavigationButtons.vue'
 import LightboxPager from './LightboxPager.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
 import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
-import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
-import { X } from '@lucide/vue'
 import {
   isGalleryTouchContextMenu,
   isGalleryTouchInput,
@@ -1132,24 +1130,12 @@ onUnmounted(() => {
         <MobileDrawer
           :open="isToolbarCompressed && mobileDetailsOpen && !isClosing"
           side="bottom"
+          :aria-label="t('gallery.details.title')"
           :z-index="110"
           :close-on-escape="false"
           class="h-[82vh] max-h-[720px] rounded-t-2xl border-t border-border bg-background text-sidebar-foreground supports-[height:100dvh]:h-[82dvh]"
           @close="closeMobileDetails"
         >
-          <div class="flex h-11 shrink-0 items-center justify-between border-b px-4">
-            <h2 class="text-sm font-medium text-foreground">{{ t('gallery.details.title') }}</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-10 w-10"
-              :aria-label="t('gallery.lightbox.toolbar.closeTitle')"
-              @click="closeMobileDetails"
-            >
-              <X class="h-5 w-5" />
-            </Button>
-          </div>
-
           <div class="min-h-0 flex-1">
             <GalleryDetails />
           </div>

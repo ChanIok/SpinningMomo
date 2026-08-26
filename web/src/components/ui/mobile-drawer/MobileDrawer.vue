@@ -24,6 +24,8 @@ interface MobileDrawerProps {
   open: boolean
   side?: 'bottom' | 'right' | 'left' | 'top'
   class?: HTMLAttributes['class']
+  /** 抽屉没有可见标题时，给 dialog 提供无障碍名称。 */
+  ariaLabel?: string
   /** Teleport 后的层级；沉浸式暗房需要覆盖自身的 z-index。 */
   zIndex?: number
   /** 是否由抽屉自身消费 Escape；需要由外层历史协调器处理时关闭。 */
@@ -414,6 +416,7 @@ const overlayDynamicStyle = computed(() => {
         :class="containerPlacementClass"
         :style="{ zIndex: props.zIndex }"
         role="dialog"
+        :aria-label="props.ariaLabel"
         aria-modal="true"
       >
         <!-- 遮罩层：点击通知外部消费历史/关闭 -->

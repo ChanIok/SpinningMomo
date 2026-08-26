@@ -109,7 +109,7 @@ let assetDetailsRequestToken = 0
 let infinityNikkiRequestToken = 0
 
 // 使用gallery数据composable
-const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
+const { getAssetThumbnailUrl, getAssetUrl, loadTagTree } = useGalleryData()
 
 const selectedCount = computed(() => store.selectedCount)
 const batchSummary = computed(() => store.batchSummary)
@@ -423,6 +423,24 @@ async function reloadActiveAssetTags() {
 
 // Popover 状态
 const showTagSelector = ref(false)
+const isLoadingTagTree = ref(false)
+
+async function handleTagSelectorOpen(open: boolean) {
+  showTagSelector.value = open
+
+  if (!open || store.tags.length > 0 || isLoadingTagTree.value) {
+    return
+  }
+
+  isLoadingTagTree.value = true
+  try {
+    await loadTagTree()
+  } catch (error) {
+    console.error('Failed to load tag tree for details:', error)
+  } finally {
+    isLoadingTagTree.value = false
+  }
+}
 
 // 移除标签
 async function handleRemoveTag(tagId: number) {
@@ -791,7 +809,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
               <div>
                 <div class="mb-2 flex items-center justify-between">
                   <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
-                  <Popover v-model:open="showTagSelector">
+                  <Popover :open="showTagSelector" @update:open="handleTagSelectorOpen">
                     <PopoverTrigger as-child>
                       <Button variant="sidebarGhost" size="sm" class="h-6 gap-1 px-2 text-xs">
                         <svg
@@ -811,8 +829,19 @@ async function handleCopyColorHex(color: AssetMainColor) {
                         {{ t('gallery.details.tags.add') }}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="end" class="p-0">
+                    <PopoverContent
+                      align="end"
+                      :class="store.isCompactWindow ? 'z-[120]' : undefined"
+                      class="p-0"
+                    >
+                      <div
+                        v-if="isLoadingTagTree && store.tags.length === 0"
+                        class="w-72 py-8 text-center text-sm text-muted-foreground"
+                      >
+                        {{ t('gallery.sidebar.common.loading') }}
+                      </div>
                       <TagSelectorPopover
+                        v-else
                         :tags="store.tags"
                         :selected-tag-ids="assetTags.map((t) => t.id)"
                         @toggle="handleToggleTag"
@@ -944,7 +973,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
         <div>
           <div class="mb-2 flex items-center justify-between">
             <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
-            <Popover v-model:open="showTagSelector">
+            <Popover :open="showTagSelector" @update:open="handleTagSelectorOpen">
               <PopoverTrigger as-child>
                 <Button variant="sidebarGhost" size="sm" class="h-6 gap-1 px-2 text-xs">
                   <svg
@@ -964,8 +993,19 @@ async function handleCopyColorHex(color: AssetMainColor) {
                   {{ t('gallery.details.tags.add') }}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" class="p-0">
+              <PopoverContent
+                align="end"
+                :class="store.isCompactWindow ? 'z-[120]' : undefined"
+                class="p-0"
+              >
+                <div
+                  v-if="isLoadingTagTree && store.tags.length === 0"
+                  class="w-72 py-8 text-center text-sm text-muted-foreground"
+                >
+                  {{ t('gallery.sidebar.common.loading') }}
+                </div>
                 <TagSelectorPopover
+                  v-else
                   :tags="store.tags"
                   :selected-tag-ids="batchSelectedTagIds"
                   @toggle="handleToggleBatchTag"
