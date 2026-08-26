@@ -235,6 +235,34 @@ body,
   background-color: var(--popover);
 }
 
+/* 菜单保留原生滚动行为，只将滚动条收窄并统一到当前主题。 */
+.menu-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 45%, transparent) transparent;
+}
+
+.menu-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.menu-scrollbar::-webkit-scrollbar-track,
+.menu-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.menu-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 2rem;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+  background-clip: content-box;
+}
+
+.menu-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
+}
+
 :root[data-menu-blur] .menu-blur-surface {
   background-color: var(--popover-glass);
   -webkit-backdrop-filter: blur(var(--popover-glass-blur));
