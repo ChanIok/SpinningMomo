@@ -37,11 +37,12 @@ const sortOptions = computed(() => [
   <MobileDrawer
     :open="open"
     side="bottom"
-    class="max-h-[88vh] rounded-t-2xl border-t border-border/40 text-sidebar-foreground"
+    class="max-h-[88vh] rounded-t-2xl border-t border-border/40 text-sidebar-foreground supports-[height:100dvh]:max-h-[88dvh]"
     @close="emit('update:open', false)"
   >
     <!-- 滚动内容区 -->
     <ScrollArea class="min-h-0 flex-1">
+      <!-- 滑块位于内容末尾，需要额外的下方触控余量，避免手指贴近抽屉边缘。 -->
       <div class="flex flex-col gap-4 px-4 pt-2 pb-9">
         <!-- 视图模式（3联分段控制器） -->
         <div class="flex flex-col gap-2">

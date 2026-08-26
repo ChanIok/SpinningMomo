@@ -985,6 +985,7 @@ onUnmounted(() => {
             v-if="isLightboxChromeVisible && !isClosing"
             class="pointer-events-auto z-30"
             :class="isReservedDesktopLayout ? 'relative shrink-0' : 'absolute inset-x-0 top-0'"
+            :style="!isReservedDesktopLayout ? { paddingTop: 'var(--app-safe-top)' } : undefined"
           >
             <LightboxToolbar
               :compressed="isToolbarCompressed"
@@ -1133,7 +1134,7 @@ onUnmounted(() => {
           side="bottom"
           :z-index="110"
           :close-on-escape="false"
-          class="h-[82vh] max-h-[720px] rounded-t-2xl border-t border-border bg-background pb-[env(safe-area-inset-bottom)] text-sidebar-foreground"
+          class="h-[82vh] max-h-[720px] rounded-t-2xl border-t border-border bg-background text-sidebar-foreground supports-[height:100dvh]:h-[82dvh]"
           @close="closeMobileDetails"
         >
           <div class="flex h-11 shrink-0 items-center justify-between border-b px-4">

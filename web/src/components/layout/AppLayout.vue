@@ -36,7 +36,7 @@ const hasBackgroundImage = computed(() =>
 </script>
 
 <template>
-  <div class="relative h-screen w-screen bg-transparent">
+  <div class="relative h-screen w-screen bg-transparent supports-[height:100dvh]:h-dvh">
     <WindowResizeOverlay />
 
     <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
+import {
+  useDebounceFn,
+  useElementSize,
+  useEventListener,
+  usePreferredReducedMotion,
+} from '@vueuse/core'
 import { LoaderCircle, Upload, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
@@ -41,6 +46,17 @@ const gallerySelection = useGallerySelection()
 const { t } = useI18n()
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
+const compactToolbarRef = ref<HTMLElement | null>(null)
+const actionBarRef = ref<HTMLElement | null>(null)
+const { height: compactToolbarHeight } = useElementSize(compactToolbarRef)
+const { height: actionBarHeight } = useElementSize(actionBarRef)
+const galleryViewportStyle = computed(() => ({
+  '--gallery-toolbar-height':
+    store.isCompactWindow && compactToolbarHeight.value === 0
+      ? 'calc(3rem + var(--app-safe-top))'
+      : `${Math.ceil(compactToolbarHeight.value)}px`,
+  '--gallery-action-bar-height': `${Math.ceil(actionBarHeight.value)}px`,
+}))
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
@@ -586,7 +602,12 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
       <!-- 紧凑窗口下工具栏浮动层叠在顶部，不占用滚动区域高度 -->
-      <div v-if="store.isCompactWindow" class="absolute top-0 right-0 left-0 z-20">
+      <div
+        v-if="store.isCompactWindow"
+        ref="compactToolbarRef"
+        class="absolute top-0 right-0 left-0 z-20"
+        :style="{ paddingTop: 'var(--app-safe-top)' }"
+      >
         <GalleryCompactToolbar />
       </div>
 
@@ -624,6 +645,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
         ref="contentRef"
         class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
         :class="store.isCompactWindow && 'gallery-compact-touch-surface'"
+        :style="galleryViewportStyle"
         @pointerdown="handleContentPointerDown"
         @contextmenu="handleContentContextMenu"
         @dragenter="handleViewerDragEnter"
@@ -632,7 +654,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
         @drop="handleViewerDrop"
       >
         <div class="relative min-h-0 flex-1">
-          <GalleryContent ref="galleryContentRef" />
+          <GalleryContent ref="galleryContentRef" :toolbar-height="compactToolbarHeight" />
 
           <div
             v-if="isExternalDragActive || isDropImporting"
@@ -668,7 +690,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
             v-if="isMultiSelectMode"
             class="pointer-events-none absolute inset-x-0 bottom-0 z-20"
           >
-            <div class="pointer-events-auto">
+            <div ref="actionBarRef" class="pointer-events-auto">
               <GalleryMobileActionBar variant="solid" />
             </div>
           </div>

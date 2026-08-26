@@ -44,9 +44,9 @@ const props = withDefaults(
 
 const containerClass = computed(() => {
   if (props.variant === 'immersive') {
-    return 'shrink-0 bg-gradient-to-t from-background/60 via-background/40 to-transparent px-2 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] text-foreground'
+    return 'shrink-0 bg-gradient-to-t from-background/60 via-background/40 to-transparent pt-6 pr-[max(0.5rem,var(--app-safe-right))] pb-[calc(var(--app-bottom-inset)+0.5rem)] pl-[max(0.5rem,var(--app-safe-left))] text-foreground'
   }
-  return 'w-full  bg-background/95 dark:bg-popover/95 px-2 pt-2 pb-4 text-foreground'
+  return 'w-full bg-background/95 pt-2 pr-[max(0.5rem,var(--app-safe-right))] pb-[calc(var(--app-bottom-inset)+1rem)] pl-[max(0.5rem,var(--app-safe-left))] text-foreground dark:bg-popover/95'
 })
 
 const { t } = useI18n()
@@ -404,80 +404,84 @@ async function handleDownload() {
   <MobileDrawer
     :open="ratingSheetOpen"
     side="bottom"
-    class="rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    class="rounded-t-2xl pt-3"
     @close="ratingSheetOpen = false"
   >
-    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
-      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.ratingTitle') }}</h2>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
-        :aria-label="t('common.close')"
-        @click="ratingSheetOpen = false"
-      >
-        <X class="size-4" />
-      </Button>
-    </div>
-    <div class="grid grid-cols-6 gap-2 pt-2">
-      <Button
-        v-for="rating in [0, 1, 2, 3, 4, 5]"
-        :key="rating"
-        variant="outline"
-        class="h-12 flex-col gap-1 px-1"
-        @click="handleRating(rating)"
-      >
-        <template v-if="rating === 0">
+    <div class="px-4 pb-4">
+      <div class="flex h-10 shrink-0 items-center justify-between pb-1">
+        <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.ratingTitle') }}</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+          :aria-label="t('common.close')"
+          @click="ratingSheetOpen = false"
+        >
           <X class="size-4" />
-          <span class="text-[11px]">{{ t('gallery.mobile.sheet.clearRating') }}</span>
-        </template>
-        <template v-else>
-          <Star class="size-4 fill-amber-400 text-amber-400" />
-          <span class="text-xs">{{ rating }}</span>
-        </template>
-      </Button>
+        </Button>
+      </div>
+      <div class="grid grid-cols-6 gap-2 pt-2">
+        <Button
+          v-for="rating in [0, 1, 2, 3, 4, 5]"
+          :key="rating"
+          variant="outline"
+          class="h-12 flex-col gap-1 px-1"
+          @click="handleRating(rating)"
+        >
+          <template v-if="rating === 0">
+            <X class="size-4" />
+            <span class="text-[11px]">{{ t('gallery.mobile.sheet.clearRating') }}</span>
+          </template>
+          <template v-else>
+            <Star class="size-4 fill-amber-400 text-amber-400" />
+            <span class="text-xs">{{ rating }}</span>
+          </template>
+        </Button>
+      </div>
     </div>
   </MobileDrawer>
 
   <MobileDrawer
     :open="tagSheetOpen"
     side="bottom"
-    class="max-h-[82vh] overflow-y-auto rounded-t-2xl px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    class="max-h-[82vh] overflow-y-auto rounded-t-2xl pt-3 supports-[height:100dvh]:max-h-[82dvh]"
     @close="tagSheetOpen = false"
   >
-    <div class="flex h-10 shrink-0 items-center justify-between pb-1">
-      <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.tagsTitle') }}</h2>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
-        :aria-label="t('common.close')"
-        @click="tagSheetOpen = false"
+    <div class="px-4 pb-4">
+      <div class="flex h-10 shrink-0 items-center justify-between pb-1">
+        <h2 class="text-base font-semibold">{{ t('gallery.mobile.sheet.tagsTitle') }}</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+          :aria-label="t('common.close')"
+          @click="tagSheetOpen = false"
+        >
+          <X class="size-4" />
+        </Button>
+      </div>
+      <div
+        v-if="tagLoading && store.tags.length === 0"
+        class="py-8 text-center text-sm text-muted-foreground"
       >
-        <X class="size-4" />
-      </Button>
+        {{ t('gallery.sidebar.common.loading') }}
+      </div>
+      <TagSelectorPopover
+        v-else
+        :tags="store.tags"
+        :selected-tag-ids="tagIds"
+        @toggle="void handleTagToggle($event)"
+      />
     </div>
-    <div
-      v-if="tagLoading && store.tags.length === 0"
-      class="py-8 text-center text-sm text-muted-foreground"
-    >
-      {{ t('gallery.sidebar.common.loading') }}
-    </div>
-    <TagSelectorPopover
-      v-else
-      :tags="store.tags"
-      :selected-tag-ids="tagIds"
-      @toggle="void handleTagToggle($event)"
-    />
   </MobileDrawer>
 
   <MobileDrawer
     :open="moreSheetOpen"
     side="bottom"
-    class="max-h-[86vh] overflow-y-auto rounded-t-2xl px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+    class="max-h-[86vh] overflow-y-auto rounded-t-2xl pt-2 supports-[height:100dvh]:max-h-[86dvh]"
     @close="moreSheetOpen = false"
   >
-    <div class="grid gap-1">
+    <div class="grid gap-1 px-4 pb-4">
       <Button
         v-if="canUseLocalFileSystem"
         variant="ghost"

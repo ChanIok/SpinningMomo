@@ -661,7 +661,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
 <template>
   <ScrollArea class="h-full">
-    <div class="p-4">
+    <div class="min-h-full p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">
@@ -1046,7 +1046,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
       </div>
 
       <!-- 空状态 -->
-      <div v-else class="flex h-[calc(100vh-80px)] items-center justify-center">
+      <div v-else class="flex min-h-full items-center justify-center">
         <div class="text-center text-muted-foreground">
           <svg
             xmlns="http://www.w3.org/2000/svg"

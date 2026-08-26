@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, type HTMLAttributes } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, type CSSProperties, type HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
 
 /** 触发拖拽关闭的最小位移阈值（像素） */
@@ -304,7 +304,38 @@ const defaultPanelClass = computed(() => {
       return 'w-full border-b border-border'
     case 'bottom':
     default:
-      return 'w-full max-h-[88vh] rounded-t-2xl border-t border-border/80'
+      return 'w-full max-h-[88vh] supports-[height:100dvh]:max-h-[88dvh] rounded-t-2xl border-t border-border/80'
+  }
+})
+
+// 面板背景铺到屏幕边缘，只有内容布局需要避让系统安全区和键盘。
+const panelSafeAreaStyle = computed<CSSProperties>(() => {
+  switch (props.side) {
+    case 'right':
+      return {
+        paddingTop: 'var(--app-safe-top)',
+        paddingRight: 'var(--app-safe-right)',
+        paddingBottom: 'var(--app-bottom-inset)',
+      }
+    case 'left':
+      return {
+        paddingTop: 'var(--app-safe-top)',
+        paddingBottom: 'var(--app-bottom-inset)',
+        paddingLeft: 'var(--app-safe-left)',
+      }
+    case 'top':
+      return {
+        paddingTop: 'var(--app-safe-top)',
+        paddingRight: 'var(--app-safe-right)',
+        paddingLeft: 'var(--app-safe-left)',
+      }
+    case 'bottom':
+    default:
+      return {
+        paddingRight: 'var(--app-safe-right)',
+        paddingBottom: 'var(--app-bottom-inset)',
+        paddingLeft: 'var(--app-safe-left)',
+      }
   }
 })
 
@@ -398,7 +429,7 @@ const overlayDynamicStyle = computed(() => {
           ref="panelRef"
           class="mobile-drawer-panel relative z-10 flex flex-col bg-background shadow-2xl"
           :class="cn(defaultPanelClass, props.class)"
-          :style="panelDynamicStyle"
+          :style="[panelSafeAreaStyle, panelDynamicStyle]"
           @touchstart="handleTouchStart"
           @touchmove="handleTouchMove"
           @touchend="handleTouchEnd"

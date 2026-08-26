@@ -58,6 +58,13 @@
 
 :root {
   --radius: 0.625rem;
+  /* 移动端系统遮挡区由浏览器提供；业务组件只消费这些统一变量。 */
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --app-safe-right: env(safe-area-inset-right, 0px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-left: env(safe-area-inset-left, 0px);
+  --app-keyboard-bottom: 0px;
+  --app-bottom-inset: calc(var(--app-safe-bottom) + var(--app-keyboard-bottom));
   --app-font-latin: 'Inter Variable', 'Inter';
   --app-font-cjk:
     'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC',
@@ -127,6 +134,24 @@
   --statusbar-foreground: #3b3b3b;
   --panel: #f8f8f8;
   --panel-foreground: #3b3b3b;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@supports (height: 100dvh) {
+  html,
+  body,
+  #app {
+    height: 100dvh;
+  }
 }
 
 .dark {

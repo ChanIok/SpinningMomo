@@ -107,7 +107,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
 
 <template>
   <div
-    class="@container flex w-full items-start justify-between px-2.5 text-foreground transition-colors"
+    class="@container flex w-full items-start justify-between pr-[max(0.625rem,var(--app-safe-right))] pl-[max(0.625rem,var(--app-safe-left))] text-foreground transition-colors"
     :class="
       props.compressed
         ? 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent'

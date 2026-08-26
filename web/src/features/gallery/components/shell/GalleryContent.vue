@@ -9,6 +9,15 @@ import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
 import GalleryMoveToFolderDialog from '../dialogs/GalleryMoveToFolderDialog.vue'
 import GalleryDeleteAssetsDialog from '../dialogs/GalleryDeleteAssetsDialog.vue'
 
+const props = withDefaults(
+  defineProps<{
+    toolbarHeight?: number
+  }>(),
+  {
+    toolbarHeight: 0,
+  }
+)
+
 const store = useGalleryStore()
 const viewMode = computed(() =>
   store.isCompactWindow && store.view.mode === 'list' ? 'grid' : store.view.mode
@@ -43,10 +52,14 @@ defineExpose({ scrollToIndex, getCardRect })
 
 <template>
   <div class="h-full w-full">
-    <GridView v-if="viewMode === 'grid'" ref="gridViewRef" />
+    <GridView v-if="viewMode === 'grid'" ref="gridViewRef" :toolbar-height="props.toolbarHeight" />
     <ListView v-else-if="viewMode === 'list'" ref="listViewRef" />
-    <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" />
-    <AdaptiveView v-else ref="adaptiveViewRef" />
+    <MasonryView
+      v-else-if="viewMode === 'masonry'"
+      ref="masonryViewRef"
+      :toolbar-height="props.toolbarHeight"
+    />
+    <AdaptiveView v-else ref="adaptiveViewRef" :toolbar-height="props.toolbarHeight" />
     <GallerySharedContextMenu />
     <GalleryMoveToFolderDialog />
     <GalleryDeleteAssetsDialog />

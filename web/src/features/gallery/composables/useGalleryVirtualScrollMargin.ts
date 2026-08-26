@@ -10,17 +10,25 @@ import { useGalleryStore } from '../store'
  */
 export function useGalleryVirtualScrollMargin(
   scrollContainerRef: Ref<HTMLElement | null>,
-  headerRef: Ref<HTMLElement | null>
+  headerRef: Ref<HTMLElement | null>,
+  compactToolbarHeight: Ref<number>
 ) {
   const store = useGalleryStore()
   const { height: headerHeight } = useElementSize(headerRef)
 
   const scrollMargin = computed(() => {
     const container = scrollContainerRef.value
-    const containerPaddingTop =
+    const readContainerPaddingTop = () =>
       typeof window !== 'undefined' && container
         ? Number.parseFloat(window.getComputedStyle(container).paddingTop) || 0
         : 0
+
+    // 紧凑工具栏高度由外层 ResizeObserver 提供；首次测量完成前回读 CSS fallback，
+    // 桌面端则保留滚动容器自身的 py-2 顶部内边距。
+    const containerPaddingTop =
+      store.isCompactWindow && compactToolbarHeight.value > 0
+        ? compactToolbarHeight.value
+        : readContainerPaddingTop()
 
     return containerPaddingTop + (store.isCompactWindow ? headerHeight.value : 0)
   })

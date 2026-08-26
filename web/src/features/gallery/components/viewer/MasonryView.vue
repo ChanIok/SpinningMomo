@@ -23,6 +23,9 @@ import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
+const props = withDefaults(defineProps<{ toolbarHeight?: number }>(), {
+  toolbarHeight: 0,
+})
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const { prepareAssetDrag } = useGalleryDragPayload()
@@ -34,7 +37,12 @@ const virtualContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
-const { scrollMargin } = useGalleryVirtualScrollMargin(scrollContainerRef, heroHeaderRef)
+const toolbarHeight = computed(() => props.toolbarHeight)
+const { scrollMargin } = useGalleryVirtualScrollMargin(
+  scrollContainerRef,
+  heroHeaderRef,
+  toolbarHeight
+)
 const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -221,8 +229,10 @@ defineExpose({ scrollToIndex, getCardRect })
     <div
       ref="scrollContainerRef"
       :class="[
-        store.isCompactWindow ? 'px-0 pt-12' : 'px-4 py-2 sm:pr-2',
-        isMultiSelectMode ? 'pb-24' : store.isCompactWindow ? 'pb-2' : '',
+        store.isCompactWindow ? 'px-0 pt-[var(--gallery-toolbar-height)]' : 'px-4 py-2 sm:pr-2',
+        isMultiSelectMode || store.isCompactWindow
+          ? 'pb-[calc(max(var(--app-bottom-inset),var(--gallery-action-bar-height))+0.5rem)]'
+          : '',
       ]"
       class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"

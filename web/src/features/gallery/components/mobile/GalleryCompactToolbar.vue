@@ -90,7 +90,7 @@ function exitMultiSelectMode() {
 
 <template>
   <div
-    class="pointer-events-none flex h-12 w-full items-center justify-between bg-transparent px-2.5 transition-all duration-260 ease-[cubic-bezier(0.16,1,0.3,1)]"
+    class="pointer-events-none flex h-12 w-full items-center justify-between bg-transparent pr-[max(0.625rem,var(--app-safe-right))] pl-[max(0.625rem,var(--app-safe-left))] transition-all duration-260 ease-[cubic-bezier(0.16,1,0.3,1)]"
     :class="[isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0']"
   >
     <template v-if="isMultiSelectMode">
