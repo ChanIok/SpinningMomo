@@ -7,6 +7,7 @@ import { heroAnimating } from '../../composables/useHeroTransition'
 const props = defineProps<{
   canPrevious: boolean
   canNext: boolean
+  immersive: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,12 @@ const showPointerNavigation = computed(() => {
   return !touchPrimary.value
 })
 
+const navigationButtonVisibilityClass = computed(() =>
+  props.immersive
+    ? 'opacity-0 hover:opacity-70 focus-visible:opacity-100'
+    : 'opacity-60 hover:opacity-100'
+)
+
 function handlePointerDown(event: PointerEvent) {
   lastInputModality.value = event.pointerType === 'touch' ? 'touch' : 'fine'
 }
@@ -38,7 +45,15 @@ function handleKeydown() {
   lastInputModality.value = 'keyboard'
 }
 
+function handlePointerMove(event: PointerEvent) {
+  // 混合触控设备上，鼠标移动时应立即恢复鼠标导航按钮。
+  if (event.pointerType === 'mouse') {
+    lastInputModality.value = 'fine'
+  }
+}
+
 useEventListener(window, 'pointerdown', handlePointerDown)
+useEventListener(window, 'pointermove', handlePointerMove)
 useEventListener(window, 'keydown', handleKeydown)
 </script>
 
@@ -46,7 +61,8 @@ useEventListener(window, 'keydown', handleKeydown)
   <button
     v-if="showPointerNavigation && props.canPrevious"
     type="button"
-    class="surface-top absolute top-1/2 left-4 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
+    class="surface-top absolute top-1/2 left-4 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground active:scale-95 dark:hover:bg-white/20"
+    :class="navigationButtonVisibilityClass"
     :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
     :aria-label="t('gallery.lightbox.image.previousTitle')"
     @click="emit('previous')"
@@ -59,7 +75,8 @@ useEventListener(window, 'keydown', handleKeydown)
   <button
     v-if="showPointerNavigation && props.canNext"
     type="button"
-    class="surface-top absolute top-1/2 right-4 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 opacity-60 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground hover:opacity-100 hover:shadow-lg active:scale-95 dark:hover:bg-white/20"
+    class="surface-top absolute top-1/2 right-4 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground/75 transition-all duration-200 hover:scale-105 hover:bg-black/50 hover:text-foreground active:scale-95 dark:hover:bg-white/20"
+    :class="navigationButtonVisibilityClass"
     :style="heroAnimating ? { opacity: 0, pointerEvents: 'none' } : {}"
     :aria-label="t('gallery.lightbox.image.nextTitle')"
     @click="emit('next')"

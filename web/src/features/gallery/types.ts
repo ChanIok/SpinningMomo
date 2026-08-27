@@ -195,10 +195,11 @@ export interface LightboxState {
   isClosing: boolean
   /** 记录本次灯箱由哪种输入打开，用于保持触摸操作入口的一致性 */
   inputType: GalleryInputType
-  /** 沉浸模式：仅页面内 Teleport + 固定层铺满视口，不调用系统/浏览器全屏 */
+  /** 沉浸模式：仅当前应用内容区内 Teleport + 固定层铺满视口，不调用系统/浏览器全屏 */
   isImmersive: boolean
-  /** 暗房控件显隐：窄屏触摸手势的临时界面状态，不改变沉浸模式 */
+  /** 暗房 chrome 显隐：触摸点按或桌面边缘唤出的临时界面状态，不改变沉浸模式 */
   chromeVisible: boolean
+  /** 用户主动选择的底片栏状态；沉浸模式隐藏 chrome 时不修改该偏好 */
   showFilmstrip: boolean
   zoom: number
   fitMode: 'contain' | 'cover' | 'actual'

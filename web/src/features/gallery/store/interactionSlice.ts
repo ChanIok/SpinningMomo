@@ -351,7 +351,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function toggleLightboxImmersive() {
-    setLightboxImmersive(!lightbox.isImmersive)
+    const immersive = !lightbox.isImmersive
+    setLightboxImmersive(immersive)
+    // Store 层的切换入口也保持沉浸模式与 chrome 的状态语义一致。
+    setLightboxChromeVisible(!immersive)
   }
 
   function toggleLightboxFilmstrip() {

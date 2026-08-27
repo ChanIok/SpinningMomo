@@ -41,6 +41,10 @@ const CLOSE_AFTER_REVERSE_HERO_MS = 260
 const CLOSE_AFTER_NO_HERO_MS = 180
 /** 静态图单击先等待双击窗口，避免双击时 chrome 先闪一次。 */
 const TOUCH_SINGLE_TAP_DELAY_MS = 300
+/** 桌面沉浸模式中，靠近窗口边缘时唤出临时 chrome。 */
+const IMMERSIVE_CHROME_EDGE_ZONE_PX = 56
+/** 桌面沉浸模式中，鼠标离开临时 chrome 后自动隐藏。 */
+const IMMERSIVE_CHROME_HIDE_DELAY_MS = 1800
 /** 下拉未提交时让媒体表面回到原位的动画时长。 */
 const VERTICAL_GESTURE_SNAPBACK_MS = 220
 
@@ -87,9 +91,10 @@ let pendingVerticalGestureOffset: number | null = null
 let verticalGestureResetTimer: number | null = null
 // 下拉关闭会先消费暗房历史，再异步启动退场动画；这里暂存松手时的视觉偏移。
 let pendingExitGestureOffset: number | null = null
-// 界面层显隐与沉浸模式分离；共享状态让全局 App Header 与暗房控件同步。
+// chrome 显隐与沉浸模式分离；共享状态让紧凑窗口的 App Header 与暗房控件同步。
 const isLightboxChromeVisible = computed(() => store.lightbox.chromeVisible)
 let pendingTouchTapTimer: number | null = null
+let immersiveChromeHideTimer: number | null = null
 // inputType 记录打开来源；这里单独记录会话内最近一次指针模态，支持混合触控设备切换。
 const activeInputType = ref<GalleryInputType>('mouse')
 const preloadingAssetIds = new Set<number>()
@@ -160,7 +165,7 @@ const lightboxRootClass = computed(() => {
   const immersive = isImmersive.value
   const closing = store.lightbox.isClosing
   let cls = immersive
-    ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
+    ? 'lightbox-immersive-surface dark fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
     : 'absolute inset-0 z-10 flex h-full w-full overflow-hidden'
   if (!store.isCompactWindow) {
     cls += ' px-[1px]'
@@ -176,6 +181,7 @@ watch(
   (isOpen) => {
     clearPendingTouchTap()
     if (!isOpen) {
+      clearImmersiveChromeHideTimer()
       resetVerticalGestureSurface()
       return
     }
@@ -321,6 +327,11 @@ function enterImmersive() {
   if (isImmersive.value) {
     return
   }
+
+  clearImmersiveChromeHideTimer()
+  if (mobileDetailsOpen.value) {
+    closeMobileDetails()
+  }
   lightbox.setImmersive(true)
 }
 
@@ -328,6 +339,8 @@ function exitImmersive() {
   if (!isImmersive.value) {
     return
   }
+
+  clearImmersiveChromeHideTimer()
   lightbox.setImmersive(false)
 }
 
@@ -567,6 +580,7 @@ watch(isClosing, (closing) => {
 
 // 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
 function requestClose() {
+  clearImmersiveChromeHideTimer()
   if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
     void overlayHistory.closeLightbox()
     return
@@ -611,6 +625,16 @@ function handleToolbarRotate(deltaDegrees: number) {
 }
 
 function handleToolbarToggleFilmstrip() {
+  if (isImmersive.value && !isLightboxChromeVisible.value) {
+    // Tab 在纯图片状态下承担“召回底片栏”的职责；不改变用户退出沉浸后的偏好。
+    store.setLightboxChromeVisible(true)
+    if (!store.lightbox.showFilmstrip) {
+      lightbox.toggleFilmstrip()
+    }
+    scheduleImmersiveChromeHide()
+    return
+  }
+
   lightbox.toggleFilmstrip()
 }
 
@@ -643,11 +667,78 @@ function clearPendingTouchTap() {
   }
 }
 
+function clearImmersiveChromeHideTimer() {
+  if (immersiveChromeHideTimer !== null) {
+    window.clearTimeout(immersiveChromeHideTimer)
+    immersiveChromeHideTimer = null
+  }
+}
+
+function hideLightboxChrome() {
+  clearImmersiveChromeHideTimer()
+  store.setLightboxChromeVisible(false)
+  closeMobileDetails()
+}
+
+function scheduleImmersiveChromeHide() {
+  if (
+    !isImmersive.value ||
+    isClosing.value ||
+    !store.lightbox.isOpen ||
+    !isLightboxChromeVisible.value
+  ) {
+    return
+  }
+
+  if (immersiveChromeHideTimer !== null) {
+    return
+  }
+
+  immersiveChromeHideTimer = window.setTimeout(() => {
+    immersiveChromeHideTimer = null
+    if (
+      isImmersive.value &&
+      !isClosing.value &&
+      store.lightbox.isOpen &&
+      isLightboxChromeVisible.value
+    ) {
+      hideLightboxChrome()
+    }
+  }, IMMERSIVE_CHROME_HIDE_DELAY_MS)
+}
+
+function isLightboxChromeTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-lightbox-chrome]') !== null
+}
+
+function handleLightboxPointerMove(event: PointerEvent) {
+  // 触摸和手写笔继续使用现有的点按/手势语义，不参与桌面边缘唤出。
+  if (event.pointerType !== 'mouse' || !isImmersive.value || isClosing.value) {
+    return
+  }
+
+  const nearVerticalEdge =
+    event.clientY <= IMMERSIVE_CHROME_EDGE_ZONE_PX ||
+    event.clientY >= window.innerHeight - IMMERSIVE_CHROME_EDGE_ZONE_PX
+
+  if (nearVerticalEdge || isLightboxChromeTarget(event.target)) {
+    clearImmersiveChromeHideTimer()
+    if (!isLightboxChromeVisible.value) {
+      store.setLightboxChromeVisible(true)
+    }
+    return
+  }
+
+  scheduleImmersiveChromeHide()
+}
+
 function toggleLightboxChrome() {
   const visible = !store.lightbox.chromeVisible
-  store.setLightboxChromeVisible(visible)
-  if (!visible) {
-    closeMobileDetails()
+  if (visible) {
+    clearImmersiveChromeHideTimer()
+    store.setLightboxChromeVisible(true)
+  } else {
+    hideLightboxChrome()
   }
 }
 
@@ -946,6 +1037,7 @@ onMounted(async () => {
 useEventListener(window, 'keydown', handleKeydown)
 onUnmounted(() => {
   clearPendingTouchTap()
+  clearImmersiveChromeHideTimer()
   clearVerticalGestureResetTimer()
   clearVerticalGestureFrame()
   pendingExitGestureOffset = null
@@ -965,6 +1057,7 @@ onUnmounted(() => {
       style="--surface-opacity-scale: 0.96"
       @click.self="requestClose"
       @pointerdown.capture="handleLightboxPointerDown"
+      @pointermove="handleLightboxPointerMove"
     >
       <div
         class="relative h-full min-h-0 w-full"
@@ -981,6 +1074,7 @@ onUnmounted(() => {
         >
           <div
             v-if="isLightboxChromeVisible && !isClosing"
+            data-lightbox-chrome
             class="pointer-events-auto z-30"
             :class="isReservedDesktopLayout ? 'relative shrink-0' : 'absolute inset-x-0 top-0'"
             :style="!isReservedDesktopLayout ? { paddingTop: 'var(--app-safe-top)' } : undefined"
@@ -1052,6 +1146,7 @@ onUnmounted(() => {
                 <LightboxNavigationButtons
                   :can-previous="canGoToPrevious"
                   :can-next="canGoToNext"
+                  :immersive="isImmersive"
                   @previous="throttledPrevious"
                   @next="throttledNext"
                 />
@@ -1081,6 +1176,7 @@ onUnmounted(() => {
             <LightboxNavigationButtons
               :can-previous="canGoToPrevious"
               :can-next="canGoToNext"
+              :immersive="isImmersive"
               @previous="throttledPrevious"
               @next="throttledNext"
             />
@@ -1103,6 +1199,7 @@ onUnmounted(() => {
           >
             <div
               v-if="isLightboxChromeVisible && isTouchInput && !isClosing"
+              data-lightbox-chrome
               class="pointer-events-auto shrink-0"
             >
               <GalleryMobileActionBar variant="immersive" />
@@ -1120,6 +1217,7 @@ onUnmounted(() => {
           >
             <div
               v-if="isLightboxChromeVisible && showFilmstrip && !isClosing"
+              data-lightbox-chrome
               class="pointer-events-auto shrink-0"
             >
               <LightboxFilmstrip />
@@ -1144,3 +1242,10 @@ onUnmounted(() => {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.lightbox-immersive-surface {
+  background-color: #000;
+  color-scheme: dark;
+}
+</style>

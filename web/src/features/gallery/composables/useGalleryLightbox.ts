@@ -37,10 +37,12 @@ export function useGalleryLightbox() {
 
   function setImmersive(immersive: boolean) {
     store.setLightboxImmersive(immersive)
+    // 沉浸模式默认进入纯图片状态，退出时恢复工作区 chrome；底片栏偏好保持不变。
+    store.setLightboxChromeVisible(!immersive)
   }
 
   function toggleImmersive() {
-    store.toggleLightboxImmersive()
+    setImmersive(!store.lightbox.isImmersive)
   }
 
   function toggleFilmstrip() {

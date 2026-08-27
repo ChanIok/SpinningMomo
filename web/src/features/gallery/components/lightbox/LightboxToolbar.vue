@@ -65,6 +65,20 @@ const isActualSize = computed(
   () =>
     store.lightbox.fitMode === 'actual' && Math.abs(store.lightbox.zoom - 1) <= ACTUAL_SIZE_EPSILON
 )
+const toolbarBackgroundClass = computed(() => {
+  if (isImmersive.value) {
+    // 黑底沉浸模式只保留轻量渐变，提升亮色图片上的控件可读性，不形成实色工具栏。
+    return props.compressed
+      ? 'h-16 bg-gradient-to-b from-black/35 via-black/10 to-transparent'
+      : 'h-12 bg-gradient-to-b from-black/25 via-black/10 to-transparent'
+  }
+
+  if (props.compressed) {
+    return 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent'
+  }
+
+  return 'h-12 bg-transparent'
+})
 const lightboxMode = computed(() => {
   if (currentAsset.value?.type === 'video') {
     return t('gallery.toolbar.filter.type.video')
@@ -108,11 +122,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
 <template>
   <div
     class="@container flex w-full items-start justify-between pr-[max(0.625rem,var(--app-safe-right))] pl-[max(0.625rem,var(--app-safe-left))] text-foreground transition-colors"
-    :class="
-      props.compressed
-        ? 'h-16 bg-gradient-to-b from-background/55 via-background/35 to-transparent'
-        : 'h-12 bg-transparent'
-    "
+    :class="toolbarBackgroundClass"
     @contextmenu="handleToolbarContextMenu"
   >
     <TooltipProvider :delay-duration="300">
@@ -201,7 +211,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         </Tooltip>
       </div>
 
-      <!-- 桌面模式右侧：三阶渐进响应（>=600px 完整、420px~599px 图标、<420px 仅底片栏与全屏） -->
+      <!-- 桌面模式右侧：三阶渐进响应（>=600px 完整、420px~599px 图标、<420px 仅底片栏与沉浸） -->
       <div v-else class="flex items-center gap-2">
         <div class="mr-2 hidden items-center gap-1 @min-[420px]:flex">
           <!-- 适屏与 1:1 文字按钮：>= 600px 显示 -->
@@ -343,7 +353,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <!-- 胶片栏：始终保留 -->
+        <!-- 底片栏开关：按钮随工具栏保留，底片栏本身可单独隐藏 -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -367,7 +377,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           </TooltipContent>
         </Tooltip>
 
-        <!-- 沉浸/全屏：始终保留 -->
+        <!-- 沉浸模式开关：按钮随工具栏保留 -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
