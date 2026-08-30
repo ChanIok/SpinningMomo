@@ -118,10 +118,6 @@ auto trim_ascii(std::string_view value) -> std::string_view {
 
 // 启动 HTTP 服务前准备本次运行使用的 LAN 访问令牌。
 auto initialize(core::AppState& state) -> std::expected<void, std::string> {
-  if (!state.http_server) {
-    return std::unexpected("HTTP server state is not allocated");
-  }
-
   // 先读取持久化令牌，只有成功后才更新运行时状态。
   auto token_result = load_token();
   if (!token_result) {
@@ -139,10 +135,6 @@ auto initialize(core::AppState& state) -> std::expected<void, std::string> {
 
 // 轮换 LAN 令牌并通过 HTTP 事件循环关闭旧的 SSE 会话。
 auto reset_token(core::AppState& state) -> std::expected<std::string, std::string> {
-  if (!state.http_server) {
-    return std::unexpected("HTTP server state is not allocated");
-  }
-
   // 先生成并持久化新令牌，持久化失败时保留旧会话。
   auto generated = generate_token();
   if (!generated) {
@@ -165,10 +157,6 @@ auto reset_token(core::AppState& state) -> std::expected<std::string, std::strin
 
 // 读取设置页所需的当前服务状态、令牌和实时网卡地址。
 auto get_runtime_info(const core::AppState& state) -> std::expected<RuntimeInfo, std::string> {
-  if (!state.http_server) {
-    return std::unexpected("HTTP server state is not allocated");
-  }
-
   RuntimeInfo result;
   std::string preferred_adapter_id;
   // 在同一把设置锁下读取开关和首选网卡，避免两项配置来自不同版本。
@@ -213,8 +201,7 @@ auto is_loopback_address(std::string_view address) -> bool {
 
 // 判断服务是否已实际监听局域网且配置仍处于启用状态。
 auto is_remote_access_enabled(const core::AppState& state) -> bool {
-  if (!state.http_server || !state.http_server->is_running ||
-      !state.http_server->runtime_lan_enabled.load()) {
+  if (!state.http_server->is_running || !state.http_server->runtime_lan_enabled.load()) {
     return false;
   }
 
@@ -246,7 +233,7 @@ auto extract_cookie(std::string_view cookie_header, std::string_view name)
 
 // 读取当前令牌并以常数时间比较请求中的令牌。
 auto is_token_valid(const core::AppState& state, std::string_view token) -> bool {
-  if (!state.http_server || token.empty()) {
+  if (token.empty()) {
     return false;
   }
 

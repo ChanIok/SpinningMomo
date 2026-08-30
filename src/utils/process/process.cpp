@@ -133,12 +133,41 @@ auto run(const std::filesystem::path& executable, const std::vector<std::wstring
   const auto command_line = detail::build_command_line(executable, arguments);
   auto mutable_command_line = command_line;
 
-  STARTUPINFOW startup_info{};
-  startup_info.cb = sizeof(STARTUPINFOW);
-  startup_info.dwFlags = STARTF_USESTDHANDLES;
-  startup_info.hStdInput = stdin_nul;
-  startup_info.hStdOutput = stdout_write;
-  startup_info.hStdError = stderr_write;
+  // 只把标准 I/O 句柄传给子进程，避免监听 socket 等无关句柄被全局继承。
+  std::array inherited_handles{stdin_nul, stdout_write, stderr_write};
+  SIZE_T attribute_list_size = 0;
+  InitializeProcThreadAttributeList(nullptr, 1, 0, &attribute_list_size);
+  if (attribute_list_size == 0) {
+    const auto error = GetLastError();
+    cleanup_handles();
+    return std::unexpected("Failed to size process attribute list: " + std::to_string(error));
+  }
+
+  std::vector<std::byte> attribute_storage(attribute_list_size);
+  auto* attribute_list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attribute_storage.data());
+  if (!InitializeProcThreadAttributeList(attribute_list, 1, 0, &attribute_list_size)) {
+    const auto error = GetLastError();
+    cleanup_handles();
+    return std::unexpected("Failed to initialize process attribute list: " + std::to_string(error));
+  }
+
+  if (!UpdateProcThreadAttribute(attribute_list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                 inherited_handles.data(),
+                                 inherited_handles.size() * sizeof(HANDLE), nullptr, nullptr)) {
+    const auto error = GetLastError();
+    DeleteProcThreadAttributeList(attribute_list);
+    cleanup_handles();
+    return std::unexpected("Failed to configure inherited process handles: " +
+                           std::to_string(error));
+  }
+
+  STARTUPINFOEXW startup_info{};
+  startup_info.StartupInfo.cb = sizeof(STARTUPINFOEXW);
+  startup_info.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.StartupInfo.hStdInput = stdin_nul;
+  startup_info.StartupInfo.hStdOutput = stdout_write;
+  startup_info.StartupInfo.hStdError = stderr_write;
+  startup_info.lpAttributeList = attribute_list;
 
   PROCESS_INFORMATION process_info{};
   std::wstring working_directory;
@@ -148,10 +177,12 @@ auto run(const std::filesystem::path& executable, const std::vector<std::wstring
     working_directory_ptr = working_directory.c_str();
   }
 
-  const BOOL created =
-      CreateProcessW(executable.wstring().c_str(), mutable_command_line.data(), nullptr, nullptr,
-                     TRUE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, nullptr,
-                     working_directory_ptr, &startup_info, &process_info);
+  const BOOL created = CreateProcessW(
+      executable.wstring().c_str(), mutable_command_line.data(), nullptr, nullptr, TRUE,
+      CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, nullptr,
+      working_directory_ptr, &startup_info.StartupInfo, &process_info);
+
+  DeleteProcThreadAttributeList(attribute_list);
 
   // 父进程不应继续持有写端，否则读线程永远等不到 EOF。
   detail::close_handle(stdout_write);

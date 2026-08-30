@@ -37,16 +37,23 @@ auto format_candidate_ports(std::span<const int> ports) -> std::string {
   return result;
 }
 
+// App 析构后清空运行时指针；Loop 会在线程退出时由 uWS 自动释放。
+auto clear_runtime_state(HttpServerState& server) -> void {
+  std::lock_guard lock(server.runtime_mutex);
+  server.app = nullptr;
+  server.loop = nullptr;
+  server.listen_socket = nullptr;
+  server.is_running = false;
+  server.runtime_lan_enabled = false;
+}
+
 }  // namespace
 
 // 在 HTTP 线程中关闭旧监听句柄并绑定相同端口的新地址。
 auto rebind_listen_socket(core::AppState& state, bool lan_enabled)
     -> std::expected<void, std::string> {
-  if (!state.http_server) {
-    return std::unexpected("HTTP server state is not allocated");
-  }
-
   auto& server = *state.http_server;
+  std::unique_lock runtime_lock(server.runtime_mutex);
   if (!server.is_running.load()) {
     return std::unexpected("HTTP server is not running");
   }
@@ -72,8 +79,14 @@ auto rebind_listen_socket(core::AppState& state, bool lan_enabled)
   loop->defer([&state, app, old_socket, old_host, target_host, port,
                completion = std::move(completion)]() mutable {
     auto& server = *state.http_server;
-    us_listen_socket_close(0, old_socket);
+    std::lock_guard runtime_lock(server.runtime_mutex);
+    if (!server.is_running.load() || server.listen_socket != old_socket) {
+      completion.set_value(std::unexpected("HTTP server stopped during listener rebind"));
+      return;
+    }
+
     server.listen_socket = nullptr;
+    us_listen_socket_close(0, old_socket);
 
     us_listen_socket_t* new_socket = nullptr;
     app->listen(target_host, port, [&new_socket, &target_host, port](auto* socket) {
@@ -115,104 +128,129 @@ auto rebind_listen_socket(core::AppState& state, bool lan_enabled)
         std::unexpected(std::format("Failed to rebind HTTP server to {}:{}", target_host, port)));
   });
 
+  runtime_lock.unlock();
+
   return completion_future.get();
 }
 
 // 初始化令牌、选择监听范围和端口，并启动 HTTP 事件循环线程。
 auto initialize(core::AppState& state) -> std::expected<void, std::string> {
   try {
-    if (!state.http_server) {
-      return std::unexpected("HTTP server state is not allocated");
-    }
-
     const auto candidate_ports = get_candidate_ports();
     // 令牌必须先准备好，路由注册后才能安全处理远端请求。
     if (auto access_result = core::http_server::access::initialize(state); !access_result) {
       return std::unexpected("Failed to initialize LAN access: " + access_result.error());
     }
 
-    // 根据持久化开关决定只监听回环地址还是监听所有本机接口。
-    state.http_server->listen_host =
-        state.settings && state.settings->raw.app.lan_access.enabled ? "0.0.0.0" : "127.0.0.1";
-    state.http_server->runtime_lan_enabled = false;
-    state.http_server->app = nullptr;
-    Logger().info("Initializing HTTP server with candidate ports: {}",
-                  format_candidate_ports(candidate_ports));
-
     std::promise<std::expected<void, std::string>> startup_promise;
     auto startup_future = startup_promise.get_future();
 
-    state.http_server->server_thread = std::jthread(
+    auto& server = *state.http_server;
+    // 应用启动和关闭在当前生命周期中串行执行；这里仅防止重复初始化。
+    std::unique_lock runtime_lock(server.runtime_mutex);
+    if (server.server_thread.joinable()) {
+      return std::unexpected("HTTP server is already initialized");
+    }
+
+    // 根据持久化开关决定只监听回环地址还是监听所有本机接口。
+    server.listen_host =
+        state.settings && state.settings->raw.app.lan_access.enabled ? "0.0.0.0" : "127.0.0.1";
+    server.is_running = false;
+    server.runtime_lan_enabled = false;
+    server.app = nullptr;
+    server.loop = nullptr;
+    server.listen_socket = nullptr;
+
+    Logger().info("Initializing HTTP server with candidate ports: {}",
+                  format_candidate_ports(candidate_ports));
+
+    server.server_thread = std::jthread(
         [&state, candidate_ports, startup_promise = std::move(startup_promise)]() mutable {
           Logger().info("Starting HTTP server thread");
           bool startup_reported = false;
 
           try {
-            // 在线程中创建uWS::App实例，生命周期由线程管理
-            uWS::App app;
+            {
+              // App 必须在线程内构造和析构；Loop 由 uWS 在线程退出时自动释放。
+              uWS::App app;
 
-            // 所有路由都在拥有 uWS App 的线程中注册。
-            core::http_server::routes::register_routes(state, app);
+              try {
+                // 所有路由都在拥有 uWS App 的线程中注册。
+                core::http_server::routes::register_routes(state, app);
 
-            int selected_port = 0;
-            us_listen_socket_t* selected_socket = nullptr;
+                int selected_port = 0;
+                us_listen_socket_t* selected_socket = nullptr;
 
-            // 直接尝试绑定，避免“预检查成功后端口又被抢占”的竞态。
-            for (const auto port : candidate_ports) {
-              Logger().info("Trying HTTP server port {}", port);
-              app.listen(state.http_server->listen_host, port,
-                         [port, host = state.http_server->listen_host, &selected_port,
-                          &selected_socket](auto* socket) {
-                           if (!socket) {
-                             Logger().warn("Failed to listen on {}:{}", host, port);
-                             return;
-                           }
+                // 直接尝试绑定，避免“预检查成功后端口又被抢占”的竞态。
+                for (const auto port : candidate_ports) {
+                  Logger().info("Trying HTTP server port {}", port);
+                  app.listen(state.http_server->listen_host, port,
+                             [port, host = state.http_server->listen_host, &selected_port,
+                              &selected_socket](auto* socket) {
+                               if (!socket) {
+                                 Logger().warn("Failed to listen on {}:{}", host, port);
+                                 return;
+                               }
 
-                           selected_port = port;
-                           selected_socket = socket;
-                         });
+                               selected_port = port;
+                               selected_socket = socket;
+                             });
 
-              if (selected_socket) {
-                break;
+                  if (selected_socket) {
+                    break;
+                  }
+                }
+
+                if (!selected_socket) {
+                  auto error = std::format("Failed to listen on candidate ports: {}",
+                                           format_candidate_ports(candidate_ports));
+                  Logger().error(error);
+                  startup_promise.set_value(std::unexpected(error));
+                  startup_reported = true;
+                } else {
+                  {
+                    std::lock_guard runtime_lock(state.http_server->runtime_mutex);
+                    state.http_server->port = selected_port;
+                    state.http_server->listen_socket = selected_socket;
+                    state.http_server->loop = uWS::Loop::get();
+                    state.http_server->app = &app;
+                    state.http_server->runtime_lan_enabled =
+                        state.http_server->listen_host != "127.0.0.1";
+                    state.http_server->is_running = true;
+                  }
+
+                  Logger().info("HTTP server listening on {}:{}", state.http_server->listen_host,
+                                selected_port);
+                  startup_promise.set_value({});
+                  startup_reported = true;
+                  app.run();
+
+                  // app.run() 返回后，服务已经不再接受请求；App 仍由当前线程持有。
+                  {
+                    std::lock_guard runtime_lock(state.http_server->runtime_mutex);
+                    state.http_server->is_running = false;
+                    state.http_server->runtime_lan_enabled = false;
+                    state.http_server->listen_socket = nullptr;
+                  }
+                }
+              } catch (...) {
+                {
+                  std::lock_guard runtime_lock(state.http_server->runtime_mutex);
+                  state.http_server->is_running = false;
+                  state.http_server->runtime_lan_enabled = false;
+                  state.http_server->listen_socket = nullptr;
+                }
+                core::http_server::sse_manager::close_all_connections(state);
+                app.close();
+                throw;
               }
             }
 
-            if (!selected_socket) {
-              auto error = std::format("Failed to listen on candidate ports: {}",
-                                       format_candidate_ports(candidate_ports));
-              Logger().error(error);
-              startup_promise.set_value(std::unexpected(error));
-              startup_reported = true;
-              Logger().info("HTTP server thread finished");
-              return;
-            }
-
-            state.http_server->port = selected_port;
-            state.http_server->listen_socket = selected_socket;
-            state.http_server->loop = uWS::Loop::get();
-            state.http_server->app = &app;
-            state.http_server->runtime_lan_enabled = state.http_server->listen_host != "127.0.0.1";
-            state.http_server->is_running = true;
-
-            Logger().info("HTTP server listening on {}:{}", state.http_server->listen_host,
-                          selected_port);
-            startup_promise.set_value({});
-            startup_reported = true;
-
-            app.run();
-            state.http_server->is_running = false;
-            state.http_server->runtime_lan_enabled = false;
-            state.http_server->app = nullptr;
-            auto* loop = state.http_server->loop;
-            state.http_server->loop = nullptr;
-            if (loop) {
-              loop->free();
-            }
+            clear_runtime_state(*state.http_server);
             Logger().info("HTTP server thread finished");
           } catch (const std::exception& e) {
-            state.http_server->is_running = false;
-            state.http_server->runtime_lan_enabled = false;
-            state.http_server->app = nullptr;
+            clear_runtime_state(*state.http_server);
+
             auto error = std::string("HTTP server thread failed: ") + e.what();
             Logger().error(error);
             if (!startup_reported) {
@@ -220,6 +258,7 @@ auto initialize(core::AppState& state) -> std::expected<void, std::string> {
             }
           }
         });
+    runtime_lock.unlock();
 
     auto startup_result = startup_future.get();
     if (!startup_result) {
@@ -237,44 +276,43 @@ auto initialize(core::AppState& state) -> std::expected<void, std::string> {
 
 // 停止接受请求、关闭 SSE 和监听 socket，并等待 HTTP 线程退出。
 auto shutdown(core::AppState& state) -> void {
-  if (!state.http_server || !state.http_server->is_running) {
+  auto& server = *state.http_server;
+  std::unique_lock runtime_lock(server.runtime_mutex);
+  if (!server.server_thread.joinable()) {
     return;
   }
 
-  Logger().info("Shutting down HTTP server");
+  if (server.is_running.load()) {
+    Logger().info("Shutting down HTTP server");
 
-  auto active_sse = core::http_server::sse_manager::get_connection_count(state);
-  Logger().info("Active SSE connections before shutdown: {}", active_sse);
+    auto active_sse = core::http_server::sse_manager::get_connection_count(state);
+    Logger().info("Active SSE connections before shutdown: {}", active_sse);
 
-  // 提前标记停止，避免 shutdown 过程中继续广播 SSE 事件
-  state.http_server->is_running = false;
+    // 提前标记停止，避免 shutdown 过程中继续广播 SSE 事件；监听句柄交给关闭回调。
+    server.is_running = false;
+    server.runtime_lan_enabled = false;
 
-  auto* loop = state.http_server->loop;
-  auto* listen_socket = state.http_server->listen_socket;
+    auto* loop = server.loop;
+    auto* app = server.app;
+    server.listen_socket = nullptr;
 
-  // 使用 defer 将关闭操作调度到事件循环线程
-  if (loop) {
-    Logger().info("Scheduling SSE close and socket close");
-    loop->defer([&state, listen_socket]() {
-      core::http_server::sse_manager::close_all_connections(state);
-
-      if (listen_socket) {
-        us_listen_socket_close(0, listen_socket);
-        Logger().info("Listen socket closed");
-      }
-    });
-  } else {
-    Logger().warn("HTTP loop is null during shutdown; listen socket close was not scheduled");
+    // 使用 defer 将关闭操作调度到事件循环线程。
+    if (loop && app) {
+      Logger().info("Scheduling SSE close and socket close");
+      loop->defer([&state, app]() {
+        core::http_server::sse_manager::close_all_connections(state);
+        // close() 同时关闭监听 socket 和仍在进行的普通 HTTP 连接。
+        app->close();
+        Logger().info("HTTP sockets closed");
+      });
+    } else {
+      Logger().warn("HTTP runtime handles are unavailable during shutdown");
+    }
   }
 
-  if (state.http_server->server_thread.joinable()) {
-    state.http_server->server_thread.join();
-  }
-
-  state.http_server->listen_socket = nullptr;
-  state.http_server->app = nullptr;
-  state.http_server->loop = nullptr;
-  state.http_server->runtime_lan_enabled = false;
+  // 当前应用只从主线程调用一次 shutdown；解锁后直接等待线程退出。
+  runtime_lock.unlock();
+  server.server_thread.join();
 
   auto remaining_sse = core::http_server::sse_manager::get_connection_count(state);
   Logger().info("Remaining SSE connections after shutdown: {}", remaining_sse);

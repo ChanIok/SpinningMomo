@@ -12,9 +12,11 @@ namespace core::http_server {
 struct HttpServerState {
   // 服务器核心
   std::jthread server_thread{};
+  // 保护运行时指针和停止状态。
+  std::mutex runtime_mutex;
   // 非拥有指针；指向 server_thread 栈上的 uWS::App，只能在 HTTP loop 的 defer 回调中使用。
   uWS::App* app{nullptr};
-  // 由 HTTP 服务创建、并在 shutdown/rebind 中显式关闭的监听句柄。
+  // 由 HTTP 服务创建、并在 shutdown/rebind 中关闭的监听句柄。
   us_listen_socket_t* listen_socket{nullptr};
   // 非拥有事件循环指针；跨线程只用于投递 defer() 回调。
   uWS::Loop* loop{nullptr};
