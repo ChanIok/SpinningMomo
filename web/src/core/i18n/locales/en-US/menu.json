@@ -2,6 +2,7 @@
   "menu.app_exit": "Exit",
   "menu.app_float": "Floating Window",
   "menu.app_main": "Main",
+  "menu.adb_mode": "ADB Mode",
   "menu.external_album_open_folder": "Game Album",
   "menu.letterbox_toggle": "Letterbox",
   "menu.output_open_folder": "Output Folder",

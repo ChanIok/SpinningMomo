@@ -11,6 +11,7 @@ import WindowSceneContent from '../components/WindowSceneContent.vue'
 import FloatingWindowContent from '../components/FloatingWindowContent.vue'
 import BackupSettingsContent from '../components/BackupSettingsContent.vue'
 import NetworkAccessContent from '../components/NetworkAccessContent.vue'
+import AdbModeContent from '../components/AdbModeContent.vue'
 import { useSettingsStore } from '../store'
 
 const activePage = ref<SettingsPageKey>('general')
@@ -44,6 +45,7 @@ watch(activePage, () => {
             <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
             <CaptureSettingsContent v-if="activePage === 'capture'" />
             <ExtensionsContent v-if="activePage === 'extensions'" />
+            <AdbModeContent v-if="activePage === 'adbMode'" />
             <WindowSceneContent v-if="activePage === 'windowScene'" />
             <FloatingWindowContent v-if="activePage === 'floatingWindow'" />
             <AppearanceContent v-if="activePage === 'webAppearance'" />

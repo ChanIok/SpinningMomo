@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded Chinese JSON content as string_view
-// Size: 4150 bytes
+// Size: 4617 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -38,6 +38,7 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "menu.preview_toggle": "预览窗",
   "menu.recording_toggle": "录制",
   "menu.letterbox_toggle": "黑边模式",
+  "menu.adb_mode": "ADB模式",
 
 
   "menu.settings_config": "打开配置文件",
@@ -53,6 +54,13 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.window_not_found": "未找到目标窗口，请确保窗口已启动。",
   "message.window_reset_success": "窗口已重置为屏幕大小。",
   "message.window_reset_failed": "重置窗口尺寸失败。",
+  "message.adb_connect_success": "ADB 设备已连接。",
+  "message.adb_connect_failed": "连接 ADB 设备失败",
+  "message.adb_disconnect_success": "ADB 设备已断开。",
+  "message.adb_disconnect_failed": "断开 ADB 设备失败",
+  "message.adb_operation_failed": "ADB 设备操作失败",
+  "message.adb_not_connected": "ADB 设备未连接",
+  "message.adb_feature_unavailable": "该功能在 ADB 模式下不可用。",
 
   "message.screenshot_success": "截图已保存：",
   "message.screenshot_failed": "截图失败",

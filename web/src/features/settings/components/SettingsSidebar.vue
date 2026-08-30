@@ -10,6 +10,7 @@ import {
   Palette,
   DatabaseBackup,
   Wifi,
+  Terminal,
 } from '@lucide/vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
@@ -25,6 +26,7 @@ export type SettingsPageKey =
   | 'backup'
   // LAN 访问配置只会在 local 路由中出现。
   | 'networkAccess'
+  | 'adbMode'
 
 interface SettingsMenuItem {
   key: SettingsPageKey
@@ -74,15 +76,20 @@ const settingsMenus: SettingsMenuItem[] = [
     icon: Palette,
   },
   {
-    key: 'extensions',
-    label: 'settings.layout.extensions.title',
-    icon: Blocks,
+    key: 'adbMode',
+    label: 'settings.layout.adbMode.title',
+    icon: Terminal,
   },
   {
-    // 网络共享属于低频高级能力，放在扩展与数据维护之间。
+    // 网络共享属于低频高级能力，放在 ADB 模式与扩展之间。
     key: 'networkAccess',
     label: 'settings.layout.networkAccess.title',
     icon: Wifi,
+  },
+  {
+    key: 'extensions',
+    label: 'settings.layout.extensions.title',
+    icon: Blocks,
   },
   {
     key: 'backup',

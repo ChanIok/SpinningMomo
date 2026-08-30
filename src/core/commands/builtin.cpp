@@ -8,6 +8,7 @@
 #include "core/commands/state.hpp"
 #include "core/commands/types.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/letterbox/usecase.hpp"
 #include "features/overlay/state.hpp"
@@ -50,8 +51,6 @@ auto register_builtin_commands(core::AppState& state) -> void {
   auto& registry = state.commands->registry;
   Logger().info("Registering builtin commands...");
 
-  // === 应用层命令 ===
-
   // 打开主界面（WebView2 或浏览器）
   register_command(registry,
                    {
@@ -69,8 +68,6 @@ auto register_builtin_commands(core::AppState& state) -> void {
                                  .action = []() { PostQuitMessage(0); },
                              });
 
-  // === 悬浮窗控制 ===
-
   // 激活悬浮窗
   register_command(registry,
                    {
@@ -86,7 +83,22 @@ auto register_builtin_commands(core::AppState& state) -> void {
                            },
                    });
 
-  // === 截图功能 ===
+  // 切换 ADB 模式
+  register_command(registry, {
+                                 .id = "adb.toggle",
+                                 .i18n_key = "menu.adb_mode",
+                                 .is_toggle = true,
+                                 .action =
+                                     [&state]() {
+                                       if (!features::adb_mode::toggle_async(state)) {
+                                         Logger().warn("Failed to queue ADB device toggle");
+                                       }
+                                       ui::floating_window::request_repaint(state);
+                                     },
+                                 .get_state = [&state]() -> bool {
+                                   return features::adb_mode::is_connected(state);
+                                 },
+                             });
 
   // 截图
   register_command(registry, {
@@ -158,8 +170,6 @@ auto register_builtin_commands(core::AppState& state) -> void {
                 }
               },
       });
-
-  // === 独立功能 ===
 
   // 切换预览窗
   register_command(
@@ -252,8 +262,6 @@ auto register_builtin_commands(core::AppState& state) -> void {
                             .settings_path = "app.hotkey.recording",
                         },
                 });
-
-  // === 窗口操作 ===
 
   // 重置窗口变换
   register_command(

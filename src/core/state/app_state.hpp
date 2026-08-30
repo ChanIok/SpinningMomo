@@ -118,6 +118,10 @@ namespace features::photography {
 struct PhotographyState;
 }
 
+namespace features::adb_mode {
+struct AdbModeState;
+}
+
 namespace core {
 
 struct AppState {
@@ -162,6 +166,7 @@ struct AppState {
   std::unique_ptr<features::screenshot::ScreenshotState> screenshot;
   std::unique_ptr<features::recording::RecordingState> recording;
   std::unique_ptr<features::photography::PhotographyState> photography;
+  std::unique_ptr<features::adb_mode::AdbModeState> adb_mode;
 };
 
 }  // namespace core

@@ -6,6 +6,7 @@
 #include "core/notifications/notifications.hpp"
 #include "core/notifications/types.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/photography/state.hpp"
 #include "features/screenshot/screenshot.hpp"
 #include "features/settings/state.hpp"
@@ -31,8 +32,83 @@ auto handle_saved_file_view_action(core::AppState& state, const std::filesystem:
   }
 }
 
+auto capture_adb(core::AppState& state) -> void {
+  std::optional<std::filesystem::path> output_dir_override;
+  if (state.settings->raw.features.organize_output_by_window_title) {
+    auto output_dir_result = utils::path::GetOutputDirectoryForWindowTitle(
+        state.settings->raw.features.output_dir_path, L"ADB");
+    if (!output_dir_result) {
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.screenshot_failed"] + ": " + output_dir_result.error());
+      Logger().error("Failed to resolve ADB screenshot output directory: {}",
+                     output_dir_result.error());
+      return;
+    }
+    output_dir_override = *output_dir_result;
+  }
+
+  std::filesystem::path screenshots_dir;
+  if (output_dir_override) {
+    screenshots_dir = *output_dir_override;
+  } else {
+    auto output_dir_result =
+        utils::path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+    if (!output_dir_result) {
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.screenshot_failed"] + ": " + output_dir_result.error());
+      Logger().error("Failed to resolve ADB screenshot output directory: {}",
+                     output_dir_result.error());
+      return;
+    }
+    screenshots_dir = output_dir_result.value();
+  }
+
+  const auto file_path =
+      screenshots_dir /
+      std::filesystem::path(utils::string::FormatTimestamp(std::chrono::system_clock::now()));
+
+  auto completion_callback = [&state](bool success, const std::wstring& path) {
+    if (success) {
+      const std::filesystem::path screenshot_path(path);
+      core::notifications::NotificationOptions options;
+      options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
+      options.message =
+          utils::string::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
+
+      core::notifications::NotificationAction view_action;
+      view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
+      view_action.callback = [screenshot_path](core::AppState& app_state) {
+        handle_saved_file_view_action(app_state, screenshot_path, "screenshot");
+      };
+      options.action = std::move(view_action);
+      core::notifications::post_notification_request(state, std::move(options));
+      Logger().info("ADB screenshot saved successfully: {}", utils::string::ToUtf8(path));
+      return;
+    }
+
+    core::notifications::NotificationOptions options;
+    options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
+    options.message = utils::string::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
+    core::notifications::post_notification_request(state, std::move(options));
+    Logger().error("ADB screenshot failed: {}", utils::string::ToUtf8(path));
+  };
+
+  if (!features::adb_mode::capture_screen_async(state, file_path, std::move(completion_callback))) {
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.screenshot_failed"] + ": " +
+                                               state.i18n->texts["message.adb_not_connected"]);
+  }
+}
+
 // 截图
 auto capture(core::AppState& state) -> void {
+  if (features::adb_mode::is_connected(state)) {
+    capture_adb(state);
+    return;
+  }
+
   std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = features::window_control::find_target_window(window_title);
   if (!target_window) {

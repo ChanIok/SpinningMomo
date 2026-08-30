@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 4387 bytes
+// Size: 4882 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -38,6 +38,7 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.preview_toggle": "Preview",
   "menu.recording_toggle": "Record",
   "menu.letterbox_toggle": "Letterbox",
+  "menu.adb_mode": "ADB Mode",
 
 
   "menu.settings_config": "Open Config",
@@ -53,6 +54,13 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.window_not_found": "Target window not found. Please ensure the window is running.",
   "message.window_reset_success": "Window has been reset to screen size.",
   "message.window_reset_failed": "Failed to reset window size.",
+  "message.adb_connect_success": "ADB device connected.",
+  "message.adb_connect_failed": "Failed to connect ADB device",
+  "message.adb_disconnect_success": "ADB device disconnected.",
+  "message.adb_disconnect_failed": "Failed to disconnect ADB device",
+  "message.adb_operation_failed": "ADB device operation failed",
+  "message.adb_not_connected": "ADB device is not connected",
+  "message.adb_feature_unavailable": "This feature is unavailable in ADB mode.",
 
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",

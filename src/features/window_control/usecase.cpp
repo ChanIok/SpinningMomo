@@ -8,6 +8,7 @@
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/letterbox.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/overlay/geometry.hpp"
@@ -383,6 +384,13 @@ auto handle_window_selected(core::AppState& state,
 
 // 重置窗口变换（直接调用版本）
 auto reset_window_transform(core::AppState& state) -> void {
+  if (features::adb_mode::is_connected(state)) {
+    if (!features::adb_mode::restore_async(state)) {
+      Logger().warn("Failed to queue ADB display restore");
+    }
+    return;
+  }
+
   std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = features::window_control::find_target_window(window_title);
   if (!target_window) {

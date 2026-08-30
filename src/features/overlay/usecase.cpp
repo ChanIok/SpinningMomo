@@ -5,6 +5,7 @@
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/letterbox.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/overlay/overlay.hpp"
@@ -21,6 +22,12 @@ namespace features::overlay {
 // 切换叠加层功能
 auto toggle_overlay(core::AppState& state) -> void {
   bool is_enabled = state.overlay->enabled;
+
+  if (!is_enabled && features::adb_mode::is_connected(state)) {
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.adb_feature_unavailable"]);
+    return;
+  }
 
   // 切换启用状态
   state.overlay->enabled = !is_enabled;

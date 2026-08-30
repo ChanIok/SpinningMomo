@@ -3,13 +3,17 @@
 #include "vendor/std.hpp"
 
 #include "core/events/events.hpp"
+#include "core/i18n/state.hpp"
 #include "core/notifications/events.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/events.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/screenshot/usecase.hpp"
 #include "features/window_control/usecase.hpp"
 #include "ui/floating_window/events.hpp"
 #include "ui/floating_window/floating_window.hpp"
+#include "ui/floating_window/state.hpp"
 
 namespace core::events::handlers {
 
@@ -31,12 +35,55 @@ auto register_feature_handlers(core::AppState& app_state) -> void {
   // 注：handle_xxx 会启动协程在 UI 线程执行，协程内部会在完成后请求重绘
   subscribe<ui::floating_window::events::RatioChangeEvent>(
       app_state, [&app_state](const ui::floating_window::events::RatioChangeEvent& event) {
-        features::window_control::handle_ratio_changed(app_state, event);
+        if (features::adb_mode::is_connected(app_state)) {
+          features::adb_mode::handle_ratio_changed(app_state, event.index, event.ratio_value);
+        } else {
+          features::window_control::handle_ratio_changed(app_state, event);
+        }
       });
 
   subscribe<ui::floating_window::events::ResolutionChangeEvent>(
       app_state, [&app_state](const ui::floating_window::events::ResolutionChangeEvent& event) {
-        features::window_control::handle_resolution_changed(app_state, event);
+        if (features::adb_mode::is_connected(app_state)) {
+          features::adb_mode::handle_resolution_changed(app_state, event.index);
+        } else {
+          features::window_control::handle_resolution_changed(app_state, event);
+        }
+      });
+
+  // ADB 屏幕变换完成：失败时通知报错，成功时同步悬浮窗状态并重绘
+  subscribe<features::adb_mode::events::DisplayTransformCompletedEvent>(
+      app_state,
+      [&app_state](const features::adb_mode::events::DisplayTransformCompletedEvent& event) {
+        if (!event.success) {
+          core::notifications::show_notification(
+              app_state, app_state.i18n->texts["label.app_name"],
+              app_state.i18n->texts["message.adb_operation_failed"] + ": " + event.error);
+          return;
+        }
+
+        if (event.ratio_index) {
+          app_state.floating_window->ui.current_ratio_index = *event.ratio_index;
+        }
+        if (event.resolution_index) {
+          app_state.floating_window->ui.current_resolution_index = *event.resolution_index;
+          if (*event.resolution_index == 0) {
+            app_state.floating_window->ui.current_ratio_index =
+                std::numeric_limits<std::size_t>::max();
+          }
+        }
+        ui::floating_window::request_repaint(app_state);
+      });
+
+  // ADB 连接状态变更：断连时重置选中项并重绘悬浮窗
+  subscribe<features::adb_mode::events::ConnectionChangedEvent>(
+      app_state, [&app_state](const features::adb_mode::events::ConnectionChangedEvent& event) {
+        if (!event.connected) {
+          app_state.floating_window->ui.current_ratio_index =
+              std::numeric_limits<std::size_t>::max();
+          app_state.floating_window->ui.current_resolution_index = 0;
+        }
+        ui::floating_window::request_repaint(app_state);
       });
 
   subscribe<ui::floating_window::events::WindowSelectionEvent>(

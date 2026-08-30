@@ -136,6 +136,17 @@ struct AppSettings {
     std::string saved_file_view_action =
         "default_app";  // 保存成功通知点击“查看”后的行为: "default_app" | "reveal_in_explorer"
 
+    // ADB 模式配置。ADB 设备是否正在使用由悬浮窗命令控制；自动模式只查找正在运行的
+    // MuMu v5+ 或雷电，其他设备通过 adb_path 配置。
+    struct AdbMode {
+      bool use_custom_adb_path = false;  // 是否使用用户指定的 ADB 可执行文件
+      std::string adb_path = "";         // 自定义 ADB 可执行文件路径
+      std::string host = "127.0.0.1";
+      int port = 7555;
+      std::string serial = "";  // 为空时使用 host:port 对应的设备
+      bool auto_connect = false;
+    } adb_mode;
+
     struct Screenshot {
       std::string file_format = "png";  // 静态截图保存格式: "png" | "jpeg"
       bool enable_hdr = false;          // 目标屏为 HDR 时保存 Ultra HDR JPEG

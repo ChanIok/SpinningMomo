@@ -178,6 +178,15 @@ export interface AppSettings {
     externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
     savedFileViewAction: 'default_app' | 'reveal_in_explorer' // 保存成功通知点击“查看”后的行为
 
+    adbMode: {
+      useCustomAdbPath: boolean
+      adbPath: string // 自定义 ADB 可执行文件路径
+      host: string
+      port: number
+      serial: string
+      autoConnect: boolean
+    }
+
     screenshot: {
       fileFormat: 'png' | 'jpeg'
       enableHdr: boolean
@@ -319,6 +328,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     organizeOutputByWindowTitle: false,
     externalAlbumPath: '',
     savedFileViewAction: 'default_app',
+    adbMode: {
+      useCustomAdbPath: false,
+      adbPath: '',
+      host: '127.0.0.1',
+      port: 7555,
+      serial: '',
+      autoConnect: false,
+    },
     screenshot: {
       fileFormat: 'png',
       enableHdr: false,

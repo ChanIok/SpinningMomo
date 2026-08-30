@@ -6,7 +6,9 @@
 
 #include "core/events/events.hpp"
 #include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/recording/recording.hpp"
 #include "features/recording/session.hpp"
 #include "features/recording/state.hpp"
@@ -57,6 +59,12 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
   // 不是 Idle 的其他瞬态状态（例如 Starting）也直接忽略，避免 toggle 抢状态机
   if (status != features::recording::RecordingStatus::Idle) {
     return {};
+  }
+
+  if (features::adb_mode::is_connected(state)) {
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.adb_feature_unavailable"]);
+    return std::unexpected("Recording is unavailable in ADB mode");
   }
 
   // --- 以下是启动流程 ---
