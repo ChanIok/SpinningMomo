@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
   useAdaptiveVirtualizer,
@@ -9,6 +8,7 @@ import {
   useCardImageScheduler,
   useTimelineRail,
   useGalleryVirtualScrollMargin,
+  useGalleryViewerSize,
   type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
@@ -24,9 +24,15 @@ import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
-const props = withDefaults(defineProps<{ toolbarHeight?: number }>(), {
-  toolbarHeight: 0,
-})
+const props = withDefaults(
+  defineProps<{
+    toolbarHeight?: number
+    initialAnchorIndex?: number
+  }>(),
+  {
+    toolbarHeight: 0,
+  }
+)
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const { prepareAssetDrag } = useGalleryDragPayload()
@@ -47,7 +53,7 @@ const { scrollMargin } = useGalleryVirtualScrollMargin(
 const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
 // AdaptiveView 不再依赖 ScrollArea，避免第三方滚动容器内部测量语义干扰 thumb 尺寸。
-const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
+const { width: containerWidth, height: containerHeight } = useGalleryViewerSize(scrollContainerRef)
 
 const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerRef: scrollContainerRef,
@@ -78,6 +84,9 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
+    scrollToIndex(props.initialAnchorIndex, 'start')
+  }
   await adaptiveVirtualizer.init()
 })
 
@@ -191,8 +200,8 @@ function handleAssetDragStart(asset: Asset, event: DragEvent) {
   prepareAssetDrag(event, asset.id)
 }
 
-function scrollToIndex(index: number) {
-  adaptiveVirtualizer.scrollToIndex(index)
+function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
+  adaptiveVirtualizer.scrollToIndex(index, align)
 }
 
 function getCardRect(index: number): DOMRect | null {
@@ -209,7 +218,17 @@ function getCardRect(index: number): DOMRect | null {
   return card?.getBoundingClientRect() ?? null
 }
 
-defineExpose({ scrollToIndex, getCardRect })
+function getTopVisibleAssetIndex(): number {
+  const rows = adaptiveVirtualizer.virtualRows.value
+  for (const row of rows) {
+    if (row.items && row.items.length > 0 && row.items[0]?.index !== undefined) {
+      return row.items[0].index
+    }
+  }
+  return 0
+}
+
+defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
 </script>
 
 <template>

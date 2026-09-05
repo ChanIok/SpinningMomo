@@ -458,13 +458,13 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     )?.start
   }
 
-  function scrollToIndex(index: number) {
+  function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
     const rowIndex = getAssetRowIndex(layout.value, index, totalCount.value, columns.value)
     if (rowIndex === undefined) {
       return
     }
 
-    virtualizer.value.scrollToIndex(rowIndex, { align: 'auto' })
+    virtualizer.value.scrollToIndex(rowIndex, { align })
   }
 
   watch([layout, estimatedRowHeight], () => {

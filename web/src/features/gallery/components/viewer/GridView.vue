@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useElementSize } from '@vueuse/core'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
 import {
@@ -10,6 +9,7 @@ import {
   useCardImageScheduler,
   useTimelineRail,
   useGalleryVirtualScrollMargin,
+  useGalleryViewerSize,
   type CardImageScheduleItem,
 } from '../../composables'
 import type { VirtualRow } from '../../composables/useGridVirtualizer'
@@ -25,9 +25,15 @@ import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
-const props = withDefaults(defineProps<{ toolbarHeight?: number }>(), {
-  toolbarHeight: 0,
-})
+const props = withDefaults(
+  defineProps<{
+    toolbarHeight?: number
+    initialAnchorIndex?: number
+  }>(),
+  {
+    toolbarHeight: 0,
+  }
+)
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const { prepareAssetDrag } = useGalleryDragPayload()
@@ -47,7 +53,7 @@ const { scrollMargin } = useGalleryVirtualScrollMargin(
 
 const isTimelineMode = computed(() => store.isTimelineMode)
 const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
-const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
+const { width: containerWidth, height: containerHeight } = useGalleryViewerSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = store.getEffectiveViewSize()
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
@@ -83,6 +89,9 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
+    scrollToIndex(props.initialAnchorIndex, 'start')
+  }
   await gridVirtualizer.init()
 })
 
@@ -195,8 +204,8 @@ function handleAssetDragStart(asset: Asset, event: DragEvent) {
   prepareAssetDrag(event, asset.id)
 }
 
-function scrollToIndex(index: number) {
-  gridVirtualizer.scrollToIndex(index)
+function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
+  gridVirtualizer.scrollToIndex(index, align)
 }
 
 function getCardRect(index: number): DOMRect | null {
@@ -212,7 +221,17 @@ function getAssetIndex(row: VirtualRow, offset: number) {
   return (row.assetStartIndex ?? 0) + offset
 }
 
-defineExpose({ scrollToIndex, getCardRect })
+function getTopVisibleAssetIndex(): number {
+  const rows = gridVirtualizer.virtualRows.value
+  for (const row of rows) {
+    if (row.kind === 'assets' && row.assetStartIndex !== undefined) {
+      return row.assetStartIndex
+    }
+  }
+  return 0
+}
+
+defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
 </script>
 
 <template>

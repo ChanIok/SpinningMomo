@@ -1,5 +1,5 @@
 import { ref, reactive, shallowRef } from 'vue'
-import type { Asset, Tag, TimelineBucket } from '../types'
+import type { Asset, AssetLayoutMetaItem, Tag, TimelineBucket } from '../types'
 
 export type GalleryQueryStatus = 'idle' | 'loading' | 'refreshing' | 'error'
 
@@ -46,6 +46,18 @@ export function createQuerySlice() {
   const timelineBuckets = shallowRef<TimelineBucket[]>([])
   const timelineTotalCount = ref(0)
 
+  // ============= 布局元数据状态（瀑布流/自适应视图使用） =============
+  // layoutMetaItems: 轻量资产宽高元数据缓存，按需拉取，在查询生命周期内有效
+  const layoutMetaItems = shallowRef<AssetLayoutMetaItem[]>([])
+
+  function setLayoutMetaItems(items: AssetLayoutMetaItem[]) {
+    layoutMetaItems.value = items
+  }
+
+  function clearLayoutMetaItems() {
+    layoutMetaItems.value = []
+  }
+
   function setError(errorMessage: string | null) {
     error.value = errorMessage
     if (errorMessage !== null) {
@@ -62,6 +74,7 @@ export function createQuerySlice() {
   function beginQueryRefresh(): number {
     // 版本号是并发请求裁决核心：后到的旧响应不会覆盖新查询。
     queryVersion.value += 1
+    clearLayoutMetaItems()
     const hasExistingResults =
       paginatedAssets.value.size > 0 || totalCount.value > 0 || timelineBuckets.value.length > 0
     queryStatus.value = hasExistingResults ? 'refreshing' : 'loading'
@@ -210,6 +223,7 @@ export function createQuerySlice() {
 
     clearTimelineData()
     clearPaginatedAssets()
+    clearLayoutMetaItems()
     clearDyeCodeStatuses()
     invalidateAssetTags()
     setVisibleRange(undefined, undefined)
@@ -228,6 +242,7 @@ export function createQuerySlice() {
     assetTagsVersion,
     paginatedAssets,
     paginatedAssetsVersion,
+    layoutMetaItems,
     perPage,
     visibleRange,
     timelineBuckets,
@@ -249,6 +264,8 @@ export function createQuerySlice() {
     invalidateAssetTags,
     replacePaginatedAssets,
     clearPaginatedAssets,
+    setLayoutMetaItems,
+    clearLayoutMetaItems,
     setVisibleRange,
     setTimelineBuckets,
     setTimelineTotalCount,

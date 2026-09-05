@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
-import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
   useGallerySelection,
@@ -9,6 +8,7 @@ import {
   useCardImageScheduler,
   useTimelineRail,
   useGalleryVirtualScrollMargin,
+  useGalleryViewerSize,
   type CardImageScheduleItem,
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
@@ -23,9 +23,15 @@ import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
-const props = withDefaults(defineProps<{ toolbarHeight?: number }>(), {
-  toolbarHeight: 0,
-})
+const props = withDefaults(
+  defineProps<{
+    toolbarHeight?: number
+    initialAnchorIndex?: number
+  }>(),
+  {
+    toolbarHeight: 0,
+  }
+)
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const { prepareAssetDrag } = useGalleryDragPayload()
@@ -45,7 +51,7 @@ const { scrollMargin } = useGalleryVirtualScrollMargin(
 )
 const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select')
 
-const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
+const { width: containerWidth, height: containerHeight } = useGalleryViewerSize(scrollContainerRef)
 const targetColumnSize = computed(() => store.getEffectiveViewSize())
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
@@ -85,6 +91,9 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
+    scrollToIndex(props.initialAnchorIndex, 'start')
+  }
   await masonryVirtualizer.init()
 })
 
@@ -203,8 +212,8 @@ function handleAssetDragStart(asset: Asset, event: DragEvent) {
   prepareAssetDrag(event, asset.id)
 }
 
-function scrollToIndex(index: number) {
-  masonryVirtualizer.virtualizer.value.scrollToIndex(index, { align: 'auto' })
+function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
+  masonryVirtualizer.virtualizer.value.scrollToIndex(index, { align })
 }
 
 function getCardRect(index: number): DOMRect | null {
@@ -228,7 +237,11 @@ function measureItemElement(element: Element | ComponentPublicInstance | null) {
   }
 }
 
-defineExpose({ scrollToIndex, getCardRect })
+function getTopVisibleAssetIndex(): number {
+  return masonryVirtualizer.virtualItems.value[0]?.index ?? 0
+}
+
+defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
 </script>
 
 <template>

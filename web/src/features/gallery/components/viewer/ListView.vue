@@ -18,6 +18,10 @@ const LIST_ROW_HEIGHT_FACTOR = 0.4
 // 固定表头高度（表头在滚动区外，不参与虚拟列表的 scrollPadding）
 const LIST_HEADER_HEIGHT = 36
 
+const props = defineProps<{
+  initialAnchorIndex?: number
+}>()
+
 const { t } = useI18n()
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
@@ -88,6 +92,10 @@ onMounted(async () => {
     scrollContainerRef.value = scrollAreaRef.value.viewportElement
   }
 
+  if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
+    scrollToIndex(props.initialAnchorIndex, 'start')
+  }
+
   await listVirtualizer.init()
 })
 
@@ -130,8 +138,8 @@ function handleAssetDragStart(asset: Asset, event: DragEvent) {
   prepareAssetDrag(event, asset.id)
 }
 
-function scrollToIndex(index: number) {
-  listVirtualizer.virtualizer.value.scrollToIndex(index, { align: 'auto' })
+function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
+  listVirtualizer.virtualizer.value.scrollToIndex(index, { align })
 }
 
 function getCardRect(index: number): DOMRect | null {
@@ -148,7 +156,11 @@ function getCardRect(index: number): DOMRect | null {
   return thumbnail?.getBoundingClientRect() ?? null
 }
 
-defineExpose({ scrollToIndex, getCardRect })
+function getTopVisibleAssetIndex(): number {
+  return listVirtualizer.virtualItems.value[0]?.index ?? 0
+}
+
+defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
 </script>
 
 <template>

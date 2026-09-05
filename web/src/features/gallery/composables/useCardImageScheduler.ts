@@ -321,6 +321,19 @@ export function useCardImageScheduler(
     pruneThumbnailPermissions()
     pruneOriginalPermissions()
 
+    // 视口内严格可见的卡片立即同步授权，确保首屏 DOM 立即挂载 <img> 节点
+    const nextAllowedIds = new Set(allowedThumbnailAssetIds.value)
+    let hasNewVisible = false
+    for (const item of items) {
+      if (isItemInViewport(item, 0) && !nextAllowedIds.has(item.assetId)) {
+        nextAllowedIds.add(item.assetId)
+        hasNewVisible = true
+      }
+    }
+    if (hasNewVisible) {
+      allowedThumbnailAssetIds.value = nextAllowedIds
+    }
+
     // 虚拟窗口变化后先保证半屏缩略图进入分批加载队列。
     void runThumbnailSchedule()
 

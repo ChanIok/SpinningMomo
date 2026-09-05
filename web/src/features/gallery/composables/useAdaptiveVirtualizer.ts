@@ -223,7 +223,8 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   // 在 adaptive 模式里，viewSize 的语义不再是“方形卡片边长”，而是“目标行高”。
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
-  const { layoutMetaItems, reloadLayoutMeta } = useGalleryLayoutMeta('adaptive')
+  const { layoutMetaItems, reloadLayoutMeta, ensureLayoutMetaLoaded } =
+    useGalleryLayoutMeta('adaptive')
   const virtualRows = shallowRef<VirtualAdaptiveRow[]>([])
   const loadingPages = new Set<number>()
 
@@ -369,7 +370,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     // 已有可用分页缓存时只刷新布局元数据；首次查询由完整结果替换信号触发元数据加载，
     // 避免同一次 refreshCurrentQuery 产生重复请求。
     if (hasReusableCache && hasReusableTimelineCache) {
-      await reloadLayoutMeta()
+      await ensureLayoutMetaLoaded()
       return
     }
 
@@ -407,14 +408,14 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     virtualizer.value.measure()
   })
 
-  function scrollToIndex(index: number) {
+  function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
     // 灯箱返回/背景预对齐仍以 asset index 为中心语义，因此这里需要先映射到行再滚动。
     const rowIndex = layout.value.rowIndexByAssetIndex.get(index)
     if (rowIndex === undefined) {
       return
     }
 
-    virtualizer.value.scrollToIndex(rowIndex, { align: 'auto' })
+    virtualizer.value.scrollToIndex(rowIndex, { align })
   }
 
   return {

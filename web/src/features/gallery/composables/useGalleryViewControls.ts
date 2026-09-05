@@ -3,6 +3,8 @@ import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import type { DateGrouping, FolderTreeNode, SortBy, TagTreeNode, ViewMode } from '../types'
 import { Grid3x3, LayoutGrid, List, Rows3 } from '@lucide/vue'
+import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
+import { runWithLayoutTransition } from './useGalleryLayoutTransition'
 
 type SourceType = 'all' | 'folder' | 'tag'
 
@@ -35,6 +37,7 @@ function findTagNameById(nodes: TagTreeNode[], id: number): string | null {
 export function useGalleryViewControls() {
   const { t } = useI18n()
   const store = useGalleryStore()
+  const layoutMeta = useGalleryLayoutMeta('viewControls')
 
   const viewModes = [
     { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
@@ -101,8 +104,13 @@ export function useGalleryViewControls() {
     }
   }
 
-  function setDateGrouping(value: DateGrouping) {
-    store.setDateGrouping(value)
+  async function setDateGrouping(value: DateGrouping) {
+    if (value === store.view.dateGrouping) {
+      return
+    }
+    await runWithLayoutTransition(() => {
+      store.setDateGrouping(value)
+    })
   }
 
   function toggleSortOrder() {
@@ -113,7 +121,7 @@ export function useGalleryViewControls() {
     store.includeSubfolders = value
   }
 
-  function setViewMode(
+  async function setViewMode(
     mode:
       | string
       | number
@@ -126,7 +134,19 @@ export function useGalleryViewControls() {
       if (store.isCompactWindow && mode === 'list') {
         return
       }
-      store.view.mode = mode as ViewMode
+      const targetMode = mode as ViewMode
+      if (targetMode === store.view.mode) {
+        return
+      }
+
+      // 切换到瀑布流或自适应布局前，确保全量宽高元数据已就绪，避免挂载首帧正方形跳变
+      if (targetMode === 'masonry' || targetMode === 'adaptive') {
+        await layoutMeta.ensureLayoutMetaLoaded()
+      }
+
+      await runWithLayoutTransition(() => {
+        store.view.mode = targetMode
+      })
     }
   }
 
