@@ -44,7 +44,7 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: '/settings',
+    path: '/settings/:section?',
     name: 'settings',
     component: SettingsPage,
     meta: {

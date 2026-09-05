@@ -378,3 +378,10 @@ body,
   color: var(--foreground) !important;
   opacity: 0.78;
 }
+
+/* 移动触屏设备（无悬停能力）全局禁用 Tooltip 浮层，避免点击触发残留气泡 */
+@media (hover: none) {
+  [data-slot='tooltip-content'] {
+    display: none !important;
+  }
+}

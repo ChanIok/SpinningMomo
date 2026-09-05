@@ -31,6 +31,12 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { backWithViewTransition } from '@/router/viewTransition'
+import { useWindowSize } from '@vueuse/core'
+import {
+  SETTINGS_COMPACT_BREAKPOINT,
+  getSettingsMenuLabelKey,
+  isValidSettingsPageKey,
+} from '@/features/settings/menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,10 +44,26 @@ const { t } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
 const showWindowControls = isWebView()
+const { width: windowWidth } = useWindowSize()
+const isCompactWindow = computed(
+  () => windowWidth.value > 0 && windowWidth.value < SETTINGS_COMPACT_BREAKPOINT
+)
 const isGalleryPage = computed(() => route.name === 'gallery')
+const isSettingsPage = computed(() => route.name === 'settings')
+const settingsSection = computed(() => {
+  const section = route.params.section
+  return typeof section === 'string' && isValidSettingsPageKey(section) ? section : undefined
+})
+const isSettingsDetailPage = computed(
+  () => isSettingsPage.value && isCompactWindow.value && Boolean(settingsSection.value)
+)
 const pageTitleKey = computed(() => {
   if (route.name === 'home' || route.name === 'welcome') {
     return undefined
+  }
+  // 紧凑模式下的设置具体分类页显示对应的分类标题
+  if (isSettingsDetailPage.value && settingsSection.value) {
+    return getSettingsMenuLabelKey(settingsSection.value)
   }
   if (typeof route.meta?.titleKey === 'string') {
     return route.meta.titleKey
@@ -119,6 +141,12 @@ const handleBack = () => {
 
   if (isGalleryPage.value && overlayHistory.hasOverlay.value) {
     void overlayHistory.closeTopOverlay()
+    return
+  }
+
+  // 紧凑模式下具体设置页点击返回上一级设置主菜单
+  if (isSettingsDetailPage.value) {
+    void backWithViewTransition(router, { name: 'settings' })
     return
   }
 
