@@ -295,24 +295,31 @@ watch(
     const asset = activeAsset.value
     const requestToken = ++assetDetailsRequestToken
     infinityNikkiRequestToken += 1
-    assetTags.value = []
 
     if (!asset) {
+      assetTags.value = []
       assetMainColors.value = []
       infinityNikkiDetails.value = null
       return
     }
 
+    // 优先同步使用 Store 中的标签缓存，0ms 瞬间就位，彻底消除切图时的 DOM 位移跳动
+    const cachedTags = store.assetTagsById.get(asset.id)
+    if (cachedTags !== undefined) {
+      assetTags.value = cachedTags
+    }
+
     try {
-      const [tags, mainColors] = await Promise.all([
-        getAssetTags(asset.id),
-        getAssetMainColors(asset.id),
-      ])
+      const fetchTagsPromise = cachedTags === undefined ? getAssetTags(asset.id) : null
+      const [tags, mainColors] = await Promise.all([fetchTagsPromise, getAssetMainColors(asset.id)])
       if (requestToken !== assetDetailsRequestToken || activeAsset.value?.id !== asset.id) {
         return
       }
 
-      assetTags.value = tags
+      if (tags !== null) {
+        assetTags.value = tags
+        store.setAssetTagsForAssets([asset.id], { [asset.id]: tags })
+      }
       assetMainColors.value = mainColors
     } catch (error) {
       if (requestToken !== assetDetailsRequestToken) {
@@ -428,7 +435,18 @@ async function reloadActiveAssetTags() {
     return
   }
 
-  assetTags.value = await getAssetTags(activeAsset.value.id)
+  const assetId = activeAsset.value.id
+  const cachedTags = store.assetTagsById.get(assetId)
+  if (cachedTags !== undefined) {
+    assetTags.value = cachedTags
+    return
+  }
+
+  const tags = await getAssetTags(assetId)
+  if (activeAsset.value?.id === assetId) {
+    assetTags.value = tags
+    store.setAssetTagsForAssets([assetId], { [assetId]: tags })
+  }
 }
 
 // Popover 状态
@@ -459,8 +477,9 @@ async function handleRemoveTag(tagId: number) {
       tagIds: [tagId],
     })
 
-    await assetActions.refreshTagViewsAfterMutation([assetId])
-    await reloadActiveAssetTags()
+    store.removeTagsFromAssetMap([assetId], [tagId])
+    assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
+    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
   } catch (error) {
     console.error('Failed to remove tag:', error)
   }
@@ -479,15 +498,21 @@ async function handleToggleTag(tagId: number) {
         assetId,
         tagIds: [tagId],
       })
+      store.removeTagsFromAssetMap([assetId], [tagId])
+      assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
     } else {
       await addTagsToAsset({
         assetId,
         tagIds: [tagId],
       })
+      const tagNode = findTagById(store.tags, tagId)
+      if (tagNode) {
+        store.addTagsToAssetMap([assetId], [tagNode])
+        assetTags.value = [...assetTags.value, tagNode]
+      }
     }
 
-    await assetActions.refreshTagViewsAfterMutation([assetId])
-    await reloadActiveAssetTags()
+    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
   } catch (error) {
     console.error('Failed to toggle tag:', error)
   }
@@ -496,6 +521,7 @@ async function handleToggleTag(tagId: number) {
 async function handleRemoveBatchTag(tagId: number) {
   try {
     await assetActions.removeTagFromSelectedAssets(tagId)
+    await reloadBatchSummary()
   } catch (error) {
     console.error('Failed to remove tag from selection:', error)
   }
@@ -510,6 +536,7 @@ async function handleToggleBatchTag(tagId: number) {
     } else {
       await assetActions.addTagToSelectedAssets(tagId)
     }
+    await reloadBatchSummary()
   } catch (error) {
     console.error('Failed to toggle tag on selection:', error)
   }

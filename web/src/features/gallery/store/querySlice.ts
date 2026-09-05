@@ -74,7 +74,6 @@ export function createQuerySlice() {
   function beginQueryRefresh(): number {
     // 版本号是并发请求裁决核心：后到的旧响应不会覆盖新查询。
     queryVersion.value += 1
-    clearLayoutMetaItems()
     const hasExistingResults =
       paginatedAssets.value.size > 0 || totalCount.value > 0 || timelineBuckets.value.length > 0
     queryStatus.value = hasExistingResults ? 'refreshing' : 'loading'
@@ -161,6 +160,51 @@ export function createQuerySlice() {
     loadedAssetTagIds.value = nextLoadedIds
   }
 
+  function addTagsToAssetMap(assetIds: number[], tagsToAdd: Tag[]) {
+    if (assetIds.length === 0 || tagsToAdd.length === 0) {
+      return
+    }
+
+    const nextTagsById = new Map(assetTagsById.value)
+    const nextLoadedIds = new Set(loadedAssetTagIds.value)
+
+    for (const assetId of assetIds) {
+      const currentTags = nextTagsById.get(assetId) ?? []
+      const existingTagIds = new Set(currentTags.map((t) => t.id))
+      const newTags = tagsToAdd.filter((t) => !existingTagIds.has(t.id))
+      if (newTags.length > 0) {
+        nextTagsById.set(assetId, [...currentTags, ...newTags])
+      }
+      nextLoadedIds.add(assetId)
+    }
+
+    assetTagsById.value = nextTagsById
+    loadedAssetTagIds.value = nextLoadedIds
+    assetTagsVersion.value += 1
+  }
+
+  function removeTagsFromAssetMap(assetIds: number[], tagIdsToRemove: number[]) {
+    if (assetIds.length === 0 || tagIdsToRemove.length === 0) {
+      return
+    }
+
+    const removeSet = new Set(tagIdsToRemove)
+    const nextTagsById = new Map(assetTagsById.value)
+
+    for (const assetId of assetIds) {
+      const currentTags = nextTagsById.get(assetId)
+      if (currentTags && currentTags.some((t) => removeSet.has(t.id))) {
+        nextTagsById.set(
+          assetId,
+          currentTags.filter((t) => !removeSet.has(t.id))
+        )
+      }
+    }
+
+    assetTagsById.value = nextTagsById
+    assetTagsVersion.value += 1
+  }
+
   function invalidateAssetTags(assetIds?: number[]) {
     if (assetIds === undefined) {
       assetTagsById.value = new Map()
@@ -169,14 +213,12 @@ export function createQuerySlice() {
       return
     }
 
-    const nextTagsById = new Map(assetTagsById.value)
+    // 局部失效仅清除已加载标记，保留已有标签以维持 UI 连续性，由后台查询异步覆盖
     const nextLoadedIds = new Set(loadedAssetTagIds.value)
     for (const assetId of assetIds) {
-      nextTagsById.delete(assetId)
       nextLoadedIds.delete(assetId)
     }
 
-    assetTagsById.value = nextTagsById
     loadedAssetTagIds.value = nextLoadedIds
     assetTagsVersion.value += 1
   }
@@ -261,6 +303,8 @@ export function createQuerySlice() {
     setDyeCodeStatuses,
     clearDyeCodeStatuses,
     setAssetTagsForAssets,
+    addTagsToAssetMap,
+    removeTagsFromAssetMap,
     invalidateAssetTags,
     replacePaginatedAssets,
     clearPaginatedAssets,

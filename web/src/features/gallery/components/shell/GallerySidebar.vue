@@ -410,7 +410,8 @@ async function handleDropAssetsToTag(tagId: number, assetIds: number[]) {
       )
     }
 
-    await assetActions.refreshTagViewsAfterMutation(uniqueIds)
+    galleryStore.addTagsToAssetMap(uniqueIds, [tag])
+    await assetActions.refreshTagViewsAfterMutation(uniqueIds, [tag.id])
     galleryStore.clearSelection()
 
     if (result.success && failedCount === 0 && unchangedCount === 0) {

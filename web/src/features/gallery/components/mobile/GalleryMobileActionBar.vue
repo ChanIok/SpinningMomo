@@ -89,6 +89,18 @@ const selectedAssets = computed(() => {
 const batchRatingSummary = ref<number | null | undefined>(undefined)
 let batchRatingSummaryRequestVersion = 0
 
+// 可见资产已经带有评分；选择集完整加载时直接计算，避免等待批量摘要请求造成文案闪烁。
+const localBatchRatingSummary = computed<number | null | undefined>(() => {
+  if (selectedCount.value <= 1 || selectedAssets.value.length !== selectedCount.value) {
+    return undefined
+  }
+
+  const firstRating = selectedAssets.value[0]?.rating ?? 0
+  return selectedAssets.value.every((asset) => (asset.rating ?? 0) === firstRating)
+    ? firstRating
+    : null
+})
+
 const singleSelectedAssetRating = computed<number | undefined>(() => {
   if (selectedCount.value !== 1) {
     return undefined
@@ -112,11 +124,12 @@ const currentRating = computed<number | null | undefined>(() => {
     return singleSelectedAssetRating.value
   }
   if (selectedCount.value > 1) {
-    return batchRatingSummary.value
+    const localRating = localBatchRatingSummary.value
+    return localRating !== undefined ? localRating : batchRatingSummary.value
   }
   return undefined
 })
-const isRatingMixed = computed(() => selectedCount.value > 1 && batchRatingSummary.value === null)
+const isRatingMixed = computed(() => selectedCount.value > 1 && currentRating.value === null)
 const ratingDisplayLabel = computed(() => {
   if (isRatingMixed.value) {
     return t('gallery.mobile.actions.ratingMixed')
@@ -131,9 +144,9 @@ const ratingDisplayLabel = computed(() => {
 
 async function refreshBatchRatingSummary(assetIds: number[]) {
   const requestVersion = ++batchRatingSummaryRequestVersion
-  batchRatingSummary.value = undefined
 
   if (assetIds.length <= 1) {
+    batchRatingSummary.value = undefined
     return
   }
 
@@ -145,6 +158,7 @@ async function refreshBatchRatingSummary(assetIds: number[]) {
     batchRatingSummary.value = summary.rating
   } catch (error) {
     if (requestVersion === batchRatingSummaryRequestVersion) {
+      batchRatingSummary.value = undefined
       console.warn('Failed to load mobile gallery rating summary:', error)
     }
   }
@@ -200,7 +214,6 @@ async function handleRating(rating: number) {
 
   // 使正在返回的旧批量摘要失效，避免用旧结果覆盖刚提交的评分。
   ++batchRatingSummaryRequestVersion
-  batchRatingSummaryLoading.value = false
 
   try {
     if (rating === 0) {

@@ -47,9 +47,9 @@ const { t } = useI18n()
 const hasRating = computed(() => props.showRating && (props.rating ?? 0) > 0)
 const isRejected = computed(() => props.reviewFlag === 'rejected')
 
-// 仅在非紧凑布局且开启 showTags 时，限制最多展示 MAX_RENDERED_CARD_TAGS 个标签
+// 开启 showTags 时展示标签列表（受 MAX_RENDERED_CARD_TAGS 上限保护）
 const renderedTags = computed(() =>
-  props.showTags && !props.dense ? props.tags.slice(0, MAX_RENDERED_CARD_TAGS) : []
+  props.showTags ? props.tags.slice(0, MAX_RENDERED_CARD_TAGS) : []
 )
 
 // 悬浮提示文本：拼合所有标签名称
@@ -69,7 +69,7 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
     <div
       v-if="hasTopContent"
       class="absolute flex flex-col items-start gap-1 overflow-hidden"
-      :class="dense ? 'top-1 left-1' : 'top-2 right-2 bottom-10 left-2'"
+      :class="dense ? 'top-1 right-1 bottom-6 left-1' : 'top-2 right-2 bottom-10 left-2'"
     >
       <!-- 星级与染色码角标行 -->
       <div v-if="hasStatusMarkers" class="flex shrink-0 items-start gap-1">
@@ -105,9 +105,10 @@ const hasTopContent = computed(() => hasStatusMarkers.value || renderedTags.valu
         <div
           v-for="tag in renderedTags"
           :key="tag.id"
-          class="max-w-full min-w-0 rounded border border-white/15 bg-black/45 px-1.5 py-1 text-[11px] leading-3 text-white shadow-sm backdrop-blur-[1px]"
+          class="inline-flex max-w-full min-w-0 items-center rounded border border-white/15 bg-black/45 text-white shadow-sm backdrop-blur-[1px]"
+          :class="dense ? 'h-5 px-1 text-[10px]' : 'h-6 px-1.5 text-[11px]'"
         >
-          <span class="block truncate font-medium">{{ tag.name }}</span>
+          <span class="truncate pt-[1px] leading-none font-medium">{{ tag.name }}</span>
         </div>
       </div>
     </div>
