@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Images } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -241,6 +242,15 @@ const currentTag = computed(() => {
 const isRootTagSummary = computed(() => currentTag.value?.id === -1)
 const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
+
+const hasDetails = computed(() => {
+  if (detailsFocus.value.type === 'folder') return Boolean(currentFolder.value)
+  if (detailsFocus.value.type === 'asset') return Boolean(activeAsset.value)
+  if (detailsFocus.value.type === 'tag') return Boolean(currentTag.value)
+  if (detailsFocus.value.type === 'batch') return true
+  return false
+})
+
 const assetDescriptionDraft = ref('')
 const isSavingAssetDescription = ref(false)
 const batchDescriptionDraft = ref('')
@@ -678,8 +688,17 @@ async function handleCopyColorHex(color: AssetMainColor) {
 </script>
 
 <template>
-  <ScrollArea class="h-full">
-    <div class="min-h-full p-4">
+  <!-- 空状态：无选中内容时全高居中展示，不被滚动容器包裹 -->
+  <div v-if="!hasDetails" class="flex h-full w-full items-center justify-center p-4">
+    <div class="text-center text-muted-foreground">
+      <Images class="mx-auto mb-4 size-12 stroke-[1.5] opacity-50" />
+      <p class="text-sm">{{ t('gallery.details.empty') }}</p>
+    </div>
+  </div>
+
+  <!-- 详情内容：有选中项时启用 ScrollArea 进行正常纵向滚动 -->
+  <ScrollArea v-else class="h-full">
+    <div class="p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">
@@ -1082,29 +1101,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <div class="text-xs text-muted-foreground">
             {{ t('gallery.details.batch.reviewHint') }}
           </div>
-        </div>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="flex min-h-full items-center justify-center">
-        <div class="text-center text-muted-foreground">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="mx-auto mb-4 opacity-50"
-          >
-            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-          </svg>
-          <p class="text-sm">{{ t('gallery.details.empty') }}</p>
         </div>
       </div>
     </div>
