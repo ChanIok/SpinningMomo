@@ -290,7 +290,6 @@
   "gallery.review.flag.picked": "留用",
   "gallery.review.flag.rejected": "弃置",
   "gallery.review.update.failedTitle": "更新审片状态失败",
-  "gallery.sidebar.common.loading": "加载中...",
   "gallery.sidebar.folders.create.failedTitle": "创建文件夹失败",
   "gallery.sidebar.folders.create.placeholder": "输入文件夹名称...",
   "gallery.sidebar.folders.create.successDescription": "已创建「{name}」",

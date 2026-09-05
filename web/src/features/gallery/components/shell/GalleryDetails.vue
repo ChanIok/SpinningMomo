@@ -433,22 +433,18 @@ async function reloadActiveAssetTags() {
 
 // Popover 状态
 const showTagSelector = ref(false)
-const isLoadingTagTree = ref(false)
 
 async function handleTagSelectorOpen(open: boolean) {
   showTagSelector.value = open
 
-  if (!open || store.tags.length > 0 || isLoadingTagTree.value) {
+  if (!open || store.tags.length > 0) {
     return
   }
 
-  isLoadingTagTree.value = true
   try {
     await loadTagTree()
   } catch (error) {
     console.error('Failed to load tag tree for details:', error)
-  } finally {
-    isLoadingTagTree.value = false
   }
 }
 
@@ -853,14 +849,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                       :class="store.isCompactWindow ? 'z-[120]' : undefined"
                       class="p-0"
                     >
-                      <div
-                        v-if="isLoadingTagTree && store.tags.length === 0"
-                        class="w-72 py-8 text-center text-sm text-muted-foreground"
-                      >
-                        {{ t('gallery.sidebar.common.loading') }}
-                      </div>
                       <TagSelectorPopover
-                        v-else
                         :tags="store.tags"
                         :selected-tag-ids="assetTags.map((t) => t.id)"
                         @toggle="handleToggleTag"
@@ -1017,14 +1006,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 :class="store.isCompactWindow ? 'z-[120]' : undefined"
                 class="p-0"
               >
-                <div
-                  v-if="isLoadingTagTree && store.tags.length === 0"
-                  class="w-72 py-8 text-center text-sm text-muted-foreground"
-                >
-                  {{ t('gallery.sidebar.common.loading') }}
-                </div>
                 <TagSelectorPopover
-                  v-else
                   :tags="store.tags"
                   :selected-tag-ids="batchSelectedTagIds"
                   @toggle="handleToggleBatchTag"

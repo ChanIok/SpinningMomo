@@ -59,7 +59,7 @@ const ratingSheetOpen = ref(false)
 const tagSheetOpen = ref(false)
 const moreSheetOpen = ref(false)
 const tagIds = ref<number[]>([])
-const tagLoading = ref(false)
+const isTogglingTag = ref(false)
 const isDownloading = ref(false)
 const downloadConfirmationOpen = ref(false)
 const pendingDownloadIds = ref<number[]>([])
@@ -87,7 +87,6 @@ const selectedAssets = computed(() => {
   return assets
 })
 const batchRatingSummary = ref<number | null | undefined>(undefined)
-const batchRatingSummaryLoading = ref(false)
 let batchRatingSummaryRequestVersion = 0
 
 const singleSelectedAssetRating = computed<number | undefined>(() => {
@@ -117,14 +116,8 @@ const currentRating = computed<number | null | undefined>(() => {
   }
   return undefined
 })
-const isRatingMixed = computed(
-  () =>
-    selectedCount.value > 1 && !batchRatingSummaryLoading.value && batchRatingSummary.value === null
-)
+const isRatingMixed = computed(() => selectedCount.value > 1 && batchRatingSummary.value === null)
 const ratingDisplayLabel = computed(() => {
-  if (batchRatingSummaryLoading.value && selectedCount.value > 1) {
-    return t('gallery.sidebar.common.loading')
-  }
   if (isRatingMixed.value) {
     return t('gallery.mobile.actions.ratingMixed')
   }
@@ -139,13 +132,11 @@ const ratingDisplayLabel = computed(() => {
 async function refreshBatchRatingSummary(assetIds: number[]) {
   const requestVersion = ++batchRatingSummaryRequestVersion
   batchRatingSummary.value = undefined
-  batchRatingSummaryLoading.value = false
 
   if (assetIds.length <= 1) {
     return
   }
 
-  batchRatingSummaryLoading.value = true
   try {
     const summary = await galleryApi.getBatchSelectionSummary(assetIds)
     if (requestVersion !== batchRatingSummaryRequestVersion) {
@@ -155,10 +146,6 @@ async function refreshBatchRatingSummary(assetIds: number[]) {
   } catch (error) {
     if (requestVersion === batchRatingSummaryRequestVersion) {
       console.warn('Failed to load mobile gallery rating summary:', error)
-    }
-  } finally {
-    if (requestVersion === batchRatingSummaryRequestVersion) {
-      batchRatingSummaryLoading.value = false
     }
   }
 }
@@ -257,7 +244,6 @@ function handleRejected() {
 async function openTagSheet() {
   closeActionSheet()
   tagSheetOpen.value = true
-  tagLoading.value = true
 
   try {
     if (store.tags.length === 0) {
@@ -281,17 +267,15 @@ async function openTagSheet() {
   } catch (error) {
     console.error('Failed to load mobile gallery tags:', error)
     tagIds.value = []
-  } finally {
-    tagLoading.value = false
   }
 }
 
 async function handleTagToggle(tagId: number) {
-  if (tagLoading.value) {
+  if (isTogglingTag.value) {
     return
   }
 
-  tagLoading.value = true
+  isTogglingTag.value = true
   const hasTag = tagIds.value.includes(tagId)
 
   try {
@@ -305,7 +289,7 @@ async function handleTagToggle(tagId: number) {
   } catch (error) {
     console.error('Failed to update mobile gallery tag:', error)
   } finally {
-    tagLoading.value = false
+    isTogglingTag.value = false
   }
 }
 
@@ -582,14 +566,7 @@ async function handleDownload() {
     @close="tagSheetOpen = false"
   >
     <div class="px-4 pb-4">
-      <div
-        v-if="tagLoading && store.tags.length === 0"
-        class="py-8 text-center text-sm text-muted-foreground"
-      >
-        {{ t('gallery.sidebar.common.loading') }}
-      </div>
       <TagSelectorPopover
-        v-else
         :tags="store.tags"
         :selected-tag-ids="tagIds"
         @toggle="void handleTagToggle($event)"
