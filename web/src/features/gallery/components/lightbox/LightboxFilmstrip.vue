@@ -46,7 +46,7 @@ watch(scrollAreaRef, (newRef) => {
 })
 
 function getAssetAtIndex(index: number) {
-  return store.getAssetsInRange(index, index)[0]
+  return store.getAssetAt(index)
 }
 
 const virtualItems = computed(() => virtualizer.value.getVirtualItems())

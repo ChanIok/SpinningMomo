@@ -19,6 +19,7 @@ import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
+import GalleryTimelineHeader from '../shell/GalleryTimelineHeader.vue'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
@@ -33,7 +34,7 @@ const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const heroHeaderRef = ref<HTMLElement | null>(null)
-const virtualContentRef = ref<HTMLElement | null>(null)
+const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const targetRowHeight = computed(() => store.getEffectiveViewSize())
@@ -224,67 +225,86 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <div ref="heroHeaderRef">
-        <GalleryHeroHeader />
-      </div>
-      <div class="pb-3">
-        <div
-          ref="virtualContentRef"
-          :style="{
-            height: `${adaptiveVirtualizer.virtualizer.value.getTotalSize()}px`,
-            position: 'relative',
-          }"
-        >
+      <div ref="scrollContentRef">
+        <div ref="heroHeaderRef">
+          <GalleryHeroHeader />
+        </div>
+        <div class="pb-3">
           <div
-            v-for="virtualRow in adaptiveVirtualizer.virtualRows.value"
-            :key="virtualRow.index"
             :style="{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: `${virtualRow.size}px`,
-              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
-              display: 'flex',
-              gap: `${adaptiveVirtualizer.gap}px`,
+              height: `${adaptiveVirtualizer.virtualizer.value.getTotalSize()}px`,
+              position: 'relative',
             }"
           >
-            <template v-for="item in virtualRow.items" :key="item.id">
-              <div
-                :data-index="item.index"
-                class="shrink-0"
-                :style="{ width: `${item.width}px`, height: `${item.height}px` }"
-              >
-                <AssetCard
-                  v-if="item.asset !== null"
-                  :asset="item.asset"
-                  :aspect-ratio="`${item.width} / ${item.height}`"
-                  :allow-thumbnail-load="cardImageScheduler.isThumbnailLoadAllowed(item.asset.id)"
-                  :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(item.asset.id)"
-                  :original-preview-short-edge="Math.min(item.width, item.height)"
-                  :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
-                  @click="
-                    (asset, event, inputType) =>
-                      handleAssetClick(asset, event, item.index, inputType)
-                  "
-                  @long-press="(asset, event) => handleAssetLongPress(asset, event, item.index)"
-                  @double-click="
-                    (asset, event, inputType) =>
-                      handleAssetDoubleClick(asset, event, item.index, inputType)
-                  "
-                  @context-menu="
-                    (asset, event) => void handleAssetContextMenu(asset, event, item.index)
-                  "
-                  @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
-                />
+            <div
+              v-for="virtualRow in adaptiveVirtualizer.virtualRows.value"
+              :key="virtualRow.index"
+              :style="{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+                display: virtualRow.kind === 'assets' ? 'flex' : 'block',
+                gap: virtualRow.kind === 'assets' ? `${adaptiveVirtualizer.gap}px` : undefined,
+              }"
+            >
+              <GalleryTimelineHeader
+                v-if="virtualRow.kind === 'month' || virtualRow.kind === 'day'"
+                :kind="virtualRow.kind"
+                :date="virtualRow.date"
+                :month="virtualRow.month ?? ''"
+                :count="virtualRow.count ?? 0"
+                :compact="store.isCompactWindow"
+                :is-multi-select="isMultiSelectMode"
+                :start-index="virtualRow.startIndex"
+                :end-index="virtualRow.endIndex"
+                :is-all-selected="
+                  gallerySelection.isRangeAllSelected(virtualRow.startIndex, virtualRow.endIndex)
+                "
+                @select-group="
+                  gallerySelection.toggleRangeSelection($event.startIndex, $event.endIndex)
+                "
+              />
 
+              <template v-for="item in virtualRow.items" :key="item.id">
                 <div
-                  v-else
-                  class="h-full w-full animate-pulse bg-muted"
-                  :class="!store.isCompactWindow && 'rounded-sm'"
-                />
-              </div>
-            </template>
+                  :data-index="item.index"
+                  class="shrink-0"
+                  :style="{ width: `${item.width}px`, height: `${item.height}px` }"
+                >
+                  <AssetCard
+                    v-if="item.asset !== null"
+                    :asset="item.asset"
+                    :aspect-ratio="`${item.width} / ${item.height}`"
+                    :allow-thumbnail-load="cardImageScheduler.isThumbnailLoadAllowed(item.asset.id)"
+                    :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(item.asset.id)"
+                    :original-preview-short-edge="Math.min(item.width, item.height)"
+                    :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
+                    @click="
+                      (asset, event, inputType) =>
+                        handleAssetClick(asset, event, item.index, inputType)
+                    "
+                    @long-press="(asset, event) => handleAssetLongPress(asset, event, item.index)"
+                    @double-click="
+                      (asset, event, inputType) =>
+                        handleAssetDoubleClick(asset, event, item.index, inputType)
+                    "
+                    @context-menu="
+                      (asset, event) => void handleAssetContextMenu(asset, event, item.index)
+                    "
+                    @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
+                  />
+
+                  <div
+                    v-else
+                    class="h-full w-full animate-pulse bg-muted"
+                    :class="!store.isCompactWindow && 'rounded-sm'"
+                  />
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -295,7 +315,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
-      :content-element="virtualContentRef"
+      :content-element="scrollContentRef"
       :virtualizer="adaptiveVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, shallowRef, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
@@ -38,8 +38,8 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
 
   const totalCount = computed(() => store.totalCount)
   // 正在加载中的页码集合，防止同一页被并发重复请求
-  const loadingPages = ref<Set<number>>(new Set())
-  const virtualItems = ref<VirtualListItem[]>([])
+  const loadingPages = new Set<number>()
+  const virtualItems = shallowRef<VirtualListItem[]>([])
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLElement>({
     get count() {
@@ -77,10 +77,9 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
     )
 
     virtualItems.value = items.map((item) => {
-      const [asset] = store.getAssetsInRange(item.index, item.index)
       return {
         index: item.index,
-        asset: asset ?? null,
+        asset: store.getAssetAt(item.index),
         start: item.start,
         size: item.size,
       }
@@ -100,10 +99,10 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
     const loadPromises: Promise<void>[] = []
 
     neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-        loadingPages.value.add(pageNum)
+      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
+        loadingPages.add(pageNum)
         const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.value.delete(pageNum)
+          loadingPages.delete(pageNum)
         })
         loadPromises.push(loadPromise)
       }

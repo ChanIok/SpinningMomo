@@ -125,6 +125,9 @@ export type {
 // 视图模式
 export type ViewMode = 'masonry' | 'grid' | 'list' | 'adaptive'
 
+// 日期分组仅影响网格类视图的视觉布局，不改变资产实体和分页索引。
+export type DateGrouping = 'none' | 'month' | 'day'
+
 // 排序选项
 export type SortBy = 'createdAt' | 'name' | 'size' | 'resolution'
 export type SortOrder = 'asc' | 'desc'
@@ -166,7 +169,7 @@ export type {
   QueryAssetLayoutMetaResponse,
   AdaptiveLayoutRowItem,
   AdaptiveLayoutRow,
-  // 时间线桶与月视图
+  // 时间线日期桶与月份筛选
   TimelineBucket,
   GetTimelineBucketsParams,
   TimelineBucketsResponse,

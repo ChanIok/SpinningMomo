@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, shallowRef, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
@@ -105,8 +105,8 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
 
   const totalCount = computed(() => store.totalCount)
   // 正在加载中的页码集合，防止同一页被并发重复请求
-  const loadingPages = ref<Set<number>>(new Set())
-  const virtualItems = ref<VirtualMasonryItem[]>([])
+  const loadingPages = new Set<number>()
+  const virtualItems = shallowRef<VirtualMasonryItem[]>([])
   const { layoutMetaItems, reloadLayoutMeta } = useGalleryLayoutMeta('masonry')
 
   // 单列宽度 = (容器宽度 - 列间总间距) / 列数
@@ -121,7 +121,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   const itemStartByIndex = computed(() => {
     // 时间线轨道需要 asset index -> content offset 的稳定映射。
     // 这里复用 Masonry 的“最短列”规则重放一遍全量轻量布局，不触发资产分页加载。
-    const startMap = new Map<number, number>()
+    const starts = new Float64Array(totalCount.value)
     const laneCount = Math.max(1, columns.value)
     const laneHeights = new Array<number>(laneCount).fill(0)
 
@@ -136,24 +136,24 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
       }
 
       const start = laneHeights[lane] ?? 0
-      startMap.set(index, start)
+      starts[index] = start
 
-      const [asset] = store.getAssetsInRange(index, index)
+      // 轨道映射只需要稳定的布局元数据；分页资产加载不应让这里重放全量布局。
       const itemHeight = getAssetHeight(
-        asset ?? null,
+        null,
         columnWidth.value,
         layoutMetaItems.value[index] ?? null
       )
       laneHeights[lane] = start + itemHeight + gap
     }
 
-    return startMap
+    return starts
   })
 
   // 预估高度：virtualizer 初次渲染时使用，后续由 measureElement 实测覆盖
   function estimateSize(index: number): number {
-    const [asset] = store.getAssetsInRange(index, index)
-    return getAssetHeight(asset ?? null, columnWidth.value, layoutMetaItems.value[index] ?? null)
+    // Masonry 的几何只由完整布局元数据决定；分页资产到达时只替换内容，不改变估算来源。
+    return getAssetHeight(null, columnWidth.value, layoutMetaItems.value[index] ?? null)
   }
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLElement>({
@@ -230,10 +230,9 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     )
 
     virtualItems.value = renderItems.map((item) => {
-      const [asset] = store.getAssetsInRange(item.index, item.index)
       return {
         index: item.index,
-        asset: asset ?? null,
+        asset: store.getAssetAt(item.index),
         start: Math.round(item.start),
         size: Math.round(item.size),
         lane: item.lane,
@@ -259,10 +258,10 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     const loadPromises: Promise<void>[] = []
 
     neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-        loadingPages.value.add(pageNum)
+      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
+        loadingPages.add(pageNum)
         const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.value.delete(pageNum)
+          loadingPages.delete(pageNum)
         })
         loadPromises.push(loadPromise)
       }
@@ -284,11 +283,11 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     }
 
     if (store.isTimelineMode) {
-      await Promise.all([reloadLayoutMeta(), galleryData.loadTimelineData()])
+      await galleryData.loadTimelineData()
       return
     }
 
-    await Promise.all([reloadLayoutMeta(), galleryData.loadAllAssets()])
+    await galleryData.loadAllAssets()
   }
 
   /**
@@ -319,29 +318,21 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     }
   )
 
-  // 查询结果替换后，索引对应的资产及其高度可能已经变化，清空 Masonry 的尺寸和列分配缓存。
-  watch(
-    () => store.paginatedAssetsVersion,
-    () => {
-      virtualizer.value.measure()
-    }
-  )
-
   // 列数或列宽变化时重新测量，避免布局错位
   watch([columns, columnWidth], () => {
-    if (virtualItems.value.length > 0) virtualizer.value.measure()
+    virtualizer.value.measure()
   })
 
   watch(layoutMetaItems, () => {
-    if (virtualItems.value.length > 0) virtualizer.value.measure()
+    virtualizer.value.measure()
   })
 
   watch(
-    () => [store.filter, store.includeSubfolders, store.sortBy, store.sortOrder],
+    () => store.queryResultVersion,
     async () => {
       await reloadLayoutMeta()
     },
-    { deep: true }
+    { flush: 'post' }
   )
 
   return {

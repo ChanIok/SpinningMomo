@@ -153,7 +153,7 @@ const batchActiveAsset = computed(() => {
   // 上半部分读选择集摘要；这里只负责给下半部分“当前焦点项预览”找一个可展示的资产。
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
-    const [currentAsset] = store.getAssetsInRange(activeIndex, activeIndex)
+    const currentAsset = store.getAssetAt(activeIndex)
     if (currentAsset && store.selection.selectedIds.has(currentAsset.id)) {
       return currentAsset
     }

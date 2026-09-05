@@ -33,7 +33,7 @@ const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const heroHeaderRef = ref<HTMLElement | null>(null)
-const virtualContentRef = ref<HTMLElement | null>(null)
+const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
@@ -72,8 +72,15 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   buckets: computed(() => store.timelineBuckets),
   locale,
   getOffsetByAssetIndex(assetIndex) {
-    const itemStart = masonryVirtualizer.itemStartByIndex.value.get(assetIndex)
-    return itemStart === undefined ? undefined : scrollMargin.value + itemStart
+    if (
+      !Number.isInteger(assetIndex) ||
+      assetIndex < 0 ||
+      assetIndex >= masonryVirtualizer.itemStartByIndex.value.length
+    ) {
+      return undefined
+    }
+
+    return scrollMargin.value + masonryVirtualizer.itemStartByIndex.value[assetIndex]
   },
 })
 
@@ -237,70 +244,75 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar h-full flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <div ref="heroHeaderRef">
-        <GalleryHeroHeader />
-      </div>
-      <div>
-        <div
-          ref="virtualContentRef"
-          :style="{
-            height: `${masonryVirtualizer.virtualizer.value.getTotalSize()}px`,
-            position: 'relative',
-          }"
-        >
+      <div ref="scrollContentRef">
+        <div ref="heroHeaderRef">
+          <GalleryHeroHeader />
+        </div>
+        <div>
           <div
-            v-for="virtualItem in masonryVirtualizer.virtualItems.value"
-            :key="virtualItem.asset?.id ?? `placeholder-${virtualItem.index}`"
-            :ref="measureItemElement"
-            :data-index="virtualItem.index"
             :style="{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: `${masonryVirtualizer.columnWidth.value}px`,
-              height: `${virtualItem.size}px`,
-              transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start - scrollMargin}px)`,
+              height: `${masonryVirtualizer.virtualizer.value.getTotalSize()}px`,
+              position: 'relative',
             }"
           >
-            <AssetCard
-              v-if="virtualItem.asset !== null"
-              :asset="virtualItem.asset"
-              :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
-              :allow-thumbnail-load="
-                cardImageScheduler.isThumbnailLoadAllowed(virtualItem.asset.id)
-              "
-              :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(virtualItem.asset.id)"
-              :original-preview-short-edge="
-                Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
-              "
-              :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-              :style="{
-                height: `${virtualItem.size}px`,
-              }"
-              @click="
-                (asset, event, inputType) =>
-                  handleAssetClick(asset, event, virtualItem.index, inputType)
-              "
-              @long-press="(asset, event) => handleAssetLongPress(asset, event, virtualItem.index)"
-              @double-click="
-                (asset, event, inputType) =>
-                  handleAssetDoubleClick(asset, event, virtualItem.index, inputType)
-              "
-              @context-menu="
-                (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
-              "
-              @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
-            />
-
             <div
-              v-else
-              class="animate-pulse bg-muted"
-              :class="!store.isCompactWindow && 'rounded-sm'"
+              v-for="virtualItem in masonryVirtualizer.virtualItems.value"
+              :key="virtualItem.asset?.id ?? `placeholder-${virtualItem.index}`"
+              :ref="measureItemElement"
+              :data-index="virtualItem.index"
               :style="{
-                width: '100%',
-                height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${masonryVirtualizer.columnWidth.value}px`,
+                height: `${virtualItem.size}px`,
+                transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start - scrollMargin}px)`,
               }"
-            />
+            >
+              <AssetCard
+                v-if="virtualItem.asset !== null"
+                :asset="virtualItem.asset"
+                :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
+                :allow-thumbnail-load="
+                  cardImageScheduler.isThumbnailLoadAllowed(virtualItem.asset.id)
+                "
+                :allow-original-load="
+                  cardImageScheduler.isOriginalLoadAllowed(virtualItem.asset.id)
+                "
+                :original-preview-short-edge="
+                  Math.min(masonryVirtualizer.columnWidth.value, virtualItem.size)
+                "
+                :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+                :style="{
+                  height: `${virtualItem.size}px`,
+                }"
+                @click="
+                  (asset, event, inputType) =>
+                    handleAssetClick(asset, event, virtualItem.index, inputType)
+                "
+                @long-press="
+                  (asset, event) => handleAssetLongPress(asset, event, virtualItem.index)
+                "
+                @double-click="
+                  (asset, event, inputType) =>
+                    handleAssetDoubleClick(asset, event, virtualItem.index, inputType)
+                "
+                @context-menu="
+                  (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
+                "
+                @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
+              />
+
+              <div
+                v-else
+                class="animate-pulse bg-muted"
+                :class="!store.isCompactWindow && 'rounded-sm'"
+                :style="{
+                  width: '100%',
+                  height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,
+                }"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -311,7 +323,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
-      :content-element="virtualContentRef"
+      :content-element="scrollContentRef"
       :virtualizer="masonryVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

@@ -13,15 +13,19 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const { t } = useI18n()
 const {
   viewMode,
+  dateGrouping,
   sortBy,
   sortOrder,
   includeSubfolders,
   setIncludeSubfolders,
   currentSliderPosition,
   availableViewModes,
+  dateGroupingOptions,
+  dateGroupingSupported,
   onSortByChange,
   toggleSortOrder,
   setViewMode,
+  setDateGrouping,
   onViewSizeSliderChange,
 } = useGalleryViewControls()
 
@@ -68,6 +72,36 @@ const sortOptions = computed(() => [
             >
               <component :is="mode.icon" class="size-3.5" />
               <span>{{ t(mode.i18nKey) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 日期分组 -->
+        <div class="flex flex-col gap-2">
+          <div class="flex h-5 items-center justify-between gap-2">
+            <span class="text-sm font-medium text-foreground">
+              {{ t('gallery.toolbar.dateGrouping.label') }}
+            </span>
+            <span v-if="!dateGroupingSupported" class="text-[0.6875rem] text-muted-foreground">
+              {{ t('gallery.toolbar.dateGrouping.unsupported') }}
+            </span>
+          </div>
+          <div
+            class="grid grid-cols-3 gap-1 rounded-lg border border-border/30 bg-sidebar-hover/50 p-1"
+          >
+            <button
+              v-for="option in dateGroupingOptions"
+              :key="option.value"
+              type="button"
+              class="flex h-8.5 items-center justify-center rounded-md text-xs font-medium transition-colors duration-150"
+              :class="
+                dateGrouping === option.value
+                  ? 'bg-sidebar-accent font-medium text-primary shadow-xs'
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+              "
+              @click="setDateGrouping(option.value)"
+            >
+              {{ t(option.i18nKey) }}
             </button>
           </div>
         </div>

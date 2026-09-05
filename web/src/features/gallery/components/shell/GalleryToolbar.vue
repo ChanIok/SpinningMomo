@@ -102,17 +102,21 @@ const {
 
 const {
   viewMode,
+  dateGrouping,
   sortBy,
   includeSubfolders,
   setIncludeSubfolders,
   currentSliderPosition,
   availableViewModes,
+  dateGroupingOptions,
+  dateGroupingSupported,
   currentViewModeIcon,
   currentSource,
   sortOrderLabel,
   onSortByChange,
   toggleSortOrder,
   setViewMode,
+  setDateGrouping,
   onViewSizeSliderChange,
 } = viewControls
 
@@ -300,6 +304,34 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <component :is="mode.icon" class="h-5 w-5" />
                             <span class="text-xs">{{ t(mode.i18nKey) }}</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div class="border-t" />
+
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-sm font-medium">
+                            {{ t('gallery.toolbar.dateGrouping.label') }}
+                          </p>
+                          <span
+                            v-if="!dateGroupingSupported"
+                            class="text-[0.6875rem] text-muted-foreground"
+                          >
+                            {{ t('gallery.toolbar.dateGrouping.unsupported') }}
+                          </span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                          <Button
+                            v-for="option in dateGroupingOptions"
+                            :key="option.value"
+                            :variant="dateGrouping === option.value ? 'default' : 'outline'"
+                            size="sm"
+                            class="h-auto py-2 text-xs"
+                            @click="setDateGrouping(option.value)"
+                          >
+                            {{ t(option.i18nKey) }}
                           </Button>
                         </div>
                       </div>

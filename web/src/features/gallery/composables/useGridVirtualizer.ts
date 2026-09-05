@@ -1,9 +1,17 @@
-import { computed, watch, ref, type Ref } from 'vue'
+import { computed, watch, shallowRef, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
-import type { Asset } from '../types'
+import type { Asset, DateGrouping, TimelineBucket } from '../types'
 import { GALLERY_CARD_GAP } from '../constants'
+import {
+  buildTimelineSections,
+  getTimelineHeaderDescriptors,
+  getTimelineHeaderHeight,
+  hasCompleteTimelineBuckets,
+  type TimelineHeaderDescriptor,
+  type TimelineHeaderKind,
+} from './timelineLayout'
 
 export interface UseGridVirtualizerOptions {
   containerRef: Ref<HTMLElement | null>
@@ -14,11 +22,203 @@ export interface UseGridVirtualizerOptions {
   gap?: number
 }
 
-export interface VirtualRow {
+type GridRowKind = 'assets' | TimelineHeaderKind
+
+interface GridLayoutRow {
   index: number
-  assets: (Asset | null)[]
+  kind: GridRowKind
   start: number
   size: number
+  assetStartIndex?: number
+  assetCount?: number
+  date?: string
+  month?: string
+  count?: number
+  startIndex?: number
+  endIndex?: number
+}
+
+type GridLayoutMode = 'flat' | 'timeline'
+
+interface GridTimelineSection {
+  startIndex: number
+  endIndex: number
+  assetRowStartIndex: number
+}
+
+interface GridLayout {
+  mode: GridLayoutMode
+  totalRows: number
+  // 只有时间线分组模式需要保存完整视觉行；flat 模式按需生成当前虚拟行。
+  rows: GridLayoutRow[]
+  sections: GridTimelineSection[]
+}
+
+export interface VirtualRow {
+  /** 虚拟列表中的视觉行索引，包含标题行。 */
+  index: number
+  kind: GridRowKind
+  assets: (Asset | null)[]
+  assetStartIndex?: number
+  date?: string
+  month?: string
+  count?: number
+  startIndex?: number
+  endIndex?: number
+  start: number
+  size: number
+}
+
+function buildFlatGridLayout(total: number, columns: number): GridLayout {
+  const safeColumns = Math.max(1, columns)
+
+  return {
+    mode: 'flat',
+    totalRows: Math.ceil(Math.max(0, total) / safeColumns),
+    rows: [],
+    sections: [],
+  }
+}
+
+function buildTimelineGridLayout(
+  buckets: TimelineBucket[],
+  total: number,
+  columns: number,
+  assetRowSize: number,
+  gap: number,
+  compact: boolean,
+  grouping: DateGrouping
+): GridLayout {
+  const rows: GridLayoutRow[] = []
+  const gridSections: GridTimelineSection[] = []
+  const safeColumns = Math.max(1, columns)
+  const sections = buildTimelineSections(buckets, grouping, total)
+  let contentStart = 0
+
+  function appendHeader(header: TimelineHeaderDescriptor) {
+    const contentHeight = getTimelineHeaderHeight(compact)
+    rows.push({
+      index: rows.length,
+      kind: header.kind,
+      start: contentStart,
+      size: contentHeight + gap,
+      date: header.date,
+      month: header.month,
+      count: header.count,
+      startIndex: header.startIndex,
+      endIndex: header.endIndex,
+    })
+    contentStart += contentHeight + gap
+  }
+
+  for (const section of sections) {
+    for (const header of getTimelineHeaderDescriptors(section, grouping)) {
+      appendHeader(header)
+    }
+
+    const assetRowStartIndex = rows.length
+    for (
+      let assetStartIndex = section.startIndex;
+      assetStartIndex < section.endIndex;
+      assetStartIndex += safeColumns
+    ) {
+      const assetCount = Math.min(safeColumns, section.endIndex - assetStartIndex)
+      const rowIndex = rows.length
+      rows.push({
+        index: rowIndex,
+        kind: 'assets',
+        start: contentStart,
+        size: assetRowSize,
+        assetStartIndex,
+        assetCount,
+      })
+      contentStart += assetRowSize
+    }
+
+    gridSections.push({
+      startIndex: section.startIndex,
+      endIndex: section.endIndex,
+      assetRowStartIndex,
+    })
+  }
+
+  return { mode: 'timeline', totalRows: rows.length, rows, sections: gridSections }
+}
+
+function getTimelineAssetRowIndex(
+  sections: GridTimelineSection[],
+  index: number,
+  columns: number
+): number | undefined {
+  const safeColumns = Math.max(1, columns)
+  let left = 0
+  let right = sections.length - 1
+
+  while (left <= right) {
+    const middle = Math.floor((left + right) / 2)
+    const section = sections[middle]
+    if (!section) {
+      return undefined
+    }
+
+    if (index < section.startIndex) {
+      right = middle - 1
+      continue
+    }
+
+    if (index >= section.endIndex) {
+      left = middle + 1
+      continue
+    }
+
+    return section.assetRowStartIndex + Math.floor((index - section.startIndex) / safeColumns)
+  }
+
+  return undefined
+}
+
+function getAssetRowIndex(
+  layout: GridLayout,
+  index: number,
+  total: number,
+  columns: number
+): number | undefined {
+  if (!Number.isInteger(index) || index < 0 || index >= total) {
+    return undefined
+  }
+
+  if (layout.mode === 'flat') {
+    return Math.floor(index / Math.max(1, columns))
+  }
+
+  return getTimelineAssetRowIndex(layout.sections, index, columns)
+}
+
+function getGridRow(
+  layout: GridLayout,
+  rowIndex: number,
+  total: number,
+  columns: number,
+  rowSize: number
+): GridLayoutRow | undefined {
+  if (rowIndex < 0 || rowIndex >= layout.totalRows) {
+    return undefined
+  }
+
+  if (layout.mode === 'timeline') {
+    return layout.rows[rowIndex]
+  }
+
+  const safeColumns = Math.max(1, columns)
+  const assetStartIndex = rowIndex * safeColumns
+  return {
+    index: rowIndex,
+    kind: 'assets',
+    start: rowIndex * rowSize,
+    size: rowSize,
+    assetStartIndex,
+    assetCount: Math.min(safeColumns, total - assetStartIndex),
+  }
 }
 
 export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
@@ -27,12 +227,10 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   const store = useGalleryStore()
   const galleryData = useGalleryData()
 
-  const isTimelineMode = computed(() => store.isTimelineMode && store.view.mode === 'grid')
+  const isTimelineMode = computed(() => store.isTimelineMode)
   const totalCount = computed(() =>
     isTimelineMode.value ? store.timelineTotalCount : store.totalCount
   )
-
-  const totalRows = computed(() => Math.ceil(totalCount.value / columns.value))
 
   const estimatedRowHeight = computed(() => {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
@@ -42,12 +240,37 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     return cardWidth + gap
   })
 
+  const hasTimelineLayout = computed(
+    () =>
+      store.isDateGroupingEnabled &&
+      store.timelineBuckets.length > 0 &&
+      hasCompleteTimelineBuckets(store.timelineBuckets, totalCount.value)
+  )
+
+  const layout = computed<GridLayout>(() => {
+    if (hasTimelineLayout.value) {
+      return buildTimelineGridLayout(
+        store.timelineBuckets,
+        totalCount.value,
+        columns.value,
+        estimatedRowHeight.value,
+        gap,
+        store.isCompactWindow,
+        store.view.dateGrouping
+      )
+    }
+
+    return buildFlatGridLayout(totalCount.value, columns.value)
+  })
+
+  const totalRows = computed(() => layout.value.totalRows)
+
   const virtualizer = useVirtualizer({
     get count() {
       return totalRows.value
     },
     getScrollElement: () => containerRef.value,
-    estimateSize: () => estimatedRowHeight.value,
+    estimateSize: (index) => layout.value.rows[index]?.size ?? estimatedRowHeight.value,
     get scrollMargin() {
       return scrollMargin.value
     },
@@ -56,12 +279,11 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     overscan: 10,
   })
 
-  const virtualRows = ref<VirtualRow[]>([])
-  const loadingPages = ref<Set<number>>(new Set())
+  const virtualRows = shallowRef<VirtualRow[]>([])
+  const loadingPages = new Set<number>()
 
   function syncVirtualRows(
     items: ReturnType<typeof virtualizer.value.getVirtualItems>,
-    cols: number,
     total: number
   ) {
     if (items.length === 0) {
@@ -70,47 +292,114 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       return
     }
 
-    const firstVisibleRow = items[0]!
-    const lastVisibleRow = items[items.length - 1]!
-    store.setVisibleRange(
-      Math.max(0, firstVisibleRow.index * cols),
-      Math.min(total - 1, (lastVisibleRow.index + 1) * cols - 1)
-    )
-
-    virtualRows.value = items.map((virtualRow) => {
-      const startIndex = virtualRow.index * cols
-      const endIndex = Math.min(startIndex + cols - 1, total - 1)
-      return {
-        index: virtualRow.index,
-        assets: store.getAssetsInRange(startIndex, endIndex),
-        start: Math.round(virtualRow.start),
-        size: Math.round(virtualRow.size),
+    const currentLayout = layout.value
+    let visibleStartIndex = total
+    let visibleEndIndex = -1
+    items.forEach((item) => {
+      const row = getGridRow(
+        currentLayout,
+        item.index,
+        total,
+        columns.value,
+        estimatedRowHeight.value
+      )
+      if (!row || row.kind !== 'assets' || row.assetStartIndex === undefined) {
+        return
       }
+
+      visibleStartIndex = Math.min(visibleStartIndex, row.assetStartIndex)
+      visibleEndIndex = Math.max(
+        visibleEndIndex,
+        Math.min(total - 1, row.assetStartIndex + (row.assetCount ?? 0) - 1)
+      )
+    })
+
+    if (visibleEndIndex < visibleStartIndex) {
+      store.setVisibleRange(undefined, undefined)
+    } else {
+      store.setVisibleRange(Math.max(0, visibleStartIndex), Math.min(total - 1, visibleEndIndex))
+    }
+
+    virtualRows.value = items.flatMap((virtualItem): VirtualRow[] => {
+      const row = getGridRow(
+        currentLayout,
+        virtualItem.index,
+        total,
+        columns.value,
+        estimatedRowHeight.value
+      )
+      if (!row) {
+        return []
+      }
+
+      if (row.kind !== 'assets' || row.assetStartIndex === undefined) {
+        return [
+          {
+            index: row.index,
+            kind: row.kind,
+            assets: [],
+            date: row.date,
+            month: row.month,
+            count: row.count,
+            startIndex: row.startIndex,
+            endIndex: row.endIndex,
+            start: Math.round(virtualItem.start),
+            size: Math.round(virtualItem.size),
+          },
+        ]
+      }
+
+      const endIndex = Math.min(
+        row.assetStartIndex + (row.assetCount ?? 0) - 1,
+        Math.max(0, total - 1)
+      )
+      return [
+        {
+          index: row.index,
+          kind: row.kind,
+          assets: store.getAssetsInRange(row.assetStartIndex, endIndex),
+          assetStartIndex: row.assetStartIndex,
+          start: Math.round(virtualItem.start),
+          size: Math.round(virtualItem.size),
+        },
+      ]
     })
   }
 
   async function loadMissingData(
     items: ReturnType<typeof virtualizer.value.getVirtualItems>,
-    cols: number,
     total: number
   ): Promise<void> {
     if (items.length === 0) return
 
+    const currentLayout = layout.value
     const visibleIndexes: number[] = []
     items.forEach((item) => {
-      const start = item.index * cols
-      const end = Math.min(start + cols, total)
-      for (let i = start; i < end; i++) visibleIndexes.push(i)
+      const row = getGridRow(
+        currentLayout,
+        item.index,
+        total,
+        columns.value,
+        estimatedRowHeight.value
+      )
+      if (!row || row.kind !== 'assets' || row.assetStartIndex === undefined) {
+        return
+      }
+
+      const assetCount = Math.min(row.assetCount ?? 0, total - row.assetStartIndex)
+      for (let offset = 0; offset < assetCount; offset += 1) {
+        visibleIndexes.push(row.assetStartIndex + offset)
+      }
     })
 
     const neededPages = new Set(visibleIndexes.map((idx) => Math.floor(idx / store.perPage) + 1))
     const loadPromises: Promise<void>[] = []
 
     neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-        loadingPages.value.add(pageNum)
+      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
+        loadingPages.add(pageNum)
         const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.value.delete(pageNum)
+          loadingPages.delete(pageNum)
         })
         loadPromises.push(loadPromise)
       }
@@ -125,13 +414,15 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     () => ({
       items: virtualizer.value.getVirtualItems(),
       columns: columns.value,
+      estimatedRowHeight: estimatedRowHeight.value,
       totalCount: totalCount.value,
+      layout: layout.value,
       paginatedAssetsVersion: store.paginatedAssetsVersion,
     }),
-    async ({ items, columns: cols, totalCount: total }) => {
-      syncVirtualRows(items, cols, total)
-      await loadMissingData(items, cols, total)
-      syncVirtualRows(virtualizer.value.getVirtualItems(), columns.value, totalCount.value)
+    async ({ items, totalCount: total }) => {
+      syncVirtualRows(items, total)
+      await loadMissingData(items, total)
+      syncVirtualRows(virtualizer.value.getVirtualItems(), totalCount.value)
     }
   )
 
@@ -151,12 +442,33 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     }
   }
 
-  watch(estimatedRowHeight, () => {
-    if (virtualRows.value.length > 0) virtualizer.value.measure()
-  })
+  function getAssetOffset(index: number): number | undefined {
+    const currentLayout = layout.value
+    const rowIndex = getAssetRowIndex(currentLayout, index, totalCount.value, columns.value)
+    if (rowIndex === undefined) {
+      return undefined
+    }
 
-  watch(columns, () => {
-    if (virtualRows.value.length > 0) virtualizer.value.measure()
+    return getGridRow(
+      currentLayout,
+      rowIndex,
+      totalCount.value,
+      columns.value,
+      estimatedRowHeight.value
+    )?.start
+  }
+
+  function scrollToIndex(index: number) {
+    const rowIndex = getAssetRowIndex(layout.value, index, totalCount.value, columns.value)
+    if (rowIndex === undefined) {
+      return
+    }
+
+    virtualizer.value.scrollToIndex(rowIndex, { align: 'auto' })
+  }
+
+  watch([layout, estimatedRowHeight], () => {
+    virtualizer.value.measure()
   })
 
   return {
@@ -164,6 +476,8 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     virtualRows,
     totalRows,
     estimatedRowHeight,
+    getAssetOffset,
+    scrollToIndex,
     init,
   }
 }

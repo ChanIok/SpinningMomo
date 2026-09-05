@@ -49,7 +49,7 @@ export function useGallerySelection() {
   }
 
   function getLoadedAssetByIndex(index: number): Asset | undefined {
-    const [asset] = store.getAssetsInRange(index, index)
+    const asset = store.getAssetAt(index)
     return asset ?? undefined
   }
 
@@ -365,6 +365,73 @@ export function useGallerySelection() {
     return selectedIds.value.has(id)
   }
 
+  function isRangeAllSelected(startIndex?: number, endIndex?: number): boolean {
+    if (startIndex === undefined || endIndex === undefined || startIndex >= endIndex) {
+      return false
+    }
+
+    const count = endIndex - startIndex
+    if (selectedIds.value.size < count) {
+      return false
+    }
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const asset = getLoadedAssetByIndex(i)
+      if (!asset || !selectedIds.value.has(asset.id)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  async function toggleRangeSelection(startIndex?: number, endIndex?: number) {
+    if (startIndex === undefined || endIndex === undefined || startIndex >= endIndex) {
+      return
+    }
+
+    await ensureRangeLoaded(startIndex, endIndex)
+
+    const targetIds: number[] = []
+    for (let i = startIndex; i < endIndex; i++) {
+      const asset = getLoadedAssetByIndex(i)
+      if (asset) {
+        targetIds.push(asset.id)
+      }
+    }
+
+    if (targetIds.length === 0) {
+      return
+    }
+
+    const currentSelectedIds = store.selection.selectedIds
+    const isAllSelected = targetIds.every((id) => currentSelectedIds.has(id))
+    const nextSelectedIds = new Set(currentSelectedIds)
+
+    if (isAllSelected) {
+      targetIds.forEach((id) => nextSelectedIds.delete(id))
+    } else {
+      targetIds.forEach((id) => nextSelectedIds.add(id))
+      if (store.isCompactWindow && store.selection.mode !== 'multi-select') {
+        store.enterMultiSelectMode()
+        void overlayHistory.openSelectionMode()
+      }
+    }
+
+    if (nextSelectedIds.size === 0) {
+      clearSelection()
+      store.clearActiveAsset()
+      return
+    }
+
+    store.replaceSelection(Array.from(nextSelectedIds))
+    store.setSelectionAnchor(startIndex)
+    if (targetIds[0] !== undefined) {
+      store.setActiveAsset(targetIds[0], startIndex)
+    }
+    syncDetailsFocusFromSelection()
+  }
+
   return {
     selectedIds,
     selectedCount,
@@ -388,5 +455,7 @@ export function useGallerySelection() {
     handleAssetContextMenu,
 
     isAssetSelected,
+    isRangeAllSelected,
+    toggleRangeSelection,
   }
 }

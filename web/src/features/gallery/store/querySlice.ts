@@ -29,6 +29,8 @@ export function createQuerySlice() {
   const paginatedAssets = shallowRef<Map<number, Asset[]>>(new Map()) // key: pageNumber
   // 显式 version 用于触发依赖 Map 结构变化的更新（Map 原地改动不总能被外层感知）。
   const paginatedAssetsVersion = ref(0)
+  // 仅在完整查询结果原子替换后递增，供布局元数据与结果集保持同步。
+  const queryResultVersion = ref(0)
   const perPage = ref(500) // 每页数量
   // 可见区由虚拟列表回传，用于决定“优先加载哪些页”。
   const visibleRange = reactive<{
@@ -40,8 +42,8 @@ export function createQuerySlice() {
   })
 
   // ============= 时间线数据状态 =============
-  // buckets 仅保存月份元信息，不保存每月资产明细（明细仍走分页查询）。
-  const timelineBuckets = ref<TimelineBucket[]>([])
+  // buckets 仅保存按日聚合的轻量元信息，不保存日期资产明细（明细仍走分页查询）。
+  const timelineBuckets = shallowRef<TimelineBucket[]>([])
   const timelineTotalCount = ref(0)
 
   function setError(errorMessage: string | null) {
@@ -80,6 +82,19 @@ export function createQuerySlice() {
     perPage.value = count
   }
 
+  /** 获取指定全局索引的资产；页面尚未加载时返回 null。 */
+  function getAssetAt(index: number): Asset | null {
+    const pageSize = perPage.value
+    if (!Number.isInteger(index) || index < 0 || pageSize <= 0) {
+      return null
+    }
+
+    // 全局索引 -> 页号 + 页内索引。
+    const pageNum = Math.floor(index / pageSize) + 1
+    const indexInPage = index % pageSize
+    return paginatedAssets.value.get(pageNum)?.[indexInPage] ?? null
+  }
+
   /**
    * 获取指定索引范围的资产（用于虚拟列表）
    * @returns Asset[] | null[] - null 表示该位置数据未加载
@@ -88,12 +103,7 @@ export function createQuerySlice() {
     const result: (Asset | null)[] = []
 
     for (let i = startIndex; i <= endIndex; i++) {
-      // 全局索引 -> 页号 + 页内索引
-      const pageNum = Math.floor(i / perPage.value) + 1
-      const indexInPage = i % perPage.value
-      const page = paginatedAssets.value.get(pageNum)
-
-      result.push(page?.[indexInPage] ?? null)
+      result.push(getAssetAt(i))
     }
 
     return result
@@ -162,6 +172,7 @@ export function createQuerySlice() {
     paginatedAssets.value = new Map(pages)
     clearDyeCodeStatuses()
     paginatedAssetsVersion.value += 1
+    queryResultVersion.value += 1
   }
 
   function clearPaginatedAssets() {
@@ -221,12 +232,14 @@ export function createQuerySlice() {
     visibleRange,
     timelineBuckets,
     timelineTotalCount,
+    queryResultVersion,
     setError,
     setPagination,
     beginQueryRefresh,
     finishQueryRefresh,
     isQueryVersionCurrent,
     setPerPage,
+    getAssetAt,
     getAssetsInRange,
     isPageLoaded,
     setPageAssets,

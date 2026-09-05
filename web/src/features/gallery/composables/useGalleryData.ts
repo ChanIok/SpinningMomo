@@ -154,7 +154,7 @@ export function useGalleryData() {
           }
         }
 
-        const targetAsset = store.getAssetsInRange(targetIndex, targetIndex)[0]
+        const targetAsset = store.getAssetAt(targetIndex)
         if (targetAsset) {
           store.setActiveAsset(targetAsset.id, targetIndex)
           store.replaceSelection([targetAsset.id])
@@ -346,7 +346,7 @@ export function useGalleryData() {
       tryFocusFirstResultWhenDetailsEmpty(requestVersion)
 
       console.log('📅 时间线数据加载成功:', {
-        months: bucketsResponse.buckets.length,
+        days: bucketsResponse.buckets.length,
         total: bucketsResponse.totalCount,
         loadedPages: [...pages.keys()],
       })
@@ -361,7 +361,7 @@ export function useGalleryData() {
   // ============= 数据加载操作 =============
 
   /**
-   * 加载时间线数据（月份元数据 + 当前可见页）
+   * 加载时间线数据（日期元数据 + 当前可见页）
    */
   async function loadTimelineData() {
     await refreshTimelineData()

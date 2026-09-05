@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
-import type { FolderTreeNode, SortBy, TagTreeNode, ViewMode } from '../types'
+import type { DateGrouping, FolderTreeNode, SortBy, TagTreeNode, ViewMode } from '../types'
 import { Grid3x3, LayoutGrid, List, Rows3 } from '@lucide/vue'
 
 type SourceType = 'all' | 'folder' | 'tag'
@@ -48,10 +48,19 @@ export function useGalleryViewControls() {
   )
   const sortBy = computed(() => store.sortBy)
   const sortOrder = computed(() => store.sortOrder)
+  const dateGrouping = computed(() => store.view.dateGrouping)
   const includeSubfolders = computed(() => store.includeSubfolders)
   const currentSliderPosition = computed(() => store.getSliderPosition())
   const availableViewModes = computed(() =>
     store.isCompactWindow ? viewModes.filter((mode) => mode.value !== 'list') : viewModes
+  )
+  const dateGroupingOptions = [
+    { value: 'none' as DateGrouping, i18nKey: 'gallery.toolbar.dateGrouping.none' },
+    { value: 'month' as DateGrouping, i18nKey: 'gallery.toolbar.dateGrouping.month' },
+    { value: 'day' as DateGrouping, i18nKey: 'gallery.toolbar.dateGrouping.day' },
+  ]
+  const dateGroupingSupported = computed(
+    () => viewMode.value === 'grid' || viewMode.value === 'adaptive'
   )
   const currentViewModeIcon = computed(() => {
     const mode = availableViewModes.value.find((item) => item.value === viewMode.value)
@@ -92,6 +101,10 @@ export function useGalleryViewControls() {
     }
   }
 
+  function setDateGrouping(value: DateGrouping) {
+    store.setDateGrouping(value)
+  }
+
   function toggleSortOrder() {
     store.setSorting(sortBy.value, sortOrder.value === 'asc' ? 'desc' : 'asc')
   }
@@ -128,16 +141,20 @@ export function useGalleryViewControls() {
     viewMode,
     sortBy,
     sortOrder,
+    dateGrouping,
     includeSubfolders,
     setIncludeSubfolders,
     currentSliderPosition,
     availableViewModes,
+    dateGroupingOptions,
+    dateGroupingSupported,
     currentViewModeIcon,
     currentSource,
     sortOrderLabel,
     onSortByChange,
     toggleSortOrder,
     setViewMode,
+    setDateGrouping,
     onViewSizeSliderChange,
   }
 }

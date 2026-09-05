@@ -102,7 +102,7 @@ const singleSelectedAssetRating = computed<number | undefined>(() => {
 
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
-    return store.getAssetsInRange(activeIndex, activeIndex)[0]?.rating ?? 0
+    return store.getAssetAt(activeIndex)?.rating ?? 0
   }
 
   return undefined

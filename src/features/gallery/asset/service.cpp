@@ -186,12 +186,6 @@ auto query_asset_layout_meta(core::AppState& app_state, const QueryAssetLayoutMe
 
   auto order_config = query_support::build_query_order_config(params.sort_by, params.sort_order);
 
-  std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
-  auto total_count_result = core::database::query_scalar<int>(app_state, count_sql, where_params);
-  if (!total_count_result) {
-    return std::unexpected("Failed to count assets for layout meta: " + total_count_result.error());
-  }
-
   std::string sql = std::format(R"(
     SELECT id, width, height
     FROM assets
@@ -207,7 +201,7 @@ auto query_asset_layout_meta(core::AppState& app_state, const QueryAssetLayoutMe
 
   QueryAssetLayoutMetaResponse response;
   response.items = std::move(items_result.value());
-  response.total_count = total_count_result->value_or(0);
+  response.total_count = static_cast<std::int32_t>(response.items.size());
   return response;
 }
 
@@ -240,15 +234,20 @@ auto get_timeline_buckets(core::AppState& app_state, const TimelineBucketsParams
   }
   auto [where_clause, query_params] = std::move(where_result.value());
 
-  // 构建查询
+  // 按本地日历日聚合，分组使用与创建时间排序相同的有效时间表达式。
   std::string sql = std::format(R"(
     SELECT 
-      strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) as month,
+      strftime('%Y-%m-%d',
+               datetime(COALESCE(file_created_at, created_at) / 1000, 'unixepoch', 'localtime'))
+        AS date,
+      strftime('%Y-%m',
+               datetime(COALESCE(file_created_at, created_at) / 1000, 'unixepoch', 'localtime'))
+        AS month,
       COUNT(*) as count
     FROM assets 
     {}
-    GROUP BY month
-    ORDER BY month {}
+    GROUP BY date, month
+    ORDER BY date {}
   )",
                                 where_clause, order_config.sort_order);
 

@@ -161,16 +161,16 @@ auto build_unified_where_clause(const features::gallery::QueryAssetsFilters& fil
 
   if (filters.month.has_value()) {
     if (validate_month_format(filters.month.value())) {
-      conditions.push_back(
-          std::format("strftime('%Y-%m', datetime(COALESCE({}, {})/1000, 'unixepoch')) = ?",
-                      file_created_at_column, created_at_column));
+      conditions.push_back(std::format(
+          "strftime('%Y-%m', datetime(COALESCE({}, {})/1000, 'unixepoch', 'localtime')) = ?",
+          file_created_at_column, created_at_column));
       params.push_back(filters.month.value());
     }
   }
 
   if (filters.year.has_value()) {
     conditions.push_back(
-        std::format("strftime('%Y', datetime(COALESCE({}, {})/1000, 'unixepoch')) = ?",
+        std::format("strftime('%Y', datetime(COALESCE({}, {})/1000, 'unixepoch', 'localtime')) = ?",
                     file_created_at_column, created_at_column));
     params.push_back(filters.year.value());
   }

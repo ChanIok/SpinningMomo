@@ -308,8 +308,9 @@ export interface AdaptiveLayoutRow {
 // ============= 时间线相关类型 =============
 
 export interface TimelineBucket {
+  date: string // "2024-10-24" 格式
   month: string // "2024-10" 格式
-  count: number // 该月照片数量
+  count: number // 该日期资产数量
 }
 
 export interface GetTimelineBucketsParams {
@@ -333,7 +334,7 @@ export interface GetTimelineBucketsParams {
 
 export interface TimelineBucketsResponse {
   buckets: TimelineBucket[]
-  totalCount: number
+  totalCount: number // 所有匹配资产数量
   activeAssetIndex?: number
 }
 

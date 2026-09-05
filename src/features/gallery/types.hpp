@@ -346,8 +346,9 @@ struct PurgeMissingAssetsResult {
 // ============= 时间线相关类型 =============
 
 struct TimelineBucket {
+  std::string date;   // "2024-10-24" 格式
   std::string month;  // "2024-10" 格式
-  int count;          // 该月照片数量
+  int count;          // 该日期照片数量
 };
 
 struct TimelineBucketsParams {
@@ -371,7 +372,7 @@ struct TimelineBucketsParams {
 
 struct TimelineBucketsResponse {
   std::vector<TimelineBucket> buckets;
-  int total_count;  // 总照片数
+  int total_count;  // 总资产数
   std::optional<std::int64_t> active_asset_index;
 };
 

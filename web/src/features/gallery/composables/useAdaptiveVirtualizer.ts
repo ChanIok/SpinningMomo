@@ -1,10 +1,24 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, shallowRef, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
-import type { AdaptiveLayoutRow, AdaptiveLayoutRowItem, Asset, AssetLayoutMetaItem } from '../types'
+import type {
+  AdaptiveLayoutRowItem,
+  Asset,
+  AssetLayoutMetaItem,
+  DateGrouping,
+  TimelineBucket,
+} from '../types'
 import { GALLERY_CARD_GAP } from '../constants'
+import {
+  buildTimelineSections,
+  getTimelineHeaderDescriptors,
+  getTimelineHeaderHeight,
+  hasCompleteTimelineBuckets,
+  type TimelineHeaderDescriptor,
+  type TimelineHeaderKind,
+} from './timelineLayout'
 
 export interface UseAdaptiveVirtualizerOptions {
   // 原生滚动容器；adaptive 不再依赖 ScrollArea，而是直接读写真实滚动元素。
@@ -19,6 +33,21 @@ export interface UseAdaptiveVirtualizerOptions {
   gap?: number
 }
 
+type AdaptiveRowKind = 'assets' | TimelineHeaderKind
+
+interface AdaptiveLayoutRow {
+  index: number
+  kind: AdaptiveRowKind
+  start: number
+  size: number
+  date?: string
+  month?: string
+  count?: number
+  startIndex?: number
+  endIndex?: number
+  items: AdaptiveLayoutRowItem[]
+}
+
 export interface VirtualAdaptiveRowItem extends AdaptiveLayoutRowItem {
   // 真实资产数据按需分页加载；未加载到时保持 null，渲染骨架占位。
   asset: Asset | null
@@ -26,8 +55,14 @@ export interface VirtualAdaptiveRowItem extends AdaptiveLayoutRowItem {
 
 export interface VirtualAdaptiveRow {
   index: number
+  kind: AdaptiveRowKind
   start: number
   size: number
+  date?: string
+  month?: string
+  count?: number
+  startIndex?: number
+  endIndex?: number
   items: VirtualAdaptiveRowItem[]
 }
 
@@ -44,10 +79,13 @@ function buildAdaptiveRows(
   metaItems: AssetLayoutMetaItem[],
   contentWidth: number,
   targetRowHeight: number,
-  gap: number
+  gap: number,
+  timelineBuckets: TimelineBucket[],
+  compact: boolean,
+  grouping: DateGrouping
 ): { rows: AdaptiveLayoutRow[]; rowIndexByAssetIndex: Map<number, number> } {
   // 这一层只做“几何排版”，不关心真实 Asset 是否已加载。
-  // 输入是轻量布局元数据，输出是稳定的行分布和 assetIndex -> rowIndex 映射。
+  // 输入是轻量布局元数据，输出是稳定的视觉行和 assetIndex -> rowIndex 映射。
   if (metaItems.length === 0 || contentWidth <= 0 || targetRowHeight <= 0) {
     return { rows: [], rowIndexByAssetIndex: new Map() }
   }
@@ -100,6 +138,7 @@ function buildAdaptiveRows(
 
     rows.push({
       index: rowIndex,
+      kind: 'assets',
       start: currentStart,
       size: rowHeight,
       items,
@@ -110,7 +149,24 @@ function buildAdaptiveRows(
     currentAspectSum = 0
   }
 
-  metaItems.forEach((item, index) => {
+  const appendHeader = (header: TimelineHeaderDescriptor) => {
+    const headerHeight = getTimelineHeaderHeight(compact)
+    rows.push({
+      index: rows.length,
+      kind: header.kind,
+      start: currentStart,
+      size: headerHeight,
+      date: header.date,
+      month: header.month,
+      count: header.count,
+      startIndex: header.startIndex,
+      endIndex: header.endIndex,
+      items: [],
+    })
+    currentStart += headerHeight + gap
+  }
+
+  const appendAsset = (item: AssetLayoutMetaItem, index: number) => {
     const aspectRatio = normalizeAspectRatio(item)
     currentItems.push({ index, id: item.id, aspectRatio })
     currentAspectSum += aspectRatio
@@ -121,9 +177,33 @@ function buildAdaptiveRows(
     if (projectedRowWidth >= contentWidth) {
       finalizeRow(true)
     }
-  })
+  }
 
-  finalizeRow(false)
+  const timelineSections =
+    timelineBuckets.length > 0 && hasCompleteTimelineBuckets(timelineBuckets, metaItems.length)
+      ? buildTimelineSections(timelineBuckets, grouping, metaItems.length)
+      : []
+
+  if (timelineSections.length > 0) {
+    for (const section of timelineSections) {
+      for (const header of getTimelineHeaderDescriptors(section, grouping)) {
+        appendHeader(header)
+      }
+
+      for (let index = section.startIndex; index < section.endIndex; index += 1) {
+        const item = metaItems[index]
+        if (item) {
+          appendAsset(item, index)
+        }
+      }
+
+      // 分组边界必须结束当前行，下一组从新行开始。
+      finalizeRow(false)
+    }
+  } else {
+    metaItems.forEach((item, index) => appendAsset(item, index))
+    finalizeRow(false)
+  }
 
   return { rows, rowIndexByAssetIndex }
 }
@@ -144,14 +224,34 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
   const { layoutMetaItems, reloadLayoutMeta } = useGalleryLayoutMeta('adaptive')
-  const virtualRows = ref<VirtualAdaptiveRow[]>([])
-  const loadingPages = ref<Set<number>>(new Set())
+  const virtualRows = shallowRef<VirtualAdaptiveRow[]>([])
+  const loadingPages = new Set<number>()
+
+  const timelineBuckets = computed(() => {
+    if (
+      !store.isDateGroupingEnabled ||
+      store.timelineBuckets.length === 0 ||
+      !hasCompleteTimelineBuckets(store.timelineBuckets, layoutMetaItems.value.length)
+    ) {
+      return []
+    }
+
+    return store.timelineBuckets
+  })
 
   const layout = computed(() =>
-    buildAdaptiveRows(layoutMetaItems.value, contentWidth.value, targetRowHeight.value, gap)
+    buildAdaptiveRows(
+      layoutMetaItems.value,
+      contentWidth.value,
+      targetRowHeight.value,
+      gap,
+      timelineBuckets.value,
+      store.isCompactWindow,
+      store.view.dateGrouping
+    )
   )
 
-  // 虚拟滚动的单位是“行”而不是“资产”。这正是 adaptive 与 masonry/grid 的核心区别。
+  // 虚拟滚动的单位是“视觉行”而不是“资产”。标题行也占据自己的布局高度。
   const virtualizer = useVirtualizer<HTMLElement, HTMLElement>({
     get count() {
       return layout.value.rows.length
@@ -186,20 +286,43 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
       store.setVisibleRange(Math.min(...visibleIndexes), Math.max(...visibleIndexes))
     }
 
-    virtualRows.value = items.map((virtualItem) => {
-      const row = rows[virtualItem.index]!
-      return {
-        index: row.index,
-        start: Math.round(virtualItem.start),
-        size: Math.round(virtualItem.size),
-        items: row.items.map((item) => {
-          const [asset] = store.getAssetsInRange(item.index, item.index)
-          return {
-            ...item,
-            asset: asset ?? null,
-          }
-        }),
+    virtualRows.value = items.flatMap((virtualItem): VirtualAdaptiveRow[] => {
+      const row = rows[virtualItem.index]
+      if (!row) {
+        return []
       }
+
+      if (row.kind !== 'assets') {
+        return [
+          {
+            index: row.index,
+            kind: row.kind,
+            start: Math.round(virtualItem.start),
+            size: Math.round(virtualItem.size),
+            date: row.date,
+            month: row.month,
+            count: row.count,
+            startIndex: row.startIndex,
+            endIndex: row.endIndex,
+            items: [],
+          },
+        ]
+      }
+
+      return [
+        {
+          index: row.index,
+          kind: row.kind,
+          start: Math.round(virtualItem.start),
+          size: Math.round(virtualItem.size),
+          items: row.items.map((item) => {
+            return {
+              ...item,
+              asset: store.getAssetAt(item.index),
+            }
+          }),
+        },
+      ]
     })
   }
 
@@ -214,7 +337,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
     items.forEach((virtualItem) => {
       const row = rows[virtualItem.index]
-      if (!row) {
+      if (!row || row.kind !== 'assets') {
         return
       }
 
@@ -225,10 +348,10 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
     const loadPromises: Promise<void>[] = []
     neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-        loadingPages.value.add(pageNum)
+      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
+        loadingPages.add(pageNum)
         const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.value.delete(pageNum)
+          loadingPages.delete(pageNum)
         })
         loadPromises.push(loadPromise)
       }
@@ -241,23 +364,29 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
   async function init() {
     const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
+    const hasReusableTimelineCache = !store.isTimelineMode || store.timelineBuckets.length > 0
 
-    // 先拿布局元数据，再按当前查询加载可见资产页；两条链路职责分离。
-    // 若已有可用分页缓存，则只更新布局元数据，避免 refreshCurrentQuery 把缓存先替换成 page1。
-    if (hasReusableCache) {
+    // 已有可用分页缓存时只刷新布局元数据；首次查询由完整结果替换信号触发元数据加载，
+    // 避免同一次 refreshCurrentQuery 产生重复请求。
+    if (hasReusableCache && hasReusableTimelineCache) {
       await reloadLayoutMeta()
       return
     }
 
-    await Promise.all([reloadLayoutMeta(), galleryData.refreshCurrentQuery()])
+    if (store.isTimelineMode) {
+      await galleryData.loadTimelineData()
+      return
+    }
+
+    await galleryData.loadAllAssets()
   }
 
   watch(
-    () => [store.filter, store.includeSubfolders, store.sortBy, store.sortOrder],
+    () => store.queryResultVersion,
     async () => {
       await reloadLayoutMeta()
     },
-    { deep: true }
+    { flush: 'post' }
   )
 
   watch(
@@ -275,9 +404,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
   watch([layout, targetRowHeight], () => {
     // 行分布或目标高度变化后通知 virtualizer 重算总高度和可见窗口。
-    if (layout.value.rows.length > 0) {
-      virtualizer.value.measure()
-    }
+    virtualizer.value.measure()
   })
 
   function scrollToIndex(index: number) {

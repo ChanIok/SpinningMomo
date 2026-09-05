@@ -328,8 +328,7 @@ const resetWheelZoomDelta = useDebounceFn(() => {
 
 function toggleSelectedAssetsRejected() {
   const activeIndex = store.selection.activeIndex
-  const activeAsset =
-    activeIndex === undefined ? null : (store.getAssetsInRange(activeIndex, activeIndex)[0] ?? null)
+  const activeAsset = activeIndex === undefined ? null : store.getAssetAt(activeIndex)
 
   if (activeAsset?.reviewFlag === 'rejected') {
     void assetActions.clearSelectedAssetsRejected()

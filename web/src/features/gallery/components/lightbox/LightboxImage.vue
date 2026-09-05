@@ -39,7 +39,7 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(currentIdx, currentIdx)[0] ?? null
+  return store.getAssetAt(currentIdx)
 })
 
 // 在已加载页面中按 id 查找实际渲染对象，避免 displayAsset 直接依赖当前索引。

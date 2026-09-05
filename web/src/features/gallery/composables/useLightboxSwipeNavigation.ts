@@ -293,7 +293,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
   // 从缓存或分页数据中解析一个 Pager 页面。
   async function loadAssetAtIndex(index: number): Promise<Asset | null> {
-    let asset = store.getAssetsInRange(index, index)[0]
+    let asset = store.getAssetAt(index)
     if (!asset) {
       // 相邻资源可能还没有进入前端缓存，先加载它所在的分页。
       const targetPage = Math.floor(index / store.perPage) + 1
@@ -304,7 +304,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
           return null
         }
       }
-      asset = store.getAssetsInRange(index, index)[0]
+      asset = store.getAssetAt(index)
     }
 
     return isNavigableAsset(asset) ? asset : null
@@ -1192,7 +1192,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
       return false
     }
 
-    const targetAsset = store.getAssetsInRange(targetIndex, targetIndex)[0]
+    const targetAsset = store.getAssetAt(targetIndex)
     if (!targetAsset || targetAsset.id !== assetId) {
       return false
     }

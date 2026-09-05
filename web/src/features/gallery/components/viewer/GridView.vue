@@ -12,12 +12,14 @@ import {
   useGalleryVirtualScrollMargin,
   type CardImageScheduleItem,
 } from '../../composables'
+import type { VirtualRow } from '../../composables/useGridVirtualizer'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
+import GalleryTimelineHeader from '../shell/GalleryTimelineHeader.vue'
 import { useI18n } from '@/composables/useI18n'
 import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
@@ -33,7 +35,7 @@ const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const heroHeaderRef = ref<HTMLElement | null>(null)
-const virtualContentRef = ref<HTMLElement | null>(null)
+const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
 const toolbarHeight = computed(() => props.toolbarHeight)
@@ -75,8 +77,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
   buckets: computed(() => store.timelineBuckets),
   locale,
   getOffsetByAssetIndex(assetIndex) {
-    const rowIndex = Math.floor(assetIndex / Math.max(columns.value, 1))
-    return scrollMargin.value + rowIndex * gridVirtualizer.estimatedRowHeight.value
+    const rowStart = gridVirtualizer.getAssetOffset(assetIndex)
+    return rowStart === undefined ? undefined : scrollMargin.value + rowStart
   },
 })
 
@@ -194,22 +196,20 @@ function handleAssetDragStart(asset: Asset, event: DragEvent) {
 }
 
 function scrollToIndex(index: number) {
-  const row = Math.floor(index / columns.value)
-  gridVirtualizer.virtualizer.value.scrollToIndex(row, { align: 'auto' })
+  gridVirtualizer.scrollToIndex(index)
 }
 
 function getCardRect(index: number): DOMRect | null {
   const container = scrollContainerRef.value
   if (!container) return null
-  const cards = container.querySelectorAll('[data-asset-card]')
-  const row = Math.floor(index / columns.value)
-  const col = index % columns.value
-  const virtualRows = gridVirtualizer.virtualRows.value
-  const rowIdx = virtualRows.findIndex((r) => r.index === row)
-  if (rowIdx === -1) return null
-  const cardIndex = rowIdx * columns.value + col
-  const card = cards[cardIndex]
-  return card ? card.getBoundingClientRect() : null
+  const card = container.querySelector(
+    `[data-asset-index="${index}"][data-asset-card]`
+  ) as HTMLElement | null
+  return card?.getBoundingClientRect() ?? null
+}
+
+function getAssetIndex(row: VirtualRow, offset: number) {
+  return (row.assetStartIndex ?? 0) + offset
 }
 
 defineExpose({ scrollToIndex, getCardRect })
@@ -228,70 +228,92 @@ defineExpose({ scrollToIndex, getCardRect })
       class="hide-scrollbar flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <div ref="heroHeaderRef">
-        <GalleryHeroHeader />
-      </div>
-      <div
-        ref="virtualContentRef"
-        :style="{
-          height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
-          position: 'relative',
-        }"
-      >
+      <div ref="scrollContentRef">
+        <div ref="heroHeaderRef">
+          <GalleryHeroHeader />
+        </div>
         <div
-          v-for="virtualRow in gridVirtualizer.virtualRows.value"
-          :key="virtualRow.index"
-          :data-index="virtualRow.index"
           :style="{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+            height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
+            position: 'relative',
           }"
         >
           <div
-            class="grid"
+            v-for="virtualRow in gridVirtualizer.virtualRows.value"
+            :key="virtualRow.index"
+            :data-index="virtualRow.index"
             :style="{
-              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-              gap: `${gap}px`,
-              justifyContent: 'start',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
             }"
           >
-            <template
-              v-for="(asset, idx) in virtualRow.assets"
-              :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
-            >
-              <AssetCard
-                v-if="asset !== null"
-                :asset="asset"
-                :allow-thumbnail-load="cardImageScheduler.isThumbnailLoadAllowed(asset.id)"
-                :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(asset.id)"
-                :original-preview-short-edge="gridCardSize"
-                :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                @click="
-                  (a, e, inputType) =>
-                    handleAssetClick(a, e, virtualRow.index * columns + idx, inputType)
-                "
-                @long-press="(a, e) => handleAssetLongPress(a, e, virtualRow.index * columns + idx)"
-                @double-click="
-                  (a, e, inputType) =>
-                    handleAssetDoubleClick(a, e, virtualRow.index * columns + idx, inputType)
-                "
-                @context-menu="
-                  (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
-                "
-                @drag-start="(a, e) => handleAssetDragStart(a, e)"
-              />
+            <GalleryTimelineHeader
+              v-if="virtualRow.kind === 'month' || virtualRow.kind === 'day'"
+              :kind="virtualRow.kind"
+              :date="virtualRow.date"
+              :month="virtualRow.month ?? ''"
+              :count="virtualRow.count ?? 0"
+              :compact="store.isCompactWindow"
+              :is-multi-select="isMultiSelectMode"
+              :start-index="virtualRow.startIndex"
+              :end-index="virtualRow.endIndex"
+              :is-all-selected="
+                gallerySelection.isRangeAllSelected(virtualRow.startIndex, virtualRow.endIndex)
+              "
+              @select-group="
+                gallerySelection.toggleRangeSelection($event.startIndex, $event.endIndex)
+              "
+            />
 
-              <div
-                v-else
-                class="skeleton-card w-full"
-                :class="!store.isCompactWindow && 'rounded-sm'"
-                :style="{ aspectRatio: '1 / 1' }"
-              />
-            </template>
+            <div
+              v-else
+              class="grid"
+              :style="{
+                gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                gap: `${gap}px`,
+                justifyContent: 'start',
+              }"
+            >
+              <template
+                v-for="(asset, idx) in virtualRow.assets"
+                :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
+              >
+                <AssetCard
+                  v-if="asset !== null"
+                  :asset="asset"
+                  :data-asset-index="getAssetIndex(virtualRow, idx)"
+                  :allow-thumbnail-load="cardImageScheduler.isThumbnailLoadAllowed(asset.id)"
+                  :allow-original-load="cardImageScheduler.isOriginalLoadAllowed(asset.id)"
+                  :original-preview-short-edge="gridCardSize"
+                  :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                  @click="
+                    (a, e, inputType) =>
+                      handleAssetClick(a, e, getAssetIndex(virtualRow, idx), inputType)
+                  "
+                  @long-press="(a, e) => handleAssetLongPress(a, e, getAssetIndex(virtualRow, idx))"
+                  @double-click="
+                    (a, e, inputType) =>
+                      handleAssetDoubleClick(a, e, getAssetIndex(virtualRow, idx), inputType)
+                  "
+                  @context-menu="
+                    (a, e) => void handleAssetContextMenu(a, e, getAssetIndex(virtualRow, idx))
+                  "
+                  @drag-start="(a, e) => handleAssetDragStart(a, e)"
+                />
+
+                <div
+                  v-else
+                  :data-asset-index="getAssetIndex(virtualRow, idx)"
+                  class="skeleton-card w-full"
+                  :class="!store.isCompactWindow && 'rounded-sm'"
+                  :style="{ aspectRatio: '1 / 1' }"
+                />
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -302,7 +324,7 @@ defineExpose({ scrollToIndex, getCardRect })
       :scroll-top="scrollTop"
       :viewport-height="containerHeight"
       :scroll-container="scrollContainerRef"
-      :content-element="virtualContentRef"
+      :content-element="scrollContentRef"
       :virtualizer="gridVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"

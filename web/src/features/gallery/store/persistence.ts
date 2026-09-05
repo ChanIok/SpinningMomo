@@ -1,4 +1,4 @@
-import type { ViewMode } from '../types'
+import type { DateGrouping, ViewMode } from '../types'
 
 export type GalleryDeleteMode = 'recycleBin' | 'permanent'
 
@@ -6,6 +6,7 @@ export interface GallerySettings {
   view: {
     size: number
     mode: ViewMode
+    dateGrouping: DateGrouping
     useOriginalImagesForCards: boolean
     showRatingBadge: boolean
     showDyeCodeBadge: boolean
@@ -38,6 +39,7 @@ export function createDefaultGallerySettings(): GallerySettings {
     view: {
       size: 256,
       mode: 'grid' satisfies ViewMode,
+      dateGrouping: 'none' satisfies DateGrouping,
       useOriginalImagesForCards: true,
       showRatingBadge: true,
       showDyeCodeBadge: true,
