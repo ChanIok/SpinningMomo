@@ -39,6 +39,9 @@ const gallerySelection = useGallerySelection()
         @click="gallerySelection.clearSelection"
       >
         {{ t('gallery.contextMenu.selection.clear') }}
+        <DropdownMenuShortcut>
+          <Kbd>Esc</Kbd>
+        </DropdownMenuShortcut>
       </DropdownMenuItem>
     </DropdownMenuSubContent>
   </DropdownMenuSub>

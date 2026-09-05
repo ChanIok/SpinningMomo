@@ -346,8 +346,54 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
+function isEscapeHandledByOverlay(target: EventTarget | null): boolean {
+  if (target instanceof Element) {
+    const overlayElement = target.closest(
+      '[role="dialog"], [role="alertdialog"], [role="menu"], ' +
+        '[data-slot="popover-content"], [data-slot="dropdown-menu-content"], ' +
+        '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]'
+    )
+    if (overlayElement) {
+      return true
+    }
+  }
+
+  const overlay = overlayHistory.snapshot.value.overlay
+  return (
+    store.contextMenu.isOpen ||
+    store.moveToFolderDialogOpen ||
+    store.preferencesDialogOpen ||
+    store.deleteAssetsDialog.open ||
+    (overlay !== null && overlay !== 'selection')
+  )
+}
+
 function handleKeydown(event: KeyboardEvent) {
   if (store.lightbox.isOpen || isEditableTarget(event.target)) {
+    return
+  }
+
+  if (
+    event.key === 'Escape' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !event.altKey
+  ) {
+    if (event.defaultPrevented || isEscapeHandledByOverlay(event.target)) {
+      return
+    }
+
+    if (store.selection.mode === 'multi-select') {
+      event.preventDefault()
+      void gallerySelection.exitMultiSelectMode()
+      return
+    }
+
+    if (store.selection.selectedIds.size > 0) {
+      event.preventDefault()
+      gallerySelection.clearSelection()
+    }
     return
   }
 
