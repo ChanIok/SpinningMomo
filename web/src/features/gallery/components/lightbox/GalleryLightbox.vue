@@ -578,11 +578,11 @@ watch(isClosing, (closing) => {
   applyVerticalGestureSurfaceStyle(verticalGestureOffset, 'settling')
 })
 
-// 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
+// 工具栏、背景点击和 Escape 共用“退出暗房”入口，不改变跨页面来源。
 function requestClose() {
   clearImmersiveChromeHideTimer()
   if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
-    void overlayHistory.closeLightbox()
+    void overlayHistory.closeLightboxOverlay()
     return
   }
 

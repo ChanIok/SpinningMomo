@@ -105,21 +105,21 @@ function clearLightboxRecoveryParams() {
   window.history.replaceState(window.history.state, '', currentUrl.toString())
 }
 
-// 按资产 ID 重建当前查询集中的选择，供前进/后退和页面恢复复用。
+// 以资产 ID 作为当前查询目标，由图库查询层解析出内部位置后恢复选择。
 async function restoreLightboxAsset(assetId: number): Promise<boolean> {
   if (!Number.isInteger(assetId) || assetId <= 0) {
     return false
   }
 
+  store.setActiveAssetId(assetId)
   await galleryData.refreshCurrentQuery()
-  const allAssetIds = await galleryData.queryCurrentAssetIds()
-  const index = allAssetIds.findIndex((id) => id === assetId)
-  if (index < 0) {
+  const index = store.selection.activeIndex
+  if (store.selection.activeAssetId !== assetId || index === undefined) {
     return false
   }
 
   const selectedAsset = await gallerySelection.selectOnlyIndex(index)
-  return Boolean(selectedAsset)
+  return selectedAsset?.id === assetId
 }
 
 // 兼容外部恢复链接：先恢复筛选和资产，再创建新的暗房历史层。

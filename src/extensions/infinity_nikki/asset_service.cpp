@@ -41,7 +41,6 @@ struct PhotoMapPointWithWorldRecord {
   double nikki_loc_x;
   double nikki_loc_y;
   std::optional<double> nikki_loc_z;
-  std::int64_t asset_index;
   std::optional<std::string> user_world_id;
 };
 
@@ -315,31 +314,15 @@ auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPoints
   }
   auto [where_clause, query_params] = std::move(where_result.value());
 
-  auto order_config = features::gallery::asset::query_support::build_query_order_config(
-      params.sort_by, params.sort_order);
-
   std::string sql = std::format(R"(
     WITH filtered_assets AS (
       SELECT a.id,
              a.name,
              a.hash,
              a.file_created_at,
-             a.type AS asset_type,
-
-             COALESCE(a.file_created_at, a.created_at) AS sort_created_at,
-             a.file_created_at AS sort_file_created_at,
-             a.name AS sort_name,
-             (COALESCE(a.width, 0) * COALESCE(a.height, 0)) AS sort_resolution,
-             COALESCE(a.width, 0) AS sort_width,
-             COALESCE(a.height, 0) AS sort_height,
-             a.size AS sort_size
+             a.type AS asset_type
       FROM assets a
       {}
-    ),
-    indexed_assets AS (
-      SELECT id,
-             ROW_NUMBER() OVER ({}) - 1 AS asset_index
-      FROM filtered_assets
     )
     SELECT fa.id AS asset_id,
            fa.name,
@@ -348,20 +331,18 @@ auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPoints
            p.nikki_loc_x,
            p.nikki_loc_y,
            p.nikki_loc_z,
-           ia.asset_index AS asset_index,
            wr.record_value AS user_world_id
-    FROM indexed_assets ia
-    INNER JOIN filtered_assets fa ON fa.id = ia.id
-    INNER JOIN asset_infinity_nikki_params p ON p.asset_id = ia.id
+    FROM filtered_assets fa
+    INNER JOIN asset_infinity_nikki_params p ON p.asset_id = fa.id
     LEFT JOIN asset_infinity_nikki_user_record wr
-      ON wr.asset_id = ia.id
+      ON wr.asset_id = fa.id
      AND wr.record_key = 'world_id'
     WHERE p.nikki_loc_x IS NOT NULL
       AND p.nikki_loc_y IS NOT NULL
       AND fa.asset_type IN ('photo', 'live_photo')
-    ORDER BY ia.asset_index
+    ORDER BY fa.id ASC
   )",
-                                where_clause, order_config.indexed_order_clause);
+                                where_clause);
 
   auto result = core::database::query<PhotoMapPointWithWorldRecord>(app_state, sql, query_params);
   if (!result) {
@@ -424,7 +405,6 @@ auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPoints
         .lng = map_coordinate->lng,
         .world_id = resolved_world->world_id,
         .official_world_id = resolved_world->official_world_id,
-        .asset_index = point.asset_index,
     });
   }
 

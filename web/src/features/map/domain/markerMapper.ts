@@ -61,7 +61,6 @@ export function toMapMarkers(points: PhotoMapPoint[], context: MarkerMapperConte
 
     return {
       assetId: point.assetId,
-      assetIndex: point.assetIndex,
       name: point.name,
       lat: point.lat,
       lng: point.lng,

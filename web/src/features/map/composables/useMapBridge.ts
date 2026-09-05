@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { useGalleryData, useGallerySelection } from '@/features/gallery/composables'
+import { buildGalleryLightboxRoute } from '@/features/gallery/composables/useGalleryOverlayHistory'
+import { useGalleryData } from '@/features/gallery/composables'
 import { useGalleryStore } from '@/features/gallery/store'
 import {
   ACTION_CLEAR_GALLERY_FILTERS,
@@ -52,7 +53,6 @@ function buildSerializableRuntimePayload(
   return {
     markers: mapStore.markers.map((marker) => ({
       assetId: marker.assetId,
-      assetIndex: marker.assetIndex,
       name: marker.name,
       lat: marker.lat,
       lng: marker.lng,
@@ -94,7 +94,6 @@ function buildSerializableRuntimePayload(
 
 export function useMapBridge(options: UseMapBridgeOptions) {
   const { mapIframe, mapStore, galleryStore, router } = options
-  const gallerySelection = useGallerySelection()
   const galleryData = useGalleryData()
 
   function postRuntimeSync() {
@@ -149,26 +148,11 @@ export function useMapBridge(options: UseMapBridgeOptions) {
         return
       }
 
-      const assetIndex = Number(data.payload?.assetIndex)
-      const normalizedAssetIndex = Number.isFinite(assetIndex) ? assetIndex : 0
-      const selectedAsset = await gallerySelection.selectOnlyIndex(normalizedAssetIndex)
-      if (!selectedAsset || selectedAsset.id !== assetId) {
-        console.warn('[MapBridge] Ignored stale gallery asset request:', {
-          assetId,
-          assetIndex: normalizedAssetIndex,
-          selectedAssetId: selectedAsset?.id,
-        })
-        return
-      }
-
-      galleryStore.openLightbox()
-
       try {
-        await router.push({
-          name: 'gallery',
-        })
-      } catch {
-        galleryStore.closeLightbox()
+        // 地图是暗房的跨页面父级；一次导航直接携带暗房快照，关闭时才能返回地图。
+        await router.push(buildGalleryLightboxRoute(assetId))
+      } catch (error) {
+        console.error('[MapBridge] Failed to open gallery asset:', error)
       }
       return
     }

@@ -98,10 +98,10 @@ export function useGalleryLightbox() {
     void syncLightboxSelection(index)
   }
 
-  // 有覆盖层历史时通过回退关闭；没有历史时保留 Store 兜底，兼容内部临时状态。
+  // 有覆盖层历史时退出暗房；没有历史时保留 Store 兜底，兼容内部临时状态。
   function closeLightbox() {
     if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
-      void overlayHistory.closeLightbox()
+      void overlayHistory.closeLightboxOverlay()
       return
     }
 

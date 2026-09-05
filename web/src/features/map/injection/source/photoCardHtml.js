@@ -12,10 +12,6 @@ export function buildPhotoCardSnippet() {
 
     const hasAssetId = Number.isFinite(Number(item.assetId));
     const assetIdAttr = hasAssetId ? ' data-sm-open-asset-id="' + String(item.assetId) + '"' : '';
-    const hasAssetIndex = Number.isFinite(Number(item.assetIndex));
-    const assetIndexAttr = hasAssetIndex
-      ? ' data-sm-open-asset-index="' + String(item.assetIndex) + '"'
-      : '';
     const cellStyle = hasAssetId ? 'width:100%;height:100%;cursor:pointer;' : 'width:100%;height:100%;';
 
     if (item.thumbnailUrl) {
@@ -23,23 +19,19 @@ export function buildPhotoCardSnippet() {
         '<img src="' +
         escapeHtml(String(item.thumbnailUrl)) +
         '" loading="lazy" style="width:100%;height:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;background:#1f2937;display:block;" />';
-      return '<div' + assetIdAttr + assetIndexAttr + ' style="' + cellStyle + '">' + innerHtml + '</div>';
+      return '<div' + assetIdAttr + ' style="' + cellStyle + '">' + innerHtml + '</div>';
     }
 
     const fallback =
       '<div style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:#1f2937;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;">无图</div>';
-    return '<div' + assetIdAttr + assetIndexAttr + ' style="' + cellStyle + '">' + fallback + '</div>';
+    return '<div' + assetIdAttr + ' style="' + cellStyle + '">' + fallback + '</div>';
   };
 
   const buildSinglePhotoHoverHtml = (marker) => {
     const title = escapeHtml(String(marker && marker.cardTitle != null ? marker.cardTitle : ''));
     const thumbnailUrl = marker && marker.thumbnailUrl ? String(marker.thumbnailUrl) : '';
     const hasAssetId = marker && Number.isFinite(Number(marker.assetId));
-    const hasAssetIndex = marker && Number.isFinite(Number(marker.assetIndex));
     const assetIdAttr = hasAssetId ? ' data-sm-open-asset-id="' + String(Number(marker.assetId)) + '"' : '';
-    const assetIndexAttr = hasAssetIndex
-      ? ' data-sm-open-asset-index="' + String(Number(marker.assetIndex)) + '"'
-      : '';
     const cursorStyle = hasAssetId ? 'cursor:pointer;' : '';
 
     let thumbBlock = '';
@@ -50,7 +42,6 @@ export function buildPhotoCardSnippet() {
         cursorStyle +
         '"' +
         assetIdAttr +
-        assetIndexAttr +
         '>' +
         '<img class="spinning-momo-popup-thumbnail-image" src="' +
         escapeHtml(thumbnailUrl) +
@@ -66,7 +57,6 @@ export function buildPhotoCardSnippet() {
         cursorStyle +
         '"' +
         assetIdAttr +
-        assetIndexAttr +
         '>' +
         '<div class="spinning-momo-popup-thumbnail-fallback">无图</div>' +
         '</div>' +

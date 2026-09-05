@@ -168,7 +168,7 @@ export function useGalleryData() {
       if (store.lightbox.isOpen) {
         // 当前资产已从结果集消失，先关闭 URL 暗房层，让浏览器历史和 Store 同步收口。
         if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
-          void overlayHistory.closeLightbox()
+          void overlayHistory.closeLightboxOverlay()
         } else {
           store.closeLightbox()
         }
