@@ -17,6 +17,7 @@ namespace {
 enum class EmulatorKind : std::uint8_t {
   MuMu,
   LDPlayer,
+  BlueStacks,
 };
 
 struct EmulatorCandidate {
@@ -85,7 +86,7 @@ auto to_lower(std::wstring value) -> std::wstring {
   return value;
 }
 
-// 根据进程名判断它属于 MuMu 还是 LDPlayer。
+// 根据进程名判断它属于 MuMu、LDPlayer 还是 BlueStacks。
 auto process_kind(std::wstring_view process_name) -> std::optional<EmulatorKind> {
   const auto name = to_lower(std::wstring(process_name));
   if (name.find(L"mumunxdevice.exe") != std::wstring::npos) {
@@ -93,6 +94,9 @@ auto process_kind(std::wstring_view process_name) -> std::optional<EmulatorKind>
   }
   if (name.find(L"dnplayer.exe") != std::wstring::npos) {
     return EmulatorKind::LDPlayer;
+  }
+  if (name.find(L"hd-player.exe") != std::wstring::npos) {
+    return EmulatorKind::BlueStacks;
   }
   return std::nullopt;
 }
@@ -121,7 +125,7 @@ auto add_candidate(std::vector<EmulatorCandidate>& candidates, EmulatorKind kind
   });
 }
 
-// 扫描当前进程，定位正在运行的 MuMu/LDPlayer 及其配套 ADB。
+// 扫描当前进程，定位正在运行的 MuMu/LDPlayer/BlueStacks 及其配套 ADB。
 auto find_running_emulators() -> std::vector<EmulatorCandidate> {
   std::vector<EmulatorCandidate> candidates;
 
@@ -159,8 +163,26 @@ auto find_running_emulators() -> std::vector<EmulatorCandidate> {
     }
 
     // LDPlayer 的 adb.exe 与 ldconsole.exe 通常位于同一目录。
-    add_candidate(candidates, *kind, process_directory / L"adb.exe",
-                  process_directory / L"ldconsole.exe");
+    if (*kind == EmulatorKind::LDPlayer) {
+      add_candidate(candidates, *kind, process_directory / L"adb.exe",
+                    process_directory / L"ldconsole.exe");
+      continue;
+    }
+
+    // BlueStacks 的 ADB 按已知目录布局查找，并按顺序使用首个存在的文件。
+    const std::array<std::filesystem::path, 2> adb_relative_paths = {
+        std::filesystem::path(L"HD-Adb.exe"),
+        std::filesystem::path(L"Engine") / L"ProgramFiles" / L"HD-Adb.exe",
+    };
+    for (const auto& relative_path : adb_relative_paths) {
+      const auto adb_path = process_directory / relative_path;
+      if (!existing_file(adb_path)) {
+        continue;
+      }
+      // 同一进程只使用首个匹配路径，避免一个实例产生两个 ADB 候选。
+      add_candidate(candidates, *kind, adb_path, {});
+      break;
+    }
   } while (Process32NextW(snapshot, &entry));
 
   CloseHandle(snapshot);
@@ -336,10 +358,33 @@ auto parse_ld_endpoints(const std::filesystem::path& adb_path, std::string_view 
   return endpoints;
 }
 
-// 调用候选模拟器的管理工具，并把其输出转换为可连接的 endpoint 列表。
-auto discover_endpoints(const EmulatorCandidate& candidate) -> std::vector<DiscoveredEndpoint> {
+// 调用候选模拟器的管理工具或 ADB，并把输出转换为可连接的 endpoint 列表。
+auto discover_endpoints(const EmulatorCandidate& candidate)
+    -> std::expected<std::vector<DiscoveredEndpoint>, std::string> {
+  if (candidate.kind == EmulatorKind::BlueStacks) {
+    auto devices_result = adb::list_devices(AdbConnectionConfig{.executable = candidate.adb_path});
+    if (!devices_result) {
+      return std::unexpected("BlueStacks ADB device discovery failed: " + devices_result.error());
+    }
+
+    std::vector<DiscoveredEndpoint> endpoints;
+    for (const auto& device : devices_result.value()) {
+      if (device.state != "device") {
+        continue;
+      }
+      // BlueStacks 已将可用实例登记在 ADB 列表中，serial 就是唯一连接目标。
+      add_endpoint(endpoints, EmulatorKind::BlueStacks, candidate.adb_path, {}, 0, device.serial);
+    }
+    if (endpoints.empty()) {
+      return std::unexpected(
+          "BlueStacks ADB device discovery found no ready devices. Ensure BlueStacks is running "
+          "and ADB is enabled in its settings.");
+    }
+    return endpoints;
+  }
+
   if (candidate.management_tool.empty()) {
-    return {};
+    return std::vector<DiscoveredEndpoint>{};
   }
 
   if (candidate.kind == EmulatorKind::MuMu) {
@@ -347,14 +392,14 @@ auto discover_endpoints(const EmulatorCandidate& candidate) -> std::vector<Disco
     auto result = run_management_tool(candidate.management_tool, {L"adb", L"--vmindex", L"all"},
                                       "MuMuManager");
     if (!result) {
-      return {};
+      return std::unexpected(result.error());
     }
     return parse_mumu_endpoints(candidate.adb_path, result->stdout_data);
   }
 
   auto result = run_management_tool(candidate.management_tool, {L"list2"}, "LDConsole");
   if (!result) {
-    return {};
+    return std::unexpected(result.error());
   }
   return parse_ld_endpoints(candidate.adb_path, result->stdout_data);
 }
@@ -385,6 +430,21 @@ auto make_multiple_devices_error(const std::vector<DiscoveredEndpoint>& endpoint
   return error;
 }
 
+auto append_discovery_failures(std::string error, const std::vector<std::string>& failures)
+    -> std::string {
+  if (failures.empty()) {
+    return error;
+  }
+  error += " Automatic discovery diagnostics: ";
+  for (std::size_t index = 0; index < failures.size(); ++index) {
+    if (index != 0) {
+      error += "; ";
+    }
+    error += failures[index];
+  }
+  return error;
+}
+
 }  // namespace
 
 // 解析用户配置或自动发现模拟器，最终补齐可执行文件和设备序列号。
@@ -402,12 +462,22 @@ auto resolve_connection(AdbConnectionConfig config)
   }
 
   const auto candidates = find_running_emulators();
+  const bool has_bluestacks_candidate =
+      std::ranges::any_of(candidates, [](const EmulatorCandidate& candidate) {
+        return candidate.kind == EmulatorKind::BlueStacks;
+      });
   std::vector<DiscoveredEndpoint> endpoints;
+  std::vector<std::string> discovery_failures;
   for (const auto& candidate : candidates) {
     // 每个模拟器候选独立发现 endpoint，失败的候选不影响其他候选。
     auto candidate_endpoints = discover_endpoints(candidate);
-    endpoints.insert(endpoints.end(), std::make_move_iterator(candidate_endpoints.begin()),
-                     std::make_move_iterator(candidate_endpoints.end()));
+    if (!candidate_endpoints) {
+      discovery_failures.push_back(candidate_endpoints.error());
+      continue;
+    }
+    auto& discovered = candidate_endpoints.value();
+    endpoints.insert(endpoints.end(), std::make_move_iterator(discovered.begin()),
+                     std::make_move_iterator(discovered.end()));
   }
 
   if (!config.serial.empty()) {
@@ -418,6 +488,13 @@ auto resolve_connection(AdbConnectionConfig config)
     if (matching_endpoint != endpoints.end()) {
       set_discovered_endpoint(config, *matching_endpoint);
       return config;
+    }
+    if (has_bluestacks_candidate) {
+      return std::unexpected(append_discovery_failures(
+          std::format("Configured ADB device serial was not found among automatically discovered "
+                      "devices: {}",
+                      config.serial),
+          discovery_failures));
     }
   } else if (!endpoints.empty()) {
     const auto configured_endpoint = std::format("{}:{}", config.host, config.port);
@@ -439,6 +516,12 @@ auto resolve_connection(AdbConnectionConfig config)
     return std::unexpected(make_multiple_devices_error(endpoints));
   }
 
+  if (has_bluestacks_candidate && !discovery_failures.empty()) {
+    // BlueStacks 通过设备列表发现实例，失败时不能退回默认 host/port。
+    return std::unexpected(
+        append_discovery_failures("Automatic emulator discovery failed", discovery_failures));
+  }
+
   if (candidates.size() == 1) {
     // 找到唯一 ADB 但没有管理工具输出时，先补路径，连接阶段再使用配置地址。
     config.executable = candidates.front().adb_path;
@@ -446,14 +529,10 @@ auto resolve_connection(AdbConnectionConfig config)
   }
   if (candidates.size() > 1) {
     // 多个安装都没有可解析的 endpoint，无法安全猜测应该使用哪一个。
-    return std::unexpected(
-        "Multiple emulator ADB executables were found. Set the ADB path or device serial "
-        "explicitly.");
+    return std::unexpected("message.adb_multiple_emulators_found");
   }
 
-  return std::unexpected(
-      "No running MuMu or LDPlayer emulator was found. Start the emulator and the game, or "
-      "choose an ADB executable in settings.");
+  return std::unexpected("message.adb_no_emulator_found");
 }
 
 }  // namespace features::adb_mode::device_finder

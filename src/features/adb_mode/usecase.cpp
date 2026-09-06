@@ -52,7 +52,7 @@ auto build_connection_config(const core::AppState& state)
   std::filesystem::path executable;
   if (settings.use_custom_adb_path) {
     if (settings.adb_path.empty()) {
-      return std::unexpected("Custom ADB path is enabled, but no ADB executable was selected");
+      return std::unexpected("message.adb_custom_path_empty");
     }
     executable = std::filesystem::path(utils::string::FromUtf8(settings.adb_path));
   }
@@ -83,13 +83,22 @@ auto set_operation_state(core::AppState& state, ConnectionState connection_state
   adb_state.last_error.clear();
 }
 
+// 根据语义 key 解析本地化文本；未命中时返回原始文本。
+auto resolve_localized_text(const core::AppState& state, const std::string& key_or_text)
+    -> std::string {
+  if (const auto it = state.i18n->texts.find(key_or_text); it != state.i18n->texts.end()) {
+    return it->second;
+  }
+  return key_or_text;
+}
+
 // 记录失败原因；连接仍可用时保留会话，确保用户还能执行恢复。
 auto set_error_state(core::AppState& state, std::string error, bool retain_connection) -> void {
   auto& adb_state = *state.adb_mode;
   std::scoped_lock lock(adb_state.mutex);
   adb_state.connection_state =
       retain_connection ? ConnectionState::Connected : ConnectionState::Error;
-  adb_state.last_error = std::move(error);
+  adb_state.last_error = resolve_localized_text(state, error);
   if (!retain_connection) {
     clear_session_locked(adb_state);
   }
@@ -125,7 +134,7 @@ auto post_queue_failure_notification(core::AppState& state) -> void {
   }
 }
 
-// 根据结果选择本地化提示，并在失败时附加底层错误。
+// 根据结果选择本地化提示，并在失败时根据错误类型友好呈现。
 auto post_operation_notification(core::AppState& state,
                                  const std::expected<void, std::string>& result,
                                  std::string_view success_key, std::string_view failure_key)
@@ -134,14 +143,25 @@ auto post_operation_notification(core::AppState& state,
     return;
   }
 
-  const auto key = result ? success_key : failure_key;
-  const auto message = state.i18n->texts.find(std::string(key));
-  if (message == state.i18n->texts.end()) {
-    post_adb_notification(state, result ? "ADB operation completed" : "ADB operation failed");
+  if (result) {
+    const auto it = state.i18n->texts.find(std::string(success_key));
+    post_adb_notification(state,
+                          it != state.i18n->texts.end() ? it->second : "ADB operation completed");
     return;
   }
 
-  post_adb_notification(state, result ? message->second : message->second + ": " + result.error());
+  // 若底层错误本身是预定义的语义多语言 key，直接以该独立友好的提示通知用户
+  if (const auto error_it = state.i18n->texts.find(result.error());
+      error_it != state.i18n->texts.end()) {
+    post_adb_notification(state, error_it->second);
+    return;
+  }
+
+  // 未预定义语义的系统或命令异常，降级显示带前缀的错误信息
+  const auto fallback_it = state.i18n->texts.find(std::string(failure_key));
+  const auto prefix =
+      fallback_it != state.i18n->texts.end() ? fallback_it->second : "ADB operation failed";
+  post_adb_notification(state, prefix + ": " + result.error());
 }
 
 // 异步通知其他模块连接状态发生变化。

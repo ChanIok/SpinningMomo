@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded Chinese JSON content as string_view
-// Size: 4617 bytes
+// Size: 4917 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -61,6 +61,9 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.adb_operation_failed": "ADB 设备操作失败",
   "message.adb_not_connected": "ADB 设备未连接",
   "message.adb_feature_unavailable": "该功能在 ADB 模式下不可用。",
+  "message.adb_no_emulator_found": "未检测到运行中的模拟器，请先启动模拟器。",
+  "message.adb_multiple_emulators_found": "检测到多个模拟器，请在设置中指定设备。",
+  "message.adb_custom_path_empty": "已启用自定义 ADB 路径，但未选择执行程序。",
 
   "message.screenshot_success": "截图已保存：",
   "message.screenshot_failed": "截图失败",

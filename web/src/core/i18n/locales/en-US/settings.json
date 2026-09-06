@@ -272,7 +272,7 @@
   "settings.adbMode.title": "ADB Mode",
   "settings.adbMode.description": "Temporarily adjust an Android emulator's resolution through ADB and capture its screen directly.",
   "settings.adbMode.customPath.label": "Use Custom ADB Path",
-  "settings.adbMode.customPath.description": "Running MuMu and LDPlayer instances are detected automatically; other devices can be configured manually.",
+  "settings.adbMode.customPath.description": "Automatically find your emulator's ADB, or specify its path manually.",
   "settings.adbMode.adbPath.label": "ADB Path",
   "settings.adbMode.adbPath.placeholder": "Not selected",
   "settings.adbMode.adbPath.select": "Select",

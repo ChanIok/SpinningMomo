@@ -6,7 +6,7 @@
 
 namespace features::adb_mode::device_finder {
 
-// 补全连接配置中的 ADB 路径和设备序列号；自动模式只识别正在运行的模拟器。
+// 补全连接配置中的 ADB 路径和设备序列号；自动模式只识别正在运行的 MuMu、雷电和蓝叠。
 // executable 非空时仅使用用户指定的 ADB。
 auto resolve_connection(AdbConnectionConfig config)
     -> std::expected<AdbConnectionConfig, std::string>;

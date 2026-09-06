@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 4882 bytes
+// Size: 5189 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -61,6 +61,9 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.adb_operation_failed": "ADB device operation failed",
   "message.adb_not_connected": "ADB device is not connected",
   "message.adb_feature_unavailable": "This feature is unavailable in ADB mode.",
+  "message.adb_no_emulator_found": "No running emulator was found. Please start your emulator first.",
+  "message.adb_multiple_emulators_found": "Multiple emulators found. Please specify device in settings.",
+  "message.adb_custom_path_empty": "Custom ADB path is enabled, but no executable was selected.",
 
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",

@@ -137,7 +137,7 @@ struct AppSettings {
         "default_app";  // 保存成功通知点击“查看”后的行为: "default_app" | "reveal_in_explorer"
 
     // ADB 模式配置。ADB 设备是否正在使用由悬浮窗命令控制；自动模式只查找正在运行的
-    // MuMu v5+ 或雷电，其他设备通过 adb_path 配置。
+    // MuMu v5+、雷电或蓝叠，其他设备通过 adb_path 配置。
     struct AdbMode {
       bool use_custom_adb_path = false;  // 是否使用用户指定的 ADB 可执行文件
       std::string adb_path = "";         // 自定义 ADB 可执行文件路径
