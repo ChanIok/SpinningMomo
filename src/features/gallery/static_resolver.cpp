@@ -186,10 +186,11 @@ auto register_http_resolvers(core::AppState& state) -> void {
         // 文件存在性由统一静态服务入口查询，避免 resolver 重复访问磁盘。
         Logger().debug("Resolved original locator {}/{} to {}", locator->root_id,
                        locator->relative_path, path_result->string());
+        // 原文件体积较大，禁止 HTTP 缓存存储，避免浏览时额外写入浏览器磁盘缓存。
         return core::http_server::PathResolutionData{
             .file_path = *path_result,
             .cache_duration = std::chrono::seconds{0},
-            .cache_control_header = std::string{"private, no-cache"}};
+            .cache_control_header = std::string{"no-store"}};
       });
 
   Logger().info("Registered HTTP static resolvers for gallery");
