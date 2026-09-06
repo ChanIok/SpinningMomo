@@ -2,8 +2,10 @@
 
 #include "vendor/std.hpp"
 
+#include "vendor/asio.hpp"
 #include "vendor/wil.hpp"
 
+#include "core/async/async.hpp"
 #include "features/gallery/asset/repository.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
@@ -15,7 +17,17 @@ namespace {
 
 constexpr std::string_view kDownloadDirectoryName = "gallery-downloads";
 constexpr std::string_view kArchiveFileName = "SpinningMomo-Download.zip";
+constexpr auto kArchiveIdleTimeout = std::chrono::minutes(2);
 std::atomic<std::uint64_t> archive_sequence = 0;
+
+struct ArchiveEntry {
+  std::filesystem::path file_path;
+  int active_streams = 0;
+  std::chrono::steady_clock::time_point expire_at{};
+};
+
+std::mutex g_archives_mutex;
+std::unordered_map<std::string, ArchiveEntry> g_archives;
 
 struct PreparedAsset {
   std::int64_t id = 0;
@@ -258,9 +270,14 @@ auto remove_matching_entries(const std::filesystem::path& directory, auto&& shou
   }
 }
 
+struct CreatedArchive {
+  std::string token;
+  std::filesystem::path file_path;
+};
+
 // 写入媒体清单、创建 ZIP，并以原子改名发布可下载归档。
 auto create_archive(const std::vector<PreparedAsset>& assets)
-    -> std::expected<std::string, std::string> {
+    -> std::expected<CreatedArchive, std::string> {
   // 归档文件和准备脚本分别放入持久下载目录与隔离临时目录。
   auto download_directory_result = utils::path::GetAppDataSubdirectory(kDownloadDirectoryName);
   if (!download_directory_result) {
@@ -326,7 +343,87 @@ auto create_archive(const std::vector<PreparedAsset>& assets)
     return std::unexpected("Failed to publish gallery archive: " + rename_error.message());
   }
 
-  return token;
+  return CreatedArchive{
+      .token = token,
+      .file_path = final_archive_path,
+  };
+}
+
+// 物理删除磁盘上的归档文件，带路径边界安全检查。
+auto remove_archive_file_on_disk(const std::filesystem::path& archive_path) -> void {
+  try {
+    auto directory_result = utils::path::GetAppDataSubdirectory(kDownloadDirectoryName);
+    if (!directory_result) {
+      Logger().warn("Failed to locate gallery download directory for cleanup: {}",
+                    directory_result.error());
+      return;
+    }
+
+    const auto archive_name = utils::string::ToUtf8(archive_path.filename().wstring());
+    if (!is_safe_archive_name(archive_name) ||
+        !utils::path::IsPathWithinBase(archive_path, *directory_result)) {
+      Logger().warn("Refused to remove an unsafe gallery archive path: {}",
+                    path_to_utf8(archive_path));
+      return;
+    }
+
+    std::error_code remove_error;
+    std::filesystem::remove(archive_path, remove_error);
+    if (remove_error) {
+      Logger().warn("Failed to remove gallery archive '{}': {}", path_to_utf8(archive_path),
+                    remove_error.message());
+    }
+  } catch (const std::exception& error) {
+    Logger().warn("Failed to remove gallery archive '{}': {}", path_to_utf8(archive_path),
+                  error.what());
+  }
+}
+
+// 调度归档空闲超时检查；若期间无新请求或连接占用，则安全删除。
+auto schedule_archive_cleanup(core::AppState& app_state, const std::string& token,
+                              std::chrono::steady_clock::duration delay) -> void {
+  auto* io_context = core::async::get_io_context(app_state);
+  if (!io_context) {
+    return;
+  }
+
+  auto timer = std::make_shared<asio::steady_timer>(*io_context, delay);
+  timer->async_wait([&app_state, token, timer](const std::error_code& ec) {
+    if (ec) {
+      return;
+    }
+
+    std::filesystem::path file_to_delete;
+    std::chrono::steady_clock::duration remaining_delay{};
+    bool should_reschedule = false;
+    {
+      std::lock_guard lock(g_archives_mutex);
+      auto it = g_archives.find(token);
+      if (it == g_archives.end()) {
+        return;
+      }
+      if (it->second.active_streams == 0) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= it->second.expire_at) {
+          file_to_delete = std::move(it->second.file_path);
+          g_archives.erase(it);
+        } else {
+          remaining_delay = it->second.expire_at - now;
+          should_reschedule = true;
+        }
+      }
+    }
+
+    if (should_reschedule) {
+      schedule_archive_cleanup(app_state, token, remaining_delay);
+      return;
+    }
+
+    if (!file_to_delete.empty()) {
+      Logger().debug("Removing expired gallery archive: {}", path_to_utf8(file_to_delete));
+      remove_archive_file_on_disk(file_to_delete);
+    }
+  });
 }
 
 }  // namespace
@@ -334,6 +431,11 @@ auto create_archive(const std::vector<PreparedAsset>& assets)
 // 清理上一次进程遗留的归档文件、半成品和准备目录。
 auto cleanup_stale_files() -> void {
   try {
+    {
+      std::lock_guard lock(g_archives_mutex);
+      g_archives.clear();
+    }
+
     // 下载目录中的全部文件都是一次性归档，启动时可以整体回收。
     auto download_directory_result = utils::path::GetAppDataSubdirectory(kDownloadDirectoryName);
     if (!download_directory_result) {
@@ -415,12 +517,22 @@ auto prepare(core::AppState& app_state, const std::vector<std::int64_t>& ids)
     }
 
     // 多文件或部分成功都统一生成一次性 ZIP。
-    auto token_result = create_archive(available_assets);
-    if (!token_result) {
-      return std::unexpected(token_result.error());
+    auto archive_result = create_archive(available_assets);
+    if (!archive_result) {
+      return std::unexpected(archive_result.error());
     }
 
-    result.archive_token = *token_result;
+    {
+      std::lock_guard lock(g_archives_mutex);
+      g_archives[archive_result->token] = ArchiveEntry{
+          .file_path = archive_result->file_path,
+          .active_streams = 0,
+          .expire_at = std::chrono::steady_clock::now() + kArchiveIdleTimeout,
+      };
+    }
+    schedule_archive_cleanup(app_state, archive_result->token, kArchiveIdleTimeout);
+
+    result.archive_token = std::move(archive_result->token);
     result.file_name = kArchiveFileName;
     return result;
   } catch (const std::exception& error) {
@@ -439,59 +551,69 @@ auto resolve_asset_file(core::AppState& app_state, std::int64_t asset_id)
   }
 }
 
-// 校验归档名和目录边界后返回临时 ZIP 的真实路径。
-auto resolve_archive_file(core::AppState& app_state, std::string_view archive_name)
-    -> std::expected<DownloadFile, std::string> {
-  if (!is_safe_archive_name(archive_name)) {
-    return std::unexpected("Invalid gallery download archive name");
-  }
-
-  auto directory_result = utils::path::GetAppDataSubdirectory(kDownloadDirectoryName);
-  if (!directory_result) {
-    return std::unexpected(directory_result.error());
-  }
-
-  // 客户端只能引用下载目录内、符合格式的归档文件。
-  const auto archive_path = *directory_result / utils::string::FromUtf8(std::string(archive_name));
-  if (!utils::path::IsPathWithinBase(archive_path, *directory_result) ||
-      !is_regular_file_available(archive_path)) {
-    return std::unexpected("Gallery download archive was not found");
-  }
-
-  return DownloadFile{
-      .file_path = archive_path,
-      .file_name = std::string(kArchiveFileName),
-  };
-}
-
-// 完整传输后删除一次性归档，异常中断则留给下次启动清理。
-auto remove_archive_file(const std::filesystem::path& archive_path) -> void {
+// 借出归档文件并绑定流生命周期租约（活跃传输保护 + 空闲倒计时自动回收）。
+auto acquire_archive_file(core::AppState& app_state, std::string_view archive_name)
+    -> std::expected<ArchiveLease, std::string> {
   try {
-    auto directory_result = utils::path::GetAppDataSubdirectory(kDownloadDirectoryName);
-    if (!directory_result) {
-      Logger().warn("Failed to locate gallery download directory after transfer: {}",
-                    directory_result.error());
-      return;
+    if (!is_safe_archive_name(archive_name)) {
+      return std::unexpected("Invalid gallery download archive name");
     }
 
-    // 再次校验路径边界，避免完成回调成为任意文件删除入口。
-    const auto archive_name = utils::string::ToUtf8(archive_path.filename().wstring());
-    if (!is_safe_archive_name(archive_name) ||
-        !utils::path::IsPathWithinBase(archive_path, *directory_result)) {
-      Logger().warn("Refused to remove an unsafe gallery archive path: {}",
-                    path_to_utf8(archive_path));
-      return;
+    // 从形如 "{token}.zip" 中提取 token
+    const auto token = archive_name.substr(0, archive_name.size() - 4);
+
+    std::filesystem::path file_path;
+    {
+      std::lock_guard lock(g_archives_mutex);
+      auto it = g_archives.find(std::string(token));
+      if (it == g_archives.end()) {
+        return std::unexpected("Gallery download archive was not found");
+      }
+
+      if (!is_regular_file_available(it->second.file_path)) {
+        g_archives.erase(it);
+        return std::unexpected("Gallery download archive was not found");
+      }
+
+      it->second.active_streams++;
+      file_path = it->second.file_path;
     }
 
-    std::error_code remove_error;
-    std::filesystem::remove(archive_path, remove_error);
-    if (remove_error) {
-      Logger().warn("Failed to remove gallery archive '{}': {}", path_to_utf8(archive_path),
-                    remove_error.message());
-    }
+    // 创建流生命周期卫士，当流结束（完成、中止或错误）析构时自动递减引用并重置空闲倒计时
+    auto stream_guard =
+        std::shared_ptr<void>(nullptr, [&app_state, token_str = std::string(token)](void*) {
+          bool should_schedule = false;
+          {
+            std::lock_guard lock(g_archives_mutex);
+            auto it = g_archives.find(token_str);
+            if (it == g_archives.end()) {
+              return;
+            }
+
+            it->second.active_streams--;
+            if (it->second.active_streams <= 0) {
+              it->second.active_streams = 0;
+              it->second.expire_at = std::chrono::steady_clock::now() + kArchiveIdleTimeout;
+              should_schedule = true;
+            }
+          }
+
+          if (should_schedule) {
+            schedule_archive_cleanup(app_state, token_str, kArchiveIdleTimeout);
+          }
+        });
+
+    return ArchiveLease{
+        .file =
+            DownloadFile{
+                .file_path = std::move(file_path),
+                .file_name = std::string(kArchiveFileName),
+            },
+        .stream_guard = std::move(stream_guard),
+    };
   } catch (const std::exception& error) {
-    Logger().warn("Failed to remove gallery archive '{}': {}", path_to_utf8(archive_path),
-                  error.what());
+    return std::unexpected(std::string("Exception while acquiring gallery archive: ") +
+                           error.what());
   }
 }
 

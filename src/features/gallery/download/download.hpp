@@ -12,6 +12,11 @@ struct DownloadFile {
   std::string file_name;
 };
 
+struct ArchiveLease {
+  DownloadFile file;
+  std::shared_ptr<void> stream_guard;
+};
+
 struct PrepareDownloadResult {
   std::optional<std::int64_t> asset_id;
   std::string archive_token;
@@ -30,11 +35,8 @@ auto cleanup_stale_files() -> void;
 auto resolve_asset_file(core::AppState& app_state, std::int64_t asset_id)
     -> std::expected<DownloadFile, std::string>;
 
-// 根据受限归档名解析一个已生成的临时 ZIP。
-auto resolve_archive_file(core::AppState& app_state, std::string_view archive_name)
-    -> std::expected<DownloadFile, std::string>;
-
-// 完整归档响应结束后删除一次性归档。
-auto remove_archive_file(const std::filesystem::path& archive_path) -> void;
+// 解析已生成的临时 ZIP 并获取其租约卫士（活跃流保护与空闲清理）。
+auto acquire_archive_file(core::AppState& app_state, std::string_view archive_name)
+    -> std::expected<ArchiveLease, std::string>;
 
 }  // namespace features::gallery::download
