@@ -378,8 +378,6 @@ async function startDownload(assetIds: number[]) {
           failed: result.failedCount,
         }),
       })
-    } else {
-      toast.success(t('gallery.mobile.download.successTitle'))
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

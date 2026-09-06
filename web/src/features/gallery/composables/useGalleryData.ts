@@ -304,7 +304,24 @@ export function useGalleryData() {
         }
       }
 
-      const pages = await queryVisiblePages(response.totalCount, pageNum)
+      const requiresLayoutMeta = store.view.mode === 'masonry' || store.view.mode === 'adaptive'
+      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
+      const [pages, layoutMetaResponse] = await Promise.all([
+        queryVisiblePages(response.totalCount, pageNum),
+        requiresLayoutMeta
+          ? galleryApi
+              .queryAssetLayoutMeta({
+                filters,
+                sortBy: store.sortBy,
+                sortOrder: store.sortOrder,
+              })
+              .catch((err) => {
+                console.error('Failed to query asset layout meta:', err)
+                return null
+              })
+          : Promise.resolve(null),
+      ])
       if (!store.isQueryVersionCurrent(requestVersion)) {
         return
       }
@@ -312,6 +329,11 @@ export function useGalleryData() {
       const applyUpdates = async () => {
         store.clearTimelineData()
         store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
+        if (layoutMetaResponse) {
+          store.setLayoutMetaItems(layoutMetaResponse.items)
+        } else if (!requiresLayoutMeta) {
+          store.clearLayoutMetaItems()
+        }
         store.replacePaginatedAssets(pages)
         await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
         tryFocusFirstResultWhenDetailsEmpty(requestVersion)
@@ -374,7 +396,23 @@ export function useGalleryData() {
           Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
         )
       )
-      const pages = await queryVisiblePages(bucketsResponse.totalCount, pageNum)
+      const requiresLayoutMeta = store.view.mode === 'masonry' || store.view.mode === 'adaptive'
+
+      const [pages, layoutMetaResponse] = await Promise.all([
+        queryVisiblePages(bucketsResponse.totalCount, pageNum),
+        requiresLayoutMeta
+          ? galleryApi
+              .queryAssetLayoutMeta({
+                filters,
+                sortBy: store.sortBy,
+                sortOrder: store.sortOrder,
+              })
+              .catch((err) => {
+                console.error('Failed to query asset layout meta for timeline:', err)
+                return null
+              })
+          : Promise.resolve(null),
+      ])
       if (!store.isQueryVersionCurrent(requestVersion)) {
         return
       }
@@ -387,6 +425,11 @@ export function useGalleryData() {
           pageNum,
           pageNum < Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
         )
+        if (layoutMetaResponse) {
+          store.setLayoutMetaItems(layoutMetaResponse.items)
+        } else if (!requiresLayoutMeta) {
+          store.clearLayoutMetaItems()
+        }
         store.replacePaginatedAssets(pages)
         await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
         tryFocusFirstResultWhenDetailsEmpty(requestVersion)

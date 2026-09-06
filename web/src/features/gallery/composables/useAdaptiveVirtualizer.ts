@@ -223,8 +223,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   // 在 adaptive 模式里，viewSize 的语义不再是“方形卡片边长”，而是“目标行高”。
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
-  const { layoutMetaItems, reloadLayoutMeta, ensureLayoutMetaLoaded } =
-    useGalleryLayoutMeta('adaptive')
+  const { layoutMetaItems, ensureLayoutMetaLoaded } = useGalleryLayoutMeta('adaptive')
   const virtualRows = shallowRef<VirtualAdaptiveRow[]>([])
   const loadingPages = new Set<number>()
 
@@ -381,14 +380,6 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
     await galleryData.loadAllAssets()
   }
-
-  watch(
-    () => store.queryResultVersion,
-    async () => {
-      await reloadLayoutMeta()
-    },
-    { flush: 'post' }
-  )
 
   watch(
     () => ({

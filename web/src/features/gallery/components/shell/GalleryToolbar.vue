@@ -308,8 +308,6 @@ function handleToolbarContextMenu(event: MouseEvent) {
                         </div>
                       </div>
 
-                      <div class="border-t" />
-
                       <div class="space-y-3">
                         <div class="flex items-center justify-between gap-2">
                           <p class="text-sm font-medium">

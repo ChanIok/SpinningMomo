@@ -1090,8 +1090,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
         </div>
 
         <template v-if="batchActiveAsset">
-          <Separator />
-
           <h4 class="text-sm font-medium">{{ t('gallery.details.batch.currentFocus') }}</h4>
           <AssetDetailsContent
             :asset="batchActiveAsset"

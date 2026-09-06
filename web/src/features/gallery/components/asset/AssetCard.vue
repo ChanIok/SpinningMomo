@@ -504,7 +504,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
   <div
     data-asset-card
     draggable="true"
-    class="group transition-ring relative w-full overflow-hidden bg-background duration-200 contain-[layout_size_paint] select-none"
+    class="group relative w-full overflow-hidden bg-background transition-shadow duration-200 contain-[layout_size_paint] select-none"
     :class="[
       store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-sm',
       showSelectionVisual

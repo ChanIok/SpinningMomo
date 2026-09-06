@@ -107,8 +107,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   // 正在加载中的页码集合，防止同一页被并发重复请求
   const loadingPages = new Set<number>()
   const virtualItems = shallowRef<VirtualMasonryItem[]>([])
-  const { layoutMetaItems, reloadLayoutMeta, ensureLayoutMetaLoaded } =
-    useGalleryLayoutMeta('masonry')
+  const { layoutMetaItems, ensureLayoutMetaLoaded } = useGalleryLayoutMeta('masonry')
 
   // 单列宽度 = (容器宽度 - 列间总间距) / 列数
   const columnWidth = computed(() => {
@@ -327,14 +326,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   watch(layoutMetaItems, () => {
     virtualizer.value.measure()
   })
-
-  watch(
-    () => store.queryResultVersion,
-    async () => {
-      await reloadLayoutMeta()
-    },
-    { flush: 'post' }
-  )
 
   return {
     virtualizer,
