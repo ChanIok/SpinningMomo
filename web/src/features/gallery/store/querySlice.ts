@@ -1,5 +1,5 @@
 import { ref, reactive, shallowRef } from 'vue'
-import type { Asset, Tag, TimelineBucket } from '../types'
+import type { Asset, AssetLayoutMetaItem, Tag, TimelineBucket } from '../types'
 
 export type GalleryQueryStatus = 'idle' | 'loading' | 'refreshing' | 'error'
 
@@ -29,6 +29,8 @@ export function createQuerySlice() {
   const paginatedAssets = shallowRef<Map<number, Asset[]>>(new Map()) // key: pageNumber
   // 显式 version 用于触发依赖 Map 结构变化的更新（Map 原地改动不总能被外层感知）。
   const paginatedAssetsVersion = ref(0)
+  // 仅在完整查询结果原子替换后递增，供布局元数据与结果集保持同步。
+  const queryResultVersion = ref(0)
   const perPage = ref(500) // 每页数量
   // 可见区由虚拟列表回传，用于决定“优先加载哪些页”。
   const visibleRange = reactive<{
@@ -40,9 +42,21 @@ export function createQuerySlice() {
   })
 
   // ============= 时间线数据状态 =============
-  // buckets 仅保存月份元信息，不保存每月资产明细（明细仍走分页查询）。
-  const timelineBuckets = ref<TimelineBucket[]>([])
+  // buckets 仅保存按日聚合的轻量元信息，不保存日期资产明细（明细仍走分页查询）。
+  const timelineBuckets = shallowRef<TimelineBucket[]>([])
   const timelineTotalCount = ref(0)
+
+  // ============= 布局元数据状态（瀑布流/自适应视图使用） =============
+  // layoutMetaItems: 轻量资产宽高元数据缓存，按需拉取，在查询生命周期内有效
+  const layoutMetaItems = shallowRef<AssetLayoutMetaItem[]>([])
+
+  function setLayoutMetaItems(items: AssetLayoutMetaItem[]) {
+    layoutMetaItems.value = items
+  }
+
+  function clearLayoutMetaItems() {
+    layoutMetaItems.value = []
+  }
 
   function setError(errorMessage: string | null) {
     error.value = errorMessage
@@ -80,6 +94,19 @@ export function createQuerySlice() {
     perPage.value = count
   }
 
+  /** 获取指定全局索引的资产；页面尚未加载时返回 null。 */
+  function getAssetAt(index: number): Asset | null {
+    const pageSize = perPage.value
+    if (!Number.isInteger(index) || index < 0 || pageSize <= 0) {
+      return null
+    }
+
+    // 全局索引 -> 页号 + 页内索引。
+    const pageNum = Math.floor(index / pageSize) + 1
+    const indexInPage = index % pageSize
+    return paginatedAssets.value.get(pageNum)?.[indexInPage] ?? null
+  }
+
   /**
    * 获取指定索引范围的资产（用于虚拟列表）
    * @returns Asset[] | null[] - null 表示该位置数据未加载
@@ -88,12 +115,7 @@ export function createQuerySlice() {
     const result: (Asset | null)[] = []
 
     for (let i = startIndex; i <= endIndex; i++) {
-      // 全局索引 -> 页号 + 页内索引
-      const pageNum = Math.floor(i / perPage.value) + 1
-      const indexInPage = i % perPage.value
-      const page = paginatedAssets.value.get(pageNum)
-
-      result.push(page?.[indexInPage] ?? null)
+      result.push(getAssetAt(i))
     }
 
     return result
@@ -138,6 +160,51 @@ export function createQuerySlice() {
     loadedAssetTagIds.value = nextLoadedIds
   }
 
+  function addTagsToAssetMap(assetIds: number[], tagsToAdd: Tag[]) {
+    if (assetIds.length === 0 || tagsToAdd.length === 0) {
+      return
+    }
+
+    const nextTagsById = new Map(assetTagsById.value)
+    const nextLoadedIds = new Set(loadedAssetTagIds.value)
+
+    for (const assetId of assetIds) {
+      const currentTags = nextTagsById.get(assetId) ?? []
+      const existingTagIds = new Set(currentTags.map((t) => t.id))
+      const newTags = tagsToAdd.filter((t) => !existingTagIds.has(t.id))
+      if (newTags.length > 0) {
+        nextTagsById.set(assetId, [...currentTags, ...newTags])
+      }
+      nextLoadedIds.add(assetId)
+    }
+
+    assetTagsById.value = nextTagsById
+    loadedAssetTagIds.value = nextLoadedIds
+    assetTagsVersion.value += 1
+  }
+
+  function removeTagsFromAssetMap(assetIds: number[], tagIdsToRemove: number[]) {
+    if (assetIds.length === 0 || tagIdsToRemove.length === 0) {
+      return
+    }
+
+    const removeSet = new Set(tagIdsToRemove)
+    const nextTagsById = new Map(assetTagsById.value)
+
+    for (const assetId of assetIds) {
+      const currentTags = nextTagsById.get(assetId)
+      if (currentTags && currentTags.some((t) => removeSet.has(t.id))) {
+        nextTagsById.set(
+          assetId,
+          currentTags.filter((t) => !removeSet.has(t.id))
+        )
+      }
+    }
+
+    assetTagsById.value = nextTagsById
+    assetTagsVersion.value += 1
+  }
+
   function invalidateAssetTags(assetIds?: number[]) {
     if (assetIds === undefined) {
       assetTagsById.value = new Map()
@@ -146,14 +213,12 @@ export function createQuerySlice() {
       return
     }
 
-    const nextTagsById = new Map(assetTagsById.value)
+    // 局部失效仅清除已加载标记，保留已有标签以维持 UI 连续性，由后台查询异步覆盖
     const nextLoadedIds = new Set(loadedAssetTagIds.value)
     for (const assetId of assetIds) {
-      nextTagsById.delete(assetId)
       nextLoadedIds.delete(assetId)
     }
 
-    assetTagsById.value = nextTagsById
     loadedAssetTagIds.value = nextLoadedIds
     assetTagsVersion.value += 1
   }
@@ -162,6 +227,7 @@ export function createQuerySlice() {
     paginatedAssets.value = new Map(pages)
     clearDyeCodeStatuses()
     paginatedAssetsVersion.value += 1
+    queryResultVersion.value += 1
   }
 
   function clearPaginatedAssets() {
@@ -199,6 +265,7 @@ export function createQuerySlice() {
 
     clearTimelineData()
     clearPaginatedAssets()
+    clearLayoutMetaItems()
     clearDyeCodeStatuses()
     invalidateAssetTags()
     setVisibleRange(undefined, undefined)
@@ -217,25 +284,32 @@ export function createQuerySlice() {
     assetTagsVersion,
     paginatedAssets,
     paginatedAssetsVersion,
+    layoutMetaItems,
     perPage,
     visibleRange,
     timelineBuckets,
     timelineTotalCount,
+    queryResultVersion,
     setError,
     setPagination,
     beginQueryRefresh,
     finishQueryRefresh,
     isQueryVersionCurrent,
     setPerPage,
+    getAssetAt,
     getAssetsInRange,
     isPageLoaded,
     setPageAssets,
     setDyeCodeStatuses,
     clearDyeCodeStatuses,
     setAssetTagsForAssets,
+    addTagsToAssetMap,
+    removeTagsFromAssetMap,
     invalidateAssetTags,
     replacePaginatedAssets,
     clearPaginatedAssets,
+    setLayoutMetaItems,
+    clearLayoutMetaItems,
     setVisibleRange,
     setTimelineBuckets,
     setTimelineTotalCount,

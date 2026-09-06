@@ -108,10 +108,6 @@ auto handle_add_tag_to_assets(core::AppState& app_state,
                                        .message = "Service error: " + result.error()});
   }
 
-  if (result->affected_count.value_or(0) > 0) {
-    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
-  }
-
   co_return result.value();
 }
 
@@ -123,10 +119,6 @@ auto handle_remove_tag_from_assets(core::AppState& app_state,
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
                                        .message = "Service error: " + result.error()});
-  }
-
-  if (result->affected_count.value_or(0) > 0) {
-    core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
   }
 
   co_return result.value();

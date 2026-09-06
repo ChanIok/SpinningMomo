@@ -23,6 +23,13 @@ function pathsOf(response: QueryAssetsResponse): string[] {
   return response.items.map((item) => canonicalizeWindowsPath(item.path));
 }
 
+function localCalendarDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 async function waitForMetadata(
   application: Parameters<typeof queryAssets>[0],
   predicate: (assets: Asset[]) => boolean,
@@ -102,11 +109,14 @@ const phase: ScenarioPhase = {
       "资产元数据可见",
     );
 
-    // 月份/年份按资产实际 file_created_at 推算，避免跨月边界时的时区抖动。
+    // 月份/年份按资产实际 file_created_at 的本地日历推算，与时间线查询保持一致。
     const monthReference = assetD.fileCreatedAt ?? assetD.createdAt;
     assert.ok(monthReference, "资产缺少时间戳用于推算月份");
-    const expectedMonth = new Date(monthReference).toISOString().slice(0, 7);
-    const expectedYear = new Date(monthReference).toISOString().slice(0, 4);
+    const monthReferenceDate = new Date(monthReference);
+    const expectedMonth = `${monthReferenceDate.getFullYear()}-${String(
+      monthReferenceDate.getMonth() + 1,
+    ).padStart(2, "0")}`;
+    const expectedYear = String(monthReferenceDate.getFullYear());
     const aPath = canonicalizeWindowsPath(assetAPath);
     const bPath = canonicalizeWindowsPath(assetBPath);
     const cPath = canonicalizeWindowsPath(assetCPath);
@@ -239,13 +249,46 @@ const phase: ScenarioPhase = {
     assert.deepEqual(mixedSummary.commonTags, [], "无共同标签时不应给出共同标签");
 
     const timeline = await application.call<{
-      buckets: Array<{ month: string; count: number }>;
+      buckets: Array<{ date: string; month: string; count: number }>;
       totalCount: number;
     }>("gallery.getTimelineBuckets", { search: "qf-" });
     assert.equal(timeline.totalCount, 4);
-    const monthBucket = timeline.buckets.find((bucket) => bucket.month === expectedMonth);
-    assert.ok(monthBucket, `时间线缺少当前月份桶 ${expectedMonth}`);
-    assert.equal(monthBucket.count, 4, "时间线当前月份桶数量不符");
+    assert.ok(timeline.buckets.length > 0, "时间线至少应返回一个日期桶");
+    assert.equal(
+      new Set(timeline.buckets.map((bucket) => bucket.date)).size,
+      timeline.buckets.length,
+      "时间线日期桶不应重复",
+    );
+    for (const bucket of timeline.buckets) {
+      assert.match(bucket.date, /^\d{4}-\d{2}-\d{2}$/, "时间线日期格式不符");
+      assert.equal(bucket.date.slice(0, 7), bucket.month, "日期桶的月份与日期不一致");
+      assert.ok(bucket.count > 0, "时间线日期桶数量应为正数");
+    }
+    for (let index = 1; index < timeline.buckets.length; index += 1) {
+      assert.ok(
+        timeline.buckets[index - 1].date >= timeline.buckets[index].date,
+        "时间线日期桶应按创建时间倒序排列",
+      );
+    }
+    const expectedDateCounts = new Map<string, number>();
+    for (const asset of [assetA, assetB, assetC, assetD]) {
+      const timestamp = asset.fileCreatedAt ?? asset.createdAt;
+      assert.ok(timestamp, `资产 ${asset.id} 缺少创建时间`);
+      const date = localCalendarDate(timestamp);
+      expectedDateCounts.set(date, (expectedDateCounts.get(date) ?? 0) + 1);
+    }
+    assert.deepEqual(
+      timeline.buckets.map((bucket) => [bucket.date, bucket.count]),
+      [...expectedDateCounts.entries()].sort(([left], [right]) => right.localeCompare(left)),
+      "时间线日期桶数量与资产创建日期不符",
+    );
+    const monthBuckets = timeline.buckets.filter((bucket) => bucket.month === expectedMonth);
+    assert.ok(monthBuckets.length > 0, `时间线缺少当前月份桶 ${expectedMonth}`);
+    assert.equal(
+      monthBuckets.reduce((total, bucket) => total + bucket.count, 0),
+      4,
+      "时间线当前月份桶数量不符",
+    );
 
     const byMonthAssets = await application.call<{
       month: string;

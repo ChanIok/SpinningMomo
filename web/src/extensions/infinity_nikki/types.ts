@@ -1,10 +1,7 @@
 import type { OperationResult, QueryAssetsFilters } from '@/features/gallery/types'
-import type { SortOrder } from '@/features/gallery/types'
 
 export interface QueryPhotoMapPointsParams {
   filters: QueryAssetsFilters
-  sortBy?: string
-  sortOrder?: SortOrder
   worldId: string
 }
 
@@ -20,7 +17,6 @@ export interface PhotoMapPoint {
   lng: number
   worldId: string
   officialWorldId: string
-  assetIndex: number
 }
 
 export interface InfinityNikkiExtractedParams {

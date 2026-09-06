@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { computed } from 'vue'
+import type { DateGrouping } from '../types'
 import {
   applySettingsDefaults,
   createDefaultGallerySettings,
@@ -63,8 +64,21 @@ export const useGalleryStore = defineStore('gallery', () => {
     },
   })
 
-  // timeline mode 本质是按 createdAt 排序的特化表现，保持历史语义兼容。
+  // 时间线数据模式由创建日期排序决定，供分页数据和月份滚动轨道复用。
   const isTimelineMode = computed(() => navigationSlice.sortBy.value === 'createdAt')
+  // 时间线数据可用于月份滚动轨道；日期标题是否出现由独立的 dateGrouping 控制。
+  const isDateGroupingEnabled = computed(
+    () => isTimelineMode.value && viewSlice.view.value.dateGrouping !== 'none'
+  )
+
+  function setDateGrouping(grouping: DateGrouping) {
+    viewSlice.setDateGrouping(grouping)
+
+    // 分组需要创建日期作为主排序；保留用户当前的升/降序方向。
+    if (grouping !== 'none' && navigationSlice.sortBy.value !== 'createdAt') {
+      navigationSlice.setSorting('createdAt', navigationSlice.sortOrder.value)
+    }
+  }
 
   // reset 只保留一个入口，避免“某个 slice 忘记重置”的问题。
   function reset() {
@@ -88,6 +102,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     ...interactionSlice,
     gallerySettings,
     isTimelineMode,
+    isDateGroupingEnabled,
+    setDateGrouping,
     reset,
   }
 })

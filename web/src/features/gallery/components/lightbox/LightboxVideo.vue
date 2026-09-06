@@ -40,7 +40,7 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(currentIdx, currentIdx)[0] ?? null
+  return store.getAssetAt(currentIdx)
 })
 
 // 只有紧凑触摸模式需要在图库底栏和视频原生控制条之间切换；其他模式保留原生 controls。

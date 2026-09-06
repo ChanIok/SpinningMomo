@@ -105,21 +105,21 @@ function clearLightboxRecoveryParams() {
   window.history.replaceState(window.history.state, '', currentUrl.toString())
 }
 
-// 按资产 ID 重建当前查询集中的选择，供前进/后退和页面恢复复用。
+// 以资产 ID 作为当前查询目标，由图库查询层解析出内部位置后恢复选择。
 async function restoreLightboxAsset(assetId: number): Promise<boolean> {
   if (!Number.isInteger(assetId) || assetId <= 0) {
     return false
   }
 
+  store.setActiveAssetId(assetId)
   await galleryData.refreshCurrentQuery()
-  const allAssetIds = await galleryData.queryCurrentAssetIds()
-  const index = allAssetIds.findIndex((id) => id === assetId)
-  if (index < 0) {
+  const index = store.selection.activeIndex
+  if (store.selection.activeAssetId !== assetId || index === undefined) {
     return false
   }
 
   const selectedAsset = await gallerySelection.selectOnlyIndex(index)
-  return Boolean(selectedAsset)
+  return selectedAsset?.id === assetId
 }
 
 // 兼容外部恢复链接：先恢复筛选和资产，再创建新的暗房历史层。
@@ -328,8 +328,7 @@ const resetWheelZoomDelta = useDebounceFn(() => {
 
 function toggleSelectedAssetsRejected() {
   const activeIndex = store.selection.activeIndex
-  const activeAsset =
-    activeIndex === undefined ? null : (store.getAssetsInRange(activeIndex, activeIndex)[0] ?? null)
+  const activeAsset = activeIndex === undefined ? null : store.getAssetAt(activeIndex)
 
   if (activeAsset?.reviewFlag === 'rejected') {
     void assetActions.clearSelectedAssetsRejected()
@@ -347,8 +346,54 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
+function isEscapeHandledByOverlay(target: EventTarget | null): boolean {
+  if (target instanceof Element) {
+    const overlayElement = target.closest(
+      '[role="dialog"], [role="alertdialog"], [role="menu"], ' +
+        '[data-slot="popover-content"], [data-slot="dropdown-menu-content"], ' +
+        '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]'
+    )
+    if (overlayElement) {
+      return true
+    }
+  }
+
+  const overlay = overlayHistory.snapshot.value.overlay
+  return (
+    store.contextMenu.isOpen ||
+    store.moveToFolderDialogOpen ||
+    store.preferencesDialogOpen ||
+    store.deleteAssetsDialog.open ||
+    (overlay !== null && overlay !== 'selection')
+  )
+}
+
 function handleKeydown(event: KeyboardEvent) {
   if (store.lightbox.isOpen || isEditableTarget(event.target)) {
+    return
+  }
+
+  if (
+    event.key === 'Escape' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !event.altKey
+  ) {
+    if (event.defaultPrevented || isEscapeHandledByOverlay(event.target)) {
+      return
+    }
+
+    if (store.selection.mode === 'multi-select') {
+      event.preventDefault()
+      void gallerySelection.exitMultiSelectMode()
+      return
+    }
+
+    if (store.selection.selectedIds.size > 0) {
+      event.preventDefault()
+      gallerySelection.clearSelection()
+    }
     return
   }
 

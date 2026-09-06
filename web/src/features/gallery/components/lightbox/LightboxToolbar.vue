@@ -53,7 +53,7 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(currentIndex, currentIndex)[0] ?? null
+  return store.getAssetAt(currentIndex)
 })
 // 视频使用原生 controls，不适用灯箱图片的适屏/缩放语义。
 const supportsZoom = computed(() => currentAsset.value?.type !== 'video')

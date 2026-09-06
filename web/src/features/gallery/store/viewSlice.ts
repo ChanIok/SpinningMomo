@@ -6,6 +6,7 @@ import {
   GALLERY_VIEW_SIZE_MIN,
 } from '../constants'
 import { createDefaultGallerySettings, type GallerySettings } from './persistence'
+import type { DateGrouping } from '../types'
 
 interface ViewSliceArgs {
   settings: Ref<GallerySettings>
@@ -56,6 +57,10 @@ export function createViewSlice(args: ViewSliceArgs) {
     console.log('📏 视图大小调整:', validSize, 'px')
   }
 
+  function setDateGrouping(grouping: DateGrouping) {
+    view.value.dateGrouping = grouping
+  }
+
   function setViewSizeFromSlider(sliderPosition: number) {
     const range = getViewSizeRange()
     const validSize = sliderToSize(sliderPosition, range)
@@ -87,6 +92,7 @@ export function createViewSlice(args: ViewSliceArgs) {
 
   return {
     view,
+    setDateGrouping,
     getViewSizeRange,
     getEffectiveViewSize,
     setViewSize,

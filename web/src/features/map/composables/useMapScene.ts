@@ -99,8 +99,6 @@ export function useMapScene() {
       const filters = toQueryAssetsFilters(galleryStore.filter, galleryStore.includeSubfolders)
       const nextMapPoints = await queryPhotoMapPoints({
         filters,
-        sortBy: galleryStore.sortBy,
-        sortOrder: galleryStore.sortOrder,
         worldId: backendWorldId,
       })
       if (loadId !== loadSequence) {
@@ -129,8 +127,6 @@ export function useMapScene() {
     JSON.stringify({
       filter: galleryStore.filter,
       includeSubfolders: galleryStore.includeSubfolders,
-      sortBy: galleryStore.sortBy,
-      sortOrder: galleryStore.sortOrder,
       iframeSessionReady: mapStore.iframeSessionReady,
       currentWorldId: getCurrentWorldId(),
     })

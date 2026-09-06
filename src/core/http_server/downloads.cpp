@@ -78,25 +78,24 @@ auto handle_asset_download(core::AppState& state, auto* res, auto* req) -> void 
                                               std::move(file_result->file_name), res, req);
 }
 
-// 发送完整的一次性 ZIP，并在响应结束后删除归档文件。
+// 发送多选 ZIP 归档，并绑定生命周期租约（活跃传输保护 + 空闲倒计时自动回收）。
 auto handle_archive_download(core::AppState& state, auto* res, auto* req) -> void {
   if (!has_download_access(state, res, req)) {
     return;
   }
 
-  auto file_result =
-      features::gallery::download::resolve_archive_file(state, req->getParameter("archive_name"));
-  if (!file_result) {
-    Logger().debug("Gallery archive download was not found: {}", file_result.error());
+  auto lease_result =
+      features::gallery::download::acquire_archive_file(state, req->getParameter("archive_name"));
+  if (!lease_result) {
+    Logger().debug("Gallery archive download was not found: {}", lease_result.error());
     reject_not_found(res);
     return;
   }
 
-  // 归档不支持 Range；只有完整响应结束才触发删除回调。
-  const auto archive_path = file_result->file_path;
-  static_content::serve_download_file_request(
-      state, file_result->file_path, std::move(file_result->file_name), res, req, false,
-      [archive_path] { features::gallery::download::remove_archive_file(archive_path); });
+  // 归档支持 Range 断点续传；传输卫士负责在连接断开后倒计时回收。
+  static_content::serve_download_file_request(state, lease_result->file.file_path,
+                                              std::move(lease_result->file.file_name), res, req,
+                                              true, std::move(lease_result->stream_guard));
 }
 
 }  // namespace

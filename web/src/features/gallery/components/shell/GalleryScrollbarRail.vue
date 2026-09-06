@@ -23,6 +23,7 @@ const props = withDefaults(
     scrollTop: number
     viewportHeight: number
     scrollContainer?: HTMLElement | null
+    /** 包含 Hero Header 与虚拟内容的完整滚动内容节点。 */
     contentElement: HTMLElement | null
     virtualizer: {
       getTotalSize: () => number
@@ -69,11 +70,9 @@ function syncScrollRange() {
   scrollRange.value = actualRange > 0 ? actualRange : fallbackScrollRange.value
 }
 
-watch(
-  () => [props.scrollContainer, props.scrollTop, props.containerHeight, props.viewportHeight],
-  syncScrollRange,
-  { immediate: true }
-)
+watch(() => [props.scrollContainer, props.containerHeight, props.viewportHeight], syncScrollRange, {
+  immediate: true,
+})
 
 watch(
   () => [props.scrollContainer, props.contentElement],

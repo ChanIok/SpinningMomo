@@ -1,5 +1,11 @@
 import { computed } from 'vue'
-import { useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
+import {
+  useRoute,
+  useRouter,
+  type LocationQuery,
+  type LocationQueryRaw,
+  type RouteLocationRaw,
+} from 'vue-router'
 
 export type GalleryOverlay =
   | 'folder'
@@ -73,7 +79,18 @@ export function isGalleryLightboxOverlay(overlay: GalleryOverlay | null | undefi
   return overlay === 'lightbox' || overlay === 'lightbox-details'
 }
 
-// 统一管理图库抽屉、临时面板和暗房的同页历史，保证手势返回、工具栏返回与页面按钮遵循同一层级。
+// 地图等外部页面直接进入图库暗房时，只创建一条跨页面历史记录。
+export function buildGalleryLightboxRoute(assetId: number): RouteLocationRaw {
+  return {
+    name: 'gallery',
+    query: {
+      [OVERLAY_QUERY_KEY]: 'lightbox',
+      [ASSET_QUERY_KEY]: String(assetId),
+    },
+  }
+}
+
+// 统一管理图库内部覆盖层与跨页面暗房历史，保证各种返回入口遵循同一层级。
 export function useGalleryOverlayHistory() {
   const route = useRoute()
   const router = useRouter()
@@ -140,8 +157,8 @@ export function useGalleryOverlayHistory() {
     return navigateToSnapshot({ overlay: 'selection' }, false)
   }
 
-  // 从 Vue Router 当前条目读取 back 指向的父级，用来判断是否可以安全消费一层历史。
-  function getHistoryParentSnapshot(): GalleryOverlaySnapshot | undefined {
+  // 从 Vue Router 当前条目读取 back 指向的父级；外部父级也必须保留，供暗房返回来源页面。
+  function getHistoryParentRoute() {
     if (typeof window === 'undefined') {
       return undefined
     }
@@ -152,11 +169,25 @@ export function useGalleryOverlayHistory() {
     }
 
     try {
-      const parent = router.resolve(state.back)
-      return parent.name === 'gallery' ? snapshotFromQuery(parent.query) : undefined
+      return router.resolve(state.back)
     } catch {
       return undefined
     }
+  }
+
+  function getHistoryParentSnapshot(): GalleryOverlaySnapshot | undefined {
+    const parent = getHistoryParentRoute()
+    return parent?.name === 'gallery' ? snapshotFromQuery(parent.query) : undefined
+  }
+
+  function consumeHistoryBack(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const removeAfterEach = router.afterEach(() => {
+        removeAfterEach()
+        resolve(true)
+      })
+      router.back()
+    })
   }
 
   // 仅当父级确实是预期状态时回退，避免误退到图库之外的页面。
@@ -165,14 +196,7 @@ export function useGalleryOverlayHistory() {
       return Promise.resolve(false)
     }
 
-    return new Promise((resolve) => {
-      const removeAfterEach = router.afterEach(() => {
-        removeAfterEach()
-        resolve(true)
-      })
-      // 等待导航完成后再读取 snapshot，确保调用方看到的是已经消费后的界面状态。
-      router.back()
-    })
+    return consumeHistoryBack()
   }
 
   // 关闭文件夹抽屉时消费 folder -> gallery 的历史层，避免 replace 产生重复图库条目。
@@ -223,7 +247,7 @@ export function useGalleryOverlayHistory() {
     return navigateToSnapshot({ overlay: 'lightbox', assetId }, false)
   }
 
-  // 暗房工具栏的返回语义是退出暗房；详情打开时先消费详情层，再消费暗房层。
+  // 页面级返回离开当前图库入口；详情打开时先消费详情层，再处理暗房来源页面。
   async function closeLightbox() {
     if (!isGalleryLightboxOverlay(snapshot.value.overlay)) {
       return
@@ -239,10 +263,45 @@ export function useGalleryOverlayHistory() {
       }
     }
 
-    // 消费 lightbox -> gallery 的历史层，交给界面 watcher 播放关闭动画。
+    // 跨页面进入的暗房没有图库父级：直接返回来源页面。
+    const parentRoute = getHistoryParentRoute()
+    if (parentRoute && parentRoute.name !== 'gallery') {
+      const externalConsumed = await consumeHistoryBack()
+      if (externalConsumed) {
+        return
+      }
+    }
+
+    // 普通图库进入的暗房消费 lightbox -> gallery 历史层，交给界面 watcher 播放关闭动画。
     const lightboxConsumed = await consumeHistoryEntry(null)
     if (!lightboxConsumed || snapshot.value.overlay !== null) {
       // 没有可消费的父级时，用 replace 清除暗房地址作为安全兜底。
+      await navigateToSnapshot({ overlay: null }, true)
+    }
+  }
+
+  // 暗房内部返回只退出暗房，跨页面进入时用 replace 保留图库作为当前页面。
+  async function closeLightboxOverlay() {
+    if (!isGalleryLightboxOverlay(snapshot.value.overlay)) {
+      return
+    }
+
+    if (snapshot.value.overlay === 'lightbox-details') {
+      const detailsConsumed = await consumeHistoryEntry('lightbox')
+      if (!detailsConsumed || currentOverlay() !== 'lightbox') {
+        await navigateToSnapshot({ overlay: null }, true)
+        return
+      }
+    }
+
+    const parentRoute = getHistoryParentRoute()
+    if (parentRoute && parentRoute.name !== 'gallery') {
+      await navigateToSnapshot({ overlay: null }, true)
+      return
+    }
+
+    const lightboxConsumed = await consumeHistoryEntry(null)
+    if (!lightboxConsumed || snapshot.value.overlay !== null) {
       await navigateToSnapshot({ overlay: null }, true)
     }
   }
@@ -333,6 +392,7 @@ export function useGalleryOverlayHistory() {
     closeSelectionMode,
     openLightbox,
     closeLightbox,
+    closeLightboxOverlay,
     openLightboxDetails,
     closeLightboxDetails,
     replaceLightboxAsset,

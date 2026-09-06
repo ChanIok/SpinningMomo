@@ -28,7 +28,6 @@ export type OpenGalleryAssetMessage = {
   action: typeof ACTION_OPEN_GALLERY_ASSET
   payload?: {
     assetId?: number
-    assetIndex?: number
   }
 }
 

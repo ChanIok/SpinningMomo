@@ -210,15 +210,21 @@ onUnmounted(() => {
     </div>
 
     <!-- 2. 左下角：数据概览卡片 (HUD Corner Widget) -->
-    <div class="absolute bottom-8 left-8 z-20 animate-in duration-300 fade-in-0">
+    <div
+      class="absolute bottom-8 left-8 z-20 max-w-[calc(100%-4rem)] animate-in duration-300 fade-in-0"
+    >
       <div class="relative overflow-hidden rounded-md backdrop-blur-md">
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
 
-        <div class="relative z-10 p-5">
-          <div class="flex items-center gap-6">
+        <div class="relative z-10 px-3.5 py-2.5 min-[380px]:p-4 min-[440px]:p-5">
+          <div
+            class="flex items-center gap-2.5 whitespace-nowrap min-[380px]:gap-4 min-[440px]:gap-6"
+          >
             <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+              <span
+                class="text-[0.65rem] font-light tracking-wider text-foreground/40 uppercase min-[440px]:tracking-widest"
+              >
                 Photos
               </span>
               <span class="text-sm font-medium tracking-wider text-foreground/90">
@@ -227,10 +233,10 @@ onUnmounted(() => {
             </div>
 
             <template v-if="videoCount > 0">
-              <div class="h-6 w-px bg-foreground/10"></div>
+              <div class="h-5 w-px bg-foreground/10 min-[380px]:h-6"></div>
               <div class="flex flex-col gap-0.5">
                 <span
-                  class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase"
+                  class="text-[0.65rem] font-light tracking-wider text-foreground/40 uppercase min-[440px]:tracking-widest"
                 >
                   Videos
                 </span>
@@ -240,10 +246,12 @@ onUnmounted(() => {
               </div>
             </template>
 
-            <div class="h-6 w-px bg-foreground/10"></div>
+            <div class="h-5 w-px bg-foreground/10 min-[380px]:h-6"></div>
 
             <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+              <span
+                class="text-[0.65rem] font-light tracking-wider text-foreground/40 uppercase min-[440px]:tracking-widest"
+              >
                 Storage
               </span>
               <span class="text-sm font-medium tracking-wider text-foreground/90">
@@ -251,10 +259,12 @@ onUnmounted(() => {
               </span>
             </div>
 
-            <div class="h-6 w-px bg-foreground/10"></div>
+            <div class="h-5 w-px bg-foreground/10 min-[380px]:h-6"></div>
 
             <div class="flex flex-col gap-0.5">
-              <span class="text-[0.65rem] font-light tracking-widest text-foreground/40 uppercase">
+              <span
+                class="text-[0.65rem] font-light tracking-wider text-foreground/40 uppercase min-[440px]:tracking-widest"
+              >
                 Today
               </span>
               <span

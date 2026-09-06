@@ -59,7 +59,7 @@ const ratingSheetOpen = ref(false)
 const tagSheetOpen = ref(false)
 const moreSheetOpen = ref(false)
 const tagIds = ref<number[]>([])
-const tagLoading = ref(false)
+const isTogglingTag = ref(false)
 const isDownloading = ref(false)
 const downloadConfirmationOpen = ref(false)
 const pendingDownloadIds = ref<number[]>([])
@@ -87,8 +87,19 @@ const selectedAssets = computed(() => {
   return assets
 })
 const batchRatingSummary = ref<number | null | undefined>(undefined)
-const batchRatingSummaryLoading = ref(false)
 let batchRatingSummaryRequestVersion = 0
+
+// 可见资产已经带有评分；选择集完整加载时直接计算，避免等待批量摘要请求造成文案闪烁。
+const localBatchRatingSummary = computed<number | null | undefined>(() => {
+  if (selectedCount.value <= 1 || selectedAssets.value.length !== selectedCount.value) {
+    return undefined
+  }
+
+  const firstRating = selectedAssets.value[0]?.rating ?? 0
+  return selectedAssets.value.every((asset) => (asset.rating ?? 0) === firstRating)
+    ? firstRating
+    : null
+})
 
 const singleSelectedAssetRating = computed<number | undefined>(() => {
   if (selectedCount.value !== 1) {
@@ -102,7 +113,7 @@ const singleSelectedAssetRating = computed<number | undefined>(() => {
 
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
-    return store.getAssetsInRange(activeIndex, activeIndex)[0]?.rating ?? 0
+    return store.getAssetAt(activeIndex)?.rating ?? 0
   }
 
   return undefined
@@ -113,18 +124,13 @@ const currentRating = computed<number | null | undefined>(() => {
     return singleSelectedAssetRating.value
   }
   if (selectedCount.value > 1) {
-    return batchRatingSummary.value
+    const localRating = localBatchRatingSummary.value
+    return localRating !== undefined ? localRating : batchRatingSummary.value
   }
   return undefined
 })
-const isRatingMixed = computed(
-  () =>
-    selectedCount.value > 1 && !batchRatingSummaryLoading.value && batchRatingSummary.value === null
-)
+const isRatingMixed = computed(() => selectedCount.value > 1 && currentRating.value === null)
 const ratingDisplayLabel = computed(() => {
-  if (batchRatingSummaryLoading.value && selectedCount.value > 1) {
-    return t('gallery.sidebar.common.loading')
-  }
   if (isRatingMixed.value) {
     return t('gallery.mobile.actions.ratingMixed')
   }
@@ -138,14 +144,12 @@ const ratingDisplayLabel = computed(() => {
 
 async function refreshBatchRatingSummary(assetIds: number[]) {
   const requestVersion = ++batchRatingSummaryRequestVersion
-  batchRatingSummary.value = undefined
-  batchRatingSummaryLoading.value = false
 
   if (assetIds.length <= 1) {
+    batchRatingSummary.value = undefined
     return
   }
 
-  batchRatingSummaryLoading.value = true
   try {
     const summary = await galleryApi.getBatchSelectionSummary(assetIds)
     if (requestVersion !== batchRatingSummaryRequestVersion) {
@@ -154,11 +158,8 @@ async function refreshBatchRatingSummary(assetIds: number[]) {
     batchRatingSummary.value = summary.rating
   } catch (error) {
     if (requestVersion === batchRatingSummaryRequestVersion) {
+      batchRatingSummary.value = undefined
       console.warn('Failed to load mobile gallery rating summary:', error)
-    }
-  } finally {
-    if (requestVersion === batchRatingSummaryRequestVersion) {
-      batchRatingSummaryLoading.value = false
     }
   }
 }
@@ -213,7 +214,6 @@ async function handleRating(rating: number) {
 
   // 使正在返回的旧批量摘要失效，避免用旧结果覆盖刚提交的评分。
   ++batchRatingSummaryRequestVersion
-  batchRatingSummaryLoading.value = false
 
   try {
     if (rating === 0) {
@@ -257,7 +257,6 @@ function handleRejected() {
 async function openTagSheet() {
   closeActionSheet()
   tagSheetOpen.value = true
-  tagLoading.value = true
 
   try {
     if (store.tags.length === 0) {
@@ -281,17 +280,15 @@ async function openTagSheet() {
   } catch (error) {
     console.error('Failed to load mobile gallery tags:', error)
     tagIds.value = []
-  } finally {
-    tagLoading.value = false
   }
 }
 
 async function handleTagToggle(tagId: number) {
-  if (tagLoading.value) {
+  if (isTogglingTag.value) {
     return
   }
 
-  tagLoading.value = true
+  isTogglingTag.value = true
   const hasTag = tagIds.value.includes(tagId)
 
   try {
@@ -305,7 +302,7 @@ async function handleTagToggle(tagId: number) {
   } catch (error) {
     console.error('Failed to update mobile gallery tag:', error)
   } finally {
-    tagLoading.value = false
+    isTogglingTag.value = false
   }
 }
 
@@ -381,8 +378,6 @@ async function startDownload(assetIds: number[]) {
           failed: result.failedCount,
         }),
       })
-    } else {
-      toast.success(t('gallery.mobile.download.successTitle'))
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -582,14 +577,7 @@ async function handleDownload() {
     @close="tagSheetOpen = false"
   >
     <div class="px-4 pb-4">
-      <div
-        v-if="tagLoading && store.tags.length === 0"
-        class="py-8 text-center text-sm text-muted-foreground"
-      >
-        {{ t('gallery.sidebar.common.loading') }}
-      </div>
       <TagSelectorPopover
-        v-else
         :tags="store.tags"
         :selected-tag-ids="tagIds"
         @toggle="void handleTagToggle($event)"

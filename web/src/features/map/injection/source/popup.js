@@ -77,18 +77,11 @@ export function buildPopupSnippet() {
           return;
         }
 
-        const rawAssetIndex = el.getAttribute('data-sm-open-asset-index');
-        const hasIndex = rawAssetIndex !== null && rawAssetIndex !== undefined;
-        const assetIndex = hasIndex ? Number(rawAssetIndex) : undefined;
-        if (hasIndex && !Number.isFinite(assetIndex)) {
-          return;
-        }
-
         if (window.parent && window.parent !== window) {
           window.parent.postMessage(
             {
               action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET',
-              payload: hasIndex ? { assetId, assetIndex } : { assetId },
+              payload: { assetId },
             },
             '*'
           );

@@ -329,25 +329,18 @@ auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
   res->end();
 }
 
-// 关闭已完成的流，并执行一次性归档的完成回调。
+// 关闭已完成的流。
 auto complete_stream(const std::shared_ptr<StreamContext>& ctx) -> void {
-  if (ctx->abort_flag->load() || ctx->completion_called) {
-    // 中止或已完成的流不再重复关闭文件和触发回调。
+  if (ctx->abort_flag->load() || !ctx->file.is_open()) {
+    // 中止或已关闭的流不再重复处理。
     return;
   }
 
-  ctx->completion_called = true;
-  // 先释放文件句柄，确保回调可以在 Windows 上删除归档。
   std::error_code close_error;
   ctx->file.close(close_error);
   if (close_error) {
     Logger().warn("Failed to close streamed file '{}': {}", ctx->file_path.string(),
                   close_error.message());
-  }
-  if (ctx->on_complete) {
-    // 完整响应已经发送，通知归档所属功能回收临时文件。
-    auto on_complete = std::move(ctx->on_complete);
-    on_complete();
   }
   Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(), ctx->bytes_sent);
 }
@@ -488,13 +481,13 @@ auto read_and_send_next_chunk(std::shared_ptr<StreamContext> ctx) -> void {
       });
 }
 
-// 按块异步读取大文件，并在完整发送后执行完成回调。
+// 按块异步读取大文件并按流式发送。
 auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                         std::string mime_type, std::string cache_control,
                         CacheValidators validators, size_t file_size,
                         std::optional<ByteRange> range,
                         std::optional<std::string> content_disposition, bool allow_range,
-                        std::move_only_function<void()> on_complete, auto* res) -> void {
+                        std::shared_ptr<void> stream_lifetime_token, auto* res) -> void {
   auto* loop = uWS::Loop::get();
   auto io_context = core::async::get_io_context(state);
 
@@ -516,7 +509,7 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
                            validators = std::move(validators),
                            content_disposition = std::move(content_disposition), loop, io_context,
                            file_size, range, range_start, range_end, response_size, allow_range,
-                           on_complete = std::move(on_complete)]() mutable {
+                           stream_lifetime_token = std::move(stream_lifetime_token)]() mutable {
     try {
       // 在异步线程打开文件，避免阻塞 uWS 事件循环。
       asio::random_access_file file(*io_context, file_path.string(), asio::file_base::read_only);
@@ -546,8 +539,7 @@ auto handle_file_stream(core::AppState& state, std::filesystem::path file_path,
           .loop = loop,
           .res = res,
           .buffer = std::vector<char>(STREAM_CHUNK_SIZE),
-          .on_complete = std::move(on_complete),
-          .completion_called = false,
+          .stream_lifetime_token = std::move(stream_lifetime_token),
           .abort_flag = abort_flag,
       });
 
@@ -595,7 +587,7 @@ auto serve_resolved_file_request(
     std::optional<std::chrono::seconds> cache_duration_override,
     std::optional<std::string> cache_control_override, auto* res, auto* req, bool is_head,
     std::optional<std::string> content_disposition_override = std::nullopt, bool allow_range = true,
-    std::move_only_function<void()> on_complete = {}) -> void {
+    std::shared_ptr<void> stream_lifetime_token = nullptr) -> void {
   // 先读取统一元数据，后续 Range、缓存和响应头都使用同一份快照。
   auto metadata_result = query_file_metadata(file_path);
   if (!metadata_result) {
@@ -662,7 +654,7 @@ auto serve_resolved_file_request(
     Logger().debug("Using stream for resolved file: {} bytes", file_size);
     handle_file_stream(state, file_path, mime_type, cache_control, validators, file_size,
                        range_parse.range, std::move(content_disposition_override), allow_range,
-                       std::move(on_complete), res);
+                       std::move(stream_lifetime_token), res);
     return;
   }
 
@@ -682,8 +674,6 @@ auto serve_resolved_file_request(
     abort_flag->store(true);
     Logger().debug("Single-read aborted for: {}", file_path.string());
   });
-  // 让异步协程和 uWS 回调共享一次性的完成处理器。
-  auto completion = std::make_shared<std::move_only_function<void()>>(std::move(on_complete));
 
   // 在异步运行时中读取文件，再回到 uWS 线程发送响应。
   asio::co_spawn(
@@ -691,7 +681,8 @@ auto serve_resolved_file_request(
       [res, file_path, mime_type, cache_control = std::move(cache_control),
        validators = std::move(validators),
        content_disposition = std::move(content_disposition_override), loop, file_size,
-       range = range_parse.range, allow_range, abort_flag, completion]() -> asio::awaitable<void> {
+       range = range_parse.range, allow_range, abort_flag,
+       stream_lifetime_token = std::move(stream_lifetime_token)]() -> asio::awaitable<void> {
         try {
           // 读取整文件后再按请求的 Range 截取响应体。
           auto file_result = co_await utils::file::read_file(file_path, file_size);
@@ -732,11 +723,10 @@ auto serve_resolved_file_request(
                                  content_length);
           }
 
-          // 只有响应成功结束后才执行一次性归档的完成回调。
           loop->defer([res, file_path, mime_type, cache_control, validators, file_size, range,
                        content_disposition = std::move(content_disposition),
                        response_body = std::move(response_body), allow_range, abort_flag,
-                       completion]() mutable {
+                       stream_lifetime_token = std::move(stream_lifetime_token)]() mutable {
             if (abort_flag->load()) {
               return;
             }
@@ -748,18 +738,12 @@ auto serve_resolved_file_request(
                                       allow_range);
             res->end(response_body);
 
-            if (*completion) {
-              // 移出回调再执行，避免同一响应重复触发删除。
-              auto on_complete = std::move(*completion);
-              on_complete();
-            }
-
             Logger().debug("Served resolved file: {}, size: {} bytes", file_path.string(),
                            response_body.size());
           });
 
         } catch (const std::exception& e) {
-          // 读取或组装响应失败时不认为文件已完成传输。
+          // 读取或组装响应失败。
           Logger().error("Error serving resolved file {}: {}", file_path.string(), e.what());
           loop->defer([res, abort_flag]() {
             if (abort_flag->load()) {
@@ -770,18 +754,19 @@ auto serve_resolved_file_request(
           });
         }
       },
-      core::async::log_completion("Static file request"));
+      asio::detached);
 }
 
-// 构造兼容 ASCII 文件名和 UTF-8 filename* 的附件响应头。
+// 转义文件名中的特殊字符，生成兼容各类浏览器的 Content-Disposition 响应头。
 auto build_download_content_disposition(std::string_view download_name) -> std::string {
   std::string fallback_name;
   fallback_name.reserve(download_name.size());
   for (const auto character : download_name) {
     const auto byte = static_cast<unsigned char>(character);
-    if (byte >= 0x20 && byte <= 0x7E && character != '"' && character != '\\' && character != '/') {
+    if ((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
+        (byte >= '0' && byte <= '9') || byte == '-' || byte == '.' || byte == '_') {
       fallback_name.push_back(character);
-    } else {
+    } else if (character == ' ') {
       fallback_name.push_back('_');
     }
   }
@@ -810,15 +795,15 @@ auto build_download_content_disposition(std::string_view download_name) -> std::
                      encoded_name);
 }
 
-// 按下载策略发送附件文件，并把完成回调传给具体传输分支。
+// 按下载策略发送附件文件，并可绑定生命周期卫士。
 auto serve_download_file_request(core::AppState& state, const std::filesystem::path& file_path,
                                  std::string download_name, uWS::HttpResponse<false>* res,
                                  uWS::HttpRequest* req, bool allow_range,
-                                 std::move_only_function<void()> on_complete) -> void {
+                                 std::shared_ptr<void> stream_lifetime_token) -> void {
   serve_resolved_file_request(state, file_path, "/downloads/", std::chrono::seconds{0},
                               std::string{"no-store"}, res, req, false,
                               build_download_content_disposition(download_name), allow_range,
-                              std::move(on_complete));
+                              std::move(stream_lifetime_token));
 }
 
 // 处理静态文件请求

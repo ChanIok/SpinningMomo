@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Images } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -153,7 +154,7 @@ const batchActiveAsset = computed(() => {
   // 上半部分读选择集摘要；这里只负责给下半部分“当前焦点项预览”找一个可展示的资产。
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
-    const [currentAsset] = store.getAssetsInRange(activeIndex, activeIndex)
+    const currentAsset = store.getAssetAt(activeIndex)
     if (currentAsset && store.selection.selectedIds.has(currentAsset.id)) {
       return currentAsset
     }
@@ -241,6 +242,15 @@ const currentTag = computed(() => {
 const isRootTagSummary = computed(() => currentTag.value?.id === -1)
 const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
+
+const hasDetails = computed(() => {
+  if (detailsFocus.value.type === 'folder') return Boolean(currentFolder.value)
+  if (detailsFocus.value.type === 'asset') return Boolean(activeAsset.value)
+  if (detailsFocus.value.type === 'tag') return Boolean(currentTag.value)
+  if (detailsFocus.value.type === 'batch') return true
+  return false
+})
+
 const assetDescriptionDraft = ref('')
 const isSavingAssetDescription = ref(false)
 const batchDescriptionDraft = ref('')
@@ -285,24 +295,31 @@ watch(
     const asset = activeAsset.value
     const requestToken = ++assetDetailsRequestToken
     infinityNikkiRequestToken += 1
-    assetTags.value = []
 
     if (!asset) {
+      assetTags.value = []
       assetMainColors.value = []
       infinityNikkiDetails.value = null
       return
     }
 
+    // 优先同步使用 Store 中的标签缓存，0ms 瞬间就位，彻底消除切图时的 DOM 位移跳动
+    const cachedTags = store.assetTagsById.get(asset.id)
+    if (cachedTags !== undefined) {
+      assetTags.value = cachedTags
+    }
+
     try {
-      const [tags, mainColors] = await Promise.all([
-        getAssetTags(asset.id),
-        getAssetMainColors(asset.id),
-      ])
+      const fetchTagsPromise = cachedTags === undefined ? getAssetTags(asset.id) : null
+      const [tags, mainColors] = await Promise.all([fetchTagsPromise, getAssetMainColors(asset.id)])
       if (requestToken !== assetDetailsRequestToken || activeAsset.value?.id !== asset.id) {
         return
       }
 
-      assetTags.value = tags
+      if (tags !== null) {
+        assetTags.value = tags
+        store.setAssetTagsForAssets([asset.id], { [asset.id]: tags })
+      }
       assetMainColors.value = mainColors
     } catch (error) {
       if (requestToken !== assetDetailsRequestToken) {
@@ -418,27 +435,34 @@ async function reloadActiveAssetTags() {
     return
   }
 
-  assetTags.value = await getAssetTags(activeAsset.value.id)
+  const assetId = activeAsset.value.id
+  const cachedTags = store.assetTagsById.get(assetId)
+  if (cachedTags !== undefined) {
+    assetTags.value = cachedTags
+    return
+  }
+
+  const tags = await getAssetTags(assetId)
+  if (activeAsset.value?.id === assetId) {
+    assetTags.value = tags
+    store.setAssetTagsForAssets([assetId], { [assetId]: tags })
+  }
 }
 
 // Popover 状态
 const showTagSelector = ref(false)
-const isLoadingTagTree = ref(false)
 
 async function handleTagSelectorOpen(open: boolean) {
   showTagSelector.value = open
 
-  if (!open || store.tags.length > 0 || isLoadingTagTree.value) {
+  if (!open || store.tags.length > 0) {
     return
   }
 
-  isLoadingTagTree.value = true
   try {
     await loadTagTree()
   } catch (error) {
     console.error('Failed to load tag tree for details:', error)
-  } finally {
-    isLoadingTagTree.value = false
   }
 }
 
@@ -453,8 +477,9 @@ async function handleRemoveTag(tagId: number) {
       tagIds: [tagId],
     })
 
-    await assetActions.refreshTagViewsAfterMutation([assetId])
-    await reloadActiveAssetTags()
+    store.removeTagsFromAssetMap([assetId], [tagId])
+    assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
+    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
   } catch (error) {
     console.error('Failed to remove tag:', error)
   }
@@ -473,15 +498,21 @@ async function handleToggleTag(tagId: number) {
         assetId,
         tagIds: [tagId],
       })
+      store.removeTagsFromAssetMap([assetId], [tagId])
+      assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
     } else {
       await addTagsToAsset({
         assetId,
         tagIds: [tagId],
       })
+      const tagNode = findTagById(store.tags, tagId)
+      if (tagNode) {
+        store.addTagsToAssetMap([assetId], [tagNode])
+        assetTags.value = [...assetTags.value, tagNode]
+      }
     }
 
-    await assetActions.refreshTagViewsAfterMutation([assetId])
-    await reloadActiveAssetTags()
+    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
   } catch (error) {
     console.error('Failed to toggle tag:', error)
   }
@@ -490,6 +521,7 @@ async function handleToggleTag(tagId: number) {
 async function handleRemoveBatchTag(tagId: number) {
   try {
     await assetActions.removeTagFromSelectedAssets(tagId)
+    await reloadBatchSummary()
   } catch (error) {
     console.error('Failed to remove tag from selection:', error)
   }
@@ -504,6 +536,7 @@ async function handleToggleBatchTag(tagId: number) {
     } else {
       await assetActions.addTagToSelectedAssets(tagId)
     }
+    await reloadBatchSummary()
   } catch (error) {
     console.error('Failed to toggle tag on selection:', error)
   }
@@ -678,8 +711,17 @@ async function handleCopyColorHex(color: AssetMainColor) {
 </script>
 
 <template>
-  <ScrollArea class="h-full">
-    <div class="min-h-full p-4">
+  <!-- 空状态：无选中内容时全高居中展示，不被滚动容器包裹 -->
+  <div v-if="!hasDetails" class="flex h-full w-full items-center justify-center p-4">
+    <div class="text-center text-muted-foreground">
+      <Images class="mx-auto mb-4 size-12 stroke-[1.5] opacity-50" />
+      <p class="text-sm">{{ t('gallery.details.empty') }}</p>
+    </div>
+  </div>
+
+  <!-- 详情内容：有选中项时启用 ScrollArea 进行正常纵向滚动 -->
+  <ScrollArea v-else class="h-full">
+    <div class="p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">
@@ -834,14 +876,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                       :class="store.isCompactWindow ? 'z-[120]' : undefined"
                       class="p-0"
                     >
-                      <div
-                        v-if="isLoadingTagTree && store.tags.length === 0"
-                        class="w-72 py-8 text-center text-sm text-muted-foreground"
-                      >
-                        {{ t('gallery.sidebar.common.loading') }}
-                      </div>
                       <TagSelectorPopover
-                        v-else
                         :tags="store.tags"
                         :selected-tag-ids="assetTags.map((t) => t.id)"
                         @toggle="handleToggleTag"
@@ -998,14 +1033,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 :class="store.isCompactWindow ? 'z-[120]' : undefined"
                 class="p-0"
               >
-                <div
-                  v-if="isLoadingTagTree && store.tags.length === 0"
-                  class="w-72 py-8 text-center text-sm text-muted-foreground"
-                >
-                  {{ t('gallery.sidebar.common.loading') }}
-                </div>
                 <TagSelectorPopover
-                  v-else
                   :tags="store.tags"
                   :selected-tag-ids="batchSelectedTagIds"
                   @toggle="handleToggleBatchTag"
@@ -1062,8 +1090,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
         </div>
 
         <template v-if="batchActiveAsset">
-          <Separator />
-
           <h4 class="text-sm font-medium">{{ t('gallery.details.batch.currentFocus') }}</h4>
           <AssetDetailsContent
             :asset="batchActiveAsset"
@@ -1082,29 +1108,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <div class="text-xs text-muted-foreground">
             {{ t('gallery.details.batch.reviewHint') }}
           </div>
-        </div>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="flex min-h-full items-center justify-center">
-        <div class="text-center text-muted-foreground">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="mx-auto mb-4 opacity-50"
-          >
-            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-          </svg>
-          <p class="text-sm">{{ t('gallery.details.empty') }}</p>
         </div>
       </div>
     </div>

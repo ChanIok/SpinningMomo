@@ -77,15 +77,10 @@ struct PhotoMapPoint {
   double lng;
   std::string world_id;
   std::string official_world_id;
-  // asset_index：该照片在“当前 gallery 排序结果集”里的 0-based 下标
-  // 用于地图点击后原子地对齐灯箱 activeIndex，避免闪一下。
-  std::int64_t asset_index;
 };
 
 struct QueryPhotoMapPointsParams {
   features::gallery::QueryAssetsFilters filters;
-  std::optional<std::string> sort_by = "created_at";
-  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
   std::string world_id;
 };
 

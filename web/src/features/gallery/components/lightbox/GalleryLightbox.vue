@@ -155,7 +155,7 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(currentIndex, currentIndex)[0]
+  return store.getAssetAt(currentIndex)
 })
 const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
 const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
@@ -253,7 +253,7 @@ async function preloadRange(currentIndex: number) {
   const PRELOAD_RANGE = 2
   const start = Math.max(0, currentIndex - PRELOAD_RANGE)
   const end = Math.min(store.totalCount - 1, currentIndex + PRELOAD_RANGE)
-  const currentAsset = store.getAssetsInRange(currentIndex, currentIndex)[0]
+  const currentAsset = store.getAssetAt(currentIndex)
   if (!currentAsset) {
     return
   }
@@ -277,7 +277,7 @@ async function preloadRange(currentIndex: number) {
         continue
       }
 
-      const asset = store.getAssetsInRange(index, index)[0]
+      const asset = store.getAssetAt(index)
       if (asset) {
         preloadPromises.push(
           preloadImage(asset).catch((error) => {
@@ -364,7 +364,7 @@ function animateClose() {
     const galleryContent = props.galleryContentRef
     if (galleryContent) {
       const cardRect = galleryContent.getCardRect(activeIndex)
-      const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
+      const asset = store.getAssetAt(activeIndex)
       const heroViewport = getHeroViewport()
       if (cardRect && asset && heroViewport) {
         let fromRect = computeLightboxHeroRect(
@@ -578,11 +578,11 @@ watch(isClosing, (closing) => {
   applyVerticalGestureSurfaceStyle(verticalGestureOffset, 'settling')
 })
 
-// 工具栏、背景点击和 Escape 共用这条入口，确保关闭动作同步消费暗房历史。
+// 工具栏、背景点击和 Escape 共用“退出暗房”入口，不改变跨页面来源。
 function requestClose() {
   clearImmersiveChromeHideTimer()
   if (isGalleryLightboxOverlay(overlayHistory.snapshot.value.overlay)) {
-    void overlayHistory.closeLightbox()
+    void overlayHistory.closeLightboxOverlay()
     return
   }
 

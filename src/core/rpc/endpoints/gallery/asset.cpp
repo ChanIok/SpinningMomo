@@ -408,7 +408,7 @@ auto register_all(core::AppState& app_state) -> void {
   register_method<features::gallery::TimelineBucketsParams,
                   features::gallery::TimelineBucketsResponse>(
       app_state, app_state.rpc->registry, "gallery.getTimelineBuckets", handle_get_timeline_buckets,
-      "Get timeline buckets (months) with asset counts for timeline view", AccessLevel::lan);
+      "Get timeline buckets (days) with asset counts for timeline view", AccessLevel::lan);
 
   register_method<features::gallery::GetAssetsByMonthParams,
                   features::gallery::GetAssetsByMonthResponse>(

@@ -66,7 +66,7 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(activeIndex, activeIndex)[0] ?? null
+  return store.getAssetAt(activeIndex)
 })
 
 const isVideo = computed(() => currentAsset.value?.type === 'video')

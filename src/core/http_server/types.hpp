@@ -34,14 +34,13 @@ struct StreamContext {
   int status_code = 200;
   std::optional<std::string> content_range_header;
   std::optional<std::string> content_disposition;
-  bool accepts_ranges = true;  // 一次性归档关闭分段响应，确保完整传输后才能清理文件。
+  bool accepts_ranges = true;
 
   // 运行时
   uWS::Loop* loop;
   uWS::HttpResponse<false>* res;
   std::vector<char> buffer;
-  std::move_only_function<void()> on_complete;  // 完整响应结束后的资源清理回调。
-  bool completion_called = false;               // 防止流式完成路径重复执行清理。
+  std::shared_ptr<void> stream_lifetime_token;  // 请求生命周期卫士，响应结束时自动解引用。
 
   // 状态
   std::shared_ptr<std::atomic_bool> abort_flag;

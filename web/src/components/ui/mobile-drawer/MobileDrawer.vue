@@ -412,7 +412,7 @@ const overlayDynamicStyle = computed(() => {
     <Transition :name="transitionName" :duration="{ enter: 250, leave: 180 }">
       <div
         v-if="open"
-        class="pointer-events-auto fixed inset-0 z-50 flex"
+        class="mobile-drawer-root pointer-events-auto fixed inset-0 z-50 flex"
         :class="containerPlacementClass"
         :style="{ zIndex: props.zIndex }"
         role="dialog"

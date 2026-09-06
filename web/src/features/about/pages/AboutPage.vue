@@ -287,7 +287,7 @@ onBeforeUnmount(() => {
     <div class="flex h-full w-full items-center justify-center py-[clamp(1.5rem,6vh,3rem)]">
       <div class="mx-auto flex w-full max-w-2xl flex-col items-center px-8">
         <!-- Header: Logo, Name, Version -->
-        <div class="group mb-[clamp(1.5rem,6vh,3rem)] flex flex-col items-center">
+        <div class="group mb-[clamp(1.5rem,6vh,3rem)] flex w-full flex-col items-center">
           <!-- Spinning Logo -->
           <div class="perspective-1000 relative mb-[clamp(0.75rem,3vh,1.5rem)] h-28 w-28">
             <img
@@ -309,7 +309,10 @@ onBeforeUnmount(() => {
               @click="handleUpdateAction"
             >
               <!-- Status Icon -->
-              <Loader2 v-if="isVersionBusy" class="h-4 w-4 shrink-0 animate-spin" />
+              <Loader2
+                v-if="isVersionBusy"
+                class="h-4 w-4 shrink-0 animate-spin will-change-transform"
+              />
               <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4 shrink-0" />
               <Download v-else-if="hasUpdate" class="h-4 w-4 shrink-0" />
               <Check v-else-if="isConfirmedUpToDate" class="h-4 w-4 shrink-0" />
@@ -368,7 +371,7 @@ onBeforeUnmount(() => {
           <!-- Report Issues Row -->
           <button
             type="button"
-            class="group/link flex w-full items-center justify-between px-5 py-[clamp(0.75rem,3vh,1rem)] text-left transition-colors hover:bg-accent/50"
+            class="group/link flex w-full cursor-pointer items-center justify-between px-5 py-[clamp(0.75rem,3vh,1rem)] text-left transition-colors hover:bg-accent/50"
             @click="issuesDialogOpen = true"
           >
             <div class="flex items-center gap-4">
@@ -432,7 +435,7 @@ onBeforeUnmount(() => {
                       v-if="canUseLocalHostActions"
                       variant="secondary"
                       size="sm"
-                      class="h-7 text-xs"
+                      class="h-7 cursor-pointer text-xs hover:bg-accent hover:text-accent-foreground"
                       @click="openLogDirectory"
                     >
                       <FolderOpen class="mr-1.5 h-3.5 w-3.5" />
@@ -457,7 +460,7 @@ onBeforeUnmount(() => {
                     {{ t('about.feedback.step3.description') }}
                   </p>
                   <div class="mt-2 flex gap-2">
-                    <Button as-child size="sm" class="h-7 text-xs">
+                    <Button as-child size="sm" class="h-7 cursor-pointer text-xs">
                       <a :href="issuesUrl" target="_blank" rel="noopener noreferrer">
                         <ExternalLink class="mr-1.5 h-3.5 w-3.5" />
                         {{ t('about.feedback.openGithub') }}
@@ -466,7 +469,7 @@ onBeforeUnmount(() => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="h-7 text-xs"
+                      class="h-7 cursor-pointer text-xs hover:bg-accent hover:text-accent-foreground"
                       @click="copyFeedbackEmail"
                     >
                       <Check v-if="emailCopied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />

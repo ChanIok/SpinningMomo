@@ -342,6 +342,83 @@ body,
   }
 }
 
+/* 画廊布局切换专属局部 View Transition */
+html[data-transition='gallery-layout'] {
+  view-transition-name: none;
+}
+
+html[data-transition='gallery-layout'] .route-scene {
+  view-transition-name: none;
+}
+
+.gallery-layout-scene {
+  view-transition-name: gallery-layout;
+}
+
+/* 布局切换时将打开的浮动面板提升至顶层 View Transition 伪元素，防止被内容快照遮挡 */
+html[data-transition='gallery-layout'] [data-slot='popover-content']:not([data-state='closed']),
+html[data-transition='gallery-layout']
+  [data-slot='dropdown-menu-content']:not([data-state='closed']),
+html[data-transition='gallery-layout'] .mobile-drawer-root {
+  view-transition-name: gallery-floating-panel;
+}
+
+::view-transition-group(gallery-floating-panel) {
+  z-index: 100;
+  animation: none;
+}
+
+::view-transition-old(gallery-floating-panel) {
+  display: none;
+}
+
+::view-transition-new(gallery-floating-panel) {
+  animation: none;
+}
+
+::view-transition-group(gallery-layout) {
+  z-index: 1;
+  animation-duration: var(--route-transition-duration);
+  animation-timing-function: var(--route-transition-easing);
+}
+
+::view-transition-old(gallery-layout) {
+  animation-name: gallery-layout-fade-out;
+}
+
+::view-transition-new(gallery-layout) {
+  animation-name: gallery-layout-fade-in;
+}
+
+@keyframes gallery-layout-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gallery-layout-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(gallery-layout),
+  ::view-transition-old(gallery-layout),
+  ::view-transition-new(gallery-layout),
+  ::view-transition-group(gallery-floating-panel),
+  ::view-transition-old(gallery-floating-panel),
+  ::view-transition-new(gallery-floating-panel) {
+    animation: none !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -377,4 +454,11 @@ body,
 [data-sonner-toast][data-styled='true'] [data-description] {
   color: var(--foreground) !important;
   opacity: 0.78;
+}
+
+/* 移动触屏设备（无悬停能力）全局禁用 Tooltip 浮层，避免点击触发残留气泡 */
+@media (hover: none) {
+  [data-slot='tooltip-content'] {
+    display: none !important;
+  }
 }

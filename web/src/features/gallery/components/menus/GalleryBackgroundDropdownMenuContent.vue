@@ -11,12 +11,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
+import { useGalleryViewControls } from '../../composables'
 import type { SortBy, SortOrder, ViewMode } from '../../types'
 import GalleryPasteDropdownMenuItem from './GalleryPasteDropdownMenuItem.vue'
 import GallerySelectionDropdownMenu from './GallerySelectionDropdownMenu.vue'
 
 const { t } = useI18n()
 const store = useGalleryStore()
+const { setViewMode } = useGalleryViewControls()
 const viewMode = computed(() => store.view.mode)
 const sortBy = computed(() => store.sortBy)
 const sortOrder = computed(() => store.sortOrder)
@@ -61,7 +63,7 @@ function setSortOrder(value: SortOrder) {
           v-for="option in viewModeOptions"
           :key="option.value"
           :value="option.value"
-          @click="store.view.mode = option.value"
+          @click="setViewMode(option.value)"
         >
           {{ t(option.i18nKey) }}
         </DropdownMenuRadioItem>

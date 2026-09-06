@@ -1,5 +1,6 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
 import type { TimelineBucket } from '../types'
+import { buildTimelineDaySections } from './timelineLayout'
 
 export interface TimelineRailMarker {
   id: string
@@ -41,19 +42,21 @@ export function useTimelineRail(options: {
     }
 
     const result: TimelineRailMarker[] = []
-    let globalAssetIndex = 0
+    const sections = buildTimelineDaySections(options.buckets.value)
 
-    for (const bucket of options.buckets.value) {
-      const contentOffset = options.getOffsetByAssetIndex(globalAssetIndex)
-      if (contentOffset !== undefined) {
-        result.push({
-          id: bucket.month,
-          contentOffset,
-          label: formatMonthFull(bucket.month, options.locale.value),
-        })
+    for (const section of sections) {
+      if (!section.monthStart) {
+        continue
       }
 
-      globalAssetIndex += bucket.count
+      const contentOffset = options.getOffsetByAssetIndex(section.startIndex)
+      if (contentOffset !== undefined) {
+        result.push({
+          id: section.month,
+          contentOffset,
+          label: formatMonthFull(section.month, options.locale.value),
+        })
+      }
     }
 
     return result
