@@ -479,7 +479,7 @@ async function handleRemoveTag(tagId: number) {
 
     store.removeTagsFromAssetMap([assetId], [tagId])
     assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
-    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
+    await assetActions.refreshTagViewsAfterMutation([tagId])
   } catch (error) {
     console.error('Failed to remove tag:', error)
   }
@@ -512,7 +512,7 @@ async function handleToggleTag(tagId: number) {
       }
     }
 
-    await assetActions.refreshTagViewsAfterMutation([assetId], [tagId])
+    await assetActions.refreshTagViewsAfterMutation([tagId])
   } catch (error) {
     console.error('Failed to toggle tag:', error)
   }

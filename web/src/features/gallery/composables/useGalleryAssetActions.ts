@@ -148,7 +148,7 @@ export function useGalleryAssetActions() {
     return selectedAssetIds.value[0]
   }
 
-  async function refreshTagViewsAfterMutation(assetIds?: number[], mutatedTagIds?: number[]) {
+  async function refreshTagViewsAfterMutation(mutatedTagIds?: number[]) {
     // 异步刷新标签树计数，保持侧栏与操作栏数字同步
     const treePromise = galleryData.loadTagTree().catch((error) => {
       console.error('Failed to reload tag tree after mutation:', error)
@@ -525,7 +525,7 @@ export function useGalleryAssetActions() {
         }
 
         store.addTagsToAssetMap(assetIds, tagsToPaste)
-        await refreshTagViewsAfterMutation(assetIds, tagIds)
+        await refreshTagViewsAfterMutation(tagIds)
         toast.success(t('gallery.contextMenu.pasteTags.successTitle'), {
           description: t('gallery.contextMenu.pasteTags.successDescription', {
             assetCount: assetIds.length,
@@ -556,7 +556,7 @@ export function useGalleryAssetActions() {
       }
 
       store.addTagsToAssetMap(assetIds, tagsToPaste)
-      await refreshTagViewsAfterMutation(assetIds, tagIds)
+      await refreshTagViewsAfterMutation(tagIds)
 
       if (failedRelations === 0 && unchangedRelations === 0) {
         toast.success(t('gallery.contextMenu.pasteTags.successTitle'), {
@@ -686,7 +686,7 @@ export function useGalleryAssetActions() {
     if (tag) {
       store.addTagsToAssetMap(assetIds, [tag])
     }
-    await refreshTagViewsAfterMutation(assetIds, [tagId])
+    await refreshTagViewsAfterMutation([tagId])
   }
 
   async function removeTagFromSelectedAssets(tagId: number) {
@@ -705,7 +705,7 @@ export function useGalleryAssetActions() {
     }
 
     store.removeTagsFromAssetMap(assetIds, [tagId])
-    await refreshTagViewsAfterMutation(assetIds, [tagId])
+    await refreshTagViewsAfterMutation([tagId])
   }
 
   return {

@@ -19,7 +19,6 @@ const props = withDefaults(
 )
 
 const store = useGalleryStore()
-const containerRef = ref<HTMLElement | null>(null)
 
 const viewMode = computed(() =>
   store.isCompactWindow && store.view.mode === 'list' ? 'grid' : store.view.mode
@@ -78,7 +77,7 @@ defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
-  <div ref="containerRef" class="gallery-layout-scene h-full w-full">
+  <div class="gallery-layout-scene h-full w-full">
     <GridView
       v-if="viewMode === 'grid'"
       ref="gridViewRef"
