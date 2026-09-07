@@ -185,6 +185,9 @@ export interface AppSettings {
       port: number
       serial: string
       autoConnect: boolean
+      recordBitrate: number // 目标平均码率 (bps)，默认 40000000 (40 Mbps)
+      recordFps: number // 录制最大帧率，默认 60
+      recordCodec: 'h264' | 'h265' // 录制编码格式，默认 'h264'
     }
 
     screenshot: {
@@ -335,6 +338,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       port: 7555,
       serial: '',
       autoConnect: false,
+      recordBitrate: 40000000,
+      recordFps: 60,
+      recordCodec: 'h264',
     },
     screenshot: {
       fileFormat: 'png',

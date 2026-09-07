@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded Chinese JSON content as string_view
-// Size: 4917 bytes
+// Size: 5617 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -64,6 +64,13 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.adb_no_emulator_found": "未检测到运行中的模拟器，请先启动模拟器。",
   "message.adb_multiple_emulators_found": "检测到多个模拟器，请在设置中指定设备。",
   "message.adb_custom_path_empty": "已启用自定义 ADB 路径，但未选择执行程序。",
+  "adb.error.recording_already_in_progress": "录制已在进行中",
+  "adb.error.version_too_low": "音频内录功能需要 Android {required} (API 33) 或更高版本系统，当前系统版本: {current}",
+  "adb.error.get_display_size_failed": "获取屏幕尺寸失败: {message}",
+  "adb.error.encoder_not_found": "设备未找到 {codec} 视频编码器",
+  "adb.error.encoder_not_supported": "当前分辨率 {width}x{height} 无法在 {codec} 编码器 ({driver}) 上启动: {message}，请调低分辨率或切换编码格式",
+  "adb.error.bind_stream_socket_failed": "绑定录制流通信端口失败: {message}",
+  "adb.error.start_recording_failed": "录制启动失败: {message}",
 
   "message.screenshot_success": "截图已保存：",
   "message.screenshot_failed": "截图失败",

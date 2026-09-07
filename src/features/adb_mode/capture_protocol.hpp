@@ -17,10 +17,12 @@ enum class MessageType : std::uint16_t {
   Shutdown = 5,
   ShutdownAck = 6,
   StartRecord = 7,
-  VideoConfig = 8,
+  RecordReady = 8,
   VideoSample = 9,
   StopRecord = 10,
   RecordFinished = 11,
+  AudioSample = 12,
+  AudioEnded = 13,
 };
 
 struct Frame {

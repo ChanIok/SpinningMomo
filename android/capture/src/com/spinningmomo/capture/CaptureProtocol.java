@@ -18,10 +18,12 @@ final class CaptureProtocol {
     static final int SHUTDOWN = 5;
     static final int SHUTDOWN_ACK = 6;
     static final int START_RECORD = 7;
-    static final int VIDEO_CONFIG = 8;
+    static final int RECORD_READY = 8;
     static final int VIDEO_SAMPLE = 9;
     static final int STOP_RECORD = 10;
     static final int RECORD_FINISHED = 11;
+    static final int AUDIO_SAMPLE = 12;
+    static final int AUDIO_ENDED = 13;
 
     private CaptureProtocol() {}
 

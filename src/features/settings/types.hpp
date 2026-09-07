@@ -145,6 +145,11 @@ struct AppSettings {
       int port = 7555;
       std::string serial = "";  // 为空时使用 host:port 对应的设备
       bool auto_connect = false;
+
+      // ADB 录制专属配置
+      std::uint32_t record_bitrate = 40'000'000;  // 目标平均码率 (bps)，默认 40Mbps (VBR)
+      std::uint32_t record_fps = 60;              // 录制最大帧率，默认 60
+      std::string record_codec = "h264";          // 录制编码格式: "h264" | "h265"
     } adb_mode;
 
     struct Screenshot {

@@ -3,6 +3,8 @@
 #include "vendor/std.hpp"
 
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/device_session.hpp"
+#include "features/adb_mode/recording.hpp"
 #include "features/adb_mode/types.hpp"
 
 namespace features::adb_mode {
@@ -20,6 +22,20 @@ auto shutdown(core::AppState& state) -> void;
 auto get_status(const core::AppState& state) -> AdbModeStatus;
 // 只检查当前是否存在可以执行显示操作的已连接设备。
 auto is_connected(const core::AppState& state) -> bool;
+// 获取当前活动的设备会话句柄。
+auto get_active_session(const core::AppState& state)
+    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string>;
+
+// 启动 ADB 设备端屏幕与音频录制，通过 MF SinkWriter 混流写入 output_path。
+auto start_recording(core::AppState& state, const std::filesystem::path& output_path,
+                     std::uint32_t fps, std::uint32_t bitrate, bool is_h265 = false)
+    -> std::expected<void, std::string>;
+
+// 停止 ADB 设备录制，排空数据并完成 MP4 文件落盘。
+auto stop_recording(core::AppState& state) -> recording::AdbRecordResult;
+
+// 检查当前是否有活动的 ADB 录制会话。
+auto is_recording(const core::AppState& state) -> bool;
 
 // 将截图任务放入 ADB 专用队列，并在完成后通过回调返回结果。
 auto capture_screen_async(

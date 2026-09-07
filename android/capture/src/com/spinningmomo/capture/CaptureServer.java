@@ -8,15 +8,29 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-/** ADB 连接期间常驻的 Android 捕获服务。 */
+/** ADB 连接期间常驻的 Android 捕获服务（处理截图指令，并托管独立录制监听）。 */
 final class CaptureServer {
+
     private CaptureServer() {}
 
     static void run(String socketName) throws Exception {
         LocalServerSocket serverSocket = new LocalServerSocket(socketName);
+        LocalServerSocket recordServerSocket = new LocalServerSocket(socketName + "-record");
+
+        Thread recordListenerThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    LocalSocket recordClient = recordServerSocket.accept();
+                    RecordSession.handle(recordClient);
+                } catch (IOException e) {
+                    break;
+                }
+            }
+        }, "momo-record-listener");
+        recordListenerThread.start();
+
         try {
             while (true) {
-                // 监听失败（如 socket 异常）直接向外抛出，避免空转死循环
                 LocalSocket client = serverSocket.accept();
                 try (LocalSocket activeClient = client;
                         DataInputStream input = new DataInputStream(activeClient.getInputStream());
@@ -24,18 +38,20 @@ final class CaptureServer {
                     CaptureProtocol.writeFrame(output, CaptureProtocol.READY, 0, 0, 0,
                             new byte[0]);
                     serveClient(input, output);
-                    // 仅在收到显式 SHUTDOWN 时 serveClient 才会正常返回退出
                     return;
                 } catch (IOException clientError) {
-                    // 客户端通信异常或网络断开，继续等待下一个客户端连接
                 }
             }
         } finally {
             try {
                 serverSocket.close();
             } catch (IOException ignored) {
-                // 服务退出路径，关闭失败不再影响主流程。
             }
+            try {
+                recordServerSocket.close();
+            } catch (IOException ignored) {
+            }
+            recordListenerThread.interrupt();
         }
     }
 

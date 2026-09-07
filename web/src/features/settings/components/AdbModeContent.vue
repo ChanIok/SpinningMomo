@@ -8,6 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Item,
   ItemActions,
   ItemContent,
@@ -127,6 +134,51 @@ const handlePortChange = async (value: string) => {
   if (!Number.isFinite(port) || port < 1 || port > 65535) return
   try {
     await updateSettings({ port })
+  } catch (error) {
+    toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
+  }
+}
+
+const inputRecordBitrateMbps = ref(
+  Math.round((adbModeSettings.value?.recordBitrate || 40000000) / 1000000)
+)
+
+watch(
+  () => adbModeSettings.value?.recordBitrate,
+  (val) => {
+    if (val) {
+      inputRecordBitrateMbps.value = Math.round(val / 1000000)
+    }
+  }
+)
+
+const handleRecordBitrateChange = async () => {
+  const mbps = Number(inputRecordBitrateMbps.value)
+  if (isNaN(mbps) || mbps <= 0) {
+    inputRecordBitrateMbps.value = Math.round(
+      (adbModeSettings.value?.recordBitrate || 40000000) / 1000000
+    )
+    return
+  }
+  const bitrateBps = Math.round(mbps * 1000000)
+  try {
+    await updateSettings({ recordBitrate: bitrateBps })
+  } catch (error) {
+    toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
+  }
+}
+
+const handleRecordFpsChange = async (fps: number) => {
+  try {
+    await updateSettings({ recordFps: fps })
+  } catch (error) {
+    toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
+  }
+}
+
+const handleRecordCodecChange = async (codec: 'h264' | 'h265') => {
+  try {
+    await updateSettings({ recordCodec: codec })
   } catch (error) {
     toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
   }
@@ -287,6 +339,88 @@ onBeforeUnmount(() => {
             :model-value="adbModeSettings.autoConnect"
             @update:model-value="(value) => updateSettings({ autoConnect: Boolean(value) })"
           />
+        </ItemActions>
+      </Item>
+    </ItemGroup>
+
+    <div class="pt-4">
+      <h4 class="text-sm font-medium text-foreground">
+        {{ t('settings.adbMode.recording.groupTitle') }}
+      </h4>
+    </div>
+
+    <ItemGroup>
+      <!-- 录制码率 -->
+      <Item variant="surface" size="sm">
+        <ItemContent>
+          <ItemTitle>{{ t('settings.adbMode.recording.bitrate.label') }}</ItemTitle>
+          <ItemDescription>
+            {{ t('settings.adbMode.recording.bitrate.description') }}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Input
+            v-model.number="inputRecordBitrateMbps"
+            type="number"
+            :min="1"
+            :max="200"
+            class="w-24"
+            @blur="handleRecordBitrateChange"
+            @keydown.enter="handleRecordBitrateChange"
+          />
+          <span class="text-sm text-muted-foreground">Mbps</span>
+        </ItemActions>
+      </Item>
+
+      <!-- 录制帧率 -->
+      <Item variant="surface" size="sm">
+        <ItemContent>
+          <ItemTitle>{{ t('settings.adbMode.recording.fps.label') }}</ItemTitle>
+          <ItemDescription>
+            {{ t('settings.adbMode.recording.fps.description') }}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Select
+            :model-value="String(adbModeSettings.recordFps || 60)"
+            @update:model-value="(value) => handleRecordFpsChange(Number(value))"
+          >
+            <SelectTrigger class="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30">30 FPS</SelectItem>
+              <SelectItem value="60">60 FPS</SelectItem>
+            </SelectContent>
+          </Select>
+        </ItemActions>
+      </Item>
+
+      <!-- 编码格式 -->
+      <Item variant="surface" size="sm">
+        <ItemContent>
+          <ItemTitle>{{ t('settings.adbMode.recording.codec.label') }}</ItemTitle>
+          <ItemDescription>
+            {{ t('settings.adbMode.recording.codec.description') }}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Select
+            :model-value="adbModeSettings.recordCodec || 'h264'"
+            @update:model-value="(value) => handleRecordCodecChange(value as 'h264' | 'h265')"
+          >
+            <SelectTrigger class="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="h264">
+                {{ t('settings.adbMode.recording.codec.h264') }}
+              </SelectItem>
+              <SelectItem value="h265">
+                {{ t('settings.adbMode.recording.codec.h265') }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </ItemActions>
       </Item>
     </ItemGroup>

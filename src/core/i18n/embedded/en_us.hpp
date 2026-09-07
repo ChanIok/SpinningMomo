@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 5189 bytes
+// Size: 5904 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -64,6 +64,13 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.adb_no_emulator_found": "No running emulator was found. Please start your emulator first.",
   "message.adb_multiple_emulators_found": "Multiple emulators found. Please specify device in settings.",
   "message.adb_custom_path_empty": "Custom ADB path is enabled, but no executable was selected.",
+  "adb.error.recording_already_in_progress": "Recording is already in progress",
+  "adb.error.version_too_low": "Internal audio capture requires Android {required} (API 33) or higher, current version: {current}",
+  "adb.error.get_display_size_failed": "Failed to get display dimensions: {message}",
+  "adb.error.encoder_not_found": "Device has no {codec} video encoder",
+  "adb.error.encoder_not_supported": "Current resolution {width}x{height} cannot start on {codec} encoder ({driver}): {message}. Please adjust resolution or switch codec",
+  "adb.error.bind_stream_socket_failed": "Failed to bind recording stream socket: {message}",
+  "adb.error.start_recording_failed": "Failed to start recording: {message}",
 
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",

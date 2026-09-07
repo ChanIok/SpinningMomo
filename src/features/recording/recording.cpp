@@ -412,7 +412,9 @@ auto handle_control_action(core::AppState& app_state, features::recording::Recor
                            features::recording::RecordingControlAction action) -> bool {
   switch (action) {
     case RecordingControlAction::UserStart: {
+      // 取出用户提交的启动请求参数
       auto start_request = take_pending_start_request(state);
+      // 请求参数缺失时回退到空闲态并记录告警
       if (!start_request) {
         state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
         ui::floating_window::request_repaint(app_state);
@@ -422,11 +424,13 @@ auto handle_control_action(core::AppState& app_state, features::recording::Recor
 
       auto start_result = start(app_state, start_request->target_window, start_request->config);
       if (!start_result) {
+        // 启动失败时回退状态并提示用户
         state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
         ui::floating_window::request_repaint(app_state);
         notify_message(app_state, app_state.i18n->texts["message.recording_start_failed"] +
                                       start_result.error());
       } else {
+        // 启动成功后通知浮窗切换录制态
         notify_message(app_state, app_state.i18n->texts["message.recording_started"]);
         core::events::post(app_state,
                            ui::floating_window::events::RecordingToggleEvent{.enabled = true});
@@ -436,29 +440,30 @@ auto handle_control_action(core::AppState& app_state, features::recording::Recor
 
     case RecordingControlAction::UserStop: {
       auto stop_result = perform_stop(app_state);
+      // 确实处于录制中时才推送停止结果通知与切换事件
       if (stop_result.kind != features::recording::StopResultKind::NotRecording) {
         show_recording_stop_result_notification(app_state, stop_result);
         core::events::post(app_state,
                            ui::floating_window::events::RecordingToggleEvent{.enabled = false});
       }
-    }
       return true;
+    }
 
-    case RecordingControlAction::AbortWithError:
-      // 编码器出错时紧急停止并通知用户
-      {
-        if (state.status.load(std::memory_order_acquire) ==
-            features::recording::RecordingStatus::Recording) {
-          (void)enter_stopping(app_state);
-        }
-        auto stop_result = perform_stop(app_state);
-        if (stop_result.kind != features::recording::StopResultKind::NotRecording) {
-          show_recording_stop_result_notification(app_state, stop_result);
-          core::events::post(app_state,
-                             ui::floating_window::events::RecordingToggleEvent{.enabled = false});
-        }
+    case RecordingControlAction::AbortWithError: {
+      // 若正在录制，先进入停止中状态以冻结收尾时间线
+      if (state.status.load(std::memory_order_acquire) ==
+          features::recording::RecordingStatus::Recording) {
+        (void)enter_stopping(app_state);
+      }
+      auto stop_result = perform_stop(app_state);
+      // 推送停止结果通知与切换事件
+      if (stop_result.kind != features::recording::StopResultKind::NotRecording) {
+        show_recording_stop_result_notification(app_state, stop_result);
+        core::events::post(app_state,
+                           ui::floating_window::events::RecordingToggleEvent{.enabled = false});
       }
       return true;
+    }
 
     case RecordingControlAction::RestartAfterResize:
       // 窗口尺寸变了，停当前段、用新尺寸开新段
@@ -466,15 +471,17 @@ auto handle_control_action(core::AppState& app_state, features::recording::Recor
       return true;
 
     case RecordingControlAction::ShutdownStop:
-      // 应用退出，停止录制并退出控制线程
+      // 关闭阶段若仍在录制，先进入停止中状态以冻结收尾时间线
       if (state.status.load(std::memory_order_acquire) ==
           features::recording::RecordingStatus::Recording) {
         (void)enter_stopping(app_state);
       }
+      // 进入停止中后执行最终落盘
       if (state.status.load(std::memory_order_acquire) ==
           features::recording::RecordingStatus::Stopping) {
         (void)perform_stop(app_state);
       }
+      // 返回 false 通知控制线程退出循环
       return false;
 
     case RecordingControlAction::CleanupD3D:

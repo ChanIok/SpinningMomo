@@ -3,6 +3,7 @@
 #include "vendor/std.hpp"
 
 #include "features/adb_mode/device_session.hpp"
+#include "features/adb_mode/recording.hpp"
 #include "features/adb_mode/types.hpp"
 
 namespace features::adb_mode {
@@ -26,6 +27,7 @@ struct AdbModeState {
 
   // 一个完整设备会话统一拥有 ADB 连接、Android 捕获服务、forward 和协议 socket。
   std::shared_ptr<session::DeviceSession> device_session;
+  std::unique_ptr<recording::AdbRecordingSession> recording_session;
   std::string last_error;
 
   // 仅表示本次进程会话中是否成功改写过显示状态，不持久化到磁盘。

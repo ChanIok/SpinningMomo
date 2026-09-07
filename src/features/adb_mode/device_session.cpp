@@ -2,9 +2,11 @@
 
 #include "vendor/std.hpp"
 
+#include "vendor/rfl.hpp"
 #include "vendor/windows.hpp"
 
 #include "core/build_config.hpp"
+#include "core/i18n/types.hpp"
 #include "features/adb_mode/adb_client.hpp"
 #include "features/adb_mode/display_control.hpp"
 #include "utils/path/path.hpp"
@@ -212,18 +214,12 @@ auto send_frame(DeviceSession& session, capture_protocol::MessageType type,
   return write_all(*session.io_context, *session.socket, frame.data(), frame.size(), timeout);
 }
 
-// 接收并解析协议帧：读 28 字节头 → 校验魔数和版本 → 分配内存读取负载
-auto receive_frame(DeviceSession& session, std::chrono::milliseconds timeout)
+// 从指定 socket 读取并校验一个完整的二进制协议帧：读 28 字节头 → 校验魔数和版本 → 分配内存读取负载
+auto read_protocol_frame(asio::io_context& io_context, asio::ip::tcp::socket& socket,
+                         std::chrono::milliseconds timeout)
     -> std::expected<capture_protocol::Frame, std::string> {
-  // 检查 socket 状态
-  if (!session.io_context || !session.socket || !session.socket->is_open()) {
-    return std::unexpected("Android capture socket is not open");
-  }
-
-  // 先读取定长 28 字节协议头部
   std::array<std::uint8_t, capture_protocol::kHeaderSize> header{};
-  auto header_result =
-      read_exact(*session.io_context, *session.socket, header.data(), header.size(), timeout);
+  auto header_result = read_exact(io_context, socket, header.data(), header.size(), timeout);
   if (!header_result) {
     return std::unexpected(header_result.error());
   }
@@ -252,10 +248,9 @@ auto receive_frame(DeviceSession& session, std::chrono::milliseconds timeout)
       .payload = std::vector<std::uint8_t>(payload_size),
   };
 
-  // 存在负载时按长度完整读取
   if (payload_size > 0) {
-    auto payload_result = read_exact(*session.io_context, *session.socket, frame.payload.data(),
-                                     frame.payload.size(), timeout);
+    auto payload_result =
+        read_exact(io_context, socket, frame.payload.data(), frame.payload.size(), timeout);
     if (!payload_result) {
       return std::unexpected(payload_result.error());
     }
@@ -263,9 +258,13 @@ auto receive_frame(DeviceSession& session, std::chrono::milliseconds timeout)
   return frame;
 }
 
-// 提取服务端在 ERROR 帧中返回的错误描述字符串
-auto capture_error(const capture_protocol::Frame& frame) -> std::string {
-  return std::string(frame.payload.begin(), frame.payload.end());
+// 接收并解析控制通道协议帧
+auto receive_frame(DeviceSession& session, std::chrono::milliseconds timeout)
+    -> std::expected<capture_protocol::Frame, std::string> {
+  if (!session.io_context || !session.socket || !session.socket->is_open()) {
+    return std::unexpected("Android capture socket is not open");
+  }
+  return read_protocol_frame(*session.io_context, *session.socket, timeout);
 }
 
 // 校验字节流是否包含合法的 PNG 文件头签名
@@ -617,16 +616,6 @@ auto start_server(DeviceSession& session) -> std::expected<void, std::string> {
 
 }  // namespace
 
-// 会话析构：释放 socket → 终止服务进程 → 移除日志文件
-DeviceSession::~DeviceSession() {
-  close_socket(*this);
-  static_cast<void>(utils::process::terminate(server_process));
-  std::error_code remove_error;
-  if (!server_stderr_file.empty()) {
-    std::filesystem::remove(server_stderr_file, remove_error);
-  }
-}
-
 // 建立完整设备会话：连接设备 → 查询初始分辨率 → 推送 JAR 服务 → 启动服务端 → 建立 socket 传输
 auto open(const AdbConnectionConfig& config)
     -> std::expected<std::shared_ptr<DeviceSession>, std::string> {
@@ -807,6 +796,115 @@ auto screenshot_to_file(DeviceSession& session, const std::filesystem::path& out
 
   // 将图片安全写入目标文件路径
   return write_image_to_file(output_path, image);
+}
+
+// 建立录制流传输通道：建立 adb forward 端口映射 → 解析本地端口 → 连接流 socket
+auto open_recording_connection(DeviceSession& session)
+    -> std::expected<RecordingConnection, std::string> {
+  // 建立本地端口到设备录制 abstract socket 的 adb forward 映射
+  const auto remote_endpoint =
+      utils::string::FromUtf8("localabstract:" + session.socket_name + "-record");
+  auto forward_result =
+      adb::run_on_device(session.config, session.config.serial,
+                         {L"forward", L"tcp:0", remote_endpoint}, std::chrono::seconds(5));
+  if (!forward_result) {
+    return std::unexpected("Failed to forward recording stream socket: " + forward_result.error());
+  }
+
+  // 解析 adb forward 分配的本地随机端口号
+  const auto text = utils::string::TrimAscii(forward_result->stdout_data);
+  std::uint32_t stream_port = 0;
+  const auto parse_result = std::from_chars(text.data(), text.data() + text.size(), stream_port);
+  if (parse_result.ec != std::errc{} || stream_port == 0 ||
+      stream_port > std::numeric_limits<std::uint16_t>::max()) {
+    // 端口无效时回滚已建立的 forward 映射
+    static_cast<void>(adb::run_on_device(
+        session.config, session.config.serial,
+        {L"forward", L"--remove", utils::string::FromUtf8("tcp:" + std::string(text))},
+        std::chrono::seconds(5)));
+    return std::unexpected("ADB forward returned invalid stream port: " + text);
+  }
+
+  // 创建录制流连接对象并绑定本地端口
+  RecordingConnection conn;
+  conn.io_context = std::make_unique<asio::io_context>();
+  conn.socket = std::make_unique<asio::ip::tcp::socket>(*conn.io_context);
+  conn.local_port = static_cast<std::uint16_t>(stream_port);
+
+  // 连接本地转发端口建立流 socket
+  const asio::ip::tcp::endpoint endpoint(asio::ip::address_v4::loopback(), conn.local_port);
+  auto conn_res = connect_with_timeout(*conn.io_context, *conn.socket, endpoint, kStartupTimeout);
+  if (!conn_res) {
+    // 连接失败时回滚 forward 映射
+    static_cast<void>(adb::run_on_device(
+        session.config, session.config.serial,
+        {L"forward", L"--remove", utils::string::FromUtf8(std::format("tcp:{}", stream_port))},
+        std::chrono::seconds(5)));
+    return std::unexpected("Failed to connect to recording stream socket: " + conn_res.error());
+  }
+
+  return conn;
+}
+
+// 关闭录制流连接：shutdown 并关闭流 socket → 移除 adb forward 端口映射
+auto close_recording_connection(DeviceSession& session, RecordingConnection& connection) -> void {
+  // shutdown 双向并关闭流 socket
+  if (connection.socket && connection.socket->is_open()) {
+    asio::error_code ec;
+    connection.socket->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+    connection.socket->close(ec);
+  }
+  // 移除本地端口到设备录制 socket 的 adb forward 映射
+  if (connection.local_port != 0) {
+    static_cast<void>(
+        adb::run_on_device(session.config, session.config.serial,
+                           {L"forward", L"--remove",
+                            utils::string::FromUtf8(std::format("tcp:{}", connection.local_port))},
+                           std::chrono::seconds(5)));
+    connection.local_port = 0;
+  }
+}
+
+// 向录制流通道写入协议帧：组装大端序帧头与负载 → 一次性写出
+auto send_stream_frame(RecordingConnection& conn, capture_protocol::MessageType type,
+                       std::span<const std::uint8_t> payload) -> std::expected<void, std::string> {
+  // 校验流 socket 就绪状态
+  if (!conn.io_context || !conn.socket || !conn.socket->is_open()) {
+    return std::unexpected("Recording stream socket is not open");
+  }
+  // 组装大端序二进制协议帧头
+  std::vector<std::uint8_t> buffer(capture_protocol::kHeaderSize + payload.size());
+  write_u32(buffer.data(), capture_protocol::kMagic);
+  write_u16(buffer.data() + 4, capture_protocol::kVersion);
+  write_u16(buffer.data() + 6, static_cast<std::uint16_t>(type));
+  write_u32(buffer.data() + 8, 0);
+  write_u32(buffer.data() + 12, 0);
+  write_u64(buffer.data() + 16, 0);
+  write_u32(buffer.data() + 24, static_cast<std::uint32_t>(payload.size()));
+  // 拷贝负载数据
+  if (!payload.empty()) {
+    std::memcpy(buffer.data() + capture_protocol::kHeaderSize, payload.data(), payload.size());
+  }
+  // 一次性写出完整帧数据
+  return write_all(*conn.io_context, *conn.socket, buffer.data(), buffer.size(),
+                   std::chrono::seconds(5));
+}
+
+// 从录制流传输通道读取一帧协议帧：校验 socket 就绪 → 读取并校验帧头与负载
+auto receive_stream_frame(RecordingConnection& conn, std::chrono::milliseconds timeout)
+    -> std::expected<capture_protocol::Frame, std::string> {
+  // 校验流 socket 就绪状态
+  if (!conn.io_context || !conn.socket || !conn.socket->is_open()) {
+    return std::unexpected("Recording stream socket is not open");
+  }
+  // 读取并校验完整协议帧（帧头魔数、版本与负载）
+  return read_protocol_frame(*conn.io_context, *conn.socket, timeout);
+}
+
+// 提取服务端 ERROR 帧中的错误描述字符串：将负载字节转为文本
+auto capture_error(const capture_protocol::Frame& frame) -> std::string {
+  // 将负载中的原始字节转为错误描述文本
+  return std::string(frame.payload.begin(), frame.payload.end());
 }
 
 }  // namespace features::adb_mode::session

@@ -15,6 +15,7 @@
 #include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/display_control.hpp"
 #include "features/adb_mode/events.hpp"
+#include "features/adb_mode/recording.hpp"
 #include "features/adb_mode/state.hpp"
 #include "features/adb_mode/types.hpp"
 #include "features/settings/menu.hpp"
@@ -62,6 +63,7 @@ auto build_connection_config(const core::AppState& state)
 
 // 清除当前会话的所有派生状态，调用方必须持有状态锁。
 auto clear_session_locked(AdbModeState& adb_state) -> void {
+  adb_state.recording_session.reset();
   adb_state.device_session.reset();
   adb_state.restore_pending = false;
 }
@@ -75,22 +77,13 @@ auto set_operation_state(core::AppState& state, ConnectionState connection_state
   adb_state.last_error.clear();
 }
 
-// 根据语义 key 解析本地化文本；未命中时返回原始文本。
-auto resolve_localized_text(const core::AppState& state, const std::string& key_or_text)
-    -> std::string {
-  if (const auto it = state.i18n->texts.find(key_or_text); it != state.i18n->texts.end()) {
-    return it->second;
-  }
-  return key_or_text;
-}
-
 // 记录失败原因；连接仍可用时保留会话，确保用户还能执行恢复。
 auto set_error_state(core::AppState& state, std::string error, bool retain_connection) -> void {
   auto& adb_state = *state.adb_mode;
   std::scoped_lock lock(adb_state.mutex);
   adb_state.connection_state =
       retain_connection ? ConnectionState::Connected : ConnectionState::Error;
-  adb_state.last_error = resolve_localized_text(state, error);
+  adb_state.last_error = core::i18n::get_text(state.i18n->texts, error);
   if (!retain_connection) {
     clear_session_locked(adb_state);
   }
@@ -109,10 +102,6 @@ auto publish_status_changed(core::AppState& state) -> void {
 
 // 把一条文本消息投递为系统通知。
 auto post_adb_notification(core::AppState& state, std::string message) -> void {
-  if (!state.i18n) {
-    return;
-  }
-
   core::notifications::NotificationOptions options;
   options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
   options.message = utils::string::FromUtf8(message);
@@ -121,9 +110,7 @@ auto post_adb_notification(core::AppState& state, std::string message) -> void {
 
 // 任务无法入队时复用统一的 ADB 失败提示。
 auto post_queue_failure_notification(core::AppState& state) -> void {
-  if (state.i18n) {
-    post_adb_notification(state, state.i18n->texts["message.adb_operation_failed"]);
-  }
+  post_adb_notification(state, state.i18n->texts["message.adb_operation_failed"]);
 }
 
 // 根据结果选择本地化提示，并在失败时根据错误类型友好呈现。
@@ -131,10 +118,6 @@ auto post_operation_notification(core::AppState& state,
                                  const std::expected<void, std::string>& result,
                                  std::string_view success_key, std::string_view failure_key)
     -> void {
-  if (!state.i18n) {
-    return;
-  }
-
   if (result) {
     const auto it = state.i18n->texts.find(std::string(success_key));
     post_adb_notification(state,
@@ -142,18 +125,11 @@ auto post_operation_notification(core::AppState& state,
     return;
   }
 
-  // 若底层错误本身是预定义的语义多语言 key，直接以该独立友好的提示通知用户
-  if (const auto error_it = state.i18n->texts.find(result.error());
-      error_it != state.i18n->texts.end()) {
-    post_adb_notification(state, error_it->second);
-    return;
-  }
-
-  // 未预定义语义的系统或命令异常，降级显示带前缀的错误信息
+  const auto formatted_error = core::i18n::get_text(state.i18n->texts, result.error());
   const auto fallback_it = state.i18n->texts.find(std::string(failure_key));
   const auto prefix =
       fallback_it != state.i18n->texts.end() ? fallback_it->second : "ADB operation failed";
-  post_adb_notification(state, prefix + ": " + result.error());
+  post_adb_notification(state, prefix + ": " + formatted_error);
 }
 
 // 异步通知其他模块连接状态发生变化。
@@ -170,17 +146,6 @@ auto post_display_transform_result(core::AppState& state, std::optional<std::siz
                                 .resolution_index = resolution_index,
                                 .success = result.has_value(),
                                 .error = result ? std::string{} : result.error()});
-}
-
-// 复制当前设备会话句柄；会话自身拥有全部资源，避免释放状态锁后使用裸指针。
-auto get_active_session(const core::AppState& state)
-    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string> {
-  const auto& adb_state = *state.adb_mode;
-  std::scoped_lock lock(adb_state.mutex);
-  if (adb_state.connection_state != ConnectionState::Connected || !adb_state.device_session) {
-    return std::unexpected("ADB device is not connected");
-  }
-  return adb_state.device_session;
 }
 
 // 完成一个队列任务；只有队列真正为空时才清除忙碌状态。
@@ -255,7 +220,7 @@ auto adb_thread_proc(core::AppState& state, std::stop_token stop_token) -> void 
 
 // 把任务放入 ADB 专用 FIFO 队列，并在入队瞬间标记模块为忙碌。
 auto enqueue_task(core::AppState& state, AdbTask task) -> bool {
-  if (!state.adb_mode || !task) {
+  if (!task) {
     return false;
   }
 
@@ -374,6 +339,9 @@ auto restore_impl(core::AppState& state, bool disconnect_after)
 
   // 若要求断开连接：关闭会话、移除端口转发并视情况断开 ADB
   if (disconnect_after) {
+    if (is_recording(state)) {
+      static_cast<void>(stop_recording(state));
+    }
     auto close_result = session::close(adb_session);
     {
       std::scoped_lock lock(state.adb_mode->mutex);
@@ -448,10 +416,6 @@ auto apply_resolution_impl(core::AppState& state, const Resolution& target)
 
 // 启动 ADB 专用串行线程，所有后续操作都通过它执行。
 auto initialize(core::AppState& state) -> std::expected<void, std::string> {
-  if (!state.adb_mode) {
-    return std::unexpected("AdbModeState is not initialized");
-  }
-
   auto& adb_state = *state.adb_mode;
   {
     std::scoped_lock lock(adb_state.queue_mutex);
@@ -497,10 +461,6 @@ auto get_status(const core::AppState& state) -> AdbModeStatus {
       .port = settings.port,
   };
 
-  if (!state.adb_mode) {
-    return status;
-  }
-
   const auto& adb_state = *state.adb_mode;
   std::scoped_lock lock(adb_state.mutex);
   status.operation_in_progress = adb_state.operation_in_progress;
@@ -523,12 +483,72 @@ auto get_status(const core::AppState& state) -> AdbModeStatus {
 
 // 判断当前是否已建立可执行显示操作的连接。
 auto is_connected(const core::AppState& state) -> bool {
-  if (!state.adb_mode) {
-    return false;
-  }
   std::scoped_lock lock(state.adb_mode->mutex);
   return state.adb_mode->connection_state == ConnectionState::Connected &&
          state.adb_mode->device_session;
+}
+
+// 获取当前活动的设备会话句柄。
+auto get_active_session(const core::AppState& state)
+    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string> {
+  const auto& adb_state = *state.adb_mode;
+  std::scoped_lock lock(adb_state.mutex);
+  if (adb_state.connection_state != ConnectionState::Connected || !adb_state.device_session) {
+    return std::unexpected("ADB device is not connected");
+  }
+  return adb_state.device_session;
+}
+
+// 启动 ADB 设备端屏幕与音频录制，通过 MF SinkWriter 混流写入 output_path。
+auto start_recording(core::AppState& state, const std::filesystem::path& output_path,
+                     std::uint32_t fps, std::uint32_t bitrate, bool is_h265)
+    -> std::expected<void, std::string> {
+  auto session_result = get_active_session(state);
+  if (!session_result) {
+    return std::unexpected(session_result.error());
+  }
+
+  auto& adb_state = *state.adb_mode;
+  {
+    std::scoped_lock lock(adb_state.mutex);
+    if (adb_state.recording_session) {
+      return std::unexpected("ADB recording session is already active");
+    }
+  }
+
+  auto start_result = recording::start(*session_result, output_path, fps, bitrate, is_h265);
+  if (!start_result) {
+    return std::unexpected(start_result.error());
+  }
+
+  std::scoped_lock lock(adb_state.mutex);
+  adb_state.recording_session = std::move(start_result.value());
+  return {};
+}
+
+// 停止 ADB 设备录制，排空数据并完成 MP4 文件落盘。
+auto stop_recording(core::AppState& state) -> recording::AdbRecordResult {
+  std::unique_ptr<recording::AdbRecordingSession> session;
+  {
+    std::scoped_lock lock(state.adb_mode->mutex);
+    session = std::move(state.adb_mode->recording_session);
+  }
+
+  if (!session) {
+    return recording::AdbRecordResult{.kind = recording::AdbRecordResult::Kind::NotRecording};
+  }
+
+  auto result = recording::stop(session);
+  if (!result.error.empty()) {
+    result.error = core::i18n::get_text(state.i18n->texts, result.error);
+  }
+  return result;
+}
+
+// 检查当前是否有活动的 ADB 录制会话。
+auto is_recording(const core::AppState& state) -> bool {
+  std::scoped_lock lock(state.adb_mode->mutex);
+  return state.adb_mode->recording_session != nullptr;
 }
 
 // 异步设备截图：校验连接状态 → 投递截图任务至 ADB 队列 → 调用底层截图 → 更新错误状态 → 执行回调
@@ -587,10 +607,6 @@ auto restore_async(core::AppState& state) -> bool {
 
 // 根据当前连接状态把 ADB 模式切换任务放入队列。
 auto toggle_async(core::AppState& state) -> bool {
-  if (!state.adb_mode) {
-    return false;
-  }
-
   {
     std::scoped_lock lock(state.adb_mode->mutex);
     if (state.adb_mode->operation_in_progress) {
@@ -636,10 +652,6 @@ auto handle_settings_changed(core::AppState& state) -> void {
 
 // 关闭任务接收，等待队列完成后恢复物理尺寸并结束专用线程。
 auto shutdown(core::AppState& state) -> void {
-  if (!state.adb_mode) {
-    return;
-  }
-
   auto& adb_state = *state.adb_mode;
   if (!adb_state.worker_thread.joinable()) {
     auto result = restore_impl(state, true);
