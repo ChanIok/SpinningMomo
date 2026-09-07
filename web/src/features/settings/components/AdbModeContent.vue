@@ -295,8 +295,11 @@ onBeforeUnmount(() => {
               :model-value="adbModeSettings.host"
               class="w-36 font-mono text-xs"
               @focus="isEditing = true"
-              @blur="(event) => handleTextChange('host', (event.target as HTMLInputElement).value)"
-              @keydown.enter="(event) => (event.target as HTMLInputElement).blur()"
+              @blur="
+                (event: FocusEvent) =>
+                  handleTextChange('host', (event.target as HTMLInputElement).value)
+              "
+              @keydown.enter="(event: KeyboardEvent) => (event.target as HTMLInputElement).blur()"
             />
             <span class="text-sm text-muted-foreground">:</span>
             <Input
@@ -305,8 +308,10 @@ onBeforeUnmount(() => {
               min="1"
               max="65535"
               class="w-24"
-              @blur="(event) => handlePortChange((event.target as HTMLInputElement).value)"
-              @keydown.enter="(event) => (event.target as HTMLInputElement).blur()"
+              @blur="
+                (event: FocusEvent) => handlePortChange((event.target as HTMLInputElement).value)
+              "
+              @keydown.enter="(event: KeyboardEvent) => (event.target as HTMLInputElement).blur()"
             />
           </div>
         </ItemActions>
@@ -323,8 +328,11 @@ onBeforeUnmount(() => {
             class="w-48 font-mono text-xs"
             :placeholder="t('settings.adbMode.serial.placeholder')"
             @focus="isEditing = true"
-            @blur="(event) => handleTextChange('serial', (event.target as HTMLInputElement).value)"
-            @keydown.enter="(event) => (event.target as HTMLInputElement).blur()"
+            @blur="
+              (event: FocusEvent) =>
+                handleTextChange('serial', (event.target as HTMLInputElement).value)
+            "
+            @keydown.enter="(event: KeyboardEvent) => (event.target as HTMLInputElement).blur()"
           />
         </ItemActions>
       </Item>
