@@ -16,6 +16,7 @@
     "build:dist": "node scripts/prepare-dist.js",
     "build:portable": "node scripts/build-portable.js",
     "fetch:third-party": "node scripts/fetch-third-party.js",
+    "fetch:android-jar": "node scripts/fetch-android-jar.js",
     "build:installer": "node scripts/build-installer.js",
     "build:checksums": "node scripts/generate-checksums.js",
     "dev:web": "pnpm --filter web run dev",

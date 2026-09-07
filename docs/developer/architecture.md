@@ -77,6 +77,16 @@ xmake f -m release -y && xmake f -m debug -y
 node scripts/patch-vcpkg.js
 ```
 
+### 4. 获取 Android 捕获服务（可选）
+
+不修改 `android/capture/src/` 下的 Java 代码时，无需配置 JDK 与 Android SDK，直接拉取最新 release 的预编译 jar：
+
+```bash
+pnpm run fetch:android-jar
+```
+
+之后 `pnpm run build` 会自动跳过 Android 编译。需重新从源码编译时，删除 `build/android/.android-jar-fetched`。
+
 ---
 
 ## 使用 Visual Studio IDE 开发（可选）
@@ -103,7 +113,7 @@ vsxmake2026\SpinningMomo.sln
 ### 完整构建（推荐）
 
 ```bash
-# 一键完成：C++ Release + Web 前端 + 打包 dist/
+# 一键完成：C++ Release + Web 前端 + Android 捕获服务 + 打包 dist/
 pnpm run build
 ```
 
@@ -120,14 +130,20 @@ xmake build
 xmake release    # 构建 release 后自动恢复 debug 配置
 
 # Web 前端
-pnpm --filter web run build
+pnpm run build:web
 
-# Android ADB 截图服务
+# Android 捕获服务（可选，需要 JDK + Android SDK）
 pnpm run build:android
 
-# 打包 dist/（汇总 exe + web 资源）
+# 打包 dist/（汇总 exe + web 资源 + Android jar）
 pnpm run build:dist
 ```
+
+### Android 捕获服务
+
+Android 端是轻量屏幕/音频捕获服务，产物为 `build/android/momo-capture.jar`，通过 ADB 推送由 `app_process` 运行，无需安装 APK。
+
+修改 Java 代码时需配置 JDK 21 与 Android SDK（`platforms;android-36`、`build-tools;36.0.0`），然后运行 `pnpm run build:android`。依赖版本见 `android/capture/build-config.json`。
 
 ### 构建输出路径
 

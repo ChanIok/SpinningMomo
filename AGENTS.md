@@ -29,7 +29,10 @@ xmake build
 xmake release
 
 # Web frontend
-pnpm --filter web run build
+pnpm run build:web
+
+# Android capture service
+pnpm run build:android
 ```
 
 `web/` uses a Vite dev server and proxies `/rpc` and `/static` to the backend at `localhost:51206`.
@@ -48,7 +51,7 @@ The frontend auto-detects its environment (`window.chrome.webview` presence) and
 The backend uses **C++23 headers and implementation files** (`.hpp + .cpp`) with a precompiled header for build acceleration:
 
 - `core::*` — framework infrastructure (async runtime, database, events, HTTP client, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
-- `features::*` — business logic such as gallery, letterbox, notifications, overlay, preview, recording, screenshot, settings, update, and window_control
+- `features::*` — business logic such as adb_mode, gallery, letterbox, notifications, overlay, preview, recording, screenshot, settings, update, and window_control
 - `ui::*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
 - `utils::*` — shared utilities such as logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, crash_dump, and crypto
 - `extensions::*` — game-specific integrations
@@ -93,6 +96,7 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 - `web/src/assets/` — static assets
 
 ### Additional Repo Surfaces
+- `android/` — Android capture daemon (momo-capture) source and build configuration
 - `docs/` — VitePress documentation site for user and developer docs
 - `playground/` — standalone Node/TypeScript scripts for backend HTTP/RPC debugging and experiments
 - `installer/` — WiX source files for MSI and bundle installer generation
@@ -105,6 +109,7 @@ Detailed design guidelines and invariants for critical subsystems live in their 
 - `src/features/gallery/README.md` — Asset identity, metadata inheritance, 30-day missing lifecycle, and scanner/watcher invariants.
 - `src/core/state/README.md` — `AppState` layout, header forward declarations, and API dependency conventions.
 - `src/extensions/infinity_nikki/README.md` — Infinity Nikki media hardlink mirroring, task orchestration, and modification checklist.
+- `android/capture/README.md` — Android capture daemon (momo-capture) architecture, VirtualDisplay pipeline, and ADB debugging.
 
 ### RPC Endpoint Organization
 Endpoints live under `src/core/rpc/endpoints/<domain>/`. Each domain exposes a `register_all(state)` called from `registry.cpp`.
@@ -117,6 +122,7 @@ The rough order is: core infrastructure first, then native UI, then feature serv
 ## Build Output
 - Release: `build\windows\x64\release\`
 - Debug: `build\windows\x64\debug\`
+- Android daemon: `build\android\momo-capture.jar`
 - Distribution: `dist/` (exe + web resources)
 
 ## Installer

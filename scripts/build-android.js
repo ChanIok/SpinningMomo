@@ -38,6 +38,19 @@ function quoteJavaArgument(value) {
 
 function main() {
   if (process.argv.length > 2) throw new Error("Usage: node scripts/build-android.js");
+
+  // 若开发者通过 fetch:android-jar 获取了预编译 jar 并留下标记，则跳过本地编译。
+  // 需要重新编译时删除 build/android/.android-jar-fetched 即可。
+  const outputDirectory = path.join(root, "build", "android");
+  const markerPath = path.join(outputDirectory, ".android-jar-fetched");
+  const jarPath = path.join(outputDirectory, "momo-capture.jar");
+  if (fs.existsSync(markerPath) && fs.existsSync(jarPath)) {
+    const tag = fs.readFileSync(markerPath, "utf8").trim() || "unknown";
+    console.log(`Android jar fetched from release ${tag}; skipping build:android.`);
+    console.log(`Remove ${path.relative(root, markerPath)} to rebuild from source.`);
+    return;
+  }
+
   const javaHome = process.env.JAVA_HOME;
   const sdkHome = process.env.ANDROID_HOME;
   if (!javaHome) throw new Error("Please set JAVA_HOME to the JDK 21 root directory.");
@@ -51,7 +64,6 @@ function main() {
   const sources = collectFiles(path.join(root, "android", "capture", "src"), ".java");
   if (!sources.length) throw new Error("No Android Java source files found.");
 
-  const outputDirectory = path.join(root, "build", "android");
   fs.mkdirSync(outputDirectory, { recursive: true });
   const workingDirectory = fs.mkdtempSync(path.join(outputDirectory, "compile-"));
   try {
