@@ -33,9 +33,4 @@ auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionRe
 auto disconnect(const AdbConnectionConfig& config, std::string_view serial)
     -> std::expected<void, std::string>;
 
-// 通过 adb screencap 抓取 PNG，并用临时文件安全地写入目标路径。
-auto capture_screen_to_file(const AdbConnectionConfig& config, std::string_view serial,
-                            const std::filesystem::path& output_path)
-    -> std::expected<void, std::string>;
-
 }  // namespace features::adb_mode::adb

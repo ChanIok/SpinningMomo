@@ -2,6 +2,7 @@
 
 #include "vendor/std.hpp"
 
+#include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/types.hpp"
 
 namespace features::adb_mode {
@@ -23,16 +24,10 @@ struct AdbModeState {
   // 表示队列中仍有未完成的 ADB 操作。
   bool operation_in_progress = false;
 
-  // 连接成功后固定下来的配置，后续显示操作都复用它。
-  std::optional<AdbConnectionConfig> active_config;
-  // 当前连接是否由本模块执行 adb connect 建立，只有这种连接由模块负责断开。
-  bool connection_owned = false;
+  // 一个完整设备会话统一拥有 ADB 连接、Android 捕获服务、forward 和协议 socket。
+  std::shared_ptr<session::DeviceSession> device_session;
   std::string last_error;
 
-  // 连接时读取的设备物理尺寸，恢复时始终回到这个尺寸。
-  std::optional<Resolution> physical_display;
-  // 最近一次成功设置的尺寸；只用于状态展示和后续诊断。
-  std::optional<Resolution> current_display;
   // 仅表示本次进程会话中是否成功改写过显示状态，不持久化到磁盘。
   bool restore_pending = false;
 };

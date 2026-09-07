@@ -20,6 +20,8 @@ The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
 | **xmake** | 3.1.0 | C++ build system |
 | **Node.js** | v22.13+ | Web frontend build and pnpm scripts |
+| **JDK** | 21+ | Build the Android DEX service used by ADB screenshots |
+| **Android SDK Command-line Tools** | Platform 36 + Build Tools 36.0.0 | Compile the capture service with `javac`/`d8` |
 
 ### Install xmake
 
@@ -118,6 +120,9 @@ xmake release    # automatically restores debug config after release build
 
 # Web frontend
 pnpm --filter web run build
+
+# Android ADB capture service
+pnpm run build:android
 
 # Assemble dist/ (exe + web resources)
 pnpm run build:dist

@@ -22,6 +22,8 @@ C++ 后端默认使用 `clang-cl[llvm]`（Clang + LLD）进行日常开发，正
 | **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
 | **xmake** | 3.1.0 | C++ 构建系统 |
 | **Node.js** | v22.13+ | Web 前端构建及 pnpm 脚本 |
+| **JDK** | 21+ | 编译 ADB 模式的 Android DEX 服务 |
+| **Android SDK Command-line Tools** | Platform 36 + Build Tools 36.0.0 | 通过 `javac`/`d8` 构建截图服务 |
 
 ### 安装 xmake
 
@@ -119,6 +121,9 @@ xmake release    # 构建 release 后自动恢复 debug 配置
 
 # Web 前端
 pnpm --filter web run build
+
+# Android ADB 截图服务
+pnpm run build:android
 
 # 打包 dist/（汇总 exe + web 资源）
 pnpm run build:dist

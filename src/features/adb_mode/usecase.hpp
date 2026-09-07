@@ -23,9 +23,9 @@ auto is_connected(const core::AppState& state) -> bool;
 
 // 将截图任务放入 ADB 专用队列，并在完成后通过回调返回结果。
 auto capture_screen_async(
-    core::AppState& state, const std::filesystem::path& output_path,
-    std::move_only_function<void(bool success, const std::wstring& path)> completion_callback)
-    -> bool;
+    core::AppState& state, const std::filesystem::path& output_path, AdbScreenshotFormat format,
+    std::move_only_function<void(bool success, const std::wstring& path, std::string error)>
+        completion_callback) -> bool;
 
 // 将恢复物理尺寸任务放入队列，并同步浮窗的 Default 菜单状态。
 auto restore_async(core::AppState& state) -> bool;

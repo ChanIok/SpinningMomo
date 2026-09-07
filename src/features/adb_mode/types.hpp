@@ -38,6 +38,12 @@ struct AdbDevice {
   std::string state;
 };
 
+// ADB 模式截图的设备端输出格式；PNG/JPEG 都由 Android 捕获服务响应。
+enum class AdbScreenshotFormat : std::uint8_t {
+  PNG,
+  JPEG,
+};
+
 // 记录连接成功的设备，以及本次是否由模块建立了 TCP 连接。
 struct AdbConnectionResult {
   std::string serial;

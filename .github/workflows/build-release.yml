@@ -40,6 +40,19 @@ jobs:
           install: false
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android capture dependencies
+        shell: pwsh
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
       - name: Fetch third-party dependencies
         run: node scripts/fetch-third-party.js
 
@@ -163,6 +176,9 @@ jobs:
 
       - name: Build Web frontend
         run: pnpm run build:web
+
+      - name: Build Android capture service
+        run: pnpm run build:android
 
       - name: Assemble dist
         run: pnpm run build:dist

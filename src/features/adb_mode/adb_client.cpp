@@ -4,7 +4,6 @@
 
 #include "vendor/windows.hpp"
 
-#include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
 
 namespace features::adb_mode::adb {
@@ -84,37 +83,6 @@ auto has_ready_device(const std::vector<AdbDevice>& devices, std::string_view se
   return std::ranges::any_of(devices, [serial](const AdbDevice& device) {
     return device.serial == serial && device.state == "device";
   });
-}
-
-// 检查 screencap 输出是否包含完整的 PNG 头和有效尺寸。
-auto is_valid_png(std::string_view png) -> bool {
-  if (png.size() < 24) {
-    return false;
-  }
-
-  const auto read_big_endian_u32 = [&png](std::size_t offset) -> std::uint32_t {
-    return (static_cast<std::uint32_t>(static_cast<unsigned char>(png[offset])) << 24u) |
-           (static_cast<std::uint32_t>(static_cast<unsigned char>(png[offset + 1])) << 16u) |
-           (static_cast<std::uint32_t>(static_cast<unsigned char>(png[offset + 2])) << 8u) |
-           static_cast<std::uint32_t>(static_cast<unsigned char>(png[offset + 3]));
-  };
-
-  constexpr std::array<char, 8> kPngSignature = {static_cast<char>(0x89), 'P', 'N', 'G', '\r', '\n',
-                                                 static_cast<char>(0x1A), '\n'};
-  if (!std::equal(kPngSignature.begin(), kPngSignature.end(), png.begin()) ||
-      png.substr(12, 4) != "IHDR") {
-    return false;
-  }
-
-  const auto width = read_big_endian_u32(16);
-  const auto height = read_big_endian_u32(20);
-  if (width == 0 || height == 0 ||
-      width > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
-      height > static_cast<std::uint32_t>(std::numeric_limits<int>::max())) {
-    return false;
-  }
-
-  return true;
 }
 
 }  // namespace
@@ -208,8 +176,9 @@ auto list_devices(const AdbConnectionConfig& config)
   return parse_devices(result->stdout_data);
 }
 
-// 连接目标 endpoint，并从设备列表中确认最终可用的序列号。
+// 建立 ADB 连接：解析 endpoint → 检查已连接状态 → 执行 adb connect → 校验设备是否为 ready
 auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionResult, std::string> {
+  // 解析出目标 TCP endpoint (如 127.0.0.1:16384)
   std::string endpoint;
   if (!config.serial.empty() && config.serial.find(':') != std::string::npos) {
     endpoint = config.serial;
@@ -223,13 +192,13 @@ auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionRe
 
   bool connected_by_us = false;
   if (!endpoint.empty()) {
-    // 已经 ready 的 TCP 设备不需要重复 connect，也不归本次会话所有。
+    // 先检查目标设备是否已经处于 ready 状态，避免重复连接
     auto devices_before_result = list_devices(config);
     if (!devices_before_result) {
       return std::unexpected(devices_before_result.error());
     }
     if (!has_ready_device(devices_before_result.value(), endpoint)) {
-      // 只有设备尚未 ready 时才建立本次会话负责的 TCP 连接。
+      // 未连接时发起 adb connect，并标记所有权归本次会话
       connected_by_us = true;
       auto connect_result = run(config, {L"connect", utils::string::FromUtf8(endpoint)});
       if (!connect_result) {
@@ -239,24 +208,26 @@ auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionRe
         return std::unexpected(make_command_error("ADB connect", connect_result.value()));
       }
     } else {
+      // 已经存在外部活跃连接，不归本次会话管理生命周期
       return AdbConnectionResult{.serial = endpoint, .connected_by_us = false};
     }
   }
 
+  // 再次读取设备列表确认连接后的最终状态
   auto devices_result = list_devices(config);
   if (!devices_result) {
     return std::unexpected(devices_result.error());
   }
 
+  // 指定了明确序列号时，验证其是否处于正常可用 (device) 状态
   if (!config.serial.empty()) {
-    // 显式序列号必须在列表中处于 device 状态，不能只连接到 offline/unauthorized 设备。
     if (!has_ready_device(devices_result.value(), config.serial)) {
       return std::unexpected(std::format("Configured ADB device is not ready: {}", config.serial));
     }
     return AdbConnectionResult{.serial = config.serial, .connected_by_us = connected_by_us};
   }
 
-  // 自动选择时只接受刚刚连接的 endpoint，防止误选其他模拟器实例。
+  // 自动选择模式下，确认刚刚连接的 endpoint 是否已就绪
   if (has_ready_device(devices_result.value(), endpoint)) {
     return AdbConnectionResult{.serial = endpoint, .connected_by_us = connected_by_us};
   }
@@ -267,13 +238,15 @@ auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionRe
       endpoint));
 }
 
-// 断开本模块建立的 TCP ADB 连接。
+// 断开 ADB 连接：校验 TCP serial 格式 → 执行 adb disconnect → 校验命令退出码
 auto disconnect(const AdbConnectionConfig& config, std::string_view serial)
     -> std::expected<void, std::string> {
+  // 只断开网络 TCP 连接 (包含冒号端口)，不拔掉 USB 物理设备
   if (serial.empty() || serial.find(':') == std::string_view::npos) {
     return {};
   }
 
+  // 执行 adb disconnect <endpoint>
   auto result = run(config, {L"disconnect", utils::string::FromUtf8(std::string(serial))});
   if (!result) {
     return std::unexpected(result.error());
@@ -281,66 +254,6 @@ auto disconnect(const AdbConnectionConfig& config, std::string_view serial)
   if (result->exit_code != 0) {
     return std::unexpected(make_command_error("ADB disconnect", result.value()));
   }
-  return {};
-}
-
-// 抓取设备屏幕、校验 PNG，并通过临时文件替换目标文件。
-auto capture_screen_to_file(const AdbConnectionConfig& config, std::string_view serial,
-                            const std::filesystem::path& output_path)
-    -> std::expected<void, std::string> {
-  if (output_path.empty()) {
-    return std::unexpected("Screenshot output path cannot be empty");
-  }
-
-  // 使用 exec-out 保持 PNG 二进制原样输出，并给截图命令更长的超时时间。
-  auto result =
-      run_on_device(config, serial, {L"exec-out", L"screencap", L"-p"}, std::chrono::seconds(30));
-  if (!result) {
-    return std::unexpected(result.error());
-  }
-
-  if (!is_valid_png(result->stdout_data)) {
-    return std::unexpected("ADB screencap returned an invalid PNG image");
-  }
-
-  const auto parent = output_path.parent_path();
-  if (!parent.empty()) {
-    auto ensure_result = utils::path::EnsureDirectoryExists(parent);
-    if (!ensure_result) {
-      return std::unexpected("Failed to create screenshot directory: " + ensure_result.error());
-    }
-  }
-
-  auto temporary_path = output_path;
-  temporary_path += L".tmp";
-
-  std::error_code remove_error;
-  std::filesystem::remove(temporary_path, remove_error);
-
-  {
-    // 先完整写入 .tmp；写失败时删除临时文件，不破坏旧截图。
-    std::ofstream file(temporary_path, std::ios::binary | std::ios::trunc);
-    if (!file) {
-      return std::unexpected("Failed to open temporary screenshot file: " +
-                             temporary_path.string());
-    }
-    file.write(result->stdout_data.data(),
-               static_cast<std::streamsize>(result->stdout_data.size()));
-    if (!file) {
-      file.close();
-      std::filesystem::remove(temporary_path, remove_error);
-      return std::unexpected("Failed to write screenshot file: " + temporary_path.string());
-    }
-  }
-
-  std::error_code rename_error;
-  // 写入成功后再一次性改名为目标文件，减少半张截图暴露给读取方的机会。
-  std::filesystem::rename(temporary_path, output_path, rename_error);
-  if (rename_error) {
-    std::filesystem::remove(temporary_path, remove_error);
-    return std::unexpected("Failed to finalize screenshot file: " + rename_error.message());
-  }
-
   return {};
 }
 

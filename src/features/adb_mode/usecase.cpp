@@ -12,6 +12,7 @@
 #include "core/state/app_state.hpp"
 #include "features/adb_mode/adb_client.hpp"
 #include "features/adb_mode/device_finder.hpp"
+#include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/display_control.hpp"
 #include "features/adb_mode/events.hpp"
 #include "features/adb_mode/state.hpp"
@@ -31,12 +32,6 @@ namespace {
 using AdbTask = std::move_only_function<void()>;
 
 constexpr auto kDisplaySettleDelay = std::chrono::milliseconds(400);
-
-struct ActiveSession {
-  AdbConnectionConfig config;
-  Resolution physical_display;
-  bool connection_owned = false;
-};
 
 // 在设置锁保护下复制 ADB 模式配置，供后台任务独立使用。
 auto get_adb_mode_settings(const core::AppState& state)
@@ -67,10 +62,7 @@ auto build_connection_config(const core::AppState& state)
 
 // 清除当前会话的所有派生状态，调用方必须持有状态锁。
 auto clear_session_locked(AdbModeState& adb_state) -> void {
-  adb_state.active_config.reset();
-  adb_state.connection_owned = false;
-  adb_state.physical_display.reset();
-  adb_state.current_display.reset();
+  adb_state.device_session.reset();
   adb_state.restore_pending = false;
 }
 
@@ -180,20 +172,15 @@ auto post_display_transform_result(core::AppState& state, std::optional<std::siz
                                 .error = result ? std::string{} : result.error()});
 }
 
-// 复制当前活动会话，避免 ADB 线程在执行命令时读取可变状态引用。
-auto get_active_session(const core::AppState& state) -> std::expected<ActiveSession, std::string> {
+// 复制当前设备会话句柄；会话自身拥有全部资源，避免释放状态锁后使用裸指针。
+auto get_active_session(const core::AppState& state)
+    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string> {
   const auto& adb_state = *state.adb_mode;
   std::scoped_lock lock(adb_state.mutex);
-  if (adb_state.connection_state != ConnectionState::Connected || !adb_state.active_config ||
-      adb_state.active_config->serial.empty() || !adb_state.physical_display) {
+  if (adb_state.connection_state != ConnectionState::Connected || !adb_state.device_session) {
     return std::unexpected("ADB device is not connected");
   }
-
-  return ActiveSession{
-      .config = *adb_state.active_config,
-      .physical_display = *adb_state.physical_display,
-      .connection_owned = adb_state.connection_owned,
-  };
+  return adb_state.device_session;
 }
 
 // 完成一个队列任务；只有队列真正为空时才清除忙碌状态。
@@ -249,7 +236,7 @@ auto adb_thread_proc(core::AppState& state, std::stop_token stop_token) -> void 
       bool retain_connection = false;
       {
         std::scoped_lock lock(adb_state.mutex);
-        retain_connection = adb_state.active_config.has_value();
+        retain_connection = adb_state.device_session != nullptr;
       }
       set_error_state(state, std::string("ADB worker task failed: ") + e.what(), retain_connection);
     } catch (...) {
@@ -257,7 +244,7 @@ auto adb_thread_proc(core::AppState& state, std::stop_token stop_token) -> void 
       bool retain_connection = false;
       {
         std::scoped_lock lock(adb_state.mutex);
-        retain_connection = adb_state.active_config.has_value();
+        retain_connection = adb_state.device_session != nullptr;
       }
       set_error_state(state, "ADB worker task failed with unknown exception", retain_connection);
     }
@@ -320,13 +307,17 @@ auto get_window_calculation_settings(const core::AppState& state) -> std::pair<b
           state.settings->raw.window.use_resolution_short_edge};
 }
 
-// 完成一次连接并记录物理显示尺寸，后续恢复都以该尺寸为目标。
+// 执行设备连接：状态切 Connecting → 构造并解析配置 → 打开完整设备会话 → 保存会话并广播状态
 auto connect_impl(core::AppState& state) -> std::expected<void, std::string> {
+  // 已经处于连接状态时直接返回
   if (is_connected(state)) {
     return {};
   }
 
+  // 标记当前操作状态为连接中
   set_operation_state(state, ConnectionState::Connecting);
+
+  // 解析并生成 ADB 连接配置（支持自动探测模拟器与自定义路径）
   auto config_result = build_connection_config(state);
   if (!config_result) {
     set_error_state(state, config_result.error(), false);
@@ -335,134 +326,119 @@ auto connect_impl(core::AppState& state) -> std::expected<void, std::string> {
   }
   const auto config = config_result.value();
 
-  auto connection_result = adb::connect(config);
-  if (!connection_result) {
-    set_error_state(state, connection_result.error(), false);
+  // 建立完整的底层设备会话（连接、推服务、起进程、建立转发）
+  auto session_result = session::open(config);
+  if (!session_result) {
+    set_error_state(state, session_result.error(), false);
     publish_status_changed(state);
-    return std::unexpected(connection_result.error());
+    return std::unexpected(session_result.error());
   }
 
-  const auto serial = connection_result->serial;
-  auto display_result = display_control::query(config, serial);
-  if (!display_result) {
-    if (connection_result->connected_by_us) {
-      auto disconnect_config = config;
-      disconnect_config.serial = serial;
-      static_cast<void>(adb::disconnect(disconnect_config, serial));
-    }
-    set_error_state(state, display_result.error(), false);
-    publish_status_changed(state);
-    return std::unexpected(display_result.error());
-  }
-
-  auto active_config = config;
-  active_config.serial = serial;
+  // 在状态锁保护下更新连接成功状态与会话实例
   {
     std::scoped_lock lock(state.adb_mode->mutex);
     state.adb_mode->connection_state = ConnectionState::Connected;
-    state.adb_mode->active_config = std::move(active_config);
-    state.adb_mode->connection_owned = connection_result->connected_by_us;
-    state.adb_mode->physical_display = *display_result;
-    state.adb_mode->current_display = *display_result;
+    state.adb_mode->device_session = std::move(session_result.value());
     state.adb_mode->restore_pending = false;
     state.adb_mode->last_error.clear();
   }
 
+  // 广播连接成功事件并推送最新状态至前端
   post_connection_changed(state, true);
   publish_status_changed(state);
   return {};
 }
 
-// 恢复物理尺寸；需要断开时只释放本模块建立的 TCP 连接。
+// 恢复物理尺寸：状态切 Restoring → 区分断开或保留模式 → 恢复分辨率或关闭会话 → 广播连接变更
 auto restore_impl(core::AppState& state, bool disconnect_after)
     -> std::expected<void, std::string> {
+  // 检查当前是否有活动会话
   auto session_result = get_active_session(state);
   if (!session_result) {
-    bool had_connection = false;
     {
       std::scoped_lock lock(state.adb_mode->mutex);
-      had_connection = state.adb_mode->connection_state == ConnectionState::Connected;
       state.adb_mode->connection_state = ConnectionState::Disconnected;
       state.adb_mode->last_error.clear();
       clear_session_locked(*state.adb_mode);
     }
-    if (disconnect_after && had_connection) {
+    if (disconnect_after) {
       post_connection_changed(state, false);
     }
     publish_status_changed(state);
     return {};
   }
 
-  const auto session = session_result.value();
+  auto adb_session = session_result.value();
+  // 标记当前状态为恢复中
   set_operation_state(state, ConnectionState::Restoring);
 
-  auto reset_result = display_control::reset(session.config, session.config.serial);
-  if (!reset_result) {
-    set_error_state(state, reset_result.error(), true);
-    publish_status_changed(state);
-    return std::unexpected(reset_result.error());
-  }
-
-  {
-    std::scoped_lock lock(state.adb_mode->mutex);
-    state.adb_mode->current_display = session.physical_display;
-    state.adb_mode->restore_pending = false;
-    state.adb_mode->last_error.clear();
-  }
-
-  if (disconnect_after && session.connection_owned) {
-    auto disconnect_result = adb::disconnect(session.config, session.config.serial);
-    if (!disconnect_result) {
-      set_error_state(state, "Failed to disconnect ADB device: " + disconnect_result.error(), true);
-      publish_status_changed(state);
-      return std::unexpected(disconnect_result.error());
-    }
-  }
-
+  // 若要求断开连接：关闭会话、移除端口转发并视情况断开 ADB
   if (disconnect_after) {
+    auto close_result = session::close(adb_session);
     {
       std::scoped_lock lock(state.adb_mode->mutex);
       state.adb_mode->connection_state = ConnectionState::Disconnected;
       clear_session_locked(*state.adb_mode);
     }
     post_connection_changed(state, false);
-  } else {
-    std::scoped_lock lock(state.adb_mode->mutex);
-    state.adb_mode->connection_state = ConnectionState::Connected;
+    publish_status_changed(state);
+    if (!close_result) {
+      return std::unexpected(close_result.error());
+    }
+    return {};
   }
 
+  // 仅恢复显示尺寸：调用 wm size reset
+  auto reset_result = session::restore_display(*adb_session);
+  if (!reset_result) {
+    set_error_state(state, reset_result.error(), true);
+    publish_status_changed(state);
+    return std::unexpected(reset_result.error());
+  }
+
+  // 恢复成功后清除恢复标记
+  {
+    std::scoped_lock lock(state.adb_mode->mutex);
+    state.adb_mode->restore_pending = false;
+    state.adb_mode->last_error.clear();
+    state.adb_mode->connection_state = ConnectionState::Connected;
+  }
   publish_status_changed(state);
   return {};
 }
 
-// 在设备上设置目标尺寸，并在命令完成后更新当前显示快照。
+// 应用目标分辨率：参数校验 → 标记 restore_pending → 调 session 设置尺寸 → 延迟等待显示稳定
 auto apply_resolution_impl(core::AppState& state, const Resolution& target)
     -> std::expected<void, std::string> {
+  // 校验目标尺寸合法性
   if (target.width <= 0 || target.height <= 0) {
     return std::unexpected("ADB device display size must be positive");
   }
 
+  // 获取当前活动会话
   auto session_result = get_active_session(state);
   if (!session_result) {
     return std::unexpected(session_result.error());
   }
-  const auto session = session_result.value();
+  const auto adb_session = session_result.value();
   set_operation_state(state, ConnectionState::Connected);
 
+  // 标记会话有待还原的尺寸更改
   {
     std::scoped_lock lock(state.adb_mode->mutex);
     state.adb_mode->restore_pending = true;
   }
 
-  auto set_result = display_control::set(session.config, session.config.serial, target);
+  // 通过底层会话执行 wm size override
+  auto set_result = session::set_display(*adb_session, target);
   if (!set_result) {
     return std::unexpected("Failed to apply ADB device display settings: " + set_result.error());
   }
 
+  // 短暂等待模拟器/系统完成布局刷新与帧缓冲重建
   std::this_thread::sleep_for(kDisplaySettleDelay);
   {
     std::scoped_lock lock(state.adb_mode->mutex);
-    state.adb_mode->current_display = target;
     state.adb_mode->last_error.clear();
   }
   return {};
@@ -531,17 +507,16 @@ auto get_status(const core::AppState& state) -> AdbModeStatus {
   status.connection_state = connection_state_to_string(adb_state.connection_state);
   status.restore_pending = adb_state.restore_pending;
   status.last_error = adb_state.last_error;
-  if (adb_state.active_config) {
-    status.connected = adb_state.connection_state == ConnectionState::Connected &&
-                       !adb_state.active_config->serial.empty();
-    status.adb_path = utils::string::ToUtf8(adb_state.active_config->executable.wstring());
-    status.serial = adb_state.active_config->serial;
-    status.host = adb_state.active_config->host;
-    status.port = adb_state.active_config->port;
-  }
-  if (adb_state.current_display) {
-    status.display_width = adb_state.current_display->width;
-    status.display_height = adb_state.current_display->height;
+  if (adb_state.device_session) {
+    const auto& session = *adb_state.device_session;
+    std::scoped_lock session_lock(session.metadata_mutex);
+    status.connected = adb_state.connection_state == ConnectionState::Connected;
+    status.adb_path = utils::string::ToUtf8(session.config.executable.wstring());
+    status.serial = session.config.serial;
+    status.host = session.config.host;
+    status.port = session.config.port;
+    status.display_width = session.current_display.width;
+    status.display_height = session.current_display.height;
   }
   return status;
 }
@@ -553,47 +528,53 @@ auto is_connected(const core::AppState& state) -> bool {
   }
   std::scoped_lock lock(state.adb_mode->mutex);
   return state.adb_mode->connection_state == ConnectionState::Connected &&
-         state.adb_mode->active_config && !state.adb_mode->active_config->serial.empty();
+         state.adb_mode->device_session;
 }
 
-// 将设备截图任务放入队列，并在完成后回调调用方。
+// 异步设备截图：校验连接状态 → 投递截图任务至 ADB 队列 → 调用底层截图 → 更新错误状态 → 执行回调
 auto capture_screen_async(
-    core::AppState& state, const std::filesystem::path& output_path,
-    std::move_only_function<void(bool success, const std::wstring& path)> completion_callback)
-    -> bool {
+    core::AppState& state, const std::filesystem::path& output_path, AdbScreenshotFormat format,
+    std::move_only_function<void(bool success, const std::wstring& path, std::string error)>
+        completion_callback) -> bool {
+  // 未连接时直接拒绝截图请求
   if (!is_connected(state)) {
     return false;
   }
 
-  return enqueue_task(
-      state, [&state, output_path, completion_callback = std::move(completion_callback)]() mutable {
-        auto session_result = get_active_session(state);
-        std::expected<void, std::string> result = std::unexpected("ADB screenshot failed");
-        if (session_result) {
-          result = adb::capture_screen_to_file(session_result->config,
-                                               session_result->config.serial, output_path);
-        } else {
-          result = std::unexpected(session_result.error());
-        }
+  // 投递截图任务到后台工作队列中串行执行
+  return enqueue_task(state, [&state, output_path, format,
+                              completion_callback = std::move(completion_callback)]() mutable {
+    // 获取活动会话
+    auto session_result = get_active_session(state);
+    std::expected<void, std::string> result = {};
+    if (session_result) {
+      // 调用长期会话的截图接口截取并保存为指定格式
+      result = session::screenshot_to_file(*session_result.value(), output_path, format);
+    } else {
+      result = std::unexpected(session_result.error());
+    }
 
-        {
-          std::scoped_lock lock(state.adb_mode->mutex);
-          if (result) {
-            state.adb_mode->last_error.clear();
-          } else {
-            state.adb_mode->last_error = result.error();
-          }
-        }
-        publish_status_changed(state);
+    // 更新状态错误描述
+    {
+      std::scoped_lock lock(state.adb_mode->mutex);
+      if (result) {
+        state.adb_mode->last_error.clear();
+      } else {
+        state.adb_mode->last_error = result.error();
+      }
+    }
+    publish_status_changed(state);
 
-        if (completion_callback) {
-          try {
-            completion_callback(result.has_value(), output_path.wstring());
-          } catch (...) {
-            Logger().error("ADB screenshot completion callback failed");
-          }
-        }
-      });
+    // 执行完成回调通知上层业务
+    if (completion_callback) {
+      try {
+        completion_callback(result.has_value(), output_path.wstring(),
+                            result ? std::string{} : result.error());
+      } catch (...) {
+        Logger().error("ADB screenshot completion callback failed");
+      }
+    }
+  });
 }
 
 // 把恢复物理尺寸任务放入队列，并在完成后同步浮窗菜单。
@@ -708,13 +689,14 @@ auto handle_ratio_changed(core::AppState& state, std::size_t ratio_index, double
         auto preset = resolution_preset;
         if (current_resolution_index == 0 || (preset.base_width <= 0 && preset.base_height <= 0)) {
           preset = features::window_control::ResolutionPresetInput{
-              .base_width = session_result->physical_display.width,
-              .base_height = session_result->physical_display.height,
+              .base_width = session_result.value()->physical_display.width,
+              .base_height = session_result.value()->physical_display.height,
           };
         }
 
         const auto target = display_control::calculate_target_resolution(
-            ratio_value, preset, session_result->physical_display, align_to_8, use_short_edge);
+            ratio_value, preset, session_result.value()->physical_display, align_to_8,
+            use_short_edge);
         auto result = apply_resolution_impl(state, target);
         if (!result) {
           set_error_state(state, result.error(), true);
@@ -748,7 +730,7 @@ auto handle_resolution_changed(core::AppState& state, std::size_t resolution_ind
           return;
         }
 
-        const auto base = session_result->physical_display;
+        const auto base = session_result.value()->physical_display;
         const auto current_ratio = ratio.value_or(
             base.width > 0 && base.height > 0 ? static_cast<double>(base.width) / base.height
                                               : 16.0 / 9.0);
