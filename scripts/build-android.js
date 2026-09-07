@@ -7,7 +7,7 @@ const config = require("../android/capture/build-config.json");
 
 function requireFile(file, description) {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
-    throw new Error(`${description}不存在：${file}`);
+    throw new Error(`${description} not found: ${file}`);
   }
   return file;
 }
@@ -27,29 +27,29 @@ function run(executable, args) {
     shell: false,
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${path.basename(executable)} 执行失败 (${result.status})`);
+  if (result.status !== 0) throw new Error(`${path.basename(executable)} failed (${result.status})`);
 }
 
 // Java argument file 有自己的引号规则，不经过 Windows shell。
 function quoteJavaArgument(value) {
-  if (/[\r\n]/.test(value)) throw new Error("Java 参数不能包含换行");
+  if (/[\r\n]/.test(value)) throw new Error("Java argument must not contain newlines");
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 function main() {
-  if (process.argv.length > 2) throw new Error("用法：node scripts/build-android.js");
+  if (process.argv.length > 2) throw new Error("Usage: node scripts/build-android.js");
   const javaHome = process.env.JAVA_HOME;
   const sdkHome = process.env.ANDROID_HOME;
-  if (!javaHome) throw new Error("请设置 JAVA_HOME，指向 JDK 21 根目录。");
-  if (!sdkHome) throw new Error("请设置 ANDROID_HOME，指向 Android SDK 根目录。");
+  if (!javaHome) throw new Error("Please set JAVA_HOME to the JDK 21 root directory.");
+  if (!sdkHome) throw new Error("Please set ANDROID_HOME to the Android SDK root directory.");
   const java = requireFile(path.join(javaHome, "bin", "java.exe"), "Java");
-  const javac = requireFile(path.join(javaHome, "bin", "javac.exe"), "Java 编译器");
+  const javac = requireFile(path.join(javaHome, "bin", "javac.exe"), "Java compiler");
   const androidJar = requireFile(
-    path.join(sdkHome, "platforms", `android-${config.compileSdk}`, "android.jar"), "Android API 库");
+    path.join(sdkHome, "platforms", `android-${config.compileSdk}`, "android.jar"), "Android API jar");
   const d8Jar = requireFile(
-    path.join(sdkHome, "build-tools", config.buildTools, "lib", "d8.jar"), "D8 编译器");
+    path.join(sdkHome, "build-tools", config.buildTools, "lib", "d8.jar"), "D8 compiler");
   const sources = collectFiles(path.join(root, "android", "capture", "src"), ".java");
-  if (!sources.length) throw new Error("未找到 Android Java 源码。");
+  if (!sources.length) throw new Error("No Android Java source files found.");
 
   const outputDirectory = path.join(root, "build", "android");
   fs.mkdirSync(outputDirectory, { recursive: true });
@@ -68,10 +68,10 @@ function main() {
     run(java, ["-cp", d8Jar, "com.android.tools.r8.D8", "--release",
       "--min-api", String(config.minSdk), "--lib", androidJar,
       "--output", generatedJar, ...collectFiles(classes, ".class")]);
-    requireFile(generatedJar, "DEX JAR 产物");
+    requireFile(generatedJar, "DEX JAR output");
     const output = path.join(outputDirectory, "momo-capture.jar");
     fs.renameSync(generatedJar, output);
-    console.log(`Android 服务已生成：${output} (${fs.statSync(output).size} bytes)`);
+    console.log(`Android service generated: ${output} (${fs.statSync(output).size} bytes)`);
   } finally {
     // 递归清理只允许触及本次构建创建的目录。
     const resolvedRoot = fs.realpathSync(outputDirectory);
@@ -79,7 +79,7 @@ function main() {
     const relative = path.relative(resolvedRoot, resolvedWork);
     if (!relative || relative.startsWith("..") || path.isAbsolute(relative)
         || path.dirname(relative) !== "." || !path.basename(relative).startsWith("compile-")) {
-      throw new Error(`拒绝清理越界目录：${resolvedWork}`);
+      throw new Error(`Refusing to clean out-of-bounds directory: ${resolvedWork}`);
     }
     fs.rmSync(resolvedWork, { recursive: true });
   }
@@ -88,6 +88,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(`Android 构建失败：${error.message}`);
+  console.error(`Android build failed: ${error.message}`);
   process.exitCode = 1;
 }
