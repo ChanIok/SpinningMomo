@@ -11,4 +11,8 @@ namespace features::adb_mode::device_finder {
 auto resolve_connection(AdbConnectionConfig config)
     -> std::expected<AdbConnectionConfig, std::string>;
 
+// 扫描并发现所有当前可用的 Android 设备（包括运行中模拟器与已识别的真机）。
+auto discover_all_devices(AdbConnectionConfig config)
+    -> std::expected<std::vector<DiscoveredAdbDevice>, std::string>;
+
 }  // namespace features::adb_mode::device_finder

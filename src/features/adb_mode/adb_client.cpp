@@ -72,6 +72,14 @@ auto parse_devices(std::string_view output) -> std::vector<AdbDevice> {
     AdbDevice device;
     line_stream >> device.serial >> device.state;
     if (!device.serial.empty() && !device.state.empty()) {
+      std::string token;
+      while (line_stream >> token) {
+        if (token.starts_with("model:")) {
+          device.model = token.substr(6);
+        } else if (token.starts_with("product:")) {
+          device.product = token.substr(8);
+        }
+      }
       devices.push_back(std::move(device));
     }
   }
@@ -236,6 +244,31 @@ auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionRe
       "ADB connected to {}, but the endpoint is not ready. Set the device serial explicitly if "
       "the emulator uses another serial.",
       endpoint));
+}
+
+// 主动尝试连接指定的 endpoint (例如 127.0.0.1:16384 或 192.168.1.100:5555)。
+auto connect_endpoint(const AdbConnectionConfig& config, std::string_view endpoint,
+                      std::chrono::milliseconds timeout) -> std::expected<void, std::string> {
+  if (endpoint.empty()) {
+    return std::unexpected("Endpoint cannot be empty");
+  }
+
+  auto result = run(config, {L"connect", utils::string::FromUtf8(std::string(endpoint))}, timeout);
+  if (!result) {
+    return std::unexpected(result.error());
+  }
+  if (result->exit_code != 0) {
+    return std::unexpected(make_command_error("ADB connect", result.value()));
+  }
+
+  const auto output = utils::string::ToUtf8(utils::string::FromUtf8(result->stdout_data));
+  const auto trimmed_out = utils::string::TrimAscii(output);
+  if (trimmed_out.find("cannot connect") != std::string::npos ||
+      trimmed_out.find("failed to connect") != std::string::npos) {
+    return std::unexpected(trimmed_out.empty() ? "Failed to connect to endpoint" : trimmed_out);
+  }
+
+  return {};
 }
 
 // 断开 ADB 连接：校验 TCP serial 格式 → 执行 adb disconnect → 校验命令退出码

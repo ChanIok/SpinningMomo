@@ -65,6 +65,31 @@ export const adbModeApi = {
 
     return result.paths?.[0] || null
   },
+
+  listDevices: async (): Promise<DiscoveredAdbDevice[]> => {
+    return call<DiscoveredAdbDevice[]>('adbMode.listDevices')
+  },
+
+  connectEndpoint: async (params: {
+    host: string
+    port: number
+  }): Promise<ConnectEndpointResult> => {
+    return call<ConnectEndpointResult>('adbMode.connectEndpoint', params)
+  },
+}
+
+export interface DiscoveredAdbDevice {
+  serial: string
+  kind: 'mumu' | 'ldplayer' | 'bluestacks' | 'emulator' | 'device' | string
+  model: string
+  state: string
+  isEmulator: boolean
+}
+
+export interface ConnectEndpointResult {
+  success: boolean
+  serial: string
+  error: string
 }
 
 export interface LanNetworkAddress {

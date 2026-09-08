@@ -29,6 +29,11 @@ auto list_devices(const AdbConnectionConfig& config)
 // 连接配置中的 host:port（如有需要），并返回设备序列号和连接所有权。
 auto connect(const AdbConnectionConfig& config) -> std::expected<AdbConnectionResult, std::string>;
 
+// 主动尝试连接指定的 endpoint (例如 127.0.0.1:16384 或 192.168.1.100:5555)。
+auto connect_endpoint(const AdbConnectionConfig& config, std::string_view endpoint,
+                      std::chrono::milliseconds timeout = std::chrono::seconds(5))
+    -> std::expected<void, std::string>;
+
 // 断开本模块建立的 TCP ADB 连接。
 auto disconnect(const AdbConnectionConfig& config, std::string_view serial)
     -> std::expected<void, std::string>;

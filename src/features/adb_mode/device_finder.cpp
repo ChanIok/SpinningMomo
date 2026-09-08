@@ -445,6 +445,27 @@ auto append_discovery_failures(std::string error, const std::vector<std::string>
   return error;
 }
 
+// 尝试解析 ADB 可执行文件：如果配置了就用配置的；否则看候选模拟器；再否则看系统 PATH。
+auto resolve_any_adb_executable(const std::filesystem::path& configured_executable,
+                                const std::vector<EmulatorCandidate>& candidates)
+    -> std::expected<std::filesystem::path, std::string> {
+  if (!configured_executable.empty()) {
+    const auto configured_path = path_to_utf8(configured_executable);
+    return adb::resolve_executable(configured_path);
+  }
+
+  if (!candidates.empty()) {
+    return candidates.front().adb_path;
+  }
+
+  auto path_result = adb::resolve_executable("adb.exe");
+  if (path_result) {
+    return path_result.value();
+  }
+
+  return std::unexpected("message.adb_no_emulator_found");
+}
+
 }  // namespace
 
 // 解析用户配置或自动发现模拟器，最终补齐可执行文件和设备序列号。
@@ -458,6 +479,33 @@ auto resolve_connection(AdbConnectionConfig config)
       return std::unexpected(resolved.error());
     }
     config.executable = resolved.value();
+
+    if (!config.serial.empty()) {
+      return config;
+    }
+
+    // 未指定 serial 时，若刚好只有 1 台已连接设备，自动选中它。
+    auto devices_result = adb::list_devices(config);
+    if (devices_result) {
+      std::vector<AdbDevice> ready_devices;
+      for (const auto& dev : devices_result.value()) {
+        if (dev.state == "device") {
+          ready_devices.push_back(dev);
+        }
+      }
+      if (ready_devices.size() == 1) {
+        config.serial = ready_devices.front().serial;
+        return config;
+      }
+      if (ready_devices.size() > 1) {
+        std::vector<DiscoveredEndpoint> endpoints;
+        for (const auto& dev : ready_devices) {
+          endpoints.push_back(DiscoveredEndpoint{.serial = dev.serial});
+        }
+        return std::unexpected(make_multiple_devices_error(endpoints));
+      }
+    }
+
     return config;
   }
 
@@ -481,7 +529,7 @@ auto resolve_connection(AdbConnectionConfig config)
   }
 
   if (!config.serial.empty()) {
-    // 有明确 serial 时只在自动发现结果中匹配它，避免误连另一台设备。
+    // 有明确 serial 时优先在自动发现结果中匹配它。
     const auto matching_endpoint = std::ranges::find_if(
         endpoints,
         [&config](const DiscoveredEndpoint& endpoint) { return endpoint.serial == config.serial; });
@@ -489,6 +537,15 @@ auto resolve_connection(AdbConnectionConfig config)
       set_discovered_endpoint(config, *matching_endpoint);
       return config;
     }
+
+    // 未在模拟器 endpoints 中匹配到，尝试使用候选 ADB 或系统 PATH ADB 连接该设备（支持 USB
+    // 真机或无线调试）。
+    auto adb_executable = resolve_any_adb_executable(config.executable, candidates);
+    if (adb_executable) {
+      config.executable = *adb_executable;
+      return config;
+    }
+
     if (has_bluestacks_candidate) {
       return std::unexpected(append_discovery_failures(
           std::format("Configured ADB device serial was not found among automatically discovered "
@@ -522,17 +579,138 @@ auto resolve_connection(AdbConnectionConfig config)
         append_discovery_failures("Automatic emulator discovery failed", discovery_failures));
   }
 
-  if (candidates.size() == 1) {
-    // 找到唯一 ADB 但没有管理工具输出时，先补路径，连接阶段再使用配置地址。
-    config.executable = candidates.front().adb_path;
-    return config;
-  }
-  if (candidates.size() > 1) {
-    // 多个安装都没有可解析的 endpoint，无法安全猜测应该使用哪一个。
-    return std::unexpected("message.adb_multiple_emulators_found");
+  auto resolved_adb = resolve_any_adb_executable(config.executable, candidates);
+  if (resolved_adb) {
+    config.executable = *resolved_adb;
+    // 尝试直接查看 ADB 设备列表中是否只有 1 个就绪设备
+    auto devices_result = adb::list_devices(config);
+    if (devices_result) {
+      std::vector<AdbDevice> ready_devices;
+      for (const auto& dev : devices_result.value()) {
+        if (dev.state == "device") {
+          ready_devices.push_back(dev);
+        }
+      }
+      if (ready_devices.size() == 1) {
+        config.serial = ready_devices.front().serial;
+        return config;
+      }
+      if (ready_devices.size() > 1) {
+        return std::unexpected("message.adb_multiple_emulators_found");
+      }
+    }
+    if (candidates.size() == 1) {
+      return config;
+    }
+    if (candidates.size() > 1) {
+      return std::unexpected("message.adb_multiple_emulators_found");
+    }
   }
 
   return std::unexpected("message.adb_no_emulator_found");
+}
+
+// 扫描并发现所有当前可用的 Android 设备（包括运行中模拟器与已识别的真机）。
+auto discover_all_devices(AdbConnectionConfig config)
+    -> std::expected<std::vector<DiscoveredAdbDevice>, std::string> {
+  const auto candidates = find_running_emulators();
+  auto adb_executable = resolve_any_adb_executable(config.executable, candidates);
+  if (!adb_executable) {
+    return std::vector<DiscoveredAdbDevice>{};
+  }
+  config.executable = *adb_executable;
+
+  // 收集所有正在运行的模拟器候选端点
+  std::vector<DiscoveredEndpoint> endpoints;
+  for (const auto& candidate : candidates) {
+    auto candidate_endpoints = discover_endpoints(candidate);
+    if (!candidate_endpoints) {
+      continue;
+    }
+    endpoints.insert(endpoints.end(), candidate_endpoints->begin(), candidate_endpoints->end());
+  }
+
+  // 对发现的网络模拟器端点尝试快速预连接，确保它们在 adb devices 中列出
+  for (const auto& endpoint : endpoints) {
+    if (!endpoint.serial.empty() && endpoint.serial.find(':') != std::string::npos) {
+      static_cast<void>(
+          adb::connect_endpoint(config, endpoint.serial, std::chrono::milliseconds(800)));
+    }
+  }
+
+  // 执行 adb devices -l 获取完整设备列表
+  auto devices_result = adb::list_devices(config);
+  std::vector<DiscoveredAdbDevice> result;
+
+  auto classify_device = [&](const AdbDevice& device) -> std::pair<std::string, bool> {
+    for (const auto& ep : endpoints) {
+      if (ep.serial == device.serial) {
+        switch (ep.kind) {
+          case EmulatorKind::MuMu:
+            return {"mumu", true};
+          case EmulatorKind::LDPlayer:
+            return {"ldplayer", true};
+          case EmulatorKind::BlueStacks:
+            return {"bluestacks", true};
+        }
+      }
+    }
+    std::string lower_model = device.model;
+    std::ranges::transform(lower_model, lower_model.begin(), [](char character) {
+      return static_cast<char>(std::tolower(character));
+    });
+    if (lower_model.find("mumu") != std::string::npos) {
+      return {"mumu", true};
+    }
+    if (lower_model.find("emulator") != std::string::npos ||
+        lower_model.find("vbox") != std::string::npos ||
+        lower_model.find("goldfish") != std::string::npos ||
+        lower_model.find("sdk") != std::string::npos) {
+      return {"emulator", true};
+    }
+    return {"device", false};
+  };
+
+  if (devices_result) {
+    for (const auto& dev : devices_result.value()) {
+      const auto [kind, is_emulator] = classify_device(dev);
+      result.push_back(DiscoveredAdbDevice{
+          .serial = dev.serial,
+          .kind = kind,
+          .model = dev.model,
+          .state = dev.state,
+          .is_emulator = is_emulator,
+      });
+    }
+  }
+
+  // 若部分探测到的模拟器仍未出现在 adb devices 列表中，作为未就绪项补齐
+  for (const auto& ep : endpoints) {
+    if (std::ranges::none_of(
+            result, [&ep](const DiscoveredAdbDevice& dev) { return dev.serial == ep.serial; })) {
+      std::string kind = "emulator";
+      switch (ep.kind) {
+        case EmulatorKind::MuMu:
+          kind = "mumu";
+          break;
+        case EmulatorKind::LDPlayer:
+          kind = "ldplayer";
+          break;
+        case EmulatorKind::BlueStacks:
+          kind = "bluestacks";
+          break;
+      }
+      result.push_back(DiscoveredAdbDevice{
+          .serial = ep.serial,
+          .kind = kind,
+          .model = "",
+          .state = "offline",
+          .is_emulator = true,
+      });
+    }
+  }
+
+  return result;
 }
 
 }  // namespace features::adb_mode::device_finder

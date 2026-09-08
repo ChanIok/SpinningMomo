@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { on, off } from '@/core/rpc'
+import { computed, ref, watch } from 'vue'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -22,64 +21,36 @@ import {
   ItemGroup,
   ItemTitle,
 } from '@/components/ui/item'
-import { adbModeApi, type AdbModeStatus } from '../api'
+import { adbModeApi } from '../api'
 import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS, type AppSettings } from '../types'
 import { storeToRefs } from 'pinia'
-import { RotateCcw } from '@lucide/vue'
+import { RotateCcw, Loader2 } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
+import AdbDeviceInput from '@/components/AdbDeviceInput.vue'
 
 const store = useSettingsStore()
 const { appSettings } = storeToRefs(store)
 const { t } = useI18n()
 const { toast } = useToast()
 
-const status = ref<AdbModeStatus | null>(null)
-const statusError = ref<string | null>(null)
-const isLoadingStatus = ref(false)
 const isSelectingAdb = ref(false)
 const isEditing = ref(false)
+const isConnectingEndpoint = ref(false)
 
 const adbModeSettings = computed(() => appSettings.value.features.adbMode)
+const inputSerial = ref(adbModeSettings.value?.serial || '')
 
-const statusLabel = computed(() => {
-  if (!status.value) return t('settings.adbMode.status.unknown')
-  switch (status.value.connectionState) {
-    case 'connected':
-      return t('settings.adbMode.status.connected')
-    case 'connecting':
-      return t('settings.adbMode.status.connecting')
-    case 'restoring':
-      return t('settings.adbMode.status.restoring')
-    case 'error':
-      return t('settings.adbMode.status.error')
-    default:
-      return t('settings.adbMode.status.disconnected')
-  }
-})
-
-const displayLabel = computed(() => {
-  if (!status.value || status.value.displayWidth <= 0 || status.value.displayHeight <= 0) {
-    return t('settings.adbMode.display.empty')
-  }
-  return `${status.value.displayWidth} × ${status.value.displayHeight}`
-})
+watch(
+  () => adbModeSettings.value?.serial,
+  (newSerial) => {
+    inputSerial.value = newSerial || ''
+  },
+  { immediate: true }
+)
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error)
-}
-
-const refreshStatus = async () => {
-  if (isLoadingStatus.value) return
-  isLoadingStatus.value = true
-  try {
-    status.value = await adbModeApi.getStatus()
-    statusError.value = null
-  } catch (error) {
-    statusError.value = getErrorMessage(error)
-  } finally {
-    isLoadingStatus.value = false
-  }
 }
 
 const updateSettings = async (patch: Partial<AppSettings['features']['adbMode']>) => {
@@ -99,6 +70,40 @@ const handleCustomAdbPathChange = async (useCustomAdbPath: boolean) => {
     await updateSettings({ useCustomAdbPath })
   } catch (error) {
     toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
+  }
+}
+
+const handleDevicePicked = async (serial: string) => {
+  inputSerial.value = serial
+  try {
+    await updateSettings({ serial })
+  } catch (error) {
+    toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
+  }
+}
+
+const handleConnectEndpoint = async () => {
+  if (isConnectingEndpoint.value) return
+  const host = adbModeSettings.value?.host?.trim() || '127.0.0.1'
+  const port = adbModeSettings.value?.port || 7555
+
+  isConnectingEndpoint.value = true
+  try {
+    const result = await adbModeApi.connectEndpoint({ host, port })
+    if (result.success) {
+      toast.success(t('settings.adbMode.networkDevice.connectSuccess', { endpoint: result.serial }))
+      await handleDevicePicked(result.serial)
+    } else {
+      toast.error(t('settings.adbMode.networkDevice.connectFailed'), {
+        description: result.error || undefined,
+      })
+    }
+  } catch (error) {
+    toast.error(t('settings.adbMode.networkDevice.connectFailed'), {
+      description: getErrorMessage(error),
+    })
+  } finally {
+    isConnectingEndpoint.value = false
   }
 }
 
@@ -187,36 +192,10 @@ const handleRecordCodecChange = async (codec: 'h264' | 'h265') => {
 const handleReset = async () => {
   try {
     await updateSettings({ ...DEFAULT_APP_SETTINGS.features.adbMode })
-    await refreshStatus()
   } catch (error) {
     toast.error(t('settings.adbMode.saveFailed'), { description: getErrorMessage(error) })
   }
 }
-
-const handleStatusChanged = (params: unknown) => {
-  if (params && typeof params === 'object') {
-    status.value = params as AdbModeStatus
-  }
-}
-
-watch(
-  () => appSettings.value.features.adbMode,
-  () => {
-    if (!isEditing.value) void refreshStatus()
-  },
-  { deep: true }
-)
-
-onMounted(() => {
-  if (!isLocalAccess()) return
-  void refreshStatus()
-  on('adbMode.changed', handleStatusChanged)
-})
-
-onBeforeUnmount(() => {
-  if (!isLocalAccess()) return
-  off('adbMode.changed', handleStatusChanged)
-})
 </script>
 
 <template>
@@ -231,23 +210,18 @@ onBeforeUnmount(() => {
     </div>
 
     <ItemGroup>
-      <!-- 连接状态是运行时反馈，始终置于设置项最上方。 -->
+      <!-- 目标设备（通用） -->
       <Item variant="surface" size="sm">
         <ItemContent>
-          <ItemTitle>{{ t('settings.adbMode.status.label') }}</ItemTitle>
-          <ItemDescription>
-            {{ statusLabel }}<span v-if="status?.serial"> · {{ status.serial }}</span>
-            <span v-if="status?.restorePending">
-              · {{ t('settings.adbMode.status.pendingRestore') }}</span
-            >
-            <span v-if="status?.connected"> · {{ displayLabel }}</span>
-          </ItemDescription>
-          <p v-if="statusError || status?.lastError" class="mt-1 text-xs text-destructive">
-            {{ statusError || status?.lastError }}
-          </p>
+          <ItemTitle>{{ t('settings.adbMode.targetDevice.label') }}</ItemTitle>
+          <ItemDescription>{{ t('settings.adbMode.targetDevice.description') }}</ItemDescription>
         </ItemContent>
+        <ItemActions>
+          <AdbDeviceInput v-model="inputSerial" @select="handleDevicePicked" class="w-64" />
+        </ItemActions>
       </Item>
 
+      <!-- 自定义 ADB 路径 -->
       <Item variant="surface" size="sm">
         <ItemContent>
           <ItemTitle>{{ t('settings.adbMode.customPath.label') }}</ItemTitle>
@@ -284,16 +258,18 @@ onBeforeUnmount(() => {
         </ItemActions>
       </Item>
 
+      <!-- 网络设备调试（无线调试 / 自定义模拟器，仅当开启自定义 ADB 路径时显示） -->
       <Item v-if="adbModeSettings.useCustomAdbPath" variant="surface" size="sm">
         <ItemContent>
-          <ItemTitle>{{ t('settings.adbMode.endpoint.label') }}</ItemTitle>
-          <ItemDescription>{{ t('settings.adbMode.endpoint.description') }}</ItemDescription>
+          <ItemTitle>{{ t('settings.adbMode.networkDevice.label') }}</ItemTitle>
+          <ItemDescription>{{ t('settings.adbMode.networkDevice.description') }}</ItemDescription>
         </ItemContent>
         <ItemActions>
           <div class="flex items-center gap-2">
             <Input
               :model-value="adbModeSettings.host"
-              class="w-36 font-mono text-xs"
+              placeholder="127.0.0.1"
+              class="w-32 font-mono text-xs"
               @focus="isEditing = true"
               @blur="
                 (event: FocusEvent) =>
@@ -307,33 +283,23 @@ onBeforeUnmount(() => {
               type="number"
               min="1"
               max="65535"
-              class="w-24"
+              placeholder="7555"
+              class="w-20 font-mono text-xs"
               @blur="
                 (event: FocusEvent) => handlePortChange((event.target as HTMLInputElement).value)
               "
               @keydown.enter="(event: KeyboardEvent) => (event.target as HTMLInputElement).blur()"
             />
+            <Button
+              size="sm"
+              variant="outline"
+              :disabled="isConnectingEndpoint"
+              @click="handleConnectEndpoint"
+            >
+              <Loader2 v-if="isConnectingEndpoint" class="h-3.5 w-3.5 animate-spin" />
+              <template v-else>{{ t('settings.adbMode.networkDevice.connect') }}</template>
+            </Button>
           </div>
-        </ItemActions>
-      </Item>
-
-      <Item v-if="adbModeSettings.useCustomAdbPath" variant="surface" size="sm">
-        <ItemContent>
-          <ItemTitle>{{ t('settings.adbMode.serial.label') }}</ItemTitle>
-          <ItemDescription>{{ t('settings.adbMode.serial.description') }}</ItemDescription>
-        </ItemContent>
-        <ItemActions>
-          <Input
-            :model-value="adbModeSettings.serial"
-            class="w-48 font-mono text-xs"
-            :placeholder="t('settings.adbMode.serial.placeholder')"
-            @focus="isEditing = true"
-            @blur="
-              (event: FocusEvent) =>
-                handleTextChange('serial', (event.target as HTMLInputElement).value)
-            "
-            @keydown.enter="(event: KeyboardEvent) => (event.target as HTMLInputElement).blur()"
-          />
         </ItemActions>
       </Item>
 

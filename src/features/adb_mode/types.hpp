@@ -36,6 +36,30 @@ struct AdbConnectionConfig {
 struct AdbDevice {
   std::string serial;
   std::string state;
+  std::string model;
+  std::string product;
+};
+
+// 供前端展示与选择的已发现设备信息。
+struct DiscoveredAdbDevice {
+  std::string serial;
+  std::string kind;
+  std::string model;
+  std::string state;
+  bool is_emulator = false;
+};
+
+// 手动连接网络端点的参数。
+struct ConnectEndpointParams {
+  std::string host;
+  int port = 5555;
+};
+
+// 手动连接网络端点的返回结果。
+struct ConnectEndpointResult {
+  bool success = false;
+  std::string serial;
+  std::string error;
 };
 
 // ADB 模式截图的设备端输出格式；PNG/JPEG 都由 Android 捕获服务响应。

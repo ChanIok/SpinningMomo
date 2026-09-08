@@ -26,6 +26,14 @@ auto is_connected(const core::AppState& state) -> bool;
 auto get_active_session(const core::AppState& state)
     -> std::expected<std::shared_ptr<session::DeviceSession>, std::string>;
 
+// 发现所有当前可用的 Android 设备（包括运行中模拟器与已识别的真机）。
+auto list_devices(core::AppState& state)
+    -> std::expected<std::vector<DiscoveredAdbDevice>, std::string>;
+
+// 手动连接网络端点（用于无线调试或未自动探测到的模拟器）。
+auto connect_endpoint(core::AppState& state, std::string host, int port)
+    -> std::expected<ConnectEndpointResult, std::string>;
+
 // 启动 ADB 设备端屏幕与音频录制，通过 MF SinkWriter 混流写入 output_path。
 auto start_recording(core::AppState& state, const std::filesystem::path& output_path,
                      std::uint32_t fps, std::uint32_t bitrate, bool is_h265 = false)

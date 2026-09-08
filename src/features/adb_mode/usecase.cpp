@@ -760,4 +760,71 @@ auto handle_resolution_changed(core::AppState& state, std::size_t resolution_ind
   }
 }
 
+// 发现所有当前可用的 Android 设备（包括运行中模拟器与已识别的真机）。
+auto list_devices(core::AppState& state)
+    -> std::expected<std::vector<DiscoveredAdbDevice>, std::string> {
+  const auto settings = get_adb_mode_settings(state);
+  std::filesystem::path executable;
+  if (settings.use_custom_adb_path && !settings.adb_path.empty()) {
+    executable = std::filesystem::path(utils::string::FromUtf8(settings.adb_path));
+  }
+
+  return device_finder::discover_all_devices(AdbConnectionConfig{
+      .executable = std::move(executable),
+      .host = settings.host,
+      .port = settings.port,
+      .serial = settings.serial,
+  });
+}
+
+// 手动连接网络端点（用于无线调试或未自动探测到的模拟器）。
+auto connect_endpoint(core::AppState& state, std::string host, int port)
+    -> std::expected<ConnectEndpointResult, std::string> {
+  if (host.empty()) {
+    return std::unexpected("Host cannot be empty");
+  }
+  if (port <= 0 || port > 65535) {
+    return std::unexpected("Port must be between 1 and 65535");
+  }
+
+  const auto settings = get_adb_mode_settings(state);
+  std::filesystem::path executable;
+  if (settings.use_custom_adb_path && !settings.adb_path.empty()) {
+    executable = std::filesystem::path(utils::string::FromUtf8(settings.adb_path));
+  }
+
+  AdbConnectionConfig config{
+      .executable = std::move(executable),
+      .host = host,
+      .port = port,
+  };
+
+  // 补齐可执行文件
+  auto config_result = device_finder::resolve_connection(config);
+  if (!config_result) {
+    return ConnectEndpointResult{
+        .success = false,
+        .serial = "",
+        .error = config_result.error(),
+    };
+  }
+
+  const auto endpoint = std::format("{}:{}", host, port);
+  auto connect_result =
+      adb::connect_endpoint(config_result.value(), endpoint, std::chrono::seconds(5));
+  if (!connect_result) {
+    return ConnectEndpointResult{
+        .success = false,
+        .serial = endpoint,
+        .error = connect_result.error(),
+    };
+  }
+
+  return ConnectEndpointResult{
+      .success = true,
+      .serial = endpoint,
+      .error = "",
+  };
+}
+
 }  // namespace features::adb_mode
