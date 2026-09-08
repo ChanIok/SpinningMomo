@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
 import type { FolderTreeNode, TagTreeNode } from '../types'
@@ -11,6 +12,7 @@ import type { FolderTreeNode, TagTreeNode } from '../types'
  */
 export function useGallerySidebar() {
   const store = useGalleryStore()
+  const { t } = useI18n()
   const ROOT_FOLDER_ID = -1
   const ROOT_TAG_ID = -1
 
@@ -92,10 +94,13 @@ export function useGallerySidebar() {
   function selectFolder(folderId: number, folderName: string) {
     store.setFilter({ folderId: String(folderId), tagIds: [], tagMatchMode: 'any' })
 
-    // 查找文件夹对象并设置详情面板
-    const folder = findFolderById(store.folders, folderId)
-    if (folder) {
-      store.setDetailsFocus({ type: 'folder', folderId: folder.id })
+    // 普通浏览时文件夹本身是详情焦点；暗房中保持当前图片详情，
+    // 等查询结果就绪后由暗房重定位逻辑切换到新图片，避免展示中间态的文件夹详情。
+    if (!store.lightbox.isOpen) {
+      const folder = findFolderById(store.folders, folderId)
+      if (folder) {
+        store.setDetailsFocus({ type: 'folder', folderId: folder.id })
+      }
     }
 
     console.log('📁 选择文件夹:', folderName)
@@ -200,7 +205,7 @@ export function useGallerySidebar() {
       store.setTags(tagTree)
     } catch (error) {
       console.error('Failed to load tag tree:', error)
-      store.setTagsError('加载标签树失败')
+      store.setTagsError(t('gallery.sidebar.tags.loadFailed'))
       throw error
     }
   }

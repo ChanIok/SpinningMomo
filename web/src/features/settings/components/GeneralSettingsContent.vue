@@ -2,7 +2,7 @@
 import { useSettingsStore } from '../store'
 import { useGeneralActions } from '../composables/useGeneralActions'
 import { storeToRefs } from 'pinia'
-import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -154,10 +154,8 @@ const handleReset = async () => {
               {{ t('settings.general.update.description') }}
             </p>
           </div>
-          <Button variant="secondary" size="sm" as-child>
-            <RouterLink :to="{ name: 'about' }">
-              {{ t('settings.general.update.checkInAbout') }}
-            </RouterLink>
+          <Button variant="secondary" size="sm" @click="router.push({ name: 'about' })">
+            {{ t('settings.general.update.checkInAbout') }}
           </Button>
         </div>
 

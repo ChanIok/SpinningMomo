@@ -1,3 +1,4 @@
+import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 import { runWithLayoutTransition } from './useGalleryLayoutTransition'
@@ -14,6 +15,7 @@ import { getDyeCodeAssetIds } from '@/extensions/infinity_nikki/api'
 export function useGalleryData() {
   const store = useGalleryStore()
   const overlayHistory = useGalleryOverlayHistory()
+  const { t } = useI18n()
 
   async function refreshDyeCodeStatuses(assets: Asset[], requestVersion: number) {
     const assetIds = [...new Set(assets.map((asset) => asset.id))]
@@ -261,10 +263,12 @@ export function useGalleryData() {
       return true
     }
 
-    // 获取视口真实可见的全局索引范围 [startIndex, endIndex]
-    const startIndex = store.visibleRange.startIndex ?? 0
-    const endIndex =
-      store.visibleRange.endIndex ?? Math.min(19, store.totalCount > 0 ? store.totalCount - 1 : 19)
+    // 视口范围未知（虚拟器尚未上报或当前无可见卡片行）时，无法断言可见像素静止，
+    // 按“已变化”处理以播放过渡；跳过动画只允许发生在范围确切且逐张比对一致时。
+    const { startIndex, endIndex } = store.visibleRange
+    if (startIndex === undefined || endIndex === undefined) {
+      return true
+    }
 
     for (let index = startIndex; index <= endIndex; index++) {
       const oldAsset = store.getAssetAt(index)
@@ -353,7 +357,7 @@ export function useGalleryData() {
       })
     } catch (error) {
       console.error('加载失败:', error)
-      store.setError('加载数据失败')
+      store.setError(t('gallery.query.loadFailed'))
     } finally {
       store.finishQueryRefresh(requestVersion)
     }
@@ -449,7 +453,7 @@ export function useGalleryData() {
       })
     } catch (error) {
       console.error('Failed to load timeline data:', error)
-      store.setError('加载时间线数据失败')
+      store.setError(t('gallery.timeline.loadFailed'))
     } finally {
       store.finishQueryRefresh(requestVersion)
     }
@@ -516,7 +520,7 @@ export function useGalleryData() {
       store.setFolders(folderTree)
     } catch (error) {
       console.error('Failed to load folder tree:', error)
-      store.setFoldersError('加载文件夹树失败')
+      store.setFoldersError(t('gallery.sidebar.folders.loadFailed'))
       throw error
     }
   }
@@ -531,7 +535,7 @@ export function useGalleryData() {
       store.setTags(tagTree)
     } catch (error) {
       console.error('Failed to load tag tree:', error)
-      store.setTagsError('加载标签树失败')
+      store.setTagsError(t('gallery.sidebar.tags.loadFailed'))
       throw error
     }
   }
