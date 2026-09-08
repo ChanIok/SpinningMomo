@@ -1,9 +1,5 @@
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import {
-  createBrowserTaskController,
-  postBrowserTask,
-  yieldToBrowser,
-} from './browserTaskScheduler'
+import { yieldToBrowser } from './browserTaskScheduler'
 import { MIN_ORIGINAL_CARD_SHORT_EDGE_PX } from '../constants'
 
 const CARD_IMAGE_LOAD_IDLE_MS = 100
@@ -32,24 +28,12 @@ export function useCardImageScheduler(
 
   let latestItems: CardImageScheduleItem[] = []
   let scrollIdleTimer: number | null = null
-  let thumbnailScheduleVersion = 0
-  let originalScheduleVersion = 0
-  let thumbnailTaskController = createBrowserTaskController('user-visible')
-  let originalTaskController = createBrowserTaskController('background')
+  let isDestroyed = false
 
-  // 中止未派发的缩略图任务，但保留当前虚拟窗口中已经获得许可的卡片。
-  function cancelThumbnailSchedule() {
-    thumbnailScheduleVersion += 1
-    thumbnailTaskController.abort()
-    thumbnailTaskController = createBrowserTaskController('user-visible')
-  }
-
-  // 中止未派发的原图调度任务；已有许可由调用方按当前预热范围决定是否保留。
-  function cancelOriginalSchedule() {
-    originalScheduleVersion += 1
-    originalTaskController.abort()
-    originalTaskController = createBrowserTaskController('background')
-  }
+  // 持续消费者运行状态
+  let isThumbnailConsumerRunning = false
+  let isOriginalConsumerRunning = false
+  let originalConsumerGeneration = 0
 
   // 完全清空原图许可，用于关闭原图模式或销毁调度器。
   function clearOriginalPermissions() {
@@ -59,12 +43,18 @@ export function useCardImageScheduler(
   // 移除已经离开当前虚拟窗口的缩略图许可，避免调度器变成长期图片缓存。
   function pruneThumbnailPermissions() {
     const latestAssetIds = new Set(latestItems.map((item) => item.assetId))
+    const currentAllowedIds = allowedThumbnailAssetIds.value
     const nextAllowedIds = new Set<number>()
 
-    for (const assetId of allowedThumbnailAssetIds.value) {
+    for (const assetId of currentAllowedIds) {
       if (latestAssetIds.has(assetId)) {
         nextAllowedIds.add(assetId)
       }
+    }
+
+    // 若无任何 ID 被修剪，避免给响应式变量赋新 Set 实例，防止父组件模板全量重算
+    if (nextAllowedIds.size === currentAllowedIds.size) {
+      return
     }
 
     allowedThumbnailAssetIds.value = nextAllowedIds
@@ -200,108 +190,117 @@ export function useCardImageScheduler(
     return Math.abs(itemCenter - viewportCenter)
   }
 
-  // 分批授予半屏范围内的缩略图加载许可，让基础图片始终保持连续预热。
-  async function runThumbnailSchedule() {
-    cancelThumbnailSchedule()
-
-    const runVersion = thumbnailScheduleVersion
-    const signal = thumbnailTaskController.signal
-    const pendingItems = getPendingThumbnailItems(THUMBNAIL_PRELOAD_VIEWPORT_RATIO)
-
-    for (let index = 0; index < pendingItems.length; index += THUMBNAIL_BATCH_SIZE) {
-      const batch = pendingItems.slice(index, index + THUMBNAIL_BATCH_SIZE)
-      if (signal.aborted || runVersion !== thumbnailScheduleVersion) {
-        return
-      }
-
-      try {
-        await postBrowserTask('user-visible', signal, () => {
-          if (signal.aborted || runVersion !== thumbnailScheduleVersion) {
-            return
-          }
-
-          // 只给仍在当前预热范围内的卡片发许可，避免慢任务追上旧滚动位置。
-          const nextAllowedIds = new Set(allowedThumbnailAssetIds.value)
-          for (const item of batch) {
-            if (isItemInViewport(item, THUMBNAIL_PRELOAD_VIEWPORT_RATIO)) {
-              nextAllowedIds.add(item.assetId)
-            }
-          }
-          allowedThumbnailAssetIds.value = nextAllowedIds
-        })
-
-        // 每一批后让浏览器先处理输入和提交帧。
-        await yieldToBrowser(signal)
-      } catch (error) {
-        if (isAbortError(error)) {
-          return
-        }
-
-        throw error
-      }
-    }
-  }
-
-  // 逐个授予原图加载许可；视口内卡片先排队，其余候选项继续后台推进。
-  async function runOriginalSchedule() {
-    if (!originalEnabled.value || !isScrollIdle.value) {
+  // 唤醒缩略图后台平滑预热消费者（已在运行时自动复用，不重复创建）
+  function triggerThumbnailConsumer() {
+    if (isThumbnailConsumerRunning || isDestroyed) {
       return
     }
 
-    cancelOriginalSchedule()
-    pruneOriginalPermissions()
+    isThumbnailConsumerRunning = true
+    void runThumbnailConsumerLoop()
+  }
 
-    const runVersion = originalScheduleVersion
-    const signal = originalTaskController.signal
-    const pendingItems = prioritizeOriginalItems(getPendingOriginalItems())
-
-    for (const item of pendingItems) {
-      if (
-        signal.aborted ||
-        runVersion !== originalScheduleVersion ||
-        !isItemInViewport(item, getOriginalPreloadViewportRatio())
-      ) {
-        return
+  // 持续消费循环：面向最新滚动位置，按距离视口中心由近及远分批放行
+  async function runThumbnailConsumerLoop() {
+    while (!isDestroyed) {
+      // 1. 从当前最新的候选项中过滤出落在预热范围内且未授权的卡片
+      const pendingItems = getPendingThumbnailItems(THUMBNAIL_PRELOAD_VIEWPORT_RATIO)
+      if (pendingItems.length === 0) {
+        break
       }
 
-      try {
-        await postBrowserTask('background', signal, () => {
-          if (
-            signal.aborted ||
-            runVersion !== originalScheduleVersion ||
-            !isItemInViewport(item, getOriginalPreloadViewportRatio())
-          ) {
-            return
-          }
+      // 2. 按离当前视口中心的距离升序排序：即将进入视口的卡片优先预热
+      pendingItems.sort(
+        (left, right) =>
+          getItemDistanceToViewportCenter(left) - getItemDistanceToViewportCenter(right)
+      )
 
-          // 原图每次只新增一个许可，真实解码压力继续由 AssetCard 和 Worker 队列约束。
-          const nextAllowedIds = new Set(allowedOriginalAssetIds.value)
+      // 3. 取出本批次（Batch 6）
+      const batch = pendingItems.slice(0, THUMBNAIL_BATCH_SIZE)
+
+      // 4. 再次确认落在当前预热范围内，批量授权
+      const currentAllowedIds = allowedThumbnailAssetIds.value
+      const nextAllowedIds = new Set(currentAllowedIds)
+      let hasNewAllowed = false
+
+      for (const item of batch) {
+        if (isItemInViewport(item, THUMBNAIL_PRELOAD_VIEWPORT_RATIO)) {
           nextAllowedIds.add(item.assetId)
-          allowedOriginalAssetIds.value = nextAllowedIds
-        })
-
-        // 原图升级没有首屏刚需，逐项让出调度机会。
-        await yieldToBrowser(signal)
-      } catch (error) {
-        if (isAbortError(error)) {
-          return
+          hasNewAllowed = true
         }
-
-        throw error
       }
+
+      if (hasNewAllowed) {
+        allowedThumbnailAssetIds.value = nextAllowedIds
+      }
+
+      // 5. 主动让出主线程，让浏览器处理手势输入与刷帧；醒来后自然读取最新视口
+      await yieldToBrowser()
+    }
+
+    isThumbnailConsumerRunning = false
+  }
+
+  // 暂停原图升级消费者
+  function pauseOriginalConsumer() {
+    originalConsumerGeneration += 1
+    isOriginalConsumerRunning = false
+  }
+
+  // 唤醒原图后台消费者
+  function triggerOriginalConsumer() {
+    if (isOriginalConsumerRunning || !originalEnabled.value || !isScrollIdle.value || isDestroyed) {
+      return
+    }
+
+    isOriginalConsumerRunning = true
+    void runOriginalConsumerLoop()
+  }
+
+  // 原图静止消费循环：在滚动完全停止后，逐张为视口中心卡片授予原图许可
+  async function runOriginalConsumerLoop() {
+    const generation = originalConsumerGeneration
+
+    while (!isDestroyed && isScrollIdle.value && originalEnabled.value) {
+      if (generation !== originalConsumerGeneration) {
+        break
+      }
+
+      pruneOriginalPermissions()
+      const pendingItems = prioritizeOriginalItems(getPendingOriginalItems())
+      if (pendingItems.length === 0) {
+        break
+      }
+
+      const targetItem = pendingItems[0]
+      if (!targetItem || !isItemInViewport(targetItem, getOriginalPreloadViewportRatio())) {
+        break
+      }
+
+      // 原图每次只新增一个许可，真实解码压力由 AssetCard 和 Worker 队列约束
+      const nextAllowedIds = new Set(allowedOriginalAssetIds.value)
+      nextAllowedIds.add(targetItem.assetId)
+      allowedOriginalAssetIds.value = nextAllowedIds
+
+      // 原图升级没有首屏刚需，逐项让出调度机会
+      await yieldToBrowser()
+    }
+
+    if (generation === originalConsumerGeneration) {
+      isOriginalConsumerRunning = false
     }
   }
 
-  // 记录一次滚动输入：缩略图继续小批量推进，原图保留范围内许可并等空闲后补充新卡片。
+  // 记录一次滚动输入：缩略图预热平稳跟进，原图暂停升级并在空闲后恢复
   function markScrolling() {
     isScrollIdle.value = false
-    cancelOriginalSchedule()
+    pauseOriginalConsumer()
     pruneOriginalPermissions()
 
-    // 滚动中也按同一策略推进半屏缩略图，响应性由小批次和 yield 保证。
-    void runThumbnailSchedule()
+    // 唤醒缩略图持续消费者平稳推进（已在运行则自动在下一 tick 消费最新位置）
+    triggerThumbnailConsumer()
 
-    // 连续滚动时刷新空闲窗口，避免中途启动原图解码。
+    // 连续滚动时刷新空闲窗口
     if (scrollIdleTimer !== null) {
       window.clearTimeout(scrollIdleTimer)
     }
@@ -310,44 +309,47 @@ export function useCardImageScheduler(
       isScrollIdle.value = true
       scrollIdleTimer = null
 
-      // 空闲窗口只恢复原图增强，缩略图始终由同一套调度持续推进。
-      void runOriginalSchedule()
+      // 空闲窗口恢复原图增强
+      triggerOriginalConsumer()
     }, CARD_IMAGE_LOAD_IDLE_MS)
   }
 
-  // 更新虚拟列表候选项，并按当前滚动状态启动对应调度。
+  // 更新虚拟列表候选项，并按当前滚动状态启动对应调度
   function scheduleVisibleItems(items: CardImageScheduleItem[]) {
     latestItems = items
     pruneThumbnailPermissions()
     pruneOriginalPermissions()
 
-    // 视口内严格可见的卡片立即同步授权，确保首屏 DOM 立即挂载 <img> 节点
-    const nextAllowedIds = new Set(allowedThumbnailAssetIds.value)
+    // 视口内严格可见的卡片（Ratio = 0）：VIP 绿色通道，立即同步授权！
+    const currentAllowedIds = allowedThumbnailAssetIds.value
+    const nextAllowedIds = new Set(currentAllowedIds)
     let hasNewVisible = false
+
     for (const item of items) {
       if (isItemInViewport(item, 0) && !nextAllowedIds.has(item.assetId)) {
         nextAllowedIds.add(item.assetId)
         hasNewVisible = true
       }
     }
+
     if (hasNewVisible) {
       allowedThumbnailAssetIds.value = nextAllowedIds
     }
 
-    // 虚拟窗口变化后先保证半屏缩略图进入分批加载队列。
-    void runThumbnailSchedule()
+    // 唤醒后台半屏平滑预热消费者
+    triggerThumbnailConsumer()
 
     if (isScrollIdle.value) {
-      void runOriginalSchedule()
+      triggerOriginalConsumer()
     }
   }
 
-  // 查询卡片是否已经获得本轮缩略图加载许可。
+  // 查询卡片是否已经获得本轮缩略图加载许可
   function isThumbnailLoadAllowed(assetId: number): boolean {
     return allowedThumbnailAssetIds.value.has(assetId)
   }
 
-  // 查询卡片是否已经获得本轮原图加载许可。
+  // 查询卡片是否已经获得本轮原图加载许可
   function isOriginalLoadAllowed(assetId: number): boolean {
     if (!originalEnabled.value) {
       return false
@@ -359,35 +361,37 @@ export function useCardImageScheduler(
   watch(
     originalEnabled,
     (isEnabled) => {
-      cancelOriginalSchedule()
+      pauseOriginalConsumer()
       clearOriginalPermissions()
 
       if (!isEnabled) {
         return
       }
 
-      // 重新开启原图模式时，按当前虚拟候选项重新派发增强层许可。
-      void runOriginalSchedule()
+      if (isScrollIdle.value) {
+        triggerOriginalConsumer()
+      }
     },
     { immediate: true }
   )
 
   watch(isCompactWindow, () => {
-    cancelOriginalSchedule()
+    pauseOriginalConsumer()
     pruneOriginalPermissions()
 
     if (originalEnabled.value && isScrollIdle.value) {
-      void runOriginalSchedule()
+      triggerOriginalConsumer()
     }
   })
 
   onBeforeUnmount(() => {
+    isDestroyed = true
+
     if (scrollIdleTimer !== null) {
       window.clearTimeout(scrollIdleTimer)
     }
 
-    cancelThumbnailSchedule()
-    cancelOriginalSchedule()
+    pauseOriginalConsumer()
     clearOriginalPermissions()
   })
 
@@ -398,9 +402,4 @@ export function useCardImageScheduler(
     isThumbnailLoadAllowed,
     isOriginalLoadAllowed,
   }
-}
-
-// 判断异步调度失败是否来自任务取消。
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
 }

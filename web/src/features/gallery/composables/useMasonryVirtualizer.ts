@@ -162,8 +162,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize,
-    // measureElement 实测已渲染 DOM 的真实高度，修正瀑布流列布局
-    measureElement: (element) => Math.round(element.getBoundingClientRect().height),
     gap,
     get lanes() {
       return columns.value
@@ -290,18 +288,9 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     await galleryData.loadAllAssets()
   }
 
-  /**
-   * 供模板 :ref 回调使用，将真实 DOM 元素交给 virtualizer 实测高度。
-   * 瀑布流布局依赖实测高度来精确定位各列，不可省略。
-   */
-  function measureElement(element: Element | null) {
-    virtualizer.value.measureElement(element as HTMLElement | null)
-  }
-
   // 监听虚拟项变化（滚动、数据更新、列数/列宽变化）：
   // 1. 先用现有数据立即渲染（未加载项显示骨架屏）
-  // 2. 异步加载缺失分页
-  // 3. 加载完成后再次同步，将骨架屏替换为真实内容
+  // 2. 异步后台加载缺失分页（数据返回时由 paginatedAssetsVersion 触发更新替换骨架屏）
   watch(
     () => ({
       items: virtualizer.value.getVirtualItems(),
@@ -311,10 +300,9 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
       width: columnWidth.value,
       layoutMetaItems: layoutMetaItems.value,
     }),
-    async ({ items, totalCount: total }) => {
+    ({ items, totalCount: total }) => {
       syncVirtualItems(items, total)
-      await loadMissingData(items)
-      syncVirtualItems(virtualizer.value.getVirtualItems(), totalCount.value)
+      void loadMissingData(items)
     }
   )
 
@@ -333,7 +321,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     columnWidth,
     gap,
     init,
-    measureElement,
     getLaneOffset,
     getAssetHeight: (asset: Asset | null, index?: number) =>
       getAssetHeight(

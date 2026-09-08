@@ -387,10 +387,9 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
       rows: layout.value.rows,
       paginatedAssetsVersion: store.paginatedAssetsVersion,
     }),
-    async ({ items }) => {
+    ({ items }) => {
       syncVirtualRows(items)
-      await loadMissingData(items)
-      syncVirtualRows(virtualizer.value.getVirtualItems())
+      void loadMissingData(items)
     }
   )
 

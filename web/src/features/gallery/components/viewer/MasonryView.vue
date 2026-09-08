@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { Asset } from '../../types'
 import {
   useGallerySelection,
@@ -230,13 +230,6 @@ function getCardRect(index: number): DOMRect | null {
   return card?.getBoundingClientRect() ?? null
 }
 
-function measureItemElement(element: Element | ComponentPublicInstance | null) {
-  // Vue 的 :ref 回调可能传入组件实例，过滤后只将原生 HTMLElement 交给 virtualizer 实测
-  if (element instanceof HTMLElement || element === null) {
-    masonryVirtualizer.measureElement(element)
-  }
-}
-
 function getTopVisibleAssetIndex(): number {
   return masonryVirtualizer.virtualItems.value[0]?.index ?? 0
 }
@@ -271,7 +264,6 @@ defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
             <div
               v-for="virtualItem in masonryVirtualizer.virtualItems.value"
               :key="virtualItem.asset?.id ?? `placeholder-${virtualItem.index}`"
-              :ref="measureItemElement"
               :data-index="virtualItem.index"
               :style="{
                 position: 'absolute',

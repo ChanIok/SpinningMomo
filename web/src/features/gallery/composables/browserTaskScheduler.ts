@@ -44,10 +44,10 @@ export function createBrowserTaskController(priority: BrowserTaskPriority): Brow
 // 投递一个带优先级的浏览器任务。
 export async function postBrowserTask(
   priority: BrowserTaskPriority,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
   callback: () => void
 ): Promise<void> {
-  if (signal.aborted) {
+  if (signal?.aborted) {
     return
   }
 
@@ -60,7 +60,7 @@ export async function postBrowserTask(
   // rAF 降级保证任务至少让出当前输入/布局机会。
   await new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => {
-      if (!signal.aborted) {
+      if (!signal?.aborted) {
         callback()
       }
 
@@ -70,8 +70,8 @@ export async function postBrowserTask(
 }
 
 // 主动让出一次浏览器调度机会，避免批量状态更新压住输入。
-export async function yieldToBrowser(signal: AbortSignal): Promise<void> {
-  if (signal.aborted) {
+export async function yieldToBrowser(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
     return
   }
 

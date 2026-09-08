@@ -419,10 +419,9 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       layout: layout.value,
       paginatedAssetsVersion: store.paginatedAssetsVersion,
     }),
-    async ({ items, totalCount: total }) => {
+    ({ items, totalCount: total }) => {
       syncVirtualRows(items, total)
-      await loadMissingData(items, total)
-      syncVirtualRows(virtualizer.value.getVirtualItems(), totalCount.value)
+      void loadMissingData(items, total)
     }
   )
 
