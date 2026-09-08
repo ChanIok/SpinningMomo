@@ -17,6 +17,7 @@ import { RotateCcw } from '@lucide/vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 
+const router = useRouter()
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
@@ -154,7 +155,12 @@ const handleReset = async () => {
               {{ t('settings.general.update.description') }}
             </p>
           </div>
-          <Button variant="secondary" size="sm" @click="router.push({ name: 'about' })">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="cursor-pointer"
+            @click="router.push({ name: 'about' })"
+          >
             {{ t('settings.general.update.checkInAbout') }}
           </Button>
         </div>

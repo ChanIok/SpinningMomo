@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGalleryStore } from '../../store'
+import type { ViewMode } from '../../types'
 import GridView from '../viewer/GridView.vue'
 import ListView from '../viewer/ListView.vue'
 import MasonryView from '../viewer/MasonryView.vue'
@@ -35,29 +36,21 @@ const listViewRef = ref<GalleryViewExposed | null>(null)
 const masonryViewRef = ref<GalleryViewExposed | null>(null)
 const adaptiveViewRef = ref<GalleryViewExposed | null>(null)
 
-// 跟踪当前激活视图的锚点资产索引，在布局切换时传给新视图保持位置
+// 每次切换从旧视图捕获锚点，保留到新视图挂载后读取。
 const activeAnchorIndex = ref<number | undefined>(undefined)
 
-function getCurrentTopAssetIndex(): number {
-  if (viewMode.value === 'grid') return gridViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
-  if (viewMode.value === 'list') return listViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
-  if (viewMode.value === 'masonry') return masonryViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
+function getTopAssetIndex(mode: ViewMode): number {
+  if (mode === 'grid') return gridViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
+  if (mode === 'list') return listViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
+  if (mode === 'masonry') return masonryViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
   return adaptiveViewRef.value?.getTopVisibleAssetIndex?.() ?? 0
 }
 
-watch(
-  viewMode,
-  () => {
-    const topIndex = getCurrentTopAssetIndex()
-    if (topIndex >= 0 && topIndex < store.totalCount) {
-      activeAnchorIndex.value = topIndex
-    }
-    void nextTick(() => {
-      activeAnchorIndex.value = undefined
-    })
-  },
-  { flush: 'sync' }
-)
+// 默认 pre 调度在旧视图卸载前执行，并合并同一轮内的连续模式变更。
+watch(viewMode, (_mode, previousMode) => {
+  const topIndex = getTopAssetIndex(previousMode)
+  activeAnchorIndex.value = topIndex >= 0 && topIndex < store.totalCount ? topIndex : undefined
+})
 
 function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
   if (viewMode.value === 'grid') gridViewRef.value?.scrollToIndex(index, align)

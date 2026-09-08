@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGallerySelection, useGalleryLightbox, useListVirtualizer } from '../../composables'
@@ -92,6 +92,8 @@ onMounted(async () => {
     scrollContainerRef.value = scrollAreaRef.value.viewportElement
   }
 
+  // 先让虚拟器绑定 ScrollArea 的真实滚动容器，再恢复切换锚点。
+  await nextTick()
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
@@ -157,7 +159,16 @@ function getCardRect(index: number): DOMRect | null {
 }
 
 function getTopVisibleAssetIndex(): number {
-  return listVirtualizer.virtualItems.value[0]?.index ?? 0
+  const container = scrollContainerRef.value
+  if (!container) return 0
+
+  const viewportStart = container.scrollTop
+  const viewportEnd = viewportStart + container.clientHeight
+  return (
+    listVirtualizer.virtualItems.value.find(
+      (item) => item.start + item.size > viewportStart && item.start < viewportEnd
+    )?.index ?? 0
+  )
 }
 
 defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })

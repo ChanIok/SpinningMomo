@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { Asset } from '../../types'
 import {
   useGallerySelection,
@@ -91,6 +91,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  // 等滚动容器与虚拟布局完成挂载更新后，再恢复切换锚点。
+  await nextTick()
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
@@ -231,7 +233,17 @@ function getCardRect(index: number): DOMRect | null {
 }
 
 function getTopVisibleAssetIndex(): number {
-  return masonryVirtualizer.virtualItems.value[0]?.index ?? 0
+  const container = scrollContainerRef.value
+  if (!container) return 0
+
+  const viewportStart = container.scrollTop
+  const viewportEnd = viewportStart + container.clientHeight
+  // 各列卡片高度不同，逐项判断可见性，不能直接取预渲染窗口的第一项。
+  return (
+    masonryVirtualizer.virtualItems.value.find(
+      (item) => item.start + item.size > viewportStart && item.start < viewportEnd
+    )?.index ?? 0
+  )
 }
 
 defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })

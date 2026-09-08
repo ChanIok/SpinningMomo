@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { Asset } from '../../types'
 import {
   useAdaptiveVirtualizer,
@@ -84,6 +84,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  // 等滚动容器与虚拟布局完成挂载更新后，再恢复切换锚点。
+  await nextTick()
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
@@ -219,9 +221,20 @@ function getCardRect(index: number): DOMRect | null {
 }
 
 function getTopVisibleAssetIndex(): number {
+  const container = scrollContainerRef.value
+  if (!container) return 0
+
+  const viewportStart = container.scrollTop
+  const viewportEnd = viewportStart + container.clientHeight
   const rows = adaptiveVirtualizer.virtualRows.value
   for (const row of rows) {
-    if (row.items && row.items.length > 0 && row.items[0]?.index !== undefined) {
+    // 跳过分组标题和视口外的预渲染行。
+    if (
+      row.kind === 'assets' &&
+      row.items[0] !== undefined &&
+      row.start + row.size > viewportStart &&
+      row.start < viewportEnd
+    ) {
       return row.items[0].index
     }
   }

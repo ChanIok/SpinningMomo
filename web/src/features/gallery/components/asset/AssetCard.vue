@@ -54,6 +54,7 @@ const isShowingOriginal = ref(false)
 const originalPreviewUrl = ref('')
 let imageRequestVersion = 0
 let originalPreloadVersion = 0
+let renderedShortEdge = 0
 let originalPreviewAbortController: AbortController | null = null
 // 垂直滚动优先于长按；不捕获触摸指针，让浏览器在滚动开始时接管手势。
 const LONG_PRESS_DELAY = 500
@@ -90,12 +91,11 @@ const suppressHoverMask = computed(
     props.originalPreviewShortEdge * (window.devicePixelRatio || 1) >=
       MIN_ORIGINAL_CARD_SHORT_EDGE_PX
 )
-const canStartOriginalUpgrade = computed(
+const isOriginalUpgradeAllowed = computed(
   () =>
     supportsOriginalCardImage.value &&
     props.allowOriginalLoad &&
     hasThumbnailRendered.value &&
-    !isShowingOriginal.value &&
     hasOriginalPreviewShortEdge.value &&
     failedOriginalUrl.value !== originalUrl.value
 )
@@ -145,25 +145,27 @@ watch(
 )
 
 watch(
-  () => props.originalPreviewShortEdge,
-  () => {
-    // 卡片短边变化后重新生成匹配当前显示尺寸的临时预览图。
-    resetOriginalPreview()
-  }
-)
-
-watch(
-  canStartOriginalUpgrade,
-  (canStart) => {
-    if (canStart) {
-      void startOriginalUpgrade()
+  [isOriginalUpgradeAllowed, () => props.originalPreviewShortEdge],
+  ([allowed, targetEdge]) => {
+    if (!allowed) {
+      // 滚动开始或设置关闭时，停止本次挂载里尚未完成的原图升级。
+      if (!props.allowOriginalLoad || !supportsOriginalCardImage.value) {
+        cancelOriginalPreviewRequest()
+      }
       return
     }
 
-    // 滚动开始或设置关闭时，停止本次挂载里尚未完成的原图升级。
-    if (!props.allowOriginalLoad || !supportsOriginalCardImage.value) {
+    // 若当前已显示的高清图尺寸 >= 目标尺寸（卡片微调或缩小），无需重新生成
+    if (isShowingOriginal.value && renderedShortEdge >= targetEdge) {
+      return
+    }
+
+    // 若有旧尺寸请求正在进行，取消旧请求并以新尺寸重新开始
+    if (originalPreviewAbortController) {
       cancelOriginalPreviewRequest()
     }
+
+    void startOriginalUpgrade()
   },
   { immediate: true }
 )
@@ -336,6 +338,7 @@ function resetOriginalPreview() {
   cancelOriginalPreviewRequest()
   revokeOriginalPreviewUrl()
   isShowingOriginal.value = false
+  renderedShortEdge = 0
 }
 
 // 释放当前临时预览 URL，避免虚拟滚动反复挂载后泄漏 Blob。
@@ -350,7 +353,7 @@ function revokeOriginalPreviewUrl() {
 
 // 请求 Worker 生成短边高清预览，完成后才允许当前卡片切换显示。
 async function startOriginalUpgrade() {
-  if (!canStartOriginalUpgrade.value || originalPreviewAbortController) {
+  if (!isOriginalUpgradeAllowed.value || originalPreviewAbortController) {
     return
   }
 
@@ -386,6 +389,7 @@ async function startOriginalUpgrade() {
       // 新预览图确认可绘制后，再替换旧 URL 并显示覆盖层。
       revokeOriginalPreviewUrl()
       originalPreviewUrl.value = previewUrl
+      renderedShortEdge = props.originalPreviewShortEdge
       imageError.value = false
       isShowingOriginal.value = true
     } catch (error) {

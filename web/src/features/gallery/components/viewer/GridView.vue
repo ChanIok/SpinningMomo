@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
 import {
@@ -89,6 +89,8 @@ const { markers: railMarkers, labels: railLabels } = useTimelineRail({
 })
 
 onMounted(async () => {
+  // 等滚动容器与虚拟布局完成挂载更新后，再恢复切换锚点。
+  await nextTick()
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
@@ -222,9 +224,20 @@ function getAssetIndex(row: VirtualRow, offset: number) {
 }
 
 function getTopVisibleAssetIndex(): number {
+  const container = scrollContainerRef.value
+  if (!container) return 0
+
+  const viewportStart = container.scrollTop
+  const viewportEnd = viewportStart + container.clientHeight
   const rows = gridVirtualizer.virtualRows.value
   for (const row of rows) {
-    if (row.kind === 'assets' && row.assetStartIndex !== undefined) {
+    // 虚拟窗口包含预渲染行，锚点只取与滚动视口相交的资产行。
+    if (
+      row.kind === 'assets' &&
+      row.assetStartIndex !== undefined &&
+      row.start + row.size > viewportStart &&
+      row.start < viewportEnd
+    ) {
       return row.assetStartIndex
     }
   }
