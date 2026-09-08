@@ -285,6 +285,8 @@
   "settings.adbMode.serial.placeholder": "例如 emulator-5554",
   "settings.adbMode.autoConnect.label": "启动时自动连接",
   "settings.adbMode.autoConnect.description": "应用启动时自动连接 ADB 设备；运行中请通过悬浮窗中的“ADB模式”切换。",
+  "settings.adbMode.useResolutionLongEdge.label": "分辨率按长边计算",
+  "settings.adbMode.useResolutionLongEdge.description": "分辨率预设以设备长边像素为基准（如 1080P 在 21:9 下为 1920×823），适合受限于设备长边上限时使用。",
   "settings.adbMode.status.label": "连接状态",
   "settings.adbMode.status.unknown": "未知",
   "settings.adbMode.status.disconnected": "未连接",

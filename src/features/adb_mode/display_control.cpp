@@ -96,7 +96,7 @@ auto reset(const AdbConnectionConfig& config, std::string_view serial)
 // 根据宽高比和预设，以设备物理尺寸为基准计算目标分辨率。
 auto calculate_target_resolution(double ratio,
                                  const features::window_control::ResolutionPresetInput& preset,
-                                 const Resolution& base, bool align_to_8, bool use_short_edge)
+                                 const Resolution& base, bool align_to_8, bool use_long_edge)
     -> Resolution {
   if (is_default_preset(preset)) {
     return base;
@@ -106,7 +106,7 @@ auto calculate_target_resolution(double ratio,
       ratio, preset,
       features::window_control::ResolutionCalculationOptions{
           .align_to_8 = align_to_8,
-          .use_short_edge = use_short_edge,
+          .use_long_edge = use_long_edge,
           .screen_width = base.width,
           .screen_height = base.height,
       });

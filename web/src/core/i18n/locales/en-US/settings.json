@@ -285,6 +285,8 @@
   "settings.adbMode.serial.placeholder": "For example emulator-5554",
   "settings.adbMode.autoConnect.label": "Connect on Startup",
   "settings.adbMode.autoConnect.description": "Connect to an ADB device when the app starts; use the floating-window “ADB Mode” toggle while running.",
+  "settings.adbMode.useResolutionLongEdge.label": "Use Resolution as Long Edge",
+  "settings.adbMode.useResolutionLongEdge.description": "Resolution presets use the device long edge as baseline (e.g. 1080P under 21:9 is 1920×823), for use when constrained by the device long-edge limit.",
   "settings.adbMode.status.label": "Connection Status",
   "settings.adbMode.status.unknown": "Unknown",
   "settings.adbMode.status.disconnected": "Disconnected",

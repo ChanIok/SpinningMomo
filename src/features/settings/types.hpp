@@ -150,6 +150,10 @@ struct AppSettings {
       std::uint32_t record_bitrate = 40'000'000;  // 目标平均码率 (bps)，默认 40Mbps (VBR)
       std::uint32_t record_fps = 60;              // 录制最大帧率，默认 60
       std::string record_codec = "h264";          // 录制编码格式: "h264" | "h265"
+
+      // ADB 分辨率预设按长边计算。模拟器/真机对长边有上限（如 1920），按短边模式下
+      // 21:9 会被推到 2520×1080 导致 wm size 失败；按长边则固定长边（如 1080P 长边 1920）。
+      bool use_resolution_long_edge = true;
     } adb_mode;
 
     struct Screenshot {

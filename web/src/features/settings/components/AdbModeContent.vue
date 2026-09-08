@@ -349,6 +349,24 @@ onBeforeUnmount(() => {
           />
         </ItemActions>
       </Item>
+
+      <!-- 分辨率按长边计算：规避模拟器/真机长边上限 -->
+      <Item variant="surface" size="sm">
+        <ItemContent>
+          <ItemTitle>{{ t('settings.adbMode.useResolutionLongEdge.label') }}</ItemTitle>
+          <ItemDescription>
+            {{ t('settings.adbMode.useResolutionLongEdge.description') }}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Switch
+            :model-value="adbModeSettings.useResolutionLongEdge"
+            @update:model-value="
+              (value) => updateSettings({ useResolutionLongEdge: Boolean(value) })
+            "
+          />
+        </ItemActions>
+      </Item>
     </ItemGroup>
 
     <div class="pt-4">

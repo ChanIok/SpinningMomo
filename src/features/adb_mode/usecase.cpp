@@ -266,10 +266,11 @@ auto current_ratio_snapshot(const core::AppState& state) -> std::optional<double
 }
 
 // 复制窗口尺寸计算所需的两个设置开关。
-auto get_window_calculation_settings(const core::AppState& state) -> std::pair<bool, bool> {
+// ADB 独立持有 use_resolution_long_edge，不再与窗口控制共用 use_resolution_short_edge。
+auto get_adb_calculation_settings(const core::AppState& state) -> std::pair<bool, bool> {
   std::scoped_lock lock(state.settings->mutation_mutex);
   return {state.settings->raw.window.align_window_size_to_8,
-          state.settings->raw.window.use_resolution_short_edge};
+          state.settings->raw.features.adb_mode.use_resolution_long_edge};
 }
 
 // 执行设备连接：状态切 Connecting → 构造并解析配置 → 打开完整设备会话 → 保存会话并广播状态
@@ -687,10 +688,10 @@ auto handle_ratio_changed(core::AppState& state, std::size_t ratio_index, double
     -> void {
   const auto current_resolution_index = state.floating_window->ui.current_resolution_index;
   const auto resolution_preset = resolution_preset_at(state, current_resolution_index);
-  const auto [align_to_8, use_short_edge] = get_window_calculation_settings(state);
+  const auto [align_to_8, use_long_edge] = get_adb_calculation_settings(state);
 
   if (!enqueue_task(state, [&state, ratio_index, ratio_value, current_resolution_index,
-                            resolution_preset, align_to_8, use_short_edge]() {
+                            resolution_preset, align_to_8, use_long_edge]() {
         auto session_result = get_active_session(state);
         if (!session_result) {
           const std::expected<void, std::string> failure = std::unexpected(session_result.error());
@@ -708,7 +709,7 @@ auto handle_ratio_changed(core::AppState& state, std::size_t ratio_index, double
 
         const auto target = display_control::calculate_target_resolution(
             ratio_value, preset, session_result.value()->physical_display, align_to_8,
-            use_short_edge);
+            use_long_edge);
         auto result = apply_resolution_impl(state, target);
         if (!result) {
           set_error_state(state, result.error(), true);
@@ -731,10 +732,10 @@ auto handle_resolution_changed(core::AppState& state, std::size_t resolution_ind
 
   const auto resolution_preset = resolution_preset_at(state, resolution_index);
   const auto ratio = current_ratio_snapshot(state);
-  const auto [align_to_8, use_short_edge] = get_window_calculation_settings(state);
+  const auto [align_to_8, use_long_edge] = get_adb_calculation_settings(state);
 
   if (!enqueue_task(state, [&state, resolution_index, resolution_preset, ratio, align_to_8,
-                            use_short_edge]() {
+                            use_long_edge]() {
         auto session_result = get_active_session(state);
         if (!session_result) {
           const std::expected<void, std::string> failure = std::unexpected(session_result.error());
@@ -747,7 +748,7 @@ auto handle_resolution_changed(core::AppState& state, std::size_t resolution_ind
             base.width > 0 && base.height > 0 ? static_cast<double>(base.width) / base.height
                                               : 16.0 / 9.0);
         const auto target = display_control::calculate_target_resolution(
-            current_ratio, resolution_preset, base, align_to_8, use_short_edge);
+            current_ratio, resolution_preset, base, align_to_8, use_long_edge);
         auto result = apply_resolution_impl(state, target);
         if (!result) {
           set_error_state(state, result.error(), true);

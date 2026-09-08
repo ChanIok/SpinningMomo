@@ -36,7 +36,8 @@ struct ResolutionPresetInput {
 
 struct ResolutionCalculationOptions {
   bool align_to_8 = false;
-  bool use_short_edge = false;
+  bool use_short_edge = false;  // 优先级低于 use_long_edge
+  bool use_long_edge = false;
   int screen_width = 0;
   int screen_height = 0;
 };
