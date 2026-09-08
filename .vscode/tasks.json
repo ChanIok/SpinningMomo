@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: Build capture JAR",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/build-android.js"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Probe device",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/scripts/run-android.js",
+        "--adb", "${input:androidAdbPath}",
+        "--serial", "${input:androidDeviceSerial}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Capture JPEG",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/scripts/run-android.js",
+        "--adb", "${input:androidAdbPath}",
+        "--serial", "${input:androidDeviceSerial}",
+        "--screenshot"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "androidAdbPath",
+      "type": "promptString",
+      "description": "项目当前使用的 adb.exe 完整路径（无需额外引号）"
+    },
+    {
+      "id": "androidDeviceSerial",
+      "type": "promptString",
+      "description": "已连接的模拟器序列号，例如 127.0.0.1:7555"
+    }
+  ]
+}

@@ -17,8 +17,8 @@ auto format_sse_message(const std::string& event_data) -> std::string {
 
 auto add_connection(core::AppState& state, uWS::HttpResponse<false>* response,
                     std::string allowed_origin) -> void {
-  if (!state.http_server || !response) {
-    Logger().error("Cannot add SSE connection: invalid state or response");
+  if (!response) {
+    Logger().error("Cannot add SSE connection: response is null");
     return;
   }
 
@@ -56,10 +56,6 @@ auto add_connection(core::AppState& state, uWS::HttpResponse<false>* response,
 }
 
 auto remove_connection(core::AppState& state, const std::string& client_id) -> void {
-  if (!state.http_server) {
-    return;
-  }
-
   auto& connections = state.http_server->sse_connections;
   auto& mtx = state.http_server->sse_connections_mutex;
 
@@ -82,10 +78,6 @@ auto remove_connection(core::AppState& state, const std::string& client_id) -> v
 }
 
 auto close_all_connections(core::AppState& state) -> void {
-  if (!state.http_server) {
-    return;
-  }
-
   auto& connections = state.http_server->sse_connections;
   auto& mtx = state.http_server->sse_connections_mutex;
 
@@ -119,27 +111,28 @@ auto close_all_connections(core::AppState& state) -> void {
 
 // 将会话关闭动作投递到 uWS 事件循环，供其他线程安全调用。
 auto request_close_all_connections(core::AppState& state) -> void {
-  if (!state.http_server || !state.http_server->loop) {
+  auto& server = *state.http_server;
+  std::lock_guard runtime_lock(server.runtime_mutex);
+  if (!server.is_running.load() || !server.loop) {
     return;
   }
 
-  state.http_server->loop->defer([&state]() { close_all_connections(state); });
+  // 持有运行时锁直到 defer 投递完成，避免线程收尾时继续访问 loop。
+  server.loop->defer([&state]() { close_all_connections(state); });
 }
 
 auto broadcast_event(core::AppState& state, const std::string& event_data) -> void {
-  if (!state.http_server || !state.http_server->is_running) {
+  auto& server = *state.http_server;
+  std::lock_guard runtime_lock(server.runtime_mutex);
+  if (!server.is_running.load() || !server.loop) {
     return;
   }
 
-  auto* loop = state.http_server->loop;
-  if (!loop) {
-    return;
-  }
-
+  auto* loop = server.loop;
   auto sse_message = format_sse_message(event_data);
 
   loop->defer([&state, sse_message = std::move(sse_message)]() {
-    if (!state.http_server) {
+    if (!state.http_server->is_running.load()) {
       return;
     }
 
@@ -174,10 +167,6 @@ auto broadcast_event(core::AppState& state, const std::string& event_data) -> vo
 }
 
 auto get_connection_count(const core::AppState& state) -> size_t {
-  if (!state.http_server) {
-    return 0;
-  }
-
   auto& connections = state.http_server->sse_connections;
   auto& mtx = state.http_server->sse_connections_mutex;
 

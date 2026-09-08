@@ -11,6 +11,7 @@
 #include "core/state/app_state.hpp"
 #include "core/worker_pool/worker_pool.hpp"
 #include "extensions/infinity_nikki/photo_service.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/gallery/gallery.hpp"
 #include "features/letterbox/letterbox.hpp"
 #include "features/overlay/overlay.hpp"
@@ -48,6 +49,11 @@ auto shutdown_application(core::AppState& state) -> void {
   // 清理顺序应该与 core::initializer::initialize_application 中的初始化顺序相反
   // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
   features::recording::stop_recording_if_running(state);
+
+  // ADB 模式可能修改了设备的系统显示设置；先让专用线程恢复并退出。
+  if (state.adb_mode) {
+    features::adb_mode::shutdown(state);
+  }
 
   core::dialog_service::stop(state);
 

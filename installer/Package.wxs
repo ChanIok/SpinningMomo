@@ -107,6 +107,7 @@
     <Feature Id="MainFeature" Title="SpinningMomo" Level="1">
       <ComponentGroupRef Id="MainComponents" />
       <ComponentGroupRef Id="WebResources" />
+      <ComponentGroupRef Id="CaptureResources" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
       <ComponentRef Id="CleanupUserData" />
@@ -128,6 +129,7 @@
         <Directory Id="INSTALLFOLDER" Name="SpinningMomo">
           <Directory Id="ResourcesFolder" Name="resources">
             <Directory Id="WebFolder" Name="web" />
+            <Directory Id="AndroidFolder" Name="android" />
           </Directory>
         </Directory>
       </Directory>
@@ -152,6 +154,13 @@
   <Fragment>
     <ComponentGroup Id="WebResources" Directory="WebFolder">
       <Files Include="$(var.DistDir)\resources\web\**" />
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Android capture service used by ADB JPEG screenshots -->
+  <Fragment>
+    <ComponentGroup Id="CaptureResources" Directory="AndroidFolder">
+      <File Source="$(var.DistDir)\resources\android\momo-capture.jar" />
     </ComponentGroup>
   </Fragment>
 

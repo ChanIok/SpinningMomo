@@ -14,6 +14,7 @@ import WindowSceneContent from '../components/WindowSceneContent.vue'
 import FloatingWindowContent from '../components/FloatingWindowContent.vue'
 import BackupSettingsContent from '../components/BackupSettingsContent.vue'
 import NetworkAccessContent from '../components/NetworkAccessContent.vue'
+import AdbModeContent from '../components/AdbModeContent.vue'
 import { useSettingsStore } from '../store'
 import { SETTINGS_COMPACT_BREAKPOINT, isValidSettingsPageKey, type SettingsPageKey } from '../menu'
 
@@ -92,6 +93,7 @@ watch(
           <HotkeySettingsContent v-if="routeSection === 'hotkeys'" />
           <CaptureSettingsContent v-if="routeSection === 'capture'" />
           <ExtensionsContent v-if="routeSection === 'extensions'" />
+          <AdbModeContent v-if="routeSection === 'adbMode'" />
           <WindowSceneContent v-if="routeSection === 'windowScene'" />
           <FloatingWindowContent v-if="routeSection === 'floatingWindow'" />
           <AppearanceContent v-if="routeSection === 'webAppearance'" />
@@ -112,6 +114,7 @@ watch(
               <HotkeySettingsContent v-if="pcActivePage === 'hotkeys'" />
               <CaptureSettingsContent v-if="pcActivePage === 'capture'" />
               <ExtensionsContent v-if="pcActivePage === 'extensions'" />
+              <AdbModeContent v-if="pcActivePage === 'adbMode'" />
               <WindowSceneContent v-if="pcActivePage === 'windowScene'" />
               <FloatingWindowContent v-if="pcActivePage === 'floatingWindow'" />
               <AppearanceContent v-if="pcActivePage === 'webAppearance'" />

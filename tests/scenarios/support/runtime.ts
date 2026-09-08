@@ -428,6 +428,16 @@ export class ApplicationHarness {
       throw new Error("测试程序已经启动");
     }
 
+    // 进程重启时日志文件会保留旧内容；只用本次启动新增的日志判断就绪状态。
+    const previousLog = await readFile(this.environment.logPath, "utf8").catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") {
+          return "";
+        }
+        throw error;
+      },
+    );
+
     this.child = spawn(this.environment.executablePath, [], {
       cwd: this.environment.appDirectory,
       stdio: "ignore",
@@ -451,8 +461,9 @@ export class ApplicationHarness {
           },
         );
 
-        const appReady = log.includes("SpinningMomo startup ready");
-        const galleryReady = log.includes("Gallery startup initialization completed");
+        const newLog = log.startsWith(previousLog) ? log.slice(previousLog.length) : log;
+        const appReady = newLog.includes("SpinningMomo startup ready");
+        const galleryReady = newLog.includes("Gallery startup initialization completed");
         return appReady && galleryReady ? true : undefined;
       },
       { timeoutMs: 20_000, intervalMs: 100 },

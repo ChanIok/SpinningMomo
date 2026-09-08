@@ -2,6 +2,7 @@
 
 #include "vendor/std.hpp"
 
+#include "core/rpc/endpoints/adb_mode/adb_mode.hpp"
 #include "core/rpc/endpoints/backup/backup.hpp"
 #include "core/rpc/endpoints/clipboard/clipboard.hpp"
 #include "core/rpc/endpoints/dialog/dialog.hpp"
@@ -66,6 +67,9 @@ auto register_all_endpoints(core::AppState& state) -> void {
 
   // 注册窗口控制端点
   endpoints::window_control::register_all(state);
+
+  // 注册 ADB 模式端点
+  endpoints::adb_mode::register_all(state);
 
   Logger().info("RPC endpoints registration completed");
 }

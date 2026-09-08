@@ -5,6 +5,7 @@ function main() {
   const projectDir = path.join(__dirname, "..");
   const distDir = path.join(projectDir, "dist");
   const webDist = path.join(projectDir, "web", "dist");
+  const androidJar = path.join(projectDir, "build", "android", "momo-capture.jar");
   const exePath = path.join(projectDir, "build", "windows", "x64", "release", "SpinningMomo.exe");
   const licensePath = path.join(projectDir, "LICENSE");
 
@@ -15,6 +16,10 @@ function main() {
 
   if (!fs.existsSync(exePath)) {
     console.error("SpinningMomo.exe not found. Run 'pnpm run build:cpp' first.");
+    process.exit(1);
+  }
+  if (!fs.existsSync(androidJar)) {
+    console.error("Android capture JAR not found. Run 'pnpm run build:android' first.");
     process.exit(1);
   }
   if (!fs.existsSync(licensePath)) {
@@ -32,6 +37,8 @@ function main() {
   fs.copyFileSync(exePath, path.join(distDir, "SpinningMomo.exe"));
   fs.copyFileSync(licensePath, path.join(distDir, "LICENSE"));
   fs.cpSync(webDist, path.join(distDir, "resources", "web"), { recursive: true });
+  fs.mkdirSync(path.join(distDir, "resources", "android"), { recursive: true });
+  fs.copyFileSync(androidJar, path.join(distDir, "resources", "android", "momo-capture.jar"));
 
   console.log("Done!");
 }

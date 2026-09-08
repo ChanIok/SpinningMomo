@@ -5,6 +5,7 @@
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/photography/state.hpp"
 #include "ui/photography_panel/photography_panel.hpp"
 #include "utils/logger/logger.hpp"
@@ -39,6 +40,12 @@ auto stop(core::AppState& state) -> void {
 auto toggle(core::AppState& state) -> void {
   if (state.photography->enabled.load(std::memory_order_acquire)) {
     stop(state);
+    return;
+  }
+
+  if (features::adb_mode::is_connected(state)) {
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.adb_feature_unavailable"]);
     return;
   }
 

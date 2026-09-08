@@ -178,6 +178,19 @@ export interface AppSettings {
     externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
     savedFileViewAction: 'default_app' | 'reveal_in_explorer' // 保存成功通知点击“查看”后的行为
 
+    adbMode: {
+      useCustomAdbPath: boolean
+      adbPath: string // 自定义 ADB 可执行文件路径
+      host: string
+      port: number
+      serial: string
+      autoConnect: boolean
+      useResolutionLongEdge: boolean // 分辨率预设按长边计算，规避设备长边上限，默认 true
+      recordBitrate: number // 目标平均码率 (bps)，默认 40000000 (40 Mbps)
+      recordFps: number // 录制最大帧率，默认 60
+      recordCodec: 'h264' | 'h265' // 录制编码格式，默认 'h264'
+    }
+
     screenshot: {
       fileFormat: 'png' | 'jpeg'
       enableHdr: boolean
@@ -319,6 +332,18 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     organizeOutputByWindowTitle: false,
     externalAlbumPath: '',
     savedFileViewAction: 'default_app',
+    adbMode: {
+      useCustomAdbPath: false,
+      adbPath: '',
+      host: '127.0.0.1',
+      port: 7555,
+      serial: '',
+      autoConnect: false,
+      useResolutionLongEdge: true,
+      recordBitrate: 40000000,
+      recordFps: 60,
+      recordCodec: 'h264',
+    },
     screenshot: {
       fileFormat: 'png',
       enableHdr: false,

@@ -20,11 +20,6 @@ namespace core::http_server::static_content {
 // 注册 HTTP 路径解析器：独占修改注册表并转移 resolver 所有权
 auto register_path_resolver(core::AppState& state, std::string prefix, PathResolver resolver)
     -> void {
-  if (!state.http_server) {
-    Logger().error("HttpServer state not initialized, cannot register path resolver");
-    return;
-  }
-
   auto& registry = state.http_server->path_resolvers;
   std::unique_lock lock(registry.mutex);
 
@@ -35,10 +30,6 @@ auto register_path_resolver(core::AppState& state, std::string prefix, PathResol
 
 // 注销指定前缀的 HTTP 路径解析器，并等待正在执行的读取离开共享区
 auto unregister_path_resolver(core::AppState& state, std::string_view prefix) -> void {
-  if (!state.http_server) {
-    return;
-  }
-
   auto& registry = state.http_server->path_resolvers;
   std::unique_lock lock(registry.mutex);
 
@@ -50,10 +41,6 @@ auto unregister_path_resolver(core::AppState& state, std::string_view prefix) ->
 // 按注册顺序查找并调用首个能够解析当前 URL 的 HTTP resolver
 auto try_custom_resolve(core::AppState& state, std::string_view url_path)
     -> std::optional<PathResolution> {
-  if (!state.http_server) {
-    return std::nullopt;
-  }
-
   auto& registry = state.http_server->path_resolvers;
   // resolver 执行期间保持共享锁，让注销能够可靠等待在途请求结束
   std::shared_lock lock(registry.mutex);

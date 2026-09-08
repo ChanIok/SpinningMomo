@@ -3,6 +3,20 @@ import { isWebView } from '@/core/env'
 import { isLocalAccess } from '@/core/access'
 import type { AppSettings, RuntimeCapabilities } from './types'
 
+export interface AdbModeStatus {
+  connected: boolean
+  operationInProgress: boolean
+  connectionState: string
+  adbPath: string
+  serial: string
+  host: string
+  port: number
+  restorePending: boolean
+  displayWidth: number
+  displayHeight: number
+  lastError: string
+}
+
 // 设置页 RPC 入口；LAN 状态和令牌接口只暴露给本机设置页面。
 export const settingsApi = {
   get: async (): Promise<AppSettings> => {
@@ -26,6 +40,56 @@ export const settingsApi = {
     // 令牌轮换由后端完成，并返回新的完整链接状态。
     return call<LanAccessInfo>('lanAccess.resetToken')
   },
+}
+
+export const adbModeApi = {
+  getStatus: async (): Promise<AdbModeStatus> => {
+    return call<AdbModeStatus>('adbMode.getStatus')
+  },
+
+  selectAdbExecutable: async (title: string): Promise<string | null> => {
+    if (!isLocalAccess()) {
+      throw new Error('ADB file selection is only available in the local application window.')
+    }
+
+    const result = await call<{ paths: string[] }>(
+      'dialog.openFile',
+      {
+        title,
+        filter: 'Executable files (*.exe)|*.exe|All files (*.*)|*.*',
+        allow_multiple: false,
+        parentWindowMode: isWebView() ? 1 : 2,
+      },
+      0
+    )
+
+    return result.paths?.[0] || null
+  },
+
+  listDevices: async (): Promise<DiscoveredAdbDevice[]> => {
+    return call<DiscoveredAdbDevice[]>('adbMode.listDevices')
+  },
+
+  connectEndpoint: async (params: {
+    host: string
+    port: number
+  }): Promise<ConnectEndpointResult> => {
+    return call<ConnectEndpointResult>('adbMode.connectEndpoint', params)
+  },
+}
+
+export interface DiscoveredAdbDevice {
+  serial: string
+  kind: 'mumu' | 'ldplayer' | 'bluestacks' | 'emulator' | 'device' | string
+  model: string
+  state: string
+  isEmulator: boolean
+}
+
+export interface ConnectEndpointResult {
+  success: boolean
+  serial: string
+  error: string
 }
 
 export interface LanNetworkAddress {

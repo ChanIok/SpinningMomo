@@ -6,7 +6,10 @@
 
 #include "core/events/events.hpp"
 #include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/recording.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/recording/recording.hpp"
 #include "features/recording/session.hpp"
 #include "features/recording/state.hpp"
@@ -19,8 +22,108 @@
 #include "utils/media/audio_capture.hpp"
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
+#include "utils/system/system.hpp"
 
 namespace features::recording {
+
+namespace {
+
+// 显示 ADB 录制停止结果通知
+auto show_adb_recording_stop_notification(
+    core::AppState& state, const features::adb_mode::recording::AdbRecordResult& stop_result)
+    -> void {
+  using features::adb_mode::recording::AdbRecordResult;
+
+  switch (stop_result.kind) {
+    case AdbRecordResult::Kind::Saved: {
+      core::notifications::NotificationOptions options;
+      options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
+      options.message = utils::string::FromUtf8(state.i18n->texts["message.recording_saved"]) +
+                        stop_result.output_path.wstring();
+
+      core::notifications::NotificationAction view_action;
+      view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
+      view_action.callback = [saved_path = stop_result.output_path](core::AppState& app_state) {
+        const auto& action = app_state.settings->raw.features.saved_file_view_action;
+        auto action_result = action == "reveal_in_explorer"
+                                 ? utils::system::reveal_file_in_explorer(saved_path)
+                                 : utils::system::open_file_with_default_app(saved_path);
+        if (!action_result) {
+          Logger().warn("Failed to handle recording view action: {}", action_result.error());
+        }
+      };
+      options.action = std::move(view_action);
+      core::notifications::post_notification_request(state, std::move(options));
+      break;
+    }
+
+    case AdbRecordResult::Kind::Discarded: {
+      auto detail = stop_result.error.empty() ? std::string{} : (": " + stop_result.error);
+      features::recording::notify_message(
+          state, state.i18n->texts["message.recording_discarded"] + detail);
+      break;
+    }
+
+    case AdbRecordResult::Kind::PublishFailed: {
+      auto detail = stop_result.error.empty()
+                        ? utils::string::ToUtf8(stop_result.output_path.wstring())
+                        : stop_result.error;
+      features::recording::notify_message(
+          state, state.i18n->texts["message.recording_stop_failed"] + detail);
+      break;
+    }
+
+    case AdbRecordResult::Kind::NotRecording:
+    default:
+      break;
+  }
+}
+
+// 执行 ADB 模式下的录制启停切换
+auto toggle_adb_recording(core::AppState& state) -> std::expected<void, std::string> {
+  // 1. 若当前正在录制，则停止录制并推送结果
+  if (features::adb_mode::is_recording(state)) {
+    auto stop_result = features::adb_mode::stop_recording(state);
+    core::events::post(state, ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+    if (stop_result.kind != features::adb_mode::recording::AdbRecordResult::Kind::NotRecording) {
+      show_adb_recording_stop_notification(state, stop_result);
+    }
+    return {};
+  }
+
+  // 2. 否则启动 ADB 录制
+  auto output_dir_result =
+      utils::path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+  if (!output_dir_result) {
+    features::recording::notify_message(
+        state, state.i18n->texts["message.recording_start_failed"] + output_dir_result.error());
+    return std::unexpected("Failed to get output directory: " + output_dir_result.error());
+  }
+
+  auto output_path =
+      features::recording::session::build_output_path_in_directory(*output_dir_result);
+
+  const auto& adb_settings = state.settings->raw.features.adb_mode;
+  const auto fps = adb_settings.record_fps > 0 ? adb_settings.record_fps : 60;
+  const auto bitrate = adb_settings.record_bitrate > 0 ? adb_settings.record_bitrate : 16'000'000;
+  const bool is_h265 = (features::recording::video_codec_from_string(adb_settings.record_codec) ==
+                        features::recording::VideoCodec::H265);
+
+  auto start_result =
+      features::adb_mode::start_recording(state, output_path, fps, bitrate, is_h265);
+  if (!start_result) {
+    const auto formatted = core::i18n::get_text(state.i18n->texts, start_result.error());
+    features::recording::notify_message(
+        state, state.i18n->texts["message.recording_start_failed"] + formatted);
+    return std::unexpected(start_result.error());
+  }
+
+  features::recording::notify_message(state, state.i18n->texts["message.recording_started"]);
+  core::events::post(state, ui::floating_window::events::RecordingToggleEvent{.enabled = true});
+  return {};
+}
+
+}  // namespace
 
 // 录制开关：正在录就停止，空闲就启动。启动前校验窗口、配置、HDR 条件
 auto toggle_recording(core::AppState& state) -> std::expected<void, std::string> {
@@ -33,6 +136,12 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return std::unexpected("Recording shutdown is in progress");
   }
 
+  // 若当前已连接 ADB，直接路由至 ADB 专属录制工作流
+  if (features::adb_mode::is_connected(state)) {
+    return toggle_adb_recording(state);
+  }
+
+  // --- 以下是 Windows 本地窗口录制工作流 ---
   // 当前正在录制 → 按一下就是停止
   auto status = state.recording->status.load(std::memory_order_acquire);
   if (status == features::recording::RecordingStatus::Recording) {
@@ -145,6 +254,7 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return result;
   }
 
+  // CAS 将状态从 Idle 原子切换为 Starting，防止并发 toggle 重复启动
   auto expected_status = features::recording::RecordingStatus::Idle;
   if (!state.recording->status.compare_exchange_strong(
           expected_status, features::recording::RecordingStatus::Starting,
@@ -152,12 +262,14 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return std::unexpected("Recording is not idle");
   }
 
+  // 将目标窗口与组装好的配置挂起到控制请求槽，供控制线程取出执行
   {
     std::lock_guard request_lock(state.recording->control_request_mutex);
     state.recording->pending_start_request =
         features::recording::StartRequest{.target_window = *target, .config = config};
   }
 
+  // 投递 UserStart 动作；入队失败时回滚状态与挂起请求
   if (!features::recording::request_control_action(
           state, features::recording::RecordingControlAction::UserStart)) {
     std::lock_guard request_lock(state.recording->control_request_mutex);
@@ -174,6 +286,15 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
 
 // 应用退出时停止录制：先设 shutdown 标志，再投递 ShutdownStop 到控制线程
 auto stop_recording_if_running(core::AppState& state) -> void {
+  // 若当前处于 ADB 录制中，先停止 ADB 录制并发布产物
+  if (features::adb_mode::is_recording(state)) {
+    auto stop_result = features::adb_mode::stop_recording(state);
+    core::events::post(state, ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+    if (stop_result.kind != features::adb_mode::recording::AdbRecordResult::Kind::NotRecording) {
+      show_adb_recording_stop_notification(state, stop_result);
+    }
+  }
+
   if (!state.recording) {
     return;
   }

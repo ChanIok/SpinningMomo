@@ -111,12 +111,6 @@ auto handle_token_exchange(core::AppState& state, auto* res, auto* req) -> void 
 
 // 注册令牌交换、RPC、SSE、CORS 和静态资源路由。
 auto register_routes(core::AppState& state, uWS::App& app) -> void {
-  // 检查状态是否已初始化
-  if (!state.http_server) {
-    Logger().error("HTTP server not initialized");
-    return;
-  }
-
   // 令牌只在低频的会话建立路由中解析，普通静态资源请求不承担这项工作。
   app.get("/t/:token", [&state](auto* res, auto* req) { handle_token_exchange(state, res, req); });
 
@@ -197,7 +191,7 @@ auto register_routes(core::AppState& state, uWS::App& app) -> void {
 
   // 注册SSE端点
   app.get("/sse", [&state](auto* res, auto* req) {
-    if (!state.http_server || !state.http_server->is_running) {
+    if (!state.http_server->is_running) {
       res->close();
       return;
     }

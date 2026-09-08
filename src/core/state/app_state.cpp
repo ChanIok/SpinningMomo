@@ -15,6 +15,7 @@
 #include "core/tasks/state.hpp"
 #include "core/webview/state.hpp"
 #include "core/worker_pool/state.hpp"
+#include "features/adb_mode/state.hpp"
 #include "features/gallery/state.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/overlay/state.hpp"
@@ -64,7 +65,8 @@ AppState::AppState()
       window_control(std::make_unique<features::window_control::WindowControlState>()),
       screenshot(std::make_unique<features::screenshot::ScreenshotState>()),
       recording(std::make_unique<features::recording::RecordingState>()),
-      photography(std::make_unique<features::photography::PhotographyState>()) {}
+      photography(std::make_unique<features::photography::PhotographyState>()),
+      adb_mode(std::make_unique<features::adb_mode::AdbModeState>()) {}
 
 AppState::~AppState() = default;
 

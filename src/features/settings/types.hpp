@@ -136,6 +136,26 @@ struct AppSettings {
     std::string saved_file_view_action =
         "default_app";  // 保存成功通知点击“查看”后的行为: "default_app" | "reveal_in_explorer"
 
+    // ADB 模式配置。ADB 设备是否正在使用由悬浮窗命令控制；自动模式只查找正在运行的
+    // MuMu v5+、雷电或蓝叠，其他设备通过 adb_path 配置。
+    struct AdbMode {
+      bool use_custom_adb_path = false;  // 是否使用用户指定的 ADB 可执行文件
+      std::string adb_path = "";         // 自定义 ADB 可执行文件路径
+      std::string host = "127.0.0.1";
+      int port = 7555;
+      std::string serial = "";  // 为空时使用 host:port 对应的设备
+      bool auto_connect = false;
+
+      // ADB 录制专属配置
+      std::uint32_t record_bitrate = 40'000'000;  // 目标平均码率 (bps)，默认 40Mbps (VBR)
+      std::uint32_t record_fps = 60;              // 录制最大帧率，默认 60
+      std::string record_codec = "h264";          // 录制编码格式: "h264" | "h265"
+
+      // ADB 分辨率预设按长边计算。模拟器/真机对长边有上限（如 1920），按短边模式下
+      // 21:9 会被推到 2520×1080 导致 wm size 失败；按长边则固定长边（如 1080P 长边 1920）。
+      bool use_resolution_long_edge = true;
+    } adb_mode;
+
     struct Screenshot {
       std::string file_format = "png";  // 静态截图保存格式: "png" | "jpeg"
       bool enable_hdr = false;          // 目标屏为 HDR 时保存 Ultra HDR JPEG

@@ -1,0 +1,6 @@
+{
+  "compileSdk": 36,
+  "buildTools": "36.0.0",
+  "minSdk": 26,
+  "javaRelease": 8
+}

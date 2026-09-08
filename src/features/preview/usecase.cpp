@@ -5,6 +5,7 @@
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/letterbox.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/overlay/overlay.hpp"
@@ -23,6 +24,12 @@ auto toggle_preview(core::AppState& state) -> void {
   bool is_running = state.preview && state.preview->running.load(std::memory_order_acquire);
 
   if (!is_running) {
+    if (features::adb_mode::is_connected(state)) {
+      core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                             state.i18n->texts["message.adb_feature_unavailable"]);
+      return;
+    }
+
     // 启动预览
     // 预览窗与叠加层互斥：以 overlay->enabled（与浮动窗菜单勾选）为准
     if (state.overlay->enabled) {

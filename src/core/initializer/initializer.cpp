@@ -22,6 +22,7 @@
 #include "core/worker_pool/worker_pool.hpp"
 #include "extensions/infinity_nikki/map_service.hpp"
 #include "extensions/infinity_nikki/photo_service.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/gallery/gallery.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/recording/recording.hpp"
@@ -125,6 +126,10 @@ auto initialize_application(core::AppState& state) -> std::expected<void, std::s
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
 
+    if (auto adb_mode_result = features::adb_mode::initialize(state); !adb_mode_result) {
+      return std::unexpected("Failed to initialize ADB mode: " + adb_mode_result.error());
+    }
+
     // 将后端 i18n 语言与 settings 对齐，确保原生浮窗/通知文案一致
     apply_language_from_settings(state);
     apply_logger_level_from_settings(state);
@@ -175,6 +180,9 @@ auto initialize_application(core::AppState& state) -> std::expected<void, std::s
         Logger().warn("Skip HTTP server failure notification: i18n text is missing");
       }
     }
+
+    // UI、通知和本地服务都就绪后再启动恢复/自动连接任务，避免启动期状态通知丢失。
+    features::adb_mode::schedule_startup_tasks(state);
 
     // 到这里为止，悬浮窗首绘所需的配置、文案、命令和原生 UI 资源都已就绪。
     // 先显示启动 UI，避免 Gallery 目录探测、远程根检查等非首屏工作阻塞用户看到窗口。

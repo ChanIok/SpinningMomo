@@ -5,6 +5,7 @@
 #include "core/i18n/state.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/letterbox.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/overlay/overlay.hpp"
@@ -20,6 +21,13 @@ namespace features::letterbox {
 // 切换黑边模式
 auto toggle_letterbox(core::AppState& state) -> void {
   bool is_enabled = state.letterbox->enabled;
+
+  if (!is_enabled && features::adb_mode::is_connected(state)) {
+    core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.adb_feature_unavailable"]);
+    return;
+  }
+
   auto old_settings = state.settings->raw;
 
   // 切换启用状态

@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 4387 bytes
+// Size: 5904 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -38,6 +38,7 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.preview_toggle": "Preview",
   "menu.recording_toggle": "Record",
   "menu.letterbox_toggle": "Letterbox",
+  "menu.adb_mode": "ADB Mode",
 
 
   "menu.settings_config": "Open Config",
@@ -53,6 +54,23 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.window_not_found": "Target window not found. Please ensure the window is running.",
   "message.window_reset_success": "Window has been reset to screen size.",
   "message.window_reset_failed": "Failed to reset window size.",
+  "message.adb_connect_success": "ADB device connected.",
+  "message.adb_connect_failed": "Failed to connect ADB device",
+  "message.adb_disconnect_success": "ADB device disconnected.",
+  "message.adb_disconnect_failed": "Failed to disconnect ADB device",
+  "message.adb_operation_failed": "ADB device operation failed",
+  "message.adb_not_connected": "ADB device is not connected",
+  "message.adb_feature_unavailable": "This feature is unavailable in ADB mode.",
+  "message.adb_no_emulator_found": "No running emulator was found. Please start your emulator first.",
+  "message.adb_multiple_emulators_found": "Multiple emulators found. Please specify device in settings.",
+  "message.adb_custom_path_empty": "Custom ADB path is enabled, but no executable was selected.",
+  "adb.error.recording_already_in_progress": "Recording is already in progress",
+  "adb.error.version_too_low": "Internal audio capture requires Android {required} (API 33) or higher, current version: {current}",
+  "adb.error.get_display_size_failed": "Failed to get display dimensions: {message}",
+  "adb.error.encoder_not_found": "Device has no {codec} video encoder",
+  "adb.error.encoder_not_supported": "Current resolution {width}x{height} cannot start on {codec} encoder ({driver}): {message}. Please adjust resolution or switch codec",
+  "adb.error.bind_stream_socket_failed": "Failed to bind recording stream socket: {message}",
+  "adb.error.start_recording_failed": "Failed to start recording: {message}",
 
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",

@@ -12,6 +12,7 @@
 #include "core/webview/webview.hpp"
 #include "extensions/infinity_nikki/photo_service.hpp"
 #include "extensions/infinity_nikki/task_service.hpp"
+#include "features/adb_mode/usecase.hpp"
 #include "features/gallery/gallery.hpp"
 #include "features/settings/events.hpp"
 #include "features/settings/types.hpp"
@@ -153,6 +154,16 @@ auto handle_settings_changed(core::AppState& state,
 
     if (has_hotkey_changes(event.data.old_settings, event.data.new_settings)) {
       refresh_global_hotkeys(state);
+    }
+
+    const auto& old_adb_mode = event.data.old_settings.features.adb_mode;
+    const auto& new_adb_mode = event.data.new_settings.features.adb_mode;
+    const bool adb_connection_config_changed =
+        old_adb_mode.use_custom_adb_path != new_adb_mode.use_custom_adb_path ||
+        old_adb_mode.adb_path != new_adb_mode.adb_path || old_adb_mode.host != new_adb_mode.host ||
+        old_adb_mode.port != new_adb_mode.port || old_adb_mode.serial != new_adb_mode.serial;
+    if (adb_connection_config_changed) {
+      features::adb_mode::handle_settings_changed(state);
     }
 
     if (has_infinity_nikki_hardlink_setting_changes(event.data.old_settings,

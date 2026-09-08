@@ -20,6 +20,8 @@ The C++ backend defaults to `clang-cl[llvm]` (Clang + LLD) for daily development
 | **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
 | **xmake** | 3.1.0 | C++ build system |
 | **Node.js** | v22.13+ | Web frontend build and pnpm scripts |
+| **JDK** | 21+ | Compile the Android DEX service for ADB mode |
+| **Android SDK Command-line Tools** | Platform 36 + Build Tools 36.0.0 | Build the capture service with `javac`/`d8` |
 
 ### Install xmake
 
@@ -73,6 +75,16 @@ xmake f -m release -y && xmake f -m debug -y
 node scripts/patch-vcpkg.js
 ```
 
+### 4. Fetch Android capture service (optional)
+
+If you don't modify the Java code under `android/capture/src/`, you don't need JDK or Android SDK. Just pull the prebuilt jar from the latest release:
+
+```bash
+pnpm run fetch:android-jar
+```
+
+After that, `pnpm run build` automatically skips the Android compilation. To rebuild from source, delete `build/android/.android-jar-fetched`.
+
 ---
 
 ## Visual Studio Development (Optional)
@@ -100,7 +112,7 @@ vsxmake2026\SpinningMomo.sln
 ### Full Build (Recommended)
 
 ```bash
-# One command: C++ Release + Web frontend + assemble dist/
+# One command: C++ Release + Web frontend + Android capture service + assemble dist/
 pnpm run build
 ```
 
@@ -117,11 +129,20 @@ xmake build
 xmake release    # automatically restores debug config after release build
 
 # Web frontend
-pnpm --filter web run build
+pnpm run build:web
 
-# Assemble dist/ (exe + web resources)
+# Android capture service (optional, requires JDK + Android SDK)
+pnpm run build:android
+
+# Assemble dist/ (exe + web resources + Android jar)
 pnpm run build:dist
 ```
+
+### Android Capture Service
+
+The Android side is a lightweight screen/audio capture service. Its artifact is `build/android/momo-capture.jar`, pushed via ADB and run by `app_process` — no APK installation needed.
+
+When modifying Java code, set up JDK 21 and Android SDK (`platforms;android-36`, `build-tools;36.0.0`), then run `pnpm run build:android`. Dependency versions are in `android/capture/build-config.json`.
 
 ### Build Output Paths
 
