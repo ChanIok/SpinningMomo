@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
+    "@internationalized/date": "^3.12.3",
     "@lucide/vue": "^1.31.0",
     "@tailwindcss/vite": "^4.3.1",
     "@tanstack/vue-virtual": "^3.13.30",
