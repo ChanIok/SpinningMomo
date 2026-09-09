@@ -39,6 +39,13 @@ const useOriginalImagesForCards = computed({
   },
 })
 
+const useNarrowCardSpacing = computed({
+  get: () => store.view.useNarrowCardSpacing,
+  set: (value: boolean) => {
+    store.view.useNarrowCardSpacing = value
+  },
+})
+
 const showRatingBadge = computed({
   get: () => store.view.showRatingBadge,
   set: (value: boolean) => {
@@ -169,6 +176,25 @@ watch(
               <p class="mt-1 text-sm text-muted-foreground">
                 {{ t('gallery.preferences.view.description') }}
               </p>
+            </div>
+
+            <div class="space-y-3">
+              <h4 class="text-sm font-medium text-foreground">
+                {{ t('gallery.preferences.view.layout.title') }}
+              </h4>
+              <Item variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.narrowSpacing.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.narrowSpacing.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="useNarrowCardSpacing" />
+                </ItemActions>
+              </Item>
             </div>
 
             <div class="space-y-3">

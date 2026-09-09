@@ -1198,7 +1198,7 @@ onUnmounted(() => {
             leave-to-class="opacity-0"
           >
             <div
-              v-if="isLightboxChromeVisible && isTouchInput && !isClosing"
+              v-if="isLightboxChromeVisible && isToolbarCompressed && !isClosing"
               data-lightbox-chrome
               class="pointer-events-auto shrink-0"
             >

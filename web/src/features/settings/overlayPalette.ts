@@ -87,8 +87,8 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'nikki',
     themeMode: 'light',
     primaryColor: '#C66900',
-    mode: 2,
-    colors: ['#FDF0F4', '#F9E1E6', '#F9E1E6', '#F9E1E6'],
+    mode: 1,
+    colors: ['#FDF0F4', '#FDF0F4', '#FDF0F4', '#FDF0F4'],
   },
   {
     id: 'spring',

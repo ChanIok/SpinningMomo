@@ -19,7 +19,6 @@ import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
-import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
@@ -42,7 +41,7 @@ const heroHeaderRef = ref<HTMLElement | null>(null)
 const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
-const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const gap = computed(() => store.cardGap)
 const toolbarHeight = computed(() => props.toolbarHeight)
 const { scrollMargin } = useGalleryVirtualScrollMargin(
   scrollContainerRef,
@@ -56,7 +55,7 @@ const targetColumnSize = computed(() => store.getEffectiveViewSize())
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
   const itemSize = targetColumnSize.value
-  return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
+  return Math.max(1, Math.floor((containerWidth.value + gap.value) / (itemSize + gap.value)))
 })
 
 const masonryVirtualizer = useMasonryVirtualizer({

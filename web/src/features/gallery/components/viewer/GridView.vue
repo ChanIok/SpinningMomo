@@ -21,7 +21,6 @@ import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
 import GalleryTimelineHeader from '../shell/GalleryTimelineHeader.vue'
 import { useI18n } from '@/composables/useI18n'
-import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
@@ -43,7 +42,7 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const heroHeaderRef = ref<HTMLElement | null>(null)
 const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
-const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const gap = computed(() => store.cardGap)
 const toolbarHeight = computed(() => props.toolbarHeight)
 const { scrollMargin } = useGalleryVirtualScrollMargin(
   scrollContainerRef,
@@ -56,10 +55,10 @@ const isMultiSelectMode = computed(() => store.selection.mode === 'multi-select'
 const { width: containerWidth, height: containerHeight } = useGalleryViewerSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = store.getEffectiveViewSize()
-  return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
+  return Math.max(1, Math.floor((containerWidth.value + gap.value) / (itemSize + gap.value)))
 })
 const gridCardSize = computed(() => {
-  const totalGap = Math.max(0, columns.value - 1) * gap
+  const totalGap = Math.max(0, columns.value - 1) * gap.value
   const availableWidth = containerWidth.value || scrollContainerRef.value?.clientWidth || 0
 
   return Math.max(1, (availableWidth - totalGap) / Math.max(columns.value, 1))

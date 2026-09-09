@@ -3,7 +3,6 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import type { Asset, AssetLayoutMetaItem } from '../types'
-import { GALLERY_CARD_GAP } from '../constants'
 
 /**
  * 瀑布流视图虚拟化 Composable
@@ -15,8 +14,6 @@ import { GALLERY_CARD_GAP } from '../constants'
  * - Masonry 每项独立入列，高度由图片原始宽高比决定，需要实测（measureElement）
  */
 
-/** 默认列间距（px），与 CSS gap 保持一致 */
-const DEFAULT_MASONRY_GAP = GALLERY_CARD_GAP
 // TanStack masonry lanes 偶尔会返回比真实视口大很多的连续 range。
 // 渲染与分页加载只消费视口附近几屏，避免一次性拉取大量后端分页。
 const MASONRY_LOAD_BUFFER_VIEWPORTS = 2
@@ -33,7 +30,7 @@ export interface UseMasonryVirtualizerOptions {
   /** 滚动容器顶部到虚拟列表起点的真实距离。 */
   scrollMargin: Ref<number>
   /** 卡片间距（px），水平和垂直统一使用该值 */
-  gap?: number
+  gap: Ref<number>
 }
 
 export interface VirtualMasonryItem {
@@ -90,14 +87,7 @@ function getAssetHeight(
 }
 
 export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
-  const {
-    containerRef,
-    columns,
-    containerWidth,
-    targetColumnSize,
-    scrollMargin,
-    gap = DEFAULT_MASONRY_GAP,
-  } = options
+  const { containerRef, columns, containerWidth, targetColumnSize, scrollMargin, gap } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -111,7 +101,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
     if (width <= 0) return targetColumnSize.value
 
-    const totalGap = Math.max(0, columns.value - 1) * gap
+    const totalGap = Math.max(0, columns.value - 1) * gap.value
     return Math.max(1, (width - totalGap) / Math.max(columns.value, 1))
   })
 
@@ -141,7 +131,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
         columnWidth.value,
         layoutMetaItems.value[index] ?? null
       )
-      laneHeights[lane] = start + itemHeight + gap
+      laneHeights[lane] = start + itemHeight + gap.value
     }
 
     return starts
@@ -159,7 +149,9 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize,
-    gap,
+    get gap() {
+      return gap.value
+    },
     get lanes() {
       return columns.value
     },
@@ -173,7 +165,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
 
   /** 计算指定列的水平偏移量（translateX），用于定位绝对布局的卡片 */
   function getLaneOffset(lane: number): number {
-    return lane * (columnWidth.value + gap)
+    return lane * (columnWidth.value + gap.value)
   }
 
   function filterItemsNearViewport(items: ReturnType<typeof virtualizer.value.getVirtualItems>) {
@@ -265,7 +257,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   )
 
   // 列数或列宽变化时重新测量，避免布局错位
-  watch([columns, columnWidth], () => {
+  watch([columns, columnWidth, gap], () => {
     virtualizer.value.measure()
   })
 

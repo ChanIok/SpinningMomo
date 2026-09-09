@@ -3,7 +3,6 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
 import type { Asset, DateGrouping, TimelineBucket } from '../types'
-import { GALLERY_CARD_GAP } from '../constants'
 import {
   buildTimelineSections,
   getTimelineHeaderDescriptors,
@@ -19,7 +18,7 @@ export interface UseGridVirtualizerOptions {
   containerWidth: Ref<number>
   /** 滚动容器顶部到虚拟列表起点的真实距离。 */
   scrollMargin: Ref<number>
-  gap?: number
+  gap: Ref<number>
 }
 
 type GridRowKind = 'assets' | TimelineHeaderKind
@@ -222,7 +221,7 @@ function getGridRow(
 }
 
 export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
-  const { containerRef, columns, containerWidth, scrollMargin, gap = GALLERY_CARD_GAP } = options
+  const { containerRef, columns, containerWidth, scrollMargin, gap } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -236,8 +235,11 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
     if (width === 0) return 200
 
-    const cardWidth = Math.max(1, (width - (columns.value - 1) * gap) / Math.max(columns.value, 1))
-    return cardWidth + gap
+    const cardWidth = Math.max(
+      1,
+      (width - (columns.value - 1) * gap.value) / Math.max(columns.value, 1)
+    )
+    return cardWidth + gap.value
   })
 
   const hasTimelineLayout = computed(
@@ -254,7 +256,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
         totalCount.value,
         columns.value,
         estimatedRowHeight.value,
-        gap,
+        gap.value,
         store.isCompactWindow,
         store.view.dateGrouping
       )

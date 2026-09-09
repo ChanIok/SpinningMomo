@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useGalleryStore } from '../../store'
 import type { ViewMode } from '../../types'
 import GridView from '../viewer/GridView.vue'
@@ -64,6 +64,28 @@ watch(viewMode, (_mode, previousMode) => {
   const topIndex = getTopAssetIndex(previousMode)
   activeAnchorIndex.value = topIndex >= 0 && topIndex < store.totalCount ? topIndex : undefined
 })
+
+// 间距变化可能改变列数和行高；重新测量后回到原来顶部素材，避免切换开关时视口跳动。
+watch(
+  () => store.view.useNarrowCardSpacing,
+  () => {
+    const mode = viewMode.value
+    if (mode === 'list') {
+      return
+    }
+
+    const topIndex = getTopAssetIndex(mode)
+    if (topIndex < 0 || topIndex >= store.totalCount) {
+      return
+    }
+
+    void nextTick().then(() => {
+      if (viewMode.value === mode) {
+        scrollToIndex(topIndex, 'start')
+      }
+    })
+  }
+)
 
 function scrollToIndex(index: number, align: 'auto' | 'start' = 'auto') {
   if (viewMode.value === 'grid') gridViewRef.value?.scrollToIndex(index, align)

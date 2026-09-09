@@ -7,6 +7,9 @@ export const GALLERY_TOOLBAR_COMPACT_BREAKPOINT = 768
 /** 缩略图卡片在常规布局下的几何间距。 */
 export const GALLERY_CARD_GAP = 12
 
+/** 宽屏图库启用窄间距时的卡片间距。 */
+export const GALLERY_NARROW_CARD_GAP = 4
+
 /** 窄屏紧凑布局的卡片间距，让图片墙尽量贴近设备边缘。 */
 export const GALLERY_COMPACT_CARD_GAP = 2
 

@@ -1,7 +1,10 @@
 import { computed, type Ref } from 'vue'
 import {
+  GALLERY_CARD_GAP,
+  GALLERY_COMPACT_CARD_GAP,
   GALLERY_COMPACT_VIEW_SIZE_MAX,
   GALLERY_COMPACT_VIEW_SIZE_MIN,
+  GALLERY_NARROW_CARD_GAP,
   GALLERY_VIEW_SIZE_MAX,
   GALLERY_VIEW_SIZE_MIN,
 } from '../constants'
@@ -39,6 +42,15 @@ export function createViewSlice(args: ViewSliceArgs) {
   const { settings, isCompactWindow } = args
 
   const view = computed(() => settings.value.view)
+
+  // 紧凑窗口已有独立的窄屏密度；该偏好只改变宽屏卡片墙的间距。
+  const cardGap = computed(() => {
+    if (isCompactWindow.value) {
+      return GALLERY_COMPACT_CARD_GAP
+    }
+
+    return view.value.useNarrowCardSpacing ? GALLERY_NARROW_CARD_GAP : GALLERY_CARD_GAP
+  })
 
   function getViewSizeRange(): GalleryViewSizeRange {
     return isCompactWindow.value
@@ -92,6 +104,7 @@ export function createViewSlice(args: ViewSliceArgs) {
 
   return {
     view,
+    cardGap,
     setDateGrouping,
     getViewSizeRange,
     getEffectiveViewSize,

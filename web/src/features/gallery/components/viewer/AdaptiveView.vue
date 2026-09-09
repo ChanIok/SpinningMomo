@@ -20,7 +20,6 @@ import AssetCard from '../asset/AssetCard.vue'
 import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 import GalleryHeroHeader from '../shell/GalleryHeroHeader.vue'
 import GalleryTimelineHeader from '../shell/GalleryTimelineHeader.vue'
-import { GALLERY_CARD_GAP, GALLERY_COMPACT_CARD_GAP } from '../../constants'
 import { markGalleryScroll, shouldOpenAssetOnTap, type GalleryInputType } from '../../input'
 
 const store = useGalleryStore()
@@ -42,7 +41,7 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const heroHeaderRef = ref<HTMLElement | null>(null)
 const scrollContentRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
-const gap = store.isCompactWindow ? GALLERY_COMPACT_CARD_GAP : GALLERY_CARD_GAP
+const gap = computed(() => store.cardGap)
 const targetRowHeight = computed(() => store.getEffectiveViewSize())
 const toolbarHeight = computed(() => props.toolbarHeight)
 const { scrollMargin } = useGalleryVirtualScrollMargin(
@@ -278,7 +277,7 @@ defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
                 height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                 display: virtualRow.kind === 'assets' ? 'flex' : 'block',
-                gap: virtualRow.kind === 'assets' ? `${adaptiveVirtualizer.gap}px` : undefined,
+                gap: virtualRow.kind === 'assets' ? `${gap}px` : undefined,
               }"
             >
               <GalleryTimelineHeader

@@ -9,7 +9,6 @@ import type {
   DateGrouping,
   TimelineBucket,
 } from '../types'
-import { GALLERY_CARD_GAP } from '../constants'
 import {
   buildTimelineSections,
   getTimelineHeaderDescriptors,
@@ -29,7 +28,7 @@ export interface UseAdaptiveVirtualizerOptions {
   // 滚动容器顶部到虚拟列表起点的真实距离。
   scrollMargin: Ref<number>
   // 行内与行间间距；由视图层根据当前布局模式决定。
-  gap?: number
+  gap: Ref<number>
 }
 
 type AdaptiveRowKind = 'assets' | TimelineHeaderKind
@@ -208,13 +207,7 @@ function buildAdaptiveRows(
 }
 
 export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
-  const {
-    containerRef,
-    containerWidth,
-    targetRowHeight,
-    scrollMargin,
-    gap = GALLERY_CARD_GAP,
-  } = options
+  const { containerRef, containerWidth, targetRowHeight, scrollMargin, gap } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -242,7 +235,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
       layoutMetaItems.value,
       contentWidth.value,
       targetRowHeight.value,
-      gap,
+      gap.value,
       timelineBuckets.value,
       store.isCompactWindow,
       store.view.dateGrouping
@@ -256,7 +249,9 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: (index) => layout.value.rows[index]?.size ?? targetRowHeight.value,
-    gap,
+    get gap() {
+      return gap.value
+    },
     get scrollMargin() {
       return scrollMargin.value
     },
@@ -356,7 +351,7 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     }
   )
 
-  watch([layout, targetRowHeight], () => {
+  watch([layout, targetRowHeight, gap], () => {
     // 行分布或目标高度变化后通知 virtualizer 重算总高度和可见窗口。
     virtualizer.value.measure()
   })
