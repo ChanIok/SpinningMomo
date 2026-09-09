@@ -2,7 +2,6 @@ import { computed, shallowRef, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
-import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type {
   AdaptiveLayoutRowItem,
   Asset,
@@ -223,9 +222,8 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   // 在 adaptive 模式里，viewSize 的语义不再是“方形卡片边长”，而是“目标行高”。
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
-  const { layoutMetaItems, ensureLayoutMetaLoaded } = useGalleryLayoutMeta('adaptive')
+  const layoutMetaItems = computed(() => store.layoutMetaItems)
   const virtualRows = shallowRef<VirtualAdaptiveRow[]>([])
-  const loadingPages = new Set<number>()
 
   const timelineBuckets = computed(() => {
     if (
@@ -326,59 +324,24 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     })
   }
 
-  async function loadMissingData(items: ReturnType<typeof virtualizer.value.getVirtualItems>) {
+  function loadMissingData(items: ReturnType<typeof virtualizer.value.getVirtualItems>) {
     if (items.length === 0) {
       return
     }
 
-    // 行里每个 item 仍映射回原始结果集索引，因此分页策略可以完全复用 galleryData.loadPage。
     const rows = layout.value.rows
-    const neededPages = new Set<number>()
+    const visibleIndexes: number[] = []
 
     items.forEach((virtualItem) => {
       const row = rows[virtualItem.index]
-      if (!row || row.kind !== 'assets') {
-        return
-      }
-
-      row.items.forEach((item) => {
-        neededPages.add(Math.floor(item.index / store.perPage) + 1)
-      })
-    })
-
-    const loadPromises: Promise<void>[] = []
-    neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
-        loadingPages.add(pageNum)
-        const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.delete(pageNum)
+      if (row && row.kind === 'assets') {
+        row.items.forEach((item) => {
+          visibleIndexes.push(item.index)
         })
-        loadPromises.push(loadPromise)
       }
     })
 
-    if (loadPromises.length > 0) {
-      await Promise.all(loadPromises)
-    }
-  }
-
-  async function init() {
-    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
-    const hasReusableTimelineCache = !store.isTimelineMode || store.timelineBuckets.length > 0
-
-    // 已有可用分页缓存时只刷新布局元数据；首次查询由完整结果替换信号触发元数据加载，
-    // 避免同一次 refreshCurrentQuery 产生重复请求。
-    if (hasReusableCache && hasReusableTimelineCache) {
-      await ensureLayoutMetaLoaded()
-      return
-    }
-
-    if (store.isTimelineMode) {
-      await galleryData.loadTimelineData()
-      return
-    }
-
-    await galleryData.loadAllAssets()
+    void galleryData.ensureIndexesLoaded(visibleIndexes)
   }
 
   watch(
@@ -414,7 +377,6 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     rows: computed(() => layout.value.rows),
     rowIndexByAssetIndex: computed(() => layout.value.rowIndexByAssetIndex),
     gap,
-    init,
     scrollToIndex,
   }
 }

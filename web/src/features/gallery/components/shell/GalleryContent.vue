@@ -27,7 +27,11 @@ const isAllMediaSelected = computed(
 )
 
 const showEmptyState = computed(
-  () => isAllMediaSelected.value && store.totalCount === 0 && store.queryStatus !== 'loading'
+  () =>
+    isAllMediaSelected.value &&
+    store.hasInitialQueried &&
+    store.totalCount === 0 &&
+    store.queryStatus !== 'loading'
 )
 
 const viewMode = computed(() =>

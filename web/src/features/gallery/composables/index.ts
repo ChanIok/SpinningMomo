@@ -1,6 +1,5 @@
 export { useGalleryData } from './useGalleryData'
 export { useGallerySelection } from './useGallerySelection'
-export { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 export { useGallerySidebar } from './useGallerySidebar'
 export { useGalleryLightbox } from './useGalleryLightbox'
 export { useGalleryOverlayHistory } from './useGalleryOverlayHistory'

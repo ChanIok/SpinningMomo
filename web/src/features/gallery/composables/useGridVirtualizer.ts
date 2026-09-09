@@ -280,7 +280,6 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   })
 
   const virtualRows = shallowRef<VirtualRow[]>([])
-  const loadingPages = new Set<number>()
 
   function syncVirtualRows(
     items: ReturnType<typeof virtualizer.value.getVirtualItems>,
@@ -366,10 +365,10 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     })
   }
 
-  async function loadMissingData(
+  function loadMissingData(
     items: ReturnType<typeof virtualizer.value.getVirtualItems>,
     total: number
-  ): Promise<void> {
+  ) {
     if (items.length === 0) return
 
     const currentLayout = layout.value
@@ -392,22 +391,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       }
     })
 
-    const neededPages = new Set(visibleIndexes.map((idx) => Math.floor(idx / store.perPage) + 1))
-    const loadPromises: Promise<void>[] = []
-
-    neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
-        loadingPages.add(pageNum)
-        const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.delete(pageNum)
-        })
-        loadPromises.push(loadPromise)
-      }
-    })
-
-    if (loadPromises.length > 0) {
-      await Promise.all(loadPromises)
-    }
+    void galleryData.ensureIndexesLoaded(visibleIndexes)
   }
 
   watch(
@@ -424,22 +408,6 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       void loadMissingData(items, total)
     }
   )
-
-  async function init() {
-    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
-    const hasReusableTimelineCache = store.timelineBuckets.length > 0 && hasReusableCache
-
-    // 跨路由回到 gallery 时，优先复用已有分页缓存，避免先 replace 成 page1 再补回邻页。
-    if (isTimelineMode.value ? hasReusableTimelineCache : hasReusableCache) {
-      return
-    }
-
-    if (isTimelineMode.value) {
-      await galleryData.loadTimelineData()
-    } else {
-      await galleryData.loadAllAssets()
-    }
-  }
 
   function getAssetOffset(index: number): number | undefined {
     const currentLayout = layout.value
@@ -477,6 +445,5 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     estimatedRowHeight,
     getAssetOffset,
     scrollToIndex,
-    init,
   }
 }

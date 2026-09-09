@@ -315,12 +315,8 @@ async function handleRemoveFolderWatch(folderId: number) {
       !folderExistsById(galleryStore.folders, currentSelectedFolderId)
     ) {
       clearFolderFilter()
-    }
-
-    if (galleryStore.isTimelineMode) {
-      await galleryData.loadTimelineData()
     } else {
-      await galleryData.loadAllAssets()
+      await galleryData.refreshCurrentQuery()
     }
 
     toast.success(t('gallery.sidebar.folders.removeWatch.successTitle'), {

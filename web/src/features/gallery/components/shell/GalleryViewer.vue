@@ -313,6 +313,7 @@ watch(
 
 onMounted(async () => {
   await restoreLightboxFromQuery()
+  await galleryData.ensureCurrentQueryLoaded()
 })
 
 onUnmounted(() => {

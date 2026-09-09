@@ -1,11 +1,43 @@
+import { useDebounceFn } from '@vueuse/core'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 import { runWithLayoutTransition } from './useGalleryLayoutTransition'
 import { galleryApi } from '../api'
-import type { Asset, ScanAssetsParams } from '../types'
+import type { Asset, AssetLayoutMetaItem, ScanAssetsParams } from '../types'
 import { toQueryAssetsFilters } from '../queryFilters'
 import { getDyeCodeAssetIds } from '@/extensions/infinity_nikki/api'
+
+/** 模块级在途页码加载 Promise 映射，Key 为 `${queryVersion}:${pageNum}`，防止并发重复拉取并天然支持版本隔离 */
+const inFlightPageLoads = new Map<string, Promise<void>>()
+
+let notificationRefreshInFlight = false
+let notificationRefreshQueued = false
+
+const scheduleNotificationRefresh = useDebounceFn(async () => {
+  if (notificationRefreshInFlight) {
+    notificationRefreshQueued = true
+    return
+  }
+
+  notificationRefreshInFlight = true
+  do {
+    notificationRefreshQueued = false
+    try {
+      const store = useGalleryStore()
+      store.setFoldersError(null)
+      const folderTree = await galleryApi.getFolderTree()
+      store.setFolders(folderTree)
+
+      const galleryData = useGalleryData()
+      await galleryData.refreshCurrentQuery()
+    } catch (error) {
+      console.error('Failed to refresh gallery after notification:', error)
+    }
+  } while (notificationRefreshQueued)
+
+  notificationRefreshInFlight = false
+}, 400)
 
 /**
  * Gallery数据管理 Composable
@@ -109,22 +141,38 @@ export function useGalleryData() {
     return response.items.map((item) => item.id)
   }
 
-  async function queryVisiblePages(total: number, preferredPage: number) {
+  async function queryVisiblePages(
+    total: number,
+    preferredPage: number,
+    preferredPageItems?: Asset[]
+  ) {
     if (total <= 0) {
       return new Map<number, Asset[]>()
     }
 
     const maxPage = Math.max(1, Math.ceil(total / store.perPage))
     const visiblePages = new Set(getVisiblePageNumbers(total))
-    visiblePages.add(Math.max(1, Math.min(preferredPage, maxPage)))
+    const normalizedPreferredPage = Math.max(1, Math.min(preferredPage, maxPage))
+    visiblePages.add(normalizedPreferredPage)
     const pageNumbers = [...visiblePages].sort((left, right) => left - right)
 
-    const responses = await Promise.all(pageNumbers.map((pageNum) => queryAssetPage(pageNum)))
     const pages = new Map<number, Asset[]>()
+    const pagesToFetch: number[] = []
 
-    pageNumbers.forEach((pageNum, index) => {
-      pages.set(pageNum, responses[index]?.items ?? [])
+    pageNumbers.forEach((pageNum) => {
+      if (pageNum === normalizedPreferredPage && preferredPageItems) {
+        pages.set(pageNum, preferredPageItems)
+      } else {
+        pagesToFetch.push(pageNum)
+      }
     })
+
+    if (pagesToFetch.length > 0) {
+      const responses = await Promise.all(pagesToFetch.map((pageNum) => queryAssetPage(pageNum)))
+      pagesToFetch.forEach((pageNum, index) => {
+        pages.set(pageNum, responses[index]?.items ?? [])
+      })
+    }
 
     return pages
   }
@@ -283,6 +331,50 @@ export function useGalleryData() {
   }
 
   /**
+   * 重新拉取当前查询条件下的布局元数据（宽高等轻量信息）。
+   */
+  async function reloadLayoutMeta(): Promise<AssetLayoutMetaItem[]> {
+    const requestVersion = store.queryVersion
+    const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
+    try {
+      const response = await galleryApi.queryAssetLayoutMeta({
+        filters,
+        sortBy: store.sortBy,
+        sortOrder: store.sortOrder,
+      })
+
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return []
+      }
+
+      return response.items
+    } catch (error) {
+      console.error('Failed to load asset layout meta:', error)
+      return []
+    }
+  }
+
+  /**
+   * 确保当前查询条件的布局元数据已就绪。
+   * 切换至瀑布流或自适应布局前调用；若已有可用缓存则直接复用。
+   */
+  async function ensureLayoutMetaLoaded(): Promise<AssetLayoutMetaItem[]> {
+    if (
+      store.totalCount === 0 ||
+      (store.layoutMetaItems.length === store.totalCount && store.totalCount > 0)
+    ) {
+      return store.layoutMetaItems
+    }
+
+    const items = await reloadLayoutMeta()
+    if (items.length > 0) {
+      store.setLayoutMetaItems(items)
+    }
+    return store.layoutMetaItems
+  }
+
+  /**
    * 非时间线模式：按当前筛选/排序拉取 `queryAssets` 分页结果并写入 store。
    * 网格、列表、瀑布流、自适应等视图共用，与布局无关。
    */
@@ -309,22 +401,10 @@ export function useGalleryData() {
       }
 
       const requiresLayoutMeta = store.view.mode === 'masonry' || store.view.mode === 'adaptive'
-      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
 
-      const [pages, layoutMetaResponse] = await Promise.all([
-        queryVisiblePages(response.totalCount, pageNum),
-        requiresLayoutMeta
-          ? galleryApi
-              .queryAssetLayoutMeta({
-                filters,
-                sortBy: store.sortBy,
-                sortOrder: store.sortOrder,
-              })
-              .catch((err) => {
-                console.error('Failed to query asset layout meta:', err)
-                return null
-              })
-          : Promise.resolve(null),
+      const [pages, layoutMetaItems] = await Promise.all([
+        queryVisiblePages(response.totalCount, pageNum, response.items),
+        requiresLayoutMeta ? reloadLayoutMeta() : Promise.resolve(null),
       ])
       if (!store.isQueryVersionCurrent(requestVersion)) {
         return
@@ -333,8 +413,8 @@ export function useGalleryData() {
       const applyUpdates = async () => {
         store.clearTimelineData()
         store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
-        if (layoutMetaResponse) {
-          store.setLayoutMetaItems(layoutMetaResponse.items)
+        if (layoutMetaItems) {
+          store.setLayoutMetaItems(layoutMetaItems)
         } else if (!requiresLayoutMeta) {
           store.clearLayoutMetaItems()
         }
@@ -402,20 +482,9 @@ export function useGalleryData() {
       )
       const requiresLayoutMeta = store.view.mode === 'masonry' || store.view.mode === 'adaptive'
 
-      const [pages, layoutMetaResponse] = await Promise.all([
+      const [pages, layoutMetaItems] = await Promise.all([
         queryVisiblePages(bucketsResponse.totalCount, pageNum),
-        requiresLayoutMeta
-          ? galleryApi
-              .queryAssetLayoutMeta({
-                filters,
-                sortBy: store.sortBy,
-                sortOrder: store.sortOrder,
-              })
-              .catch((err) => {
-                console.error('Failed to query asset layout meta for timeline:', err)
-                return null
-              })
-          : Promise.resolve(null),
+        requiresLayoutMeta ? reloadLayoutMeta() : Promise.resolve(null),
       ])
       if (!store.isQueryVersionCurrent(requestVersion)) {
         return
@@ -429,8 +498,8 @@ export function useGalleryData() {
           pageNum,
           pageNum < Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
         )
-        if (layoutMetaResponse) {
-          store.setLayoutMetaItems(layoutMetaResponse.items)
+        if (layoutMetaItems) {
+          store.setLayoutMetaItems(layoutMetaItems)
         } else if (!requiresLayoutMeta) {
           store.clearLayoutMetaItems()
         }
@@ -485,29 +554,83 @@ export function useGalleryData() {
   }
 
   /**
-   * 加载指定页（用于虚拟列表按需加载）
+   * 确保当前查询数据已就绪。
+   * 首次挂载或跨路由切入时调用：若已有完整有效缓存则直接复用，否则触发刷新。
    */
-  async function loadPage(pageNum: number) {
+  async function ensureCurrentQueryLoaded() {
+    if (!store.hasInitialQueried) {
+      await refreshCurrentQuery()
+      return
+    }
+
+    // 仅当缓存非空且各维度数据（资产页、时间线、几何元数据）均满足当前视图时才免请求复用
+    const hasAssets = store.totalCount > 0 && store.paginatedAssets.size > 0
+    const hasTimeline =
+      !store.isTimelineMode || (store.totalCount > 0 && store.timelineBuckets.length > 0)
+    const requiresLayoutMeta = store.view.mode === 'masonry' || store.view.mode === 'adaptive'
+    const hasLayoutMeta =
+      !requiresLayoutMeta ||
+      (store.totalCount > 0 && store.layoutMetaItems.length === store.totalCount)
+
+    if (hasAssets && hasTimeline && hasLayoutMeta) {
+      return
+    }
+
+    await refreshCurrentQuery()
+  }
+
+  function cancelNotificationRefresh() {
+    scheduleNotificationRefresh.cancel()
+  }
+
+  /**
+   * 加载指定页（带查询版本隔离与并发去重）
+   */
+  async function loadPage(pageNum: number): Promise<void> {
     if (store.isPageLoaded(pageNum)) {
       return
     }
 
     const requestVersion = store.queryVersion
+    const requestKey = `${requestVersion}:${pageNum}`
 
-    try {
-      const response = await queryAssetPage(pageNum)
-      if (!store.isQueryVersionCurrent(requestVersion)) {
-        return
-      }
-
-      store.setPageAssets(pageNum, response.items)
-      void refreshDyeCodeStatuses(response.items, requestVersion)
-
-      console.log('✅ 第', pageNum, '页加载完成:', response.items.length, '个资产')
-    } catch (error) {
-      console.error('加载第', pageNum, '页失败:', error)
-      throw error
+    const existingPromise = inFlightPageLoads.get(requestKey)
+    if (existingPromise) {
+      return existingPromise
     }
+
+    const loadPromise = (async () => {
+      try {
+        const response = await queryAssetPage(pageNum)
+        if (!store.isQueryVersionCurrent(requestVersion)) {
+          return
+        }
+
+        store.setPageAssets(pageNum, response.items)
+        void refreshDyeCodeStatuses(response.items, requestVersion)
+
+        console.log('✅ 第', pageNum, '页加载完成:', response.items.length, '个资产')
+      } catch (error) {
+        console.error('加载第', pageNum, '页失败:', error)
+        throw error
+      } finally {
+        inFlightPageLoads.delete(requestKey)
+      }
+    })()
+
+    inFlightPageLoads.set(requestKey, loadPromise)
+    return loadPromise
+  }
+
+  /**
+   * 确保指定的一组全局资产索引已加载完成。
+   * 虚拟列表滚动时调用，内部自动换算缺失页码并并发拉取。
+   */
+  async function ensureIndexesLoaded(indexes: number[]): Promise<void> {
+    if (indexes.length === 0 || store.perPage <= 0) return
+
+    const neededPages = new Set(indexes.map((idx) => Math.floor(idx / store.perPage) + 1))
+    await Promise.all([...neededPages].map((pageNum) => loadPage(pageNum)))
   }
 
   /**
@@ -584,7 +707,13 @@ export function useGalleryData() {
     loadTimelineData,
     loadAllAssets,
     refreshCurrentQuery,
+    ensureCurrentQueryLoaded,
+    scheduleNotificationRefresh,
+    cancelNotificationRefresh,
     loadPage,
+    ensureIndexesLoaded,
+    reloadLayoutMeta,
+    ensureLayoutMetaLoaded,
     queryCurrentAssetIds,
     loadFolderTree,
     loadTagTree,

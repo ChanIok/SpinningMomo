@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDebounceFn, useEventListener, useWindowSize } from '@vueuse/core'
+import { useEventListener, useWindowSize } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { isLocalAccess } from '@/core/access'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -26,7 +26,6 @@ const LEFT_MIN_PX = 180
 const RIGHT_MIN_PX = 180
 const COLLAPSED_SIZE = '0px'
 const COLLAPSE_TRIGGER_PX = 40
-const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
 const galleryStore = useGalleryStore()
 const overlayHistory = useGalleryOverlayHistory()
@@ -70,10 +69,6 @@ const showInfinityNikkiGuide = computed(() => {
     isLocalAccess() && config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
   )
 })
-
-let isUnmounted = false
-let refreshInFlight = false
-let refreshQueued = false
 
 type SplitSize = number | string
 type SplitDragEvent = MouseEvent | TouchEvent
@@ -370,35 +365,8 @@ function closeFolderDrawer() {
   void overlayHistory.closeFolderDrawer()
 }
 
-async function refreshGalleryFromNotification() {
-  if (refreshInFlight) {
-    refreshQueued = true
-    return
-  }
-
-  refreshInFlight = true
-  do {
-    refreshQueued = false
-    try {
-      await galleryData.loadFolderTree()
-      await galleryData.refreshCurrentQuery()
-    } catch (error) {
-      console.error('Failed to refresh gallery after notification:', error)
-    }
-  } while (refreshQueued)
-
-  refreshInFlight = false
-}
-
-const scheduleGalleryRefresh = useDebounceFn(() => {
-  if (isUnmounted) {
-    return
-  }
-  void refreshGalleryFromNotification()
-}, GALLERY_REFRESH_DEBOUNCE_MS)
-
 const galleryChangedHandler = () => {
-  void scheduleGalleryRefresh()
+  galleryData.scheduleNotificationRefresh()
 }
 
 function resetGalleryInteraction() {
@@ -423,8 +391,8 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
-  isUnmounted = true
   offRpc('gallery.changed', galleryChangedHandler)
+  galleryData.cancelNotificationRefresh()
 })
 </script>
 

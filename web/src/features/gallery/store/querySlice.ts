@@ -18,6 +18,7 @@ export function createQuerySlice() {
   const currentPage = ref(1)
   const hasNextPage = ref(false)
   const queryVersion = ref(0)
+  const hasInitialQueried = ref(false)
   const dyeCodeAssetIds = ref<Set<number>>(new Set())
   const assetTagsById = ref<Map<number, Tag[]>>(new Map())
   const loadedAssetTagIds = ref<Set<number>>(new Set())
@@ -83,6 +84,7 @@ export function createQuerySlice() {
   function finishQueryRefresh(version: number) {
     if (queryVersion.value === version && queryStatus.value !== 'error') {
       queryStatus.value = 'idle'
+      hasInitialQueried.value = true
     }
   }
 
@@ -262,6 +264,7 @@ export function createQuerySlice() {
     currentPage.value = 1
     hasNextPage.value = false
     queryVersion.value = 0
+    hasInitialQueried.value = false
 
     clearTimelineData()
     clearPaginatedAssets()
@@ -278,6 +281,7 @@ export function createQuerySlice() {
     currentPage,
     hasNextPage,
     queryVersion,
+    hasInitialQueried,
     dyeCodeAssetIds,
     assetTagsById,
     loadedAssetTagIds,

@@ -2,7 +2,6 @@ import { computed, shallowRef, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
-import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type { Asset, AssetLayoutMetaItem } from '../types'
 import { GALLERY_CARD_GAP } from '../constants'
 
@@ -104,10 +103,8 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
   const galleryData = useGalleryData()
 
   const totalCount = computed(() => store.totalCount)
-  // 正在加载中的页码集合，防止同一页被并发重复请求
-  const loadingPages = new Set<number>()
   const virtualItems = shallowRef<VirtualMasonryItem[]>([])
-  const { layoutMetaItems, ensureLayoutMetaLoaded } = useGalleryLayoutMeta('masonry')
+  const layoutMetaItems = computed(() => store.layoutMetaItems)
 
   // 单列宽度 = (容器宽度 - 列间总间距) / 列数
   const columnWidth = computed(() => {
@@ -238,13 +235,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     })
   }
 
-  /**
-   * 根据视口附近项，找出尚未加载的分页并并发请求。
-   * 通过 loadingPages 集合避免同一页被重复触发。
-   */
-  async function loadMissingData(
-    items: ReturnType<typeof virtualizer.value.getVirtualItems>
-  ): Promise<void> {
+  function loadMissingData(items: ReturnType<typeof virtualizer.value.getVirtualItems>) {
     if (items.length === 0) return
 
     const loadItems = filterItemsNearViewport(items)
@@ -252,40 +243,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
       return
     }
 
-    const neededPages = new Set(loadItems.map((item) => Math.floor(item.index / store.perPage) + 1))
-    const loadPromises: Promise<void>[] = []
-
-    neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
-        loadingPages.add(pageNum)
-        const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.delete(pageNum)
-        })
-        loadPromises.push(loadPromise)
-      }
-    })
-
-    if (loadPromises.length > 0) {
-      await Promise.all(loadPromises)
-    }
-  }
-
-  /** 初始化：按当前排序语义加载对应数据源（时间线/普通） */
-  async function init() {
-    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
-    const hasReusableTimelineCache = store.timelineBuckets.length > 0 && hasReusableCache
-
-    if (store.isTimelineMode ? hasReusableTimelineCache : hasReusableCache) {
-      await ensureLayoutMetaLoaded()
-      return
-    }
-
-    if (store.isTimelineMode) {
-      await galleryData.loadTimelineData()
-      return
-    }
-
-    await galleryData.loadAllAssets()
+    void galleryData.ensureIndexesLoaded(loadItems.map((item) => item.index))
   }
 
   // 监听虚拟项变化（滚动、数据更新、列数/列宽变化）：
@@ -320,7 +278,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     virtualItems,
     columnWidth,
     gap,
-    init,
     getLaneOffset,
     getAssetHeight: (asset: Asset | null, index?: number) =>
       getAssetHeight(

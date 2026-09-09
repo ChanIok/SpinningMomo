@@ -97,8 +97,6 @@ onMounted(async () => {
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
-
-  await listVirtualizer.init()
 })
 
 function handleAssetClick(

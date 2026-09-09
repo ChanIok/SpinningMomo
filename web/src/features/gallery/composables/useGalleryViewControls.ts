@@ -3,7 +3,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import type { DateGrouping, FolderTreeNode, SortBy, TagTreeNode, ViewMode } from '../types'
 import { Grid3x3, LayoutGrid, List, Rows3 } from '@lucide/vue'
-import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
+import { useGalleryData } from './useGalleryData'
 import { runWithLayoutTransition } from './useGalleryLayoutTransition'
 
 type SourceType = 'all' | 'folder' | 'tag'
@@ -37,7 +37,7 @@ function findTagNameById(nodes: TagTreeNode[], id: number): string | null {
 export function useGalleryViewControls() {
   const { t } = useI18n()
   const store = useGalleryStore()
-  const layoutMeta = useGalleryLayoutMeta('viewControls')
+  const galleryData = useGalleryData()
 
   const viewModes = [
     { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
@@ -141,7 +141,7 @@ export function useGalleryViewControls() {
 
       // 切换到瀑布流或自适应布局前，确保全量宽高元数据已就绪，避免挂载首帧正方形跳变
       if (targetMode === 'masonry' || targetMode === 'adaptive') {
-        await layoutMeta.ensureLayoutMetaLoaded()
+        await galleryData.ensureLayoutMetaLoaded()
       }
 
       await runWithLayoutTransition(() => {

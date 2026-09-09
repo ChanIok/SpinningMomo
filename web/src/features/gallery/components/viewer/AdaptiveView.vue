@@ -89,7 +89,6 @@ onMounted(async () => {
   if (props.initialAnchorIndex !== undefined && props.initialAnchorIndex > 0) {
     scrollToIndex(props.initialAnchorIndex, 'start')
   }
-  await adaptiveVirtualizer.init()
 })
 
 // 同步滚动位置，并通知图片调度器进入滚动状态。

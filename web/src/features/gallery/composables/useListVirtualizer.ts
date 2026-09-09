@@ -37,8 +37,6 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
   const galleryData = useGalleryData()
 
   const totalCount = computed(() => store.totalCount)
-  // 正在加载中的页码集合，防止同一页被并发重复请求
-  const loadingPages = new Set<number>()
   const virtualItems = shallowRef<VirtualListItem[]>([])
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLElement>({
@@ -86,44 +84,6 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
     })
   }
 
-  /**
-   * 根据当前可见项，找出尚未加载的分页并并发请求。
-   * 通过 loadingPages 集合避免同一页被重复触发。
-   */
-  async function loadMissingData(
-    items: ReturnType<typeof virtualizer.value.getVirtualItems>
-  ): Promise<void> {
-    if (items.length === 0) return
-
-    const neededPages = new Set(items.map((item) => Math.floor(item.index / store.perPage) + 1))
-    const loadPromises: Promise<void>[] = []
-
-    neededPages.forEach((pageNum) => {
-      if (!store.isPageLoaded(pageNum) && !loadingPages.has(pageNum)) {
-        loadingPages.add(pageNum)
-        const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.delete(pageNum)
-        })
-        loadPromises.push(loadPromise)
-      }
-    })
-
-    if (loadPromises.length > 0) {
-      await Promise.all(loadPromises)
-    }
-  }
-
-  /** 初始化：加载总数及第一页数据 */
-  async function init() {
-    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
-    // 从其它页面切回 gallery 时，若缓存已可用则不做全量刷新，避免 loadedPages 抖动。
-    if (hasReusableCache) {
-      return
-    }
-
-    await galleryData.loadAllAssets()
-  }
-
   // 监听虚拟项变化（滚动、数据更新、行高变化）：
   // 1. 先用现有数据立即渲染（未加载项显示骨架屏）
   // 2. 异步加载缺失分页
@@ -137,8 +97,10 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
     }),
     async ({ items, totalCount: total }) => {
       syncVirtualItems(items, total)
-      await loadMissingData(items)
-      syncVirtualItems(virtualizer.value.getVirtualItems(), totalCount.value)
+      if (items.length > 0) {
+        await galleryData.ensureIndexesLoaded(items.map((item) => item.index))
+        syncVirtualItems(virtualizer.value.getVirtualItems(), totalCount.value)
+      }
     }
   )
 
@@ -150,6 +112,5 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
   return {
     virtualizer,
     virtualItems,
-    init,
   }
 }

@@ -15,7 +15,6 @@ const galleryData = useGalleryData()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const filmstripRef = ref<HTMLElement | null>(null)
-const loadingPages = ref<Set<number>>(new Set())
 
 const THUMBNAIL_SIZE = 64
 const THUMBNAIL_GAP = 12
@@ -23,7 +22,6 @@ const THUMBNAIL_GAP = 12
 const totalCount = computed(() => store.totalCount)
 const currentIndex = computed(() => store.selection.activeIndex ?? 0)
 const selectedIds = computed(() => store.selection.selectedIds)
-const perPage = computed(() => store.perPage)
 
 // 胶片条使用横向虚拟列表，只渲染可见缩略图，避免灯箱场景下全量节点开销。
 const virtualizer = useVirtualizer({
@@ -76,25 +74,7 @@ async function loadMissingData(
     return
   }
 
-  const visibleIndexes = items.map((item) => item.index)
-  const neededPages = new Set(visibleIndexes.map((idx) => Math.floor(idx / perPage.value) + 1))
-  const loadPromises: Promise<void>[] = []
-
-  neededPages.forEach((pageNum) => {
-    if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-      // 可见区按页懒加载，避免滚动触发重复请求同一页。
-      loadingPages.value.add(pageNum)
-      loadPromises.push(
-        galleryData.loadPage(pageNum).finally(() => {
-          loadingPages.value.delete(pageNum)
-        })
-      )
-    }
-  })
-
-  if (loadPromises.length > 0) {
-    await Promise.all(loadPromises)
-  }
+  await galleryData.ensureIndexesLoaded(items.map((item) => item.index))
 }
 
 watch(
