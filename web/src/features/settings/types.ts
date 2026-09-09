@@ -194,6 +194,7 @@ export interface AppSettings {
     screenshot: {
       fileFormat: 'png' | 'jpeg'
       enableHdr: boolean
+      saveJxr: boolean
       captureClientArea: boolean
     }
 
@@ -347,6 +348,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     screenshot: {
       fileFormat: 'png',
       enableHdr: false,
+      saveJxr: false,
       captureClientArea: true,
     },
     letterbox: {

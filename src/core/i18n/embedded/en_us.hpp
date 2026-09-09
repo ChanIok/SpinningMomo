@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 5904 bytes
+// Size: 6071 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -74,6 +74,9 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
 
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",
+  "message.screenshot_jpeg_failed": "Failed to save JPEG",
+  "message.screenshot_jxr_success": "JXR saved: ",
+  "message.screenshot_jxr_failed": "Failed to save JXR",
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",

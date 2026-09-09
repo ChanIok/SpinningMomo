@@ -5,6 +5,7 @@
 #include "vendor/windows.hpp"
 #include "vendor/windows/d3d11.hpp"
 
+#include "features/screenshot/types.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/graphics/photo_processing.hpp"
@@ -17,13 +18,15 @@ namespace features::screenshot {
 struct ScreenshotRequest {
   HWND target_window = nullptr;
   std::wstring file_path;
+  std::wstring jxr_file_path;
   utils::image::ImageFormat format = utils::image::ImageFormat::PNG;
   float jpeg_quality = 1.0f;
   bool use_hdr = false;
+  bool save_jxr = false;
   float hdr_target_peak_nits = 1000.0f;
   int shutter_frames = 0;
   bool capture_client_area = true;
-  std::move_only_function<void(bool success, const std::wstring& path)> completion_callback;
+  std::move_only_function<void(ScreenshotSaveResult result)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
@@ -59,52 +62,6 @@ struct ScreenshotState {
 
   // 清理定时器
   std::optional<utils::timeout::Timeout> cleanup_timer;
-
-  // 请求D3D资源清理（线程安全）
-  inline auto request_d3d_cleanup() -> void {
-    cleanup_requested = true;
-    worker_cv.notify_one();  // 唤醒工作线程处理清理
-  }
-
-  // 清理活跃的捕获会话
-  inline auto cleanup_active_sessions() -> void {
-    for (auto& [session_id, session_info] : active_sessions) {
-      if (session_info.session.need_hide_cursor) {
-        ShowCursor(TRUE);
-      }
-
-      utils::graphics::capture::stop_capture(session_info.session);
-      utils::graphics::capture::cleanup_capture_session(session_info.session);
-
-      // 通知调用者会话被取消
-      if (session_info.request.completion_callback) {
-        auto completion_callback = std::move(session_info.request.completion_callback);
-        completion_callback(false, session_info.request.file_path);
-      }
-    }
-    active_sessions.clear();
-  }
-
-  // 清理D3D资源（仅在工作线程中调用）
-  inline auto cleanup_d3d_resources() -> void {
-    cleanup_active_sessions();
-    winrt_device = nullptr;
-    if (d3d_context) {
-      utils::graphics::d3d::cleanup_d3d_context(*d3d_context);
-      d3d_context.reset();
-    }
-    d3d_initialized = false;
-  }
-
-  // 停止工作线程
-  inline auto shutdown_worker() -> void {
-    should_stop = true;
-    worker_cv.notify_all();
-    if (worker_thread && worker_thread->joinable()) {
-      worker_thread->join();
-    }
-    worker_thread.reset();
-  }
 };
 
 }  // namespace features::screenshot

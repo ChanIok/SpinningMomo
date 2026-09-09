@@ -34,6 +34,64 @@ auto handle_saved_file_view_action(core::AppState& state, const std::filesystem:
   }
 }
 
+// 截图保存完成后只发一条汇总通知：正常成功只展示主图路径，部分失败时才说明失败格式。
+auto post_screenshot_save_result_notification(core::AppState& state,
+                                              const ScreenshotSaveResult& result) -> void {
+  // 主图或 JXR 任一成功就算有产物，决定通知里是否提供“查看”按钮。
+  const bool has_saved_output = result.success || result.jxr_success;
+  std::wstring message;
+
+  // 主图成功时保持原有简洁文案；JXR 只有失败时才追加说明。
+  if (result.success) {
+    message = utils::string::FromUtf8(state.i18n->texts["message.screenshot_success"]);
+    message += result.path;
+    if (result.jxr_requested && !result.jxr_success) {
+      message += L"\n";
+      message += utils::string::FromUtf8(state.i18n->texts["message.screenshot_jxr_failed"]);
+    }
+  } else if (result.jxr_success) {
+    // 极少数主图失败、JXR 成功时明确指出失败的是 JPEG，同时保留可用产物路径。
+    message = utils::string::FromUtf8(state.i18n->texts["message.screenshot_jpeg_failed"]);
+    message += L"\n";
+    message += utils::string::FromUtf8(state.i18n->texts["message.screenshot_jxr_success"]);
+    message += result.jxr_path;
+  } else {
+    // 两路都失败时一条通用失败消息即可，详细原因写入日志。
+    message = utils::string::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
+  }
+
+  core::notifications::NotificationOptions options;
+  options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message = std::move(message);
+
+  // 有产物时挂"查看"动作：主图成功就定位主图，否则定位 JXR；点击回调走用户偏好的打开方式
+  if (has_saved_output) {
+    const std::filesystem::path view_path(result.success ? result.path : result.jxr_path);
+    core::notifications::NotificationAction view_action;
+    view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
+    view_action.callback = [view_path](core::AppState& app_state) {
+      handle_saved_file_view_action(app_state, view_path, "screenshot");
+    };
+    options.action = std::move(view_action);
+  }
+
+  // 投递系统通知
+  core::notifications::post_notification_request(state, std::move(options));
+  // 失败项分别记 error，便于排查主图与 JXR 各自的问题
+  if (!result.success) {
+    Logger().error("Screenshot primary output failed: {}", result.error);
+  }
+  if (result.jxr_requested && !result.jxr_success) {
+    Logger().error("Screenshot JXR output failed: {}", result.jxr_error);
+  }
+  // 末尾汇总一条 info，记录两路产物的成败标记与最终路径
+  Logger().info(
+      "Screenshot outputs completed: primary_success={}, jxr_requested={}, "
+      "jxr_success={}, primary_path={}, jxr_path={}",
+      result.success, result.jxr_requested, result.jxr_success, utils::string::ToUtf8(result.path),
+      utils::string::ToUtf8(result.jxr_path));
+}
+
 // 执行 ADB 模式截图：算输出目录 → 取格式配置 → 生成时间戳路径 → 发起异步截屏并挂完成通知
 auto capture_adb(core::AppState& state) -> void {
   // 检查是否启用了按窗口标题分类子目录存储
@@ -164,34 +222,8 @@ auto capture(core::AppState& state) -> void {
   }
 
   // 截图完成回调在截图工作线程的帧回调中执行，必须快速返回；通知通过事件系统发送到 UI 线程
-  auto completion_callback = [&state](bool success, const std::wstring& path) {
-    if (success) {
-      const std::filesystem::path screenshot_path(path);
-      const auto path_str = utils::string::ToUtf8(path);
-
-      core::notifications::NotificationOptions options;
-      options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
-      options.message =
-          utils::string::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
-
-      // 绑定查看动作回调
-      core::notifications::NotificationAction view_action;
-      view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
-      view_action.callback = [screenshot_path](core::AppState& app_state) {
-        handle_saved_file_view_action(app_state, screenshot_path, "screenshot");
-      };
-      options.action = std::move(view_action);
-
-      core::notifications::post_notification_request(state, std::move(options));
-      Logger().info("Screenshot saved successfully: {}", path_str);
-    } else {
-      core::notifications::NotificationOptions fail_options;
-      fail_options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
-      fail_options.message =
-          utils::string::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
-      core::notifications::post_notification_request(state, std::move(fail_options));
-      Logger().error("Screenshot capture failed");
-    }
+  auto completion_callback = [&state](ScreenshotSaveResult result) {
+    post_screenshot_save_result_notification(state, result);
   };
 
   // 读取目标图片输出格式与质量参数

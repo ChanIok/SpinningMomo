@@ -113,7 +113,8 @@ auto crop_texture_to_region(ID3D11Device* device, ID3D11DeviceContext* context,
     D3D11_TEXTURE2D_DESC output_desc{};
     output_texture->GetDesc(&output_desc);
     need_recreate = output_desc.Width != cropped_width || output_desc.Height != cropped_height ||
-                    output_desc.Format != source_desc.Format;
+                    output_desc.Format != source_desc.Format ||
+                    (output_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) == 0;
   }
 
   if (need_recreate) {
@@ -121,7 +122,8 @@ auto crop_texture_to_region(ID3D11Device* device, ID3D11DeviceContext* context,
     target_desc.Width = cropped_width;
     target_desc.Height = cropped_height;
     target_desc.Usage = D3D11_USAGE_DEFAULT;
-    target_desc.BindFlags = 0;
+    // 裁剪结果还会进入 HDR 着色器处理，必须允许创建 shader resource view。
+    target_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     target_desc.CPUAccessFlags = 0;
     target_desc.MiscFlags = 0;
 

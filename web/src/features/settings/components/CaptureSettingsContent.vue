@@ -61,6 +61,7 @@ const {
   updateRecordingAudioBitrate,
   updateScreenshotFileFormat,
   updateScreenshotHdrEnabled,
+  updateScreenshotSaveJxr,
   updateScreenshotCaptureClientArea,
   resetCaptureExportSettings,
 } = useFunctionActions()
@@ -131,6 +132,9 @@ const recordingCodecIsH265 = computed(
 )
 const recordingHdrEnabled = computed(
   () => appSettings.value?.features?.recording?.enableHdr === true
+)
+const screenshotHdrEnabled = computed(
+  () => appSettings.value?.features?.screenshot?.enableHdr === true
 )
 
 const handleSelectOutputDir = async () => {
@@ -854,6 +858,24 @@ const handleResetSettings = async () => {
               <Switch
                 :model-value="appSettings?.features?.screenshot?.enableHdr ?? false"
                 @update:model-value="(value) => updateScreenshotHdrEnabled(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.hdrSettings.jxrLabel') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.hdrSettings.jxrDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.screenshot?.saveJxr ?? false"
+                :disabled="!screenshotHdrEnabled"
+                @update:model-value="(value) => updateScreenshotSaveJxr(Boolean(value))"
               />
             </ItemActions>
           </Item>

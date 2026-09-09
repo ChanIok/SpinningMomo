@@ -92,42 +92,188 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
   }
 }
 
+auto make_failed_save_result(const features::screenshot::ScreenshotRequest& request,
+                             std::string error) -> features::screenshot::ScreenshotSaveResult {
+  const bool jxr_requested = request.use_hdr && request.save_jxr;
+  return features::screenshot::ScreenshotSaveResult{
+      .success = false,
+      .path = request.file_path,
+      .error = std::move(error),
+      .jxr_requested = jxr_requested,
+      .jxr_path = request.jxr_file_path,
+      .jxr_error = jxr_requested ? "Screenshot capture failed" : "",
+  };
+}
+
 // 安全调用完成回调的辅助函数
-auto safe_call_completion_callback(features::screenshot::ScreenshotRequest& request, bool success)
-    -> void {
+auto safe_call_completion_callback(features::screenshot::ScreenshotRequest& request,
+                                   features::screenshot::ScreenshotSaveResult result) -> void {
   if (!request.completion_callback) {
     return;
   }
 
   try {
     auto completion_callback = std::move(request.completion_callback);
-    completion_callback(success, request.file_path);
+    completion_callback(std::move(result));
   } catch (...) {
     Logger().error("Exception in completion callback");
   }
 }
 
-// 根据 HDR 标记选择 UltraHDR JPEG 或 WIC 通用编码保存纹理
-auto save_capture_texture(ID3D11Texture2D* texture,
-                          const features::screenshot::ScreenshotRequest& request)
-    -> std::expected<void, std::string> {
+// 根据 HDR 标记保存主图；HDR + JXR 请求会在同一条 D3D 线程上提交两路 GPU 准备，
+// 然后让 JXR 的 WIC 编码与 Ultra HDR 的后续 GPU/CPU 工作重叠。
+auto save_capture_textures(ID3D11Texture2D* texture,
+                           const features::screenshot::ScreenshotRequest& request)
+    -> features::screenshot::ScreenshotSaveResult {
+  const bool jxr_requested = request.use_hdr && request.save_jxr;
+  features::screenshot::ScreenshotSaveResult result{
+      .path = request.file_path,
+      .jxr_requested = jxr_requested,
+      .jxr_path = request.jxr_file_path,
+  };
+
   if (!texture) {
-    return std::unexpected("Texture cannot be null");
+    result.error = "Texture cannot be null";
+    if (jxr_requested) {
+      result.jxr_error = result.error;
+    }
+    return result;
   }
 
-  return request.use_hdr ? features::screenshot::hdr_encoder::save_texture_as_ultrahdr_jpeg(
-                               texture, request.file_path,
-                               features::screenshot::hdr_encoder::UltraHdrEncodeOptions{
-                                   .target_display_peak_nits = request.hdr_target_peak_nits})
-                         : save_texture_with_wic(texture, request.file_path, request.format,
-                                                 request.jpeg_quality);
+  const auto hdr_options = features::screenshot::hdr_encoder::UltraHdrEncodeOptions{
+      .target_display_peak_nits = request.hdr_target_peak_nits};
+
+  // 非 HDR 或未开启 JXR 时保持单路旧流程；JXR 只对有效 HDR 请求生效。
+  if (!jxr_requested) {
+    try {
+      auto primary_result = request.use_hdr
+                                ? features::screenshot::hdr_encoder::save_texture_as_ultrahdr_jpeg(
+                                      texture, request.file_path, hdr_options)
+                                : save_texture_with_wic(texture, request.file_path, request.format,
+                                                        request.jpeg_quality);
+      if (primary_result) {
+        result.success = true;
+      } else {
+        result.error = primary_result.error();
+      }
+    } catch (const std::exception& e) {
+      result.error = std::format("Screenshot output failed: {}", e.what());
+    } catch (...) {
+      result.error = "Screenshot output failed";
+    }
+    return result;
+  }
+
+  // 1. 先创建 JXR staging texture 并提交 CopyResource，只在稍后 Map。
+  std::optional<features::screenshot::hdr_encoder::JxrReadbackSession> jxr_readback;
+  try {
+    auto jxr_readback_result = features::screenshot::hdr_encoder::begin_jxr_readback(texture);
+    if (jxr_readback_result) {
+      jxr_readback.emplace(std::move(jxr_readback_result.value()));
+    } else {
+      result.jxr_error = jxr_readback_result.error();
+    }
+  } catch (const std::exception& e) {
+    result.jxr_error = std::format("JPEG XR readback setup failed: {}", e.what());
+  } catch (...) {
+    result.jxr_error = "JPEG XR readback setup failed";
+  }
+
+  // 2. 紧接着提交 Ultra HDR 直方图；此时两路 GPU 准备都已经进入同一个 immediate context。
+  std::optional<features::screenshot::hdr_encoder::UltraHdrPreprocessSession> hdr_session;
+  try {
+    auto hdr_session_result = features::screenshot::hdr_encoder::begin_ultrahdr_preprocess(texture);
+    if (hdr_session_result) {
+      hdr_session.emplace(std::move(hdr_session_result.value()));
+    } else {
+      result.error = hdr_session_result.error();
+    }
+  } catch (const std::exception& e) {
+    result.error = std::format("Ultra HDR preprocess setup failed: {}", e.what());
+  } catch (...) {
+    result.error = "Ultra HDR preprocess setup failed";
+  }
+
+  std::optional<std::future<std::expected<void, std::string>>> jxr_future;
+
+  if (!jxr_readback) {
+    if (result.jxr_error.empty()) {
+      result.jxr_error = "JPEG XR readback is unavailable";
+    }
+  } else {
+    // 3. 在 D3D 线程完成 staging Map，复制成独立 CPU 缓冲后立即释放 D3D 资源。
+    try {
+      auto jxr_pixels_result =
+          features::screenshot::hdr_encoder::read_jxr_pixels(std::move(*jxr_readback));
+      if (!jxr_pixels_result) {
+        result.jxr_error = jxr_pixels_result.error();
+      } else {
+        // 4. WIC/文件写入只使用 CPU 像素，交给独立线程；该线程不触碰 D3D immediate context。
+        jxr_future.emplace(std::async(
+            std::launch::async,
+            [pixels = std::move(jxr_pixels_result.value()), file_path = request.jxr_file_path]() {
+              return features::screenshot::hdr_encoder::save_jxr_pixels(pixels, file_path);
+            }));
+      }
+    } catch (const std::exception& e) {
+      result.jxr_error = std::format("JPEG XR readback or encoding setup failed: {}", e.what());
+    } catch (...) {
+      result.jxr_error = "JPEG XR readback or encoding setup failed";
+    }
+  }
+
+  // 5. 主线程读取直方图并继续 Ultra HDR GPU 预处理、读回和 JPEG 编码。
+  if (!hdr_session) {
+    if (result.error.empty()) {
+      result.error = "Ultra HDR preprocess is unavailable";
+    }
+  } else {
+    try {
+      auto prepared_result =
+          features::screenshot::hdr_encoder::finish_ultrahdr_preprocess(*hdr_session);
+      if (!prepared_result) {
+        result.error = prepared_result.error();
+      } else {
+        auto primary_result =
+            features::screenshot::hdr_encoder::save_prepared_images_as_ultrahdr_jpeg(
+                prepared_result.value(), request.file_path, hdr_options);
+        if (primary_result) {
+          result.success = true;
+        } else {
+          result.error = primary_result.error();
+        }
+      }
+    } catch (const std::exception& e) {
+      result.error = std::format("Ultra HDR output failed: {}", e.what());
+    } catch (...) {
+      result.error = "Ultra HDR output failed";
+    }
+  }
+
+  // 6. 类似 Promise.allSettled：无论主图是否失败，都等待已启动的 JXR 任务并汇总结果。
+  if (jxr_future) {
+    try {
+      auto jxr_result = jxr_future->get();
+      if (jxr_result) {
+        result.jxr_success = true;
+      } else {
+        result.jxr_error = jxr_result.error();
+      }
+    } catch (const std::exception& e) {
+      result.jxr_error = std::format("JPEG XR encoding task failed: {}", e.what());
+    } catch (...) {
+      result.jxr_error = "JPEG XR encoding task failed";
+    }
+  }
+
+  return result;
 }
 
 // 截图完成收尾：恢复光标 → 停止捕获 → 回调 → 移除会话 → 检查是否启动空闲清理
 auto finish_screenshot_session(
     features::screenshot::ScreenshotState& state,
     std::unordered_map<size_t, features::screenshot::SessionInfo>::iterator session_it,
-    size_t session_id, bool success) -> void {
+    size_t session_id, features::screenshot::ScreenshotSaveResult result) -> void {
   auto& session_info = session_it->second;
 
   if (session_info.session.need_hide_cursor) {
@@ -136,7 +282,7 @@ auto finish_screenshot_session(
 
   utils::graphics::capture::stop_capture(session_info.session);
   utils::graphics::capture::cleanup_capture_session(session_info.session);
-  safe_call_completion_callback(session_info.request, success);
+  safe_call_completion_callback(session_info.request, std::move(result));
   state.active_sessions.erase(session_it);
   Logger().debug("Session {} completed and removed", session_id);
 
@@ -177,8 +323,6 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
     // 创建帧回调，通过会话ID管理生命周期
     auto frame_callback = [&state,
                            session_id](utils::graphics::capture::Direct3D11CaptureFrame frame) {
-      bool success = false;
-
       // 查找对应的会话信息
       auto it = state.active_sessions.find(session_id);
       if (it == state.active_sessions.end()) {
@@ -187,6 +331,7 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
       }
 
       auto& session_info = it->second;
+      auto save_result = make_failed_save_result(session_info.request, "Captured frame is null");
 
       if (frame) {
         auto surface = frame.Surface();
@@ -205,7 +350,9 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
                 if (!accumulator_result) {
                   Logger().error("Failed to initialize long exposure for session {}: {}",
                                  session_id, accumulator_result.error());
-                  finish_screenshot_session(state, it, session_id, false);
+                  finish_screenshot_session(
+                      state, it, session_id,
+                      make_failed_save_result(session_info.request, accumulator_result.error()));
                   return;
                 }
                 session_info.average_accumulator = std::move(accumulator_result.value());
@@ -216,7 +363,9 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
                 if (!accumulate_result) {
                   Logger().error("Failed to accumulate long exposure for session {}: {}",
                                  session_id, accumulate_result.error());
-                  finish_screenshot_session(state, it, session_id, false);
+                  finish_screenshot_session(
+                      state, it, session_id,
+                      make_failed_save_result(session_info.request, accumulate_result.error()));
                   return;
                 }
               }
@@ -263,9 +412,8 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
               }
             }
 
-            auto save_result = save_capture_texture(texture_to_save, session_info.request);
-            if (save_result) {
-              success = true;
+            save_result = save_capture_textures(texture_to_save, session_info.request);
+            if (save_result.success) {
               if (session_info.request.use_hdr) {
                 Logger().info("HDR screenshot saved for session {}: {}", session_id,
                               utils::string::ToUtf8(session_info.request.file_path));
@@ -278,19 +426,33 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
             } else {
               if (session_info.request.use_hdr) {
                 Logger().error("HDR screenshot save failed for session {}: {}", session_id,
-                               save_result.error());
+                               save_result.error);
               } else {
                 Logger().error("Failed to save screenshot for session {}: {}", session_id,
-                               save_result.error());
+                               save_result.error);
               }
             }
+            if (save_result.jxr_requested && !save_result.jxr_success) {
+              Logger().error("HDR JPEG XR save failed for session {}: {}", session_id,
+                             save_result.jxr_error);
+            }
+          } else {
+            save_result.error = "Failed to get captured texture";
+            if (save_result.jxr_requested) {
+              save_result.jxr_error = save_result.error;
+            }
+          }
+        } else {
+          save_result.error = "Captured frame surface is null";
+          if (save_result.jxr_requested) {
+            save_result.jxr_error = save_result.error;
           }
         }
       } else {
         Logger().error("Captured frame is null for session {}", session_id);
       }
 
-      finish_screenshot_session(state, it, session_id, success);
+      finish_screenshot_session(state, it, session_id, std::move(save_result));
     };
 
     // 创建捕获会话
@@ -330,7 +492,9 @@ auto do_screenshot_capture(features::screenshot::ScreenshotRequest& request,
         ShowCursor(TRUE);
       }
       utils::graphics::capture::cleanup_capture_session(session_info.session);
-      safe_call_completion_callback(session_info.request, false);
+      safe_call_completion_callback(
+          session_info.request,
+          make_failed_save_result(session_info.request, start_result.error()));
       state.active_sessions.erase(session_it);
       return std::unexpected("Failed to start capture: " + start_result.error());
     }
@@ -355,11 +519,12 @@ auto process_single_request(features::screenshot::ScreenshotRequest request,
       Logger().debug("Screenshot capture started successfully");
     } else {
       Logger().error("Failed to start screenshot capture: {}", result.error());
-      safe_call_completion_callback(request, false);
+      safe_call_completion_callback(request, make_failed_save_result(request, result.error()));
     }
   } catch (...) {
     Logger().error("Exception during screenshot capture");
-    safe_call_completion_callback(request, false);
+    safe_call_completion_callback(
+        request, make_failed_save_result(request, "Exception during screenshot capture"));
   }
 }
 
@@ -379,7 +544,8 @@ auto start_cleanup_timer(features::screenshot::ScreenshotState& state) -> void {
 
   auto result = state.cleanup_timer->set_timeout(std::chrono::milliseconds(5000), [&state]() {
     Logger().debug("Screenshot cleanup timer triggered");
-    state.request_d3d_cleanup();  // 请求清理而不是直接清理
+    state.cleanup_requested = true;
+    state.worker_cv.notify_one();
   });
 
   if (!result) {
@@ -387,6 +553,39 @@ auto start_cleanup_timer(features::screenshot::ScreenshotState& state) -> void {
   } else {
     Logger().debug("Screenshot cleanup timer started (5 seconds)");
   }
+}
+
+// 清理活跃会话与 D3D 资源
+auto cleanup_d3d_resources(features::screenshot::ScreenshotState& state) -> void {
+  for (auto& [session_id, session_info] : state.active_sessions) {
+    if (session_info.session.need_hide_cursor) {
+      ShowCursor(TRUE);
+    }
+
+    utils::graphics::capture::stop_capture(session_info.session);
+    utils::graphics::capture::cleanup_capture_session(session_info.session);
+
+    if (session_info.request.completion_callback) {
+      auto completion_callback = std::move(session_info.request.completion_callback);
+      const bool jxr_requested = session_info.request.use_hdr && session_info.request.save_jxr;
+      completion_callback(ScreenshotSaveResult{
+          .success = false,
+          .path = session_info.request.file_path,
+          .error = "Screenshot session was cancelled",
+          .jxr_requested = jxr_requested,
+          .jxr_path = session_info.request.jxr_file_path,
+          .jxr_error = jxr_requested ? "Screenshot session was cancelled" : "",
+      });
+    }
+  }
+  state.active_sessions.clear();
+
+  state.winrt_device = nullptr;
+  if (state.d3d_context) {
+    utils::graphics::d3d::cleanup_d3d_context(*state.d3d_context);
+    state.d3d_context.reset();
+  }
+  state.d3d_initialized = false;
 }
 
 // 工作线程主函数
@@ -416,7 +615,7 @@ auto worker_thread_proc(core::AppState& app_state) -> void {
         // 确保没有活跃会话时才清理
         if (state.active_sessions.empty()) {
           Logger().debug("Processing D3D cleanup request");
-          state.cleanup_d3d_resources();
+          cleanup_d3d_resources(state);
           state.cleanup_requested = false;
           Logger().debug("D3D resources cleaned up by worker thread");
         } else {
@@ -485,7 +684,7 @@ auto initialize_d3d_resources_only(core::AppState& app_state) -> std::expected<v
     auto winrt_result =
         utils::graphics::capture::create_winrt_device(state.d3d_context->device.get());
     if (!winrt_result) {
-      state.cleanup_d3d_resources();
+      cleanup_d3d_resources(state);
       return std::unexpected("Failed to create WinRT device: " + winrt_result.error());
     }
 
@@ -535,30 +734,35 @@ auto cleanup_system(core::AppState& app_state) -> void {
   }
 
   // 停止工作线程
-  state.shutdown_worker();
+  state.should_stop = true;
+  state.worker_cv.notify_all();
+  if (state.worker_thread && state.worker_thread->joinable()) {
+    state.worker_thread->join();
+  }
+  state.worker_thread.reset();
 
   // 清空待处理请求
   {
     std::lock_guard<std::mutex> lock(state.request_mutex);
     while (!state.pending_requests.empty()) {
       auto& request = state.pending_requests.front();
-      safe_call_completion_callback(request, false);
+      safe_call_completion_callback(
+          request, make_failed_save_result(request, "Screenshot system was cleaned up"));
       state.pending_requests.pop();
     }
   }
 
   // 清理D3D资源
-  state.cleanup_d3d_resources();
+  cleanup_d3d_resources(state);
 
   Logger().debug("Screenshot system cleaned up");
 }
 
-auto take_screenshot(
-    core::AppState& app_state, HWND target_window,
-    std::move_only_function<void(bool success, const std::wstring& path)> completion_callback,
-    utils::image::ImageFormat format, float jpeg_quality,
-    std::optional<std::filesystem::path> output_dir_override, int shutter_frames,
-    bool capture_client_area) -> std::expected<void, std::string> {
+auto take_screenshot(core::AppState& app_state, HWND target_window,
+                     std::move_only_function<void(ScreenshotSaveResult result)> completion_callback,
+                     utils::image::ImageFormat format, float jpeg_quality,
+                     std::optional<std::filesystem::path> output_dir_override, int shutter_frames,
+                     bool capture_client_area) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
@@ -648,6 +852,12 @@ auto take_screenshot(
   request.format = use_hdr ? utils::image::ImageFormat::JPEG : format;
   request.jpeg_quality = jpeg_quality;
   request.use_hdr = use_hdr;
+  request.save_jxr = use_hdr && app_state.settings->raw.features.screenshot.save_jxr;
+  if (request.save_jxr) {
+    auto jxr_file_path = file_path;
+    jxr_file_path.replace_extension(L".jxr");
+    request.jxr_file_path = jxr_file_path.wstring();
+  }
   request.hdr_target_peak_nits = hdr_target_peak_nits;
   request.completion_callback = std::move(completion_callback);
   request.timestamp = std::chrono::steady_clock::now();

@@ -718,24 +718,32 @@ auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
   const std::uint32_t width = images.width;
   const std::uint32_t height = images.height;
 
-  // base / gainmap 互不依赖，各在线程用 thread_local WIC 工厂并行编码。
-  auto base_future = std::async(std::launch::async, [&images, width, height, base_quality]() {
-    return encode_bgra_layer_to_jpeg(images.base_bgra8, width, height, base_quality);
-  });
-  auto gainmap_future = std::async(std::launch::async, [&images, width, height, gainmap_quality]() {
-    return encode_bgra_layer_to_jpeg(images.gainmap_bgra8, width, height, gainmap_quality);
-  });
+  try {
+    // base / gainmap 互不依赖，各在线程用 thread_local WIC 工厂并行编码。
+    auto base_future = std::async(std::launch::async, [&images, width, height, base_quality]() {
+      return encode_bgra_layer_to_jpeg(images.base_bgra8, width, height, base_quality);
+    });
+    auto gainmap_future =
+        std::async(std::launch::async, [&images, width, height, gainmap_quality]() {
+          return encode_bgra_layer_to_jpeg(images.gainmap_bgra8, width, height, gainmap_quality);
+        });
 
-  auto base_jpeg = base_future.get();
-  auto gainmap_jpeg = gainmap_future.get();
-  if (!base_jpeg) {
-    return std::unexpected("Base JPEG encode failed: " + base_jpeg.error());
-  }
-  if (!gainmap_jpeg) {
-    return std::unexpected("Gain map JPEG encode failed: " + gainmap_jpeg.error());
-  }
+    auto base_jpeg = base_future.get();
+    auto gainmap_jpeg = gainmap_future.get();
+    if (!base_jpeg) {
+      return std::unexpected("Base JPEG encode failed: " + base_jpeg.error());
+    }
+    if (!gainmap_jpeg) {
+      return std::unexpected("Gain map JPEG encode failed: " + gainmap_jpeg.error());
+    }
 
-  return local_ultra_hdr::assemble_ultrahdr_jpeg(base_jpeg.value(), gainmap_jpeg.value(), metadata);
+    return local_ultra_hdr::assemble_ultrahdr_jpeg(base_jpeg.value(), gainmap_jpeg.value(),
+                                                   metadata);
+  } catch (const std::exception& e) {
+    return std::unexpected(std::format("Ultra HDR JPEG encoding failed: {}", e.what()));
+  } catch (...) {
+    return std::unexpected("Ultra HDR JPEG encoding failed");
+  }
 }
 
 auto write_file(const std::wstring& file_path, const std::vector<std::uint8_t>& data)

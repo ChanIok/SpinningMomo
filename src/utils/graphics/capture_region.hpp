@@ -22,7 +22,7 @@ struct CropRegion {
 auto calculate_client_crop_region(HWND target_window, UINT texture_width, UINT texture_height)
     -> std::expected<CropRegion, std::string>;
 
-// 将源纹理按指定区域裁剪到输出纹理（输出纹理可复用）
+// 将源纹理按指定区域裁剪到可供着色器读取的输出纹理（输出纹理可复用）。
 auto crop_texture_to_region(ID3D11Device* device, ID3D11DeviceContext* context,
                             ID3D11Texture2D* source_texture, const CropRegion& region,
                             wil::com_ptr<ID3D11Texture2D>& output_texture)

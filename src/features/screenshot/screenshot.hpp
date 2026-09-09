@@ -5,6 +5,7 @@
 #include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
+#include "features/screenshot/types.hpp"
 #include "utils/image/image.hpp"
 
 namespace features::screenshot {
@@ -13,8 +14,7 @@ namespace features::screenshot {
 // output_dir_override: 指定时使用该目录，否则使用 output_dir_path 或 Videos/SpinningMomo
 auto take_screenshot(
     core::AppState& state, HWND target_window,
-    std::move_only_function<void(bool success, const std::wstring& path)> completion_callback =
-        nullptr,
+    std::move_only_function<void(ScreenshotSaveResult result)> completion_callback = nullptr,
     utils::image::ImageFormat format = utils::image::ImageFormat::PNG, float jpeg_quality = 1.0f,
     std::optional<std::filesystem::path> output_dir_override = std::nullopt, int shutter_frames = 0,
     bool capture_client_area = true) -> std::expected<void, std::string>;
