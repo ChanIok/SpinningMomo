@@ -75,15 +75,15 @@ const STARS = [1, 2, 3, 4, 5] as const
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="rounded p-1 transition-colors"
+            class="flex h-5 w-5 items-center justify-center rounded-md transition-colors"
             :class="
               !flagIndeterminate && reviewFlag === 'rejected'
-                ? 'text-rose-500'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-secondary text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300'
+                : 'bg-muted/40 text-muted-foreground hover:text-foreground'
             "
             @click="onRejectedClick"
           >
-            <X class="h-4 w-4" />
+            <X class="h-3 w-3" />
           </button>
         </TooltipTrigger>
         <TooltipContent>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { ScanText, FolderSymlink, Sparkles, ChevronRight } from '@lucide/vue'
+import { ChevronRight } from '@lucide/vue'
 import zongziMomoSvg from '@/assets/zongzi-momo.svg?raw'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -147,24 +147,9 @@ function handlePrevious() {
         </div>
       </div>
 
-      <!-- Body：横向双栏 —— 左侧图标，右侧文字内容 -->
-      <div class="flex min-h-[220px] flex-1 items-center gap-6 px-6 py-4">
-        <!-- 左栏：精简图标 -->
-        <div class="flex w-16 shrink-0 items-center justify-center">
-          <Transition name="guide-icon" mode="out-in">
-            <div
-              :key="step"
-              class="surface-top flex size-14 items-center justify-center rounded-md border border-primary/20 text-primary"
-            >
-              <ScanText v-if="step === 1" class="size-7" :stroke-width="1.5" />
-              <FolderSymlink v-else-if="step === 2" class="size-7" :stroke-width="1.5" />
-              <Sparkles v-else class="size-7" :stroke-width="1.5" />
-            </div>
-          </Transition>
-        </div>
-
-        <!-- 右栏：步骤内容，切换时左右滑动 -->
-        <div class="flex-1 overflow-hidden">
+      <!-- Body：步骤内容，切换时左右滑动 -->
+      <div class="flex min-h-[220px] flex-1 items-center px-6 py-4">
+        <div class="w-full overflow-hidden">
           <Transition name="guide-step" mode="out-in">
             <!-- 步骤 1：照片元数据解析 -->
             <div v-if="step === 1" key="step-1" class="space-y-3">
@@ -278,16 +263,5 @@ function handlePrevious() {
 .guide-step-leave-to {
   opacity: 0;
   transform: translateX(-14px);
-}
-
-/* 左栏图标：简单淡入淡出 */
-.guide-icon-enter-active,
-.guide-icon-leave-active {
-  transition: opacity 0.15s ease;
-}
-
-.guide-icon-enter-from,
-.guide-icon-leave-to {
-  opacity: 0;
 }
 </style>

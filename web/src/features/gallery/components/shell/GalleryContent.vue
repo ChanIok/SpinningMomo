@@ -9,6 +9,7 @@ import AdaptiveView from '../viewer/AdaptiveView.vue'
 import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
 import GalleryMoveToFolderDialog from '../dialogs/GalleryMoveToFolderDialog.vue'
 import GalleryDeleteAssetsDialog from '../dialogs/GalleryDeleteAssetsDialog.vue'
+import GalleryEmptyState from './GalleryEmptyState.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -20,6 +21,14 @@ const props = withDefaults(
 )
 
 const store = useGalleryStore()
+
+const isAllMediaSelected = computed(
+  () => !store.filter.folderId && (!store.filter.tagIds || store.filter.tagIds.length === 0)
+)
+
+const showEmptyState = computed(
+  () => isAllMediaSelected.value && store.totalCount === 0 && store.queryStatus !== 'loading'
+)
 
 const viewMode = computed(() =>
   store.isCompactWindow && store.view.mode === 'list' ? 'grid' : store.view.mode
@@ -71,8 +80,9 @@ defineExpose({ scrollToIndex, getCardRect })
 
 <template>
   <div class="gallery-layout-scene h-full w-full">
+    <GalleryEmptyState v-if="showEmptyState" />
     <GridView
-      v-if="viewMode === 'grid'"
+      v-else-if="viewMode === 'grid'"
       ref="gridViewRef"
       :toolbar-height="props.toolbarHeight"
       :initial-anchor-index="activeAnchorIndex"

@@ -112,6 +112,7 @@
   "gallery.details.colors.copySuccess": "Copied {hex}",
   "gallery.details.colors.title": "Main Colors",
   "gallery.details.empty": "Select a file or folder to view details",
+  "gallery.empty.allMedia": "No photos or videos",
   "gallery.details.folderDisplayName": "Display Name",
   "gallery.details.folderInfo": "Folder Info",
   "gallery.details.folderName": "Folder Name",

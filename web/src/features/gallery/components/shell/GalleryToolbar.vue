@@ -622,31 +622,9 @@ function handleToolbarContextMenu(event: MouseEvent) {
                     </PopoverTrigger>
                     <PopoverContent align="start" class="w-auto p-3">
                       <div class="w-[220px] space-y-3">
-                        <div class="flex items-center justify-between gap-3">
-                          <div class="flex min-w-0 items-center gap-2">
-                            <div
-                              class="h-5 w-5 shrink-0 rounded border border-border/80"
-                              :style="{ backgroundColor: activeColorHex || draftColorHex }"
-                            />
-                            <div class="min-w-0">
-                              <p class="text-xs font-medium">
-                                {{ t('gallery.toolbar.colorFilter.title') }}
-                              </p>
-                              <p class="truncate font-mono text-[11px]">
-                                {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            v-if="activeColorHex"
-                            variant="sidebarGhost"
-                            size="sm"
-                            class="h-7 px-2 text-xs"
-                            @click="clearColorFilter"
-                          >
-                            {{ t('gallery.toolbar.colorFilter.clear') }}
-                          </Button>
-                        </div>
+                        <p class="text-xs font-medium">
+                          {{ t('gallery.toolbar.colorFilter.title') }}
+                        </p>
 
                         <ColorPicker
                           :model-value="draftColorHex"
@@ -672,7 +650,16 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           />
                         </div>
 
-                        <div class="flex justify-end">
+                        <div class="flex justify-end gap-2">
+                          <Button
+                            v-if="activeColorHex"
+                            variant="outline"
+                            size="sm"
+                            class="h-7 px-3 text-xs"
+                            @click="clearColorFilter"
+                          >
+                            {{ t('gallery.toolbar.colorFilter.clear') }}
+                          </Button>
                           <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
                             {{ t('gallery.toolbar.colorFilter.apply') }}
                           </Button>

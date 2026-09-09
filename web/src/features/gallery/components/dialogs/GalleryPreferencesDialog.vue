@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { useSettingsStore } from '@/features/settings/store'
@@ -155,150 +156,152 @@ watch(
         </button>
       </nav>
 
-      <main
-        class="flex min-w-0 flex-1 flex-col overflow-y-auto"
-        :class="store.isCompactWindow ? 'p-4 pt-5' : 'p-8 pt-7'"
-      >
-        <div v-if="activeTab === 'view'" class="space-y-6">
-          <div>
-            <h3 class="text-base font-semibold text-foreground">
-              {{ t('gallery.preferences.view.title') }}
-            </h3>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {{ t('gallery.preferences.view.description') }}
-            </p>
+      <ScrollArea class="min-h-0 min-w-0 flex-1">
+        <div
+          class="flex min-h-full flex-col"
+          :class="store.isCompactWindow ? 'p-4 pt-5' : 'p-8 pt-7'"
+        >
+          <div v-if="activeTab === 'view'" class="space-y-6">
+            <div>
+              <h3 class="text-base font-semibold text-foreground">
+                {{ t('gallery.preferences.view.title') }}
+              </h3>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {{ t('gallery.preferences.view.description') }}
+              </p>
+            </div>
+
+            <div class="space-y-3">
+              <h4 class="text-sm font-medium text-foreground">
+                {{ t('gallery.preferences.view.image.title') }}
+              </h4>
+              <Item variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.originalImages.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.originalImages.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="useOriginalImagesForCards" />
+                </ItemActions>
+              </Item>
+            </div>
+
+            <div class="space-y-3">
+              <h4 class="text-sm font-medium text-foreground">
+                {{ t('gallery.preferences.view.markers.title') }}
+              </h4>
+              <div class="space-y-2">
+                <Item variant="surface" size="sm">
+                  <ItemContent>
+                    <ItemTitle>
+                      {{ t('gallery.preferences.view.rating.title') }}
+                    </ItemTitle>
+                    <ItemDescription>
+                      {{ t('gallery.preferences.view.rating.description') }}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Switch v-model="showRatingBadge" />
+                  </ItemActions>
+                </Item>
+
+                <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
+                  <ItemContent>
+                    <ItemTitle>
+                      {{ t('gallery.preferences.view.dyeCode.title') }}
+                    </ItemTitle>
+                    <ItemDescription>
+                      {{ t('gallery.preferences.view.dyeCode.description') }}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Switch v-model="showDyeCodeBadge" />
+                  </ItemActions>
+                </Item>
+
+                <Item variant="surface" size="sm">
+                  <ItemContent>
+                    <ItemTitle>
+                      {{ t('gallery.preferences.view.tags.title') }}
+                    </ItemTitle>
+                    <ItemDescription>
+                      {{ t('gallery.preferences.view.tags.description') }}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Switch v-model="showTagBadges" />
+                  </ItemActions>
+                </Item>
+              </div>
+            </div>
           </div>
 
-          <div class="space-y-3">
-            <h4 class="text-sm font-medium text-foreground">
-              {{ t('gallery.preferences.view.image.title') }}
-            </h4>
-            <Item variant="surface" size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {{ t('gallery.preferences.view.originalImages.title') }}
-                </ItemTitle>
-                <ItemDescription>
-                  {{ t('gallery.preferences.view.originalImages.description') }}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Switch v-model="useOriginalImagesForCards" />
-              </ItemActions>
-            </Item>
-          </div>
+          <div v-else-if="activeTab === 'deletion'" class="space-y-6">
+            <div>
+              <h3 class="text-base font-semibold text-foreground">
+                {{ t('gallery.preferences.deletion.title') }}
+              </h3>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {{ t('gallery.preferences.deletion.description') }}
+              </p>
+            </div>
 
-          <div class="space-y-3">
-            <h4 class="text-sm font-medium text-foreground">
-              {{ t('gallery.preferences.view.markers.title') }}
-            </h4>
             <div class="space-y-2">
               <Item variant="surface" size="sm">
                 <ItemContent>
                   <ItemTitle>
-                    {{ t('gallery.preferences.view.rating.title') }}
+                    {{ t('gallery.preferences.deletion.mode.title') }}
                   </ItemTitle>
                   <ItemDescription>
-                    {{ t('gallery.preferences.view.rating.description') }}
+                    {{ t('gallery.preferences.deletion.mode.description') }}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <Switch v-model="showRatingBadge" />
+                  <Select v-model="deleteMode">
+                    <SelectTrigger class="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recycleBin">
+                        {{ t('gallery.preferences.deletion.mode.recycleBin') }}
+                      </SelectItem>
+                      <SelectItem value="permanent">
+                        {{ t('gallery.preferences.deletion.mode.permanent') }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </ItemActions>
               </Item>
 
-              <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
+              <Item v-if="deleteMode === 'recycleBin'" variant="surface" size="sm">
                 <ItemContent>
                   <ItemTitle>
-                    {{ t('gallery.preferences.view.dyeCode.title') }}
+                    {{ t('gallery.preferences.deletion.confirm.title') }}
                   </ItemTitle>
                   <ItemDescription>
-                    {{ t('gallery.preferences.view.dyeCode.description') }}
+                    {{ t('gallery.preferences.deletion.confirm.description') }}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <Switch v-model="showDyeCodeBadge" />
-                </ItemActions>
-              </Item>
-
-              <Item variant="surface" size="sm">
-                <ItemContent>
-                  <ItemTitle>
-                    {{ t('gallery.preferences.view.tags.title') }}
-                  </ItemTitle>
-                  <ItemDescription>
-                    {{ t('gallery.preferences.view.tags.description') }}
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Switch v-model="showTagBadges" />
+                  <Switch v-model="confirmRecycleBin" />
                 </ItemActions>
               </Item>
             </div>
-          </div>
-        </div>
 
-        <div v-else-if="activeTab === 'deletion'" class="space-y-6">
-          <div>
-            <h3 class="text-base font-semibold text-foreground">
-              {{ t('gallery.preferences.deletion.title') }}
-            </h3>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {{ t('gallery.preferences.deletion.description') }}
+            <p
+              class="rounded-md border border-border/40 bg-muted/30 px-3.5 py-3 text-xs text-muted-foreground"
+            >
+              {{ t('gallery.preferences.deletion.permanentNotice') }}
             </p>
           </div>
 
-          <div class="space-y-2">
-            <Item variant="surface" size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {{ t('gallery.preferences.deletion.mode.title') }}
-                </ItemTitle>
-                <ItemDescription>
-                  {{ t('gallery.preferences.deletion.mode.description') }}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Select v-model="deleteMode">
-                  <SelectTrigger class="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recycleBin">
-                      {{ t('gallery.preferences.deletion.mode.recycleBin') }}
-                    </SelectItem>
-                    <SelectItem value="permanent">
-                      {{ t('gallery.preferences.deletion.mode.permanent') }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </ItemActions>
-            </Item>
-
-            <Item v-if="deleteMode === 'recycleBin'" variant="surface" size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {{ t('gallery.preferences.deletion.confirm.title') }}
-                </ItemTitle>
-                <ItemDescription>
-                  {{ t('gallery.preferences.deletion.confirm.description') }}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Switch v-model="confirmRecycleBin" />
-              </ItemActions>
-            </Item>
-          </div>
-
-          <p
-            class="rounded-md border border-border/40 bg-muted/30 px-3.5 py-3 text-xs text-muted-foreground"
-          >
-            {{ t('gallery.preferences.deletion.permanentNotice') }}
-          </p>
+          <MissingAssetCleanupPanel v-else />
         </div>
-
-        <MissingAssetCleanupPanel v-else />
-      </main>
+      </ScrollArea>
     </DialogContent>
   </Dialog>
 </template>
