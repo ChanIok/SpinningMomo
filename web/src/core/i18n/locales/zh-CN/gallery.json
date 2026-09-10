@@ -491,6 +491,8 @@
   "gallery.preferences.view.layout.title": "卡片布局",
   "gallery.preferences.view.narrowSpacing.title": "使用窄间距",
   "gallery.preferences.view.narrowSpacing.description": "减少宽屏图库卡片之间的留白",
+  "gallery.preferences.view.squareCorners.title": "直角卡片",
+  "gallery.preferences.view.squareCorners.description": "移除卡片圆角，搭配窄间距可获得更紧凑的拼贴观感",
   "gallery.preferences.view.image.title": "图像显示",
   "gallery.preferences.view.originalImages.title": "照片卡片加载原图",
   "gallery.preferences.view.originalImages.description": "大尺寸浏览更清晰，但加载更慢、内存占用更高。",

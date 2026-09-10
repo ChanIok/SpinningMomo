@@ -52,6 +52,11 @@ export function createViewSlice(args: ViewSliceArgs) {
     return view.value.useNarrowCardSpacing ? GALLERY_NARROW_CARD_GAP : GALLERY_CARD_GAP
   })
 
+  // 直角偏好只作用于宽屏卡片墙；紧凑窗口本就无圆角，统一收口为同一派生类。
+  const cardCornerClass = computed(() =>
+    isCompactWindow.value || view.value.useSquareCardCorners ? 'rounded-none' : 'rounded-sm'
+  )
+
   function getViewSizeRange(): GalleryViewSizeRange {
     return isCompactWindow.value
       ? { min: GALLERY_COMPACT_VIEW_SIZE_MIN, max: GALLERY_COMPACT_VIEW_SIZE_MAX }
@@ -105,6 +110,7 @@ export function createViewSlice(args: ViewSliceArgs) {
   return {
     view,
     cardGap,
+    cardCornerClass,
     setDateGrouping,
     getViewSizeRange,
     getEffectiveViewSize,

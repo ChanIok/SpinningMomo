@@ -9,6 +9,7 @@ export interface GallerySettings {
     dateGrouping: DateGrouping
     useOriginalImagesForCards: boolean
     useNarrowCardSpacing: boolean
+    useSquareCardCorners: boolean
     showRatingBadge: boolean
     showDyeCodeBadge: boolean
     showTagBadges: boolean
@@ -43,6 +44,7 @@ export function createDefaultGallerySettings(): GallerySettings {
       dateGrouping: 'none' satisfies DateGrouping,
       useOriginalImagesForCards: true,
       useNarrowCardSpacing: false,
+      useSquareCardCorners: false,
       showRatingBadge: true,
       showDyeCodeBadge: true,
       showTagBadges: true,

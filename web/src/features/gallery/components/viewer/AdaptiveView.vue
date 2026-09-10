@@ -330,7 +330,7 @@ defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
                   <div
                     v-else
                     class="h-full w-full animate-pulse bg-muted"
-                    :class="!store.isCompactWindow && 'rounded-sm'"
+                    :class="store.cardCornerClass"
                   />
                 </div>
               </template>

@@ -46,6 +46,13 @@ const useNarrowCardSpacing = computed({
   },
 })
 
+const useSquareCardCorners = computed({
+  get: () => store.view.useSquareCardCorners,
+  set: (value: boolean) => {
+    store.view.useSquareCardCorners = value
+  },
+})
+
 const showRatingBadge = computed({
   get: () => store.view.showRatingBadge,
   set: (value: boolean) => {
@@ -193,6 +200,19 @@ watch(
                 </ItemContent>
                 <ItemActions>
                   <Switch v-model="useNarrowCardSpacing" />
+                </ItemActions>
+              </Item>
+              <Item variant="surface" size="sm">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.squareCorners.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.squareCorners.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="useSquareCardCorners" />
                 </ItemActions>
               </Item>
             </div>

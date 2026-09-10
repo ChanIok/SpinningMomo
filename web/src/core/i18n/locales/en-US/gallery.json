@@ -491,6 +491,8 @@
   "gallery.preferences.view.layout.title": "Card Layout",
   "gallery.preferences.view.narrowSpacing.title": "Use Narrow Spacing",
   "gallery.preferences.view.narrowSpacing.description": "Reduce whitespace between cards on wide screens.",
+  "gallery.preferences.view.squareCorners.title": "Square Card Corners",
+  "gallery.preferences.view.squareCorners.description": "Remove card corner rounding; pairs well with narrow spacing.",
   "gallery.preferences.view.image.title": "Image Display",
   "gallery.preferences.view.originalImages.title": "Load Originals on Photo Cards",
   "gallery.preferences.view.originalImages.description": "Large cards look sharper, but load more slowly and use more memory.",

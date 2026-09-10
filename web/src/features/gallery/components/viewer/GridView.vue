@@ -339,7 +339,7 @@ defineExpose({ scrollToIndex, getCardRect, getTopVisibleAssetIndex })
                   v-else
                   :data-asset-index="getAssetIndex(virtualRow, idx)"
                   class="skeleton-card w-full"
-                  :class="!store.isCompactWindow && 'rounded-sm'"
+                  :class="store.cardCornerClass"
                   :style="{ aspectRatio: '1 / 1' }"
                 />
               </template>
