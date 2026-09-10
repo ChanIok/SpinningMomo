@@ -27,23 +27,26 @@ struct NotificationVisualStyle {
   D2D1_COLOR_F border_color{};
 };
 
+struct ShadowLayer {
+  float spread;
+  float y_offset;
+  float alpha;
+};
+
+constexpr std::array<ShadowLayer, 4> shadow_layers{{
+    {.spread = 1.0f, .y_offset = 1.0f, .alpha = 0.06f},
+    {.spread = 3.0f, .y_offset = 2.0f, .alpha = 0.04f},
+    {.spread = 6.0f, .y_offset = 4.0f, .alpha = 0.025f},
+    {.spread = 10.0f, .y_offset = 7.0f, .alpha = 0.014f},
+}};
+
 auto scale_for_dpi(int value, int dpi) -> int { return MulDiv(value, dpi, 96); }
 
 auto stroke_width_for_dpi(int dpi) -> float { return static_cast<float>(scale_for_dpi(1, dpi)); }
 
-auto is_exiting(notification_window::NotificationAnimState state) -> bool {
-  return state == notification_window::NotificationAnimState::FadingOut ||
-         state == notification_window::NotificationAnimState::Done;
-}
-
 auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
   return D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
                      static_cast<float>(rect.right), static_cast<float>(rect.bottom));
-}
-
-auto color_with_opacity(D2D1_COLOR_F color, float opacity) -> D2D1_COLOR_F {
-  color.a *= std::clamp(opacity, 0.0f, 1.0f);
-  return color;
 }
 
 auto is_windows_11_or_newer() -> bool {
@@ -107,6 +110,18 @@ auto get_window_width(int dpi) -> int {
 auto get_layout_margin(int dpi) -> int {
   const auto style = resolve_visual_style(dpi);
   return scale_for_dpi(notification_window::BASE_PADDING, dpi) + style.shadow_margin;
+}
+
+auto get_surface_padding(int dpi) -> int {
+  const auto style = resolve_visual_style(dpi);
+  float extent = style.border_width / 2.0f;
+  if (style.use_system_chrome) {
+    for (const auto& layer : shadow_layers) {
+      extent = std::max(extent, layer.spread + std::abs(layer.y_offset));
+    }
+  }
+  // 表面留白覆盖实际阴影范围和抗锯齿边缘，与窗口布局间距独立。
+  return static_cast<int>(std::ceil(extent)) + 1;
 }
 
 auto get_host_size(int dpi) -> SIZE {
@@ -288,30 +303,16 @@ auto expanded_rounded_rect(const D2D1_RECT_F& rect, float spread, float y_offset
 }
 
 auto draw_card_shadow(notification_window::RenderResources& render_resources,
-                      const D2D1_RECT_F& rect, const NotificationVisualStyle& style, float opacity)
-    -> void {
-  if (!style.use_system_chrome || style.shadow_margin <= 0 || opacity <= 0.0f) {
+                      const D2D1_RECT_F& rect, const NotificationVisualStyle& style) -> void {
+  if (!style.use_system_chrome || style.shadow_margin <= 0) {
     return;
   }
 
-  struct ShadowLayer {
-    float spread;
-    float y_offset;
-    float alpha;
-  };
-
-  constexpr std::array<ShadowLayer, 4> layers{{
-      {.spread = 1.0f, .y_offset = 1.0f, .alpha = 0.06f},
-      {.spread = 3.0f, .y_offset = 2.0f, .alpha = 0.04f},
-      {.spread = 6.0f, .y_offset = 4.0f, .alpha = 0.025f},
-      {.spread = 10.0f, .y_offset = 7.0f, .alpha = 0.014f},
-  }};
-
-  for (const auto& layer : layers) {
+  for (const auto& layer : shadow_layers) {
     fill_rounded_rect(
         render_resources,
         expanded_rounded_rect(rect, layer.spread, layer.y_offset, style.corner_radius),
-        D2D1::ColorF(0.0f, 0.0f, 0.0f, layer.alpha * opacity));
+        D2D1::ColorF(0.0f, 0.0f, 0.0f, layer.alpha));
   }
 }
 
@@ -331,9 +332,7 @@ auto update_notification_rects(notification_window::Notification& notification) 
   const auto& layout = notification.layout;
   const bool has_action = notification.action.has_value();
 
-  notification.card_rect = {notification.current_pos.x, notification.current_pos.y,
-                            notification.current_pos.x + notification.width,
-                            notification.current_pos.y + notification.height};
+  notification.card_rect = {0, 0, notification.width, notification.height};
 
   const int inner_top = notification.card_rect.top + layout.padding;
   const int inner_bottom = notification.card_rect.top + layout.padding + layout.content_height;
@@ -384,91 +383,91 @@ auto draw_action_button(core::AppState& state,
   if (notification.action_hovered) {
     button_bg.a = 1.0f;
   }
-  fill_rounded_rect(render_resources, rounded, color_with_opacity(button_bg, notification.opacity));
+  fill_rounded_rect(render_resources, rounded, button_bg);
   if (notification.action_hovered) {
-    draw_stroked_rounded_rect(render_resources, rounded,
-                              color_with_opacity(notification.colors.text, notification.opacity),
+    draw_stroked_rounded_rect(render_resources, rounded, notification.colors.text,
                               stroke_width_for_dpi(dpi));
   }
 
   draw_text(render_resources, notification.action->label, render_resources.button_text_format.get(),
-            rect, color_with_opacity(notification.colors.text, notification.opacity));
+            rect, notification.colors.text);
 }
 
 auto draw_notification(core::AppState& state, const notification_window::Notification& notification)
     -> void {
   auto& render_resources = state.notification_window->render_resources;
-  if (notification.opacity <= 0.0f ||
-      notification.state == notification_window::NotificationAnimState::Done) {
-    return;
-  }
-
   const int dpi = get_current_dpi(state);
   const auto style = resolve_visual_style(dpi);
   const D2D1_RECT_F card_rect = rect_to_d2d(notification.card_rect);
 
   const auto card_rounded = D2D1::RoundedRect(card_rect, style.corner_radius, style.corner_radius);
-  draw_card_shadow(render_resources, card_rect, style, notification.opacity);
-  fill_rounded_rect(render_resources, card_rounded,
-                    color_with_opacity(notification.colors.background, notification.opacity));
+  draw_card_shadow(render_resources, card_rect, style);
+  fill_rounded_rect(render_resources, card_rounded, notification.colors.background);
   if (style.border_width > 0.0f) {
-    draw_stroked_rounded_rect(render_resources, card_rounded,
-                              color_with_opacity(style.border_color, notification.opacity),
+    draw_stroked_rounded_rect(render_resources, card_rounded, style.border_color,
                               style.border_width);
   }
 
   draw_text(render_resources, notification.title, render_resources.title_text_format.get(),
-            rect_to_d2d(notification.title_rect),
-            color_with_opacity(notification.colors.text, notification.opacity));
+            rect_to_d2d(notification.title_rect), notification.colors.text);
   draw_text(render_resources, notification.message, render_resources.message_text_format.get(),
-            rect_to_d2d(notification.message_rect),
-            color_with_opacity(notification.colors.text, notification.opacity));
+            rect_to_d2d(notification.message_rect), notification.colors.text);
   draw_action_button(state, notification);
 }
 
-auto present_render_context(core::AppState& state) -> void {
-  auto& render_resources = state.notification_window->render_resources;
-  if (!render_resources.swap_chain) {
-    return;
-  }
-
-  const HRESULT hr = render_resources.swap_chain->Present(0, 0);
+// 绘制单张卡片内容到 DComp 表面：BeginDraw 获取 DXGI 表面 → 绑定 D2D 目标位图 → 裁剪清空 → 绘制卡片
+// → EndDraw 提交
+auto paint_card(core::AppState& state, Notification& notification) -> bool {
+  auto& resources = state.notification_window->render_resources;
+  wil::com_ptr<IDXGISurface> surface;
+  POINT offset{};
+  // 开始表面更新，获取底层 DXGI 表面指针和在图集中的偏移坐标
+  HRESULT hr = notification.surface->BeginDraw(nullptr, IID_PPV_ARGS(surface.put()), &offset);
   if (FAILED(hr)) {
-    Logger().error("Notification present error: 0x{:X}", hr);
-  }
-}
-
-auto paint_notifications(core::AppState& state) -> void {
-  auto& render_resources = state.notification_window->render_resources;
-  if (state.notification_window->active_notifications.empty() ||
-      !ui::notification_window::render_context::ensure_render_context(state) ||
-      render_resources.is_rendering) {
-    return;
+    Logger().error("Failed to begin notification surface update: 0x{:X}", hr);
+    return false;
   }
 
-  render_resources.is_rendering = true;
-  render_resources.device_context->BeginDraw();
-  render_resources.device_context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
-  render_resources.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
-
-  for (const auto& notification : state.notification_window->active_notifications) {
+  wil::com_ptr<ID2D1Bitmap1> bitmap;
+  const auto properties = D2D1::BitmapProperties1(
+      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
+  // 从 DXGI 表面包装出 D2D 目标位图
+  hr = resources.device_context->CreateBitmapFromDxgiSurface(surface.get(), &properties,
+                                                             bitmap.put());
+  if (SUCCEEDED(hr)) {
+    auto* context = resources.device_context.get();
+    const int padding = notification.surface_padding;
+    context->SetTarget(bitmap.get());
+    context->BeginDraw();
+    context->SetTransform(D2D1::Matrix3x2F::Identity());
+    // DComp 表面可能位于纹理图集中，只能清除 BeginDraw 分配给当前卡片的局部矩形
+    context->PushAxisAlignedClip(
+        D2D1::RectF(static_cast<float>(offset.x), static_cast<float>(offset.y),
+                    static_cast<float>(offset.x + notification.width + padding * 2),
+                    static_cast<float>(offset.y + notification.height + padding * 2)),
+        D2D1_ANTIALIAS_MODE_ALIASED);
+    context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+    // 平移坐标系至卡片内容绘制原点（包含阴影留白偏移）
+    context->SetTransform(D2D1::Matrix3x2F::Translation(static_cast<float>(offset.x + padding),
+                                                        static_cast<float>(offset.y + padding)));
+    context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_SOURCE_OVER);
+    // 绘制卡片阴影、圆角背景、边框、标题、正文及操作按钮
     draw_notification(state, notification);
+    context->PopAxisAlignedClip();
+    hr = context->EndDraw();
+    context->SetTarget(nullptr);
   }
-
-  const HRESULT hr = render_resources.device_context->EndDraw();
-  render_resources.is_rendering = false;
-
-  if (hr == D2DERR_RECREATE_TARGET) {
-    ui::notification_window::render_context::cleanup_render_context(state);
-    Logger().warn("Notification render target needs recreation");
-    return;
+  // 在 EndDraw 之前必须先释放 DXGI 表面与 D2D 目标位图的引用
+  bitmap.reset();
+  surface.reset();
+  // 结束 DComp 表面绘制
+  const HRESULT surface_hr = notification.surface->EndDraw();
+  if (FAILED(hr) || FAILED(surface_hr)) {
+    Logger().error("Failed to draw notification card: 0x{:X}", FAILED(hr) ? hr : surface_hr);
+    return false;
   }
-  if (FAILED(hr)) {
-    Logger().error("Notification paint error: 0x{:X}", hr);
-    return;
-  }
-
-  present_render_context(state);
+  return true;
 }
 
 auto request_repaint(core::AppState& state) -> void {

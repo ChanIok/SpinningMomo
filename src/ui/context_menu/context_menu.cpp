@@ -31,26 +31,6 @@
 
 namespace ui::context_menu {
 
-auto cancel_open_animation_timer(core::AppState& state) -> void {
-  if (state.context_menu->hwnd) {
-    KillTimer(state.context_menu->hwnd, OPEN_ANIMATION_TIMER_ID);
-  }
-}
-
-// 启动淡入动画：将 opacity 置零并启动帧定时器驱动后续渐变
-auto start_open_animation(core::AppState& state, MenuOpenAnimation& animation,
-                          std::chrono::milliseconds duration) -> void {
-  animation.active = true;
-  animation.start_time = std::chrono::steady_clock::now();
-  animation.duration = duration;
-  animation.opacity = 0.0f;
-
-  if (state.context_menu->hwnd) {
-    SetTimer(state.context_menu->hwnd, OPEN_ANIMATION_TIMER_ID, OPEN_ANIMATION_FRAME_INTERVAL,
-             nullptr);
-  }
-}
-
 auto apply_corner_preference(HWND hwnd) -> void {
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
@@ -95,8 +75,6 @@ auto create_context_menu_window(HINSTANCE instance, core::AppState* app_state, H
 
 // 隐藏并销毁菜单窗口
 void hide_and_destroy_menu(core::AppState& state) {
-  cancel_open_animation_timer(state);
-
   // 先销毁子菜单
   if (state.context_menu->submenu_hwnd) {
     DestroyWindow(state.context_menu->submenu_hwnd);
@@ -115,9 +93,6 @@ void hide_and_destroy_menu(core::AppState& state) {
 
   // 重置交互状态，避免旧菜单残留的hover/定时意图影响下一次显示。
   ui::context_menu::interaction::reset(state);
-  // 动画一并归零，否则下次 Show 会残留上次的 opacity
-  state.context_menu->main_animation = {};
-  state.context_menu->submenu_animation = {};
   state.context_menu->submenu_parent_index = -1;
 }
 
@@ -195,7 +170,6 @@ void handle_menu_action(core::AppState& state, const ui::context_menu::MenuItem&
 // 隐藏子菜单
 auto hide_submenu(core::AppState& state) -> void {
   if (state.context_menu->submenu_hwnd) {
-    state.context_menu->submenu_animation = {};
     DestroyWindow(state.context_menu->submenu_hwnd);
     render_context::cleanup_submenu(state);
     state.context_menu->submenu_hwnd = nullptr;
@@ -204,13 +178,10 @@ auto hide_submenu(core::AppState& state) -> void {
   }
 }
 
-// 显示子菜单
+// 显示指定项的子菜单：复用已有窗口或创建新窗口 → 布局与计算尺寸 → 绘制内容 → 提交淡入/展示
 auto show_submenu(core::AppState& state, int index) -> void {
   auto& menu_state = *state.context_menu;
   Logger().debug("show_submenu called with index: {}", index);
-
-  // 先隐藏现有的子菜单
-  hide_submenu(state);
 
   // 检查索引是否有效
   if (index < 0 || index >= static_cast<int>(menu_state.items.size())) {
@@ -225,12 +196,57 @@ auto show_submenu(core::AppState& state, int index) -> void {
     return;
   }
 
+  if (menu_state.submenu_hwnd && menu_state.submenu_parent_index == index) {
+    return;
+  }
+
+  const int previous_parent_index = menu_state.submenu_parent_index;
+  const SIZE previous_size = menu_state.submenu_size;
+  const POINT previous_position = menu_state.submenu_position;
+
   // 设置父索引，这样get_current_submenu()才能正确返回子菜单项
   menu_state.submenu_parent_index = index;
 
   // 计算子菜单尺寸和位置
   layout::calculate_submenu_size(state);
   layout::calculate_submenu_position(state, index);
+
+  if (menu_state.submenu_hwnd) {
+    // 同级切换保留窗口和合成资源，避免销毁旧窗口后露出桌面
+    // SetWindowPos 会同步触发 WM_SIZE，因此必须先准备好完整的新菜单状态
+    const int previous_hover_index = menu_state.interaction.submenu_hover_index;
+    menu_state.interaction.submenu_hover_index = -1;
+
+    RECT previous_rect{};
+    GetClientRect(menu_state.submenu_hwnd, &previous_rect);
+    const bool size_changed =
+        previous_rect.right - previous_rect.left != menu_state.submenu_size.cx ||
+        previous_rect.bottom - previous_rect.top != menu_state.submenu_size.cy;
+
+    // 调整现有子菜单窗口位置与尺寸
+    if (!SetWindowPos(menu_state.submenu_hwnd, nullptr, menu_state.submenu_position.x,
+                      menu_state.submenu_position.y, menu_state.submenu_size.cx,
+                      menu_state.submenu_size.cy, SWP_NOACTIVATE | SWP_NOZORDER)) {
+      Logger().error("Failed to reposition submenu window. Error: {}", GetLastError());
+      menu_state.submenu_parent_index = previous_parent_index;
+      menu_state.submenu_size = previous_size;
+      menu_state.submenu_position = previous_position;
+      menu_state.interaction.submenu_hover_index = previous_hover_index;
+      return;
+    }
+    // 尺寸变化由 WM_SIZE 调整交换链并立即绘制；同尺寸切换也需要主动提交新内容
+    if (!size_changed) {
+      RECT client_rect{0, 0, menu_state.submenu_size.cx, menu_state.submenu_size.cy};
+      painter::paint_submenu(state, client_rect);
+    }
+    // 同级切换直接设为不透明显示，避免重复淡入晃眼
+    if (!render_context::show_surface(menu_state.submenu_render_resources, false)) {
+      hide_submenu(state);
+    }
+    return;
+  }
+
+  menu_state.interaction.submenu_hover_index = -1;
 
   // 创建子菜单窗口
   HINSTANCE instance = state.floating_window->window.instance;
@@ -254,10 +270,15 @@ auto show_submenu(core::AppState& state, int index) -> void {
     return;
   }
 
-  // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
-  start_open_animation(state, menu_state.submenu_animation, OPEN_ANIMATION_DURATION);
+  // 先绘制子菜单首帧内容；初始化时 visual 保持透明以防闪白
   RECT client_rect{0, 0, menu_state.submenu_size.cx, menu_state.submenu_size.cy};
   ui::context_menu::painter::paint_submenu(state, client_rect);
+
+  // 触发 DComp 硬件淡入动画
+  if (!render_context::show_surface(menu_state.submenu_render_resources, true)) {
+    hide_submenu(state);
+    return;
+  }
 
   // 显示窗口
   ShowWindow(menu_state.submenu_hwnd, SW_SHOW);
@@ -293,8 +314,6 @@ auto cleanup(core::AppState& app_state) -> void {
   // 清理上下文菜单资源
   if (app_state.context_menu) {
     // 销毁任何可能存在的窗口
-    cancel_open_animation_timer(app_state);
-
     if (app_state.context_menu->hwnd) {
       DestroyWindow(app_state.context_menu->hwnd);
       app_state.context_menu->hwnd = nullptr;
@@ -309,8 +328,6 @@ auto cleanup(core::AppState& app_state) -> void {
     render_context::cleanup_submenu(app_state);
     render_context::cleanup_context_menu(app_state);
     ui::context_menu::interaction::reset(app_state);
-    app_state.context_menu->main_animation = {};
-    app_state.context_menu->submenu_animation = {};
     app_state.context_menu->submenu_parent_index = -1;
   }
 }
@@ -367,10 +384,15 @@ auto Show(core::AppState& app_state, std::vector<MenuItem> items, const POINT& p
     return;
   }
 
-  // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
-  start_open_animation(app_state, menu_state.main_animation, OPEN_ANIMATION_DURATION);
+  // 绘制主菜单首帧内容；初始化时 visual 保持透明以防闪白
   RECT client_rect{0, 0, menu_state.menu_size.cx, menu_state.menu_size.cy};
   painter::paint_context_menu(app_state, client_rect);
+
+  // 触发 DComp 硬件淡入动画
+  if (!render_context::show_surface(menu_state.main_render_resources, true)) {
+    hide_and_destroy_menu(app_state);
+    return;
+  }
 
   // 6. 显示窗口并设置为前景
   ShowWindow(menu_state.hwnd, SW_SHOWNA);

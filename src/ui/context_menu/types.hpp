@@ -15,15 +15,6 @@ enum class CursorZone { MainMenu, Submenu, Outside };
 
 enum class PendingIntentType { None, OpenSubmenu, SwitchSubmenu, HideSubmenu };
 
-struct MenuOpenAnimation {
-  bool active = false;
-  std::chrono::steady_clock::time_point start_time{};
-  std::chrono::milliseconds duration{120};
-  float opacity = 1.0f;
-};
-
-constexpr UINT_PTR OPEN_ANIMATION_TIMER_ID = 2;
-constexpr UINT OPEN_ANIMATION_FRAME_INTERVAL = 16;
 constexpr auto OPEN_ANIMATION_DURATION = std::chrono::milliseconds(120);
 
 // 菜单项类型枚举

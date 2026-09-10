@@ -14,9 +14,11 @@
 namespace ui::context_menu {
 
 struct RenderResources {
+  wil::com_ptr<IDCompositionDevice> composition_device;
   wil::com_ptr<IDXGISwapChain1> swap_chain;
   wil::com_ptr<IDCompositionTarget> composition_target;
   wil::com_ptr<IDCompositionVisual> composition_visual;
+  wil::com_ptr<IDCompositionEffectGroup> opacity_effect;
   wil::com_ptr<ID2D1DeviceContext6> device_context;
   wil::com_ptr<ID2D1Bitmap1> target_bitmap;
   SIZE surface_size{};
@@ -46,8 +48,6 @@ struct ContextMenuState {
   std::vector<MenuItem> items;
   LayoutConfig layout;
   InteractionState interaction;
-  MenuOpenAnimation main_animation;
-  MenuOpenAnimation submenu_animation;
   SIZE menu_size{};
   POINT position{};
 

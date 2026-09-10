@@ -11,6 +11,7 @@
 #include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
+#include "ui/composition_animation/animation.hpp"
 #include "ui/context_menu/state.hpp"
 #include "ui/shared_render_resources/shared_render_resources.hpp"
 #include "ui/shared_render_resources/state.hpp"
@@ -56,8 +57,10 @@ auto cleanup_surface(RenderResources& render_resources) -> void {
   release_target_bitmap(render_resources);
   render_resources.device_context.reset();
   render_resources.composition_visual.reset();
+  render_resources.opacity_effect.reset();
   render_resources.composition_target.reset();
   render_resources.swap_chain.reset();
+  render_resources.composition_device.reset();
   render_resources.surface_size = {0, 0};
   render_resources.is_ready = false;
 }
@@ -156,7 +159,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device, RenderResources& r
     return false;
   }
 
-  wil::com_ptr<IDCompositionDevice> composition_device;
+  auto& composition_device = render_resources.composition_device;
   if (FAILED(DCompositionCreateDevice(dxgi_device.get(), IID_PPV_ARGS(composition_device.put()))) ||
       !composition_device) {
     return false;
@@ -173,10 +176,19 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device, RenderResources& r
     return false;
   }
 
-  return SUCCEEDED(
+  // 创建透明度效果组
+  if (FAILED(composition_device->CreateEffectGroup(render_resources.opacity_effect.put()))) {
+    return false;
+  }
+
+  // 装配 Visual 树：挂载效果组与交换链 → 设为根节点 → 初始设为完全透明防闪烁 → 提交初始事务
+  return SUCCEEDED(render_resources.composition_visual->SetEffect(
+             render_resources.opacity_effect.get())) &&
+         SUCCEEDED(
              render_resources.composition_visual->SetContent(render_resources.swap_chain.get())) &&
          SUCCEEDED(render_resources.composition_target->SetRoot(
              render_resources.composition_visual.get())) &&
+         SUCCEEDED(render_resources.opacity_effect->SetOpacity(0.0f)) &&
          SUCCEEDED(composition_device->Commit());
 }
 
@@ -249,6 +261,39 @@ auto resize_surface(RenderResources& render_resources, const SIZE& new_size) -> 
   }
 
   return true;
+}
+
+// 显示菜单表面：若需要动画则创建 DComp 淡入动画，否则直接置透明度为 1 → 提交合成器
+auto show_surface(RenderResources& resources, bool animate) -> bool {
+  if (!resources.composition_device || !resources.opacity_effect) {
+    return false;
+  }
+  HRESULT hr = S_OK;
+  if (animate) {
+    // 创建三次缓出淡入过渡动画 (0.0 -> 1.0)
+    auto fade = ui::composition_animation::create(
+        resources.composition_device.get(),
+        {.from = 0.0f,
+         .to = 1.0f,
+         .seconds = std::chrono::duration<double>(OPEN_ANIMATION_DURATION).count()});
+    if (!fade) {
+      Logger().error("Failed to create menu fade animation: 0x{:X}", fade.error());
+      return false;
+    }
+    // 将淡入动画绑定到合成效果组的 Opacity 属性
+    hr = resources.opacity_effect->SetOpacity(fade->get());
+  } else {
+    // 无动画直接设为完全不透明
+    hr = resources.opacity_effect->SetOpacity(1.0f);
+  }
+  // 提交合成事务
+  if (SUCCEEDED(hr)) {
+    hr = resources.composition_device->Commit();
+  }
+  if (FAILED(hr)) {
+    Logger().error("Failed to commit menu opacity: 0x{:X}", hr);
+  }
+  return SUCCEEDED(hr);
 }
 
 auto get_client_size(HWND hwnd) -> SIZE {

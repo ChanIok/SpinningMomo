@@ -19,11 +19,13 @@ struct NotificationWindowState {
   SIZE host_size{};
   POINT host_position{};
   int dpi = 96;
+  bool layout_dirty = true;
+  bool composition_dirty = false;
+  std::optional<std::chrono::steady_clock::time_point> scheduled_deadline;
+  bool hover_timer_active = false;
 
   notification_window::NotificationHitTarget hover_target;
   notification_window::NotificationHitTarget pressed_target;
-
-  bool animation_timer_active = false;
 };
 
 }  // namespace ui::notification_window

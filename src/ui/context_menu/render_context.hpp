@@ -9,6 +9,9 @@
 
 namespace ui::context_menu::render_context {
 
+// 显示菜单表面（支持 DComp 硬件淡入或直接显示）
+auto show_surface(RenderResources& resources, bool animate) -> bool;
+
 auto initialize_text_format(core::AppState& app_state) -> bool;
 
 // 主菜单D2D资源管理

@@ -11,10 +11,13 @@
 #include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/state/app_state.hpp"
+#include "ui/composition_animation/animation.hpp"
+#include "ui/notification_window/painter.hpp"
 #include "ui/notification_window/state.hpp"
 #include "ui/notification_window/types.hpp"
 #include "ui/shared_render_resources/shared_render_resources.hpp"
 #include "ui/shared_render_resources/state.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace ui::notification_window::render_context {
 
@@ -65,13 +68,6 @@ auto release_brushes(notification_window::RenderResources& render_resources) -> 
   render_resources.text_brush.reset();
 }
 
-auto release_target_bitmap(notification_window::RenderResources& render_resources) -> void {
-  if (render_resources.device_context) {
-    render_resources.device_context->SetTarget(nullptr);
-  }
-  render_resources.target_bitmap.reset();
-}
-
 auto create_device_context(ID2D1Device* shared_device,
                            notification_window::RenderResources& render_resources) -> bool {
   if (!shared_device) {
@@ -95,39 +91,10 @@ auto create_device_context(ID2D1Device* shared_device,
   return true;
 }
 
-auto create_swap_chain(ID3D11Device* shared_d3d_device,
-                       notification_window::RenderResources& render_resources, const SIZE& size)
-    -> bool {
-  if (!shared_d3d_device) {
-    return false;
-  }
-
-  wil::com_ptr<IDXGIFactory2> dxgi_factory;
-  if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(dxgi_factory.put()))) || !dxgi_factory) {
-    return false;
-  }
-
-  DXGI_SWAP_CHAIN_DESC1 desc{};
-  desc.Width = static_cast<UINT>(size.cx);
-  desc.Height = static_cast<UINT>(size.cy);
-  desc.Format = kSurfaceFormat;
-  desc.Stereo = FALSE;
-  desc.SampleDesc = {1, 0};
-  desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  desc.BufferCount = 2;
-  desc.Scaling = DXGI_SCALING_STRETCH;
-  desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-  desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
-
-  return SUCCEEDED(dxgi_factory->CreateSwapChainForComposition(
-             shared_d3d_device, &desc, nullptr, render_resources.swap_chain.put())) &&
-         render_resources.swap_chain;
-}
-
 auto create_composition_tree(ID3D11Device* shared_d3d_device,
                              notification_window::RenderResources& render_resources, HWND hwnd)
     -> bool {
-  if (!shared_d3d_device || !render_resources.swap_chain) {
+  if (!shared_d3d_device) {
     return false;
   }
 
@@ -136,7 +103,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
     return false;
   }
 
-  wil::com_ptr<IDCompositionDevice> composition_device;
+  auto& composition_device = render_resources.composition_device;
   if (FAILED(DCompositionCreateDevice(dxgi_device.get(), IID_PPV_ARGS(composition_device.put()))) ||
       !composition_device) {
     return false;
@@ -153,35 +120,9 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
     return false;
   }
 
-  return SUCCEEDED(
-             render_resources.composition_visual->SetContent(render_resources.swap_chain.get())) &&
-         SUCCEEDED(render_resources.composition_target->SetRoot(
+  return SUCCEEDED(render_resources.composition_target->SetRoot(
              render_resources.composition_visual.get())) &&
          SUCCEEDED(composition_device->Commit());
-}
-
-auto create_target_bitmap(notification_window::RenderResources& render_resources, const SIZE& size)
-    -> bool {
-  release_target_bitmap(render_resources);
-
-  wil::com_ptr<IDXGISurface> dxgi_surface;
-  if (FAILED(render_resources.swap_chain->GetBuffer(0, IID_PPV_ARGS(dxgi_surface.put()))) ||
-      !dxgi_surface) {
-    return false;
-  }
-
-  D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-      D2D1::PixelFormat(kSurfaceFormat, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
-  if (FAILED(render_resources.device_context->CreateBitmapFromDxgiSurface(
-          dxgi_surface.get(), &properties, render_resources.target_bitmap.put())) ||
-      !render_resources.target_bitmap) {
-    return false;
-  }
-
-  render_resources.device_context->SetTarget(render_resources.target_bitmap.get());
-  render_resources.surface_size = size;
-  return true;
 }
 
 auto create_brushes(notification_window::RenderResources& render_resources) -> bool {
@@ -231,12 +172,10 @@ auto ensure_text_formats(core::AppState& state,
 auto reset_render_context(notification_window::RenderResources& render_resources) -> void {
   release_text_formats(render_resources);
   release_brushes(render_resources);
-  release_target_bitmap(render_resources);
   render_resources.device_context.reset();
   render_resources.composition_visual.reset();
   render_resources.composition_target.reset();
-  render_resources.swap_chain.reset();
-  render_resources.surface_size = {0, 0};
+  render_resources.composition_device.reset();
   render_resources.is_ready = false;
   render_resources.is_rendering = false;
   render_resources.dpi = 96;
@@ -259,26 +198,19 @@ auto ensure_render_context(core::AppState& state) -> bool {
 
   auto& shared = shared_resources(state);
   if (!render_resources.is_ready) {
-    reset_render_context(render_resources);
+    cleanup_render_context(state);
     if (!create_device_context(shared.d2d_device.get(), render_resources) ||
-        !create_swap_chain(shared.d3d_device.get(), render_resources, size) ||
         !create_composition_tree(shared.d3d_device.get(), render_resources,
                                  window_state.host_hwnd) ||
-        !create_target_bitmap(render_resources, size) || !create_brushes(render_resources)) {
-      reset_render_context(render_resources);
-      return false;
-    }
-  } else if (render_resources.surface_size.cx != size.cx ||
-             render_resources.surface_size.cy != size.cy) {
-    if (!resize_render_context(state, size)) {
-      reset_render_context(render_resources);
+        !create_brushes(render_resources)) {
+      cleanup_render_context(state);
       return false;
     }
   }
 
   if (!ensure_text_formats(state, render_resources,
                            static_cast<int>(GetDpiForWindow(window_state.host_hwnd)))) {
-    reset_render_context(render_resources);
+    cleanup_render_context(state);
     return false;
   }
 
@@ -287,29 +219,135 @@ auto ensure_render_context(core::AppState& state) -> bool {
 }
 
 auto cleanup_render_context(core::AppState& state) -> void {
+  for (auto& notification : state.notification_window->active_notifications) {
+    notification.visual.reset();
+    notification.opacity_effect.reset();
+    notification.surface.reset();
+    notification.content_dirty = true;
+    notification.motion.dirty = true;
+  }
   reset_render_context(state.notification_window->render_resources);
 }
 
-auto resize_render_context(core::AppState& state, const SIZE& new_size) -> bool {
-  auto& render_resources = state.notification_window->render_resources;
-  if (!render_resources.is_ready || !render_resources.swap_chain ||
-      !render_resources.device_context || new_size.cx <= 0 || new_size.cy <= 0) {
-    return false;
-  }
-
-  if (render_resources.surface_size.cx == new_size.cx &&
-      render_resources.surface_size.cy == new_size.cy) {
+// 确保指定卡片的 DComp 资源就绪：创建 DComp 表面 → 创建 Visual 与效果组 → 挂载到根 Visual →
+// 绑定表面
+auto ensure_card(core::AppState& state, Notification& notification) -> bool {
+  // 若已有有效表面和 Visual，无需重建
+  if (notification.visual && notification.surface) {
     return true;
   }
-
-  release_target_bitmap(render_resources);
-  if (FAILED(render_resources.swap_chain->ResizeBuffers(
-          0, static_cast<UINT>(new_size.cx), static_cast<UINT>(new_size.cy), kSurfaceFormat, 0)) ||
-      !create_target_bitmap(render_resources, new_size)) {
+  auto& resources = state.notification_window->render_resources;
+  // 获取阴影留白尺寸
+  const int padding = painter::get_surface_padding(resources.dpi);
+  wil::com_ptr<IDCompositionSurface> surface;
+  // 创建包含阴影留白的卡片独立 DComp 表面
+  HRESULT hr = resources.composition_device->CreateSurface(
+      notification.width + padding * 2, notification.height + padding * 2, kSurfaceFormat,
+      DXGI_ALPHA_MODE_PREMULTIPLIED, surface.put());
+  if (SUCCEEDED(hr) && !notification.visual) {
+    // 创建卡片子 Visual
+    hr = resources.composition_device->CreateVisual(notification.visual.put());
+    // 创建并关联透明度效果组
+    if (SUCCEEDED(hr)) {
+      hr = resources.composition_device->CreateEffectGroup(notification.opacity_effect.put());
+    }
+    if (SUCCEEDED(hr)) {
+      hr = notification.visual->SetEffect(notification.opacity_effect.get());
+    }
+    // 设置双线性位图插值模式以保证动画平滑
+    if (SUCCEEDED(hr)) {
+      hr = notification.visual->SetBitmapInterpolationMode(
+          DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR);
+    }
+    // 将卡片 Visual 挂载到根 Visual 树
+    if (SUCCEEDED(hr)) {
+      hr = resources.composition_visual->AddVisual(notification.visual.get(), TRUE, nullptr);
+    }
+  }
+  // 将表面设置为卡片 Visual 的显示内容
+  if (SUCCEEDED(hr)) {
+    hr = notification.visual->SetContent(surface.get());
+  }
+  if (FAILED(hr)) {
+    Logger().error("Failed to create notification card: 0x{:X}", hr);
     return false;
   }
-
+  // 记录表面与留白并标记内容与运动待提交
+  notification.surface = std::move(surface);
+  notification.surface_padding = padding;
+  notification.content_dirty = true;
+  notification.motion.dirty = true;
   return true;
+}
+
+// 将卡片的位移与透明度运动状态应用到 DComp Visual：评估过渡属性 → 生成硬件动画 → 绑定属性
+auto apply_motion(core::AppState& state, Notification& notification) -> bool {
+  // 运动无变更则直接返回
+  if (!notification.motion.dirty) {
+    return true;
+  }
+  auto* device = state.notification_window->render_resources.composition_device.get();
+  // 辅助闭包：为数值属性生成动画或直接设值
+  auto set_property = [&](const ui::composition_animation::Transition& transition, float adjustment,
+                          auto setter) -> bool {
+    auto adjusted = transition;
+    adjusted.from += adjustment;
+    adjusted.to += adjustment;
+    // 无过渡时长或起始与目标相同时直接赋终值
+    if (adjusted.seconds <= 0.0 || adjusted.from == adjusted.to) {
+      return SUCCEEDED(setter(adjusted.to));
+    }
+    // 生成 DComp 硬件动画并绑定到属性
+    auto animation = ui::composition_animation::create(device, adjusted);
+    return animation && SUCCEEDED(setter(animation->get()));
+  };
+  auto* visual = notification.visual.get();
+  // 运动使用卡片内容坐标，visual 原点需向外偏移阴影留白
+  const float padding = static_cast<float>(notification.surface_padding);
+  // 分别应用 X 轴位移、Y 轴位移和透明度
+  const bool success = set_property(notification.motion.offset_x, -padding,
+                                    [visual](auto value) { return visual->SetOffsetX(value); }) &&
+                       set_property(notification.motion.offset_y, -padding,
+                                    [visual](auto value) { return visual->SetOffsetY(value); }) &&
+                       set_property(notification.motion.opacity, 0.0f, [&notification](auto value) {
+                         return notification.opacity_effect->SetOpacity(value);
+                       });
+  if (!success) {
+    Logger().error("Failed to update notification motion");
+  }
+  return success;
+}
+
+// 从 Visual 树移除卡片并释放合成资源：移除子节点 → 标记合成脏 → 释放 Visual 与表面
+auto remove_card(core::AppState& state, Notification& notification) -> void {
+  auto& resources = state.notification_window->render_resources;
+  // 从根 Visual 树中解绑当前卡片的子节点
+  if (notification.visual && resources.composition_visual) {
+    const HRESULT hr = resources.composition_visual->RemoveVisual(notification.visual.get());
+    if (FAILED(hr)) {
+      Logger().error("Failed to remove notification visual: 0x{:X}", hr);
+    } else {
+      state.notification_window->composition_dirty = true;
+    }
+  }
+  // 释放 COM 指针资源
+  notification.visual.reset();
+  notification.opacity_effect.reset();
+  notification.surface.reset();
+}
+
+// 提交当前 DComp 设备上的所有事务变更到系统合成器
+auto commit(core::AppState& state) -> bool {
+  auto& resources = state.notification_window->render_resources;
+  if (!resources.composition_device) {
+    return false;
+  }
+  // 提交合成事务
+  const HRESULT hr = resources.composition_device->Commit();
+  if (FAILED(hr)) {
+    Logger().error("Failed to commit notification composition: 0x{:X}", hr);
+  }
+  return SUCCEEDED(hr);
 }
 
 }  // namespace ui::notification_window::render_context

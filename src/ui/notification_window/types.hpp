@@ -10,6 +10,7 @@
 #include "vendor/windows/dxgi1_2.hpp"
 
 #include "core/notifications/types.hpp"
+#include "ui/composition_animation/animation.hpp"
 
 namespace ui::notification_window {
 
@@ -41,9 +42,11 @@ constexpr float BASE_BORDER_ALPHA = 0.45f;
 constexpr auto SLIDE_DURATION = std::chrono::milliseconds(200);
 constexpr auto FADE_DURATION = std::chrono::milliseconds(200);
 
-// 动画定时器
-constexpr UINT_PTR ANIMATION_TIMER_ID = 1001;
-constexpr UINT ANIMATION_FRAME_INTERVAL = 16;  // ~60fps
+// 仅在生命周期截止时间唤醒，不参与逐帧绘制。
+constexpr UINT_PTR LIFECYCLE_TIMER_ID = 1001;
+// 只在卡片运动时检查输入，不驱动画面帧率。
+constexpr UINT_PTR HOVER_TIMER_ID = 1002;
+constexpr UINT HOVER_CHECK_INTERVAL_MS = 16;
 
 // 窗口类名
 inline const std::wstring NOTIFICATION_WINDOW_CLASS = L"SpinningMomoNotificationHostClass";
@@ -60,14 +63,22 @@ struct NotificationHitTarget {
   size_t notification_id = 0;
 };
 
-// 通知当前的动画/生命周期阶段
-enum class NotificationAnimState {
-  Spawning,    // 正在生成，尚未进入动画
-  SlidingIn,   // 滑入动画
-  Displaying,  // 正常显示
-  MovingUp,    // 为新通知腾出空间而上移
-  FadingOut,   // 淡出动画
-  Done         // 处理完毕，待销毁
+enum class NotificationPhase { Entering, Visible, Leaving };
+
+struct NotificationLifetime {
+  NotificationPhase phase = NotificationPhase::Entering;
+  // Entering 的空截止时间表示尚未启动入场。
+  std::chrono::steady_clock::time_point deadline{};
+  std::chrono::steady_clock::duration remaining_display_time{};
+};
+
+struct NotificationMotion {
+  ui::composition_animation::Transition offset_x;
+  ui::composition_animation::Transition offset_y;
+  ui::composition_animation::Transition opacity;
+  // 运动结束后重新判断静止鼠标的悬停，不参与展示计时。
+  std::chrono::steady_clock::time_point deadline{};
+  bool dirty = true;
 };
 
 struct NotificationThemeColors {
@@ -76,7 +87,7 @@ struct NotificationThemeColors {
   D2D1_COLOR_F hover{};
 };
 
-// 通知创建时测量一次，后续只随 current_pos 更新 hit/draw 矩形。
+// 卡片局部布局；绘制和命中测试共用，位移单独由 visual 承担。
 struct NotificationLayoutMetrics {
   int padding = 0;
   int content_padding = 0;
@@ -97,17 +108,16 @@ struct Notification {
   // 主题颜色快照（创建通知时读取设置，确保通知生命周期内外观稳定）
   NotificationThemeColors colors;
 
-  // 通知当前的动画/生命周期阶段
-  NotificationAnimState state = NotificationAnimState::Spawning;
+  NotificationLifetime lifetime;
+  NotificationMotion motion;
+  D2D1_POINT_2F layout_target{};
 
-  // 动画和时间
-  std::chrono::steady_clock::time_point last_state_change_time;
-  std::chrono::steady_clock::time_point display_started_time;
-  float opacity = 0.0f;
-  float animation_start_opacity = 0.0f;
-  POINT animation_start_pos{};
-  POINT current_pos{};
-  POINT target_pos{};
+  wil::com_ptr<IDCompositionVisual> visual;
+  wil::com_ptr<IDCompositionEffectGroup> opacity_effect;
+  wil::com_ptr<IDCompositionSurface> surface;
+  bool content_dirty = true;
+  int surface_padding = 0;
+  int dpi = 0;
   int height = 0;
   int width = 0;
   NotificationLayoutMetrics layout{};
@@ -122,20 +132,14 @@ struct Notification {
   // 鼠标悬停状态
   bool is_hovered = false;
   bool action_hovered = false;
-  std::chrono::milliseconds total_paused_duration{0};
-  std::chrono::steady_clock::time_point pause_start_time;
 };
 
 struct RenderResources {
-  wil::com_ptr<IDXGISwapChain1> swap_chain;
+  wil::com_ptr<IDCompositionDevice> composition_device;
   wil::com_ptr<IDCompositionTarget> composition_target;
   wil::com_ptr<IDCompositionVisual> composition_visual;
 
   wil::com_ptr<ID2D1DeviceContext6> device_context;
-  wil::com_ptr<ID2D1Bitmap1> target_bitmap;
-
-  // 当前 back buffer 尺寸缓存；resize 只在尺寸变化时重建目标位图。
-  SIZE surface_size = {0, 0};
 
   // 通知窗口使用共享设备级资源，但保留自己的文本格式和画刷缓存。
   wil::com_ptr<IDWriteTextFormat> title_text_format;
