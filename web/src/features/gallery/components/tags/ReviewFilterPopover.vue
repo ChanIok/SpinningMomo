@@ -74,16 +74,18 @@ function toggleRating(value: number) {
           class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-sidebar-hover"
           @click="toggleRating(rating)"
         >
-          <Checkbox as="span" :model-value="isRatingSelected(rating)" class="pointer-events-none" />
+          <Checkbox
+            as="span"
+            :model-value="isRatingSelected(rating)"
+            class="pointer-events-none border-muted-foreground/40"
+          />
           <span class="flex min-w-0 items-center gap-0.5">
             <Star
               v-for="s in STARS"
               :key="s"
               class="h-3.5 w-3.5 transition-colors"
               :class="
-                rating > 0 && s <= rating
-                  ? 'fill-primary text-primary'
-                  : 'fill-muted text-muted-foreground/30'
+                rating > 0 && s <= rating ? 'fill-amber-400 text-amber-400' : 'text-foreground/40'
               "
             />
           </span>

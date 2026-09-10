@@ -773,7 +773,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           <Checkbox
                             as="span"
                             :model-value="isRatingSelected(rating)"
-                            class="pointer-events-none"
+                            class="pointer-events-none border-muted-foreground/40"
                           />
                           <span class="flex min-w-0 items-center gap-0.5">
                             <Star

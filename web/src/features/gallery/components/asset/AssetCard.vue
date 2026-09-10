@@ -108,10 +108,6 @@ const showSelectionVisual = computed(
   () => props.isSelected && (!store.isCompactWindow || store.selection.mode === 'multi-select')
 )
 
-const showPlaceholder = computed(
-  () => imageError.value || !hasThumbnail.value || !hasThumbnailRendered.value
-)
-
 const placeholderColor = computed(() => {
   return getAdjustedPlaceholderColor(props.asset.dominantColorHex)
 })
@@ -282,7 +278,7 @@ function handleDragStart(event: DragEvent) {
   emit('drag-start', props.asset, event)
 }
 
-// 缩略图加载完成后移除主色占位，后续原图升级继续用缩略图兜底。
+// 缩略图解码完成后结束加载动画，并允许后续原图升级。
 async function onThumbnailLoad(event: Event) {
   const image = event.currentTarget as HTMLImageElement
   const requestVersion = imageRequestVersion
@@ -298,7 +294,7 @@ async function onThumbnailLoad(event: Event) {
     return
   }
 
-  // 缩略图真正可见后，主色占位不再参与原图升级阶段。
+  // 主色背景始终保留，图片显示不依赖占位层的移除时机。
   hasThumbnailRendered.value = true
   isImageLoading.value = false
   imageError.value = false
@@ -508,7 +504,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
   <div
     data-asset-card
     draggable="true"
-    class="group relative w-full overflow-hidden bg-background transition-shadow duration-200 contain-[layout_size_paint] select-none"
+    class="group relative w-full overflow-hidden transition-shadow duration-200 contain-[layout_size_paint] select-none"
     :class="[
       store.isCompactWindow ? 'rounded-none shadow-none' : 'rounded-sm',
       showSelectionVisual
@@ -517,7 +513,11 @@ function getAdjustedPlaceholderColor(hex?: string): string {
           : 'shadow-lg ring-4 ring-primary'
         : !store.isCompactWindow && 'shadow-md hover:shadow-lg',
     ]"
-    :style="{ aspectRatio: props.aspectRatio, touchAction: 'pan-y' }"
+    :style="{
+      aspectRatio: props.aspectRatio,
+      touchAction: 'pan-y',
+      backgroundColor: placeholderColor,
+    }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @pointerdown="handlePointerDown"
@@ -528,13 +528,13 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     @contextmenu="handleContextMenu"
     @dragstart="handleDragStart"
   >
-    <!-- 卡片图像容器 -->
+    <!-- 主色与明暗修饰常驻图片下方，加载过程中始终提供连续背景。 -->
     <div
       data-asset-thumbnail
-      class="relative h-full w-full overflow-hidden"
+      class="relative h-full w-full overflow-hidden bg-white/24 dark:bg-black/32"
       :class="store.isCompactWindow ? 'rounded-none' : 'rounded-sm'"
     >
-      <!-- 缩略图是卡片的基础显示层，主色占位只服务它的首次加载。 -->
+      <!-- 缩略图直接覆盖常驻背景，后续原图升级继续用缩略图兜底。 -->
       <img
         v-if="hasThumbnail && !imageError"
         :src="scheduledThumbnailUrl"
@@ -563,18 +563,11 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         @error="onOriginalImageError"
       />
 
-      <!-- 主色占位符 -->
+      <!-- 加载结束只移除动画，不改变图片下方的背景。 -->
       <div
-        v-if="showPlaceholder"
-        class="absolute inset-0"
-        :style="{ backgroundColor: placeholderColor }"
-      >
-        <div class="absolute inset-0 bg-white/24 dark:bg-black/32" />
-        <div
-          v-if="isImageLoading"
-          class="absolute inset-0 animate-pulse bg-gradient-to-br from-white/18 via-transparent to-black/10 dark:from-white/10 dark:to-black/18"
-        />
-      </div>
+        v-if="isImageLoading"
+        class="absolute inset-0 animate-pulse bg-gradient-to-br from-white/18 via-transparent to-black/10 dark:from-white/10 dark:to-black/18"
+      />
 
       <!-- 错误占位符 -->
       <div
