@@ -32,6 +32,7 @@ To switch to a different window, **right-click the floating window or tray icon*
 
 | Preset | Equivalent Base | Total Pixels |
 |--------|----------------|--------------|
+| Default | Follows screen | — |
 | 1080P  | 1920×1080      | ~2.1 MP |
 | 2K     | 2560×1440      | ~3.7 MP |
 | 4K     | 3840×2160      | ~8.3 MP |
@@ -41,17 +42,36 @@ To switch to a different window, **right-click the floating window or tray icon*
 
 ::: tip How resolution works
 The tool first calculates total pixels from the selected preset, then distributes them according to your chosen aspect ratio.
-For example: **8K + 9:16** → **4320×7680** (roughly the same pixel count as 8K).
+For example: **8K + 9:16** > **4320×7680** (roughly the same pixel count as 8K).
+
+**Default** sets no pixel count; it takes the largest size your screen can fit at the current aspect ratio.
 :::
 
 ::: warning Performance
 Higher resolutions consume more VRAM, RAM, and virtual memory. On an RTX 3060 12G + 32 GB RAM system, 12K causes noticeable lag. If the game crashes, check your resource usage in Task Manager or increase your virtual memory.
 :::
 
+## Custom Presets
+
+Both ratio and resolution presets can be added or removed under **Settings > Floating Window > Menu Settings**, and reordered by dragging.
+
+- **Aspect Ratio**: Enter as `width:height`, e.g. `16:9` or `4:5`.
+- **Resolution**: Enter as `width x height`, e.g. `1920x1080`; shorthands such as `4K` or `1080P` also work.
+
+Newly added presets go to the end of the list — drag them to wherever you use them most.
+
 ## Assistive Features
 
-When the window extends beyond your physical display, use the **Preview** window or **Overlay** to help inspect and interact:
+When the resized window extends beyond your physical display, turn on any of the following to help inspect and interact with the frame:
 
-- **Preview**: Floating window similar to Photoshop's Navigator. Provides real-time preview of off-screen content with scroll-to-zoom and drag-to-pan.
-- **Overlay**: Acts like an inverted downscaling mode (similar to a reverse Magpie). Captures and scales the oversized window to fit fullscreen while synchronizing mouse positions for normal clicking and interaction.
-- **Letterbox**: Adds a fullscreen black background behind the game window to hide the desktop for an immersive experience with non-native aspect ratios.
+### Preview
+
+Similar to Photoshop's Navigator. Shows a real-time preview of the full off-screen frame in a separate floating window, with scroll-to-zoom and drag-to-pan.
+
+### Overlay
+
+Like a reverse, downscaled Magpie. Captures the oversized window and renders it scaled down to fullscreen, synchronizing cursor position dynamically so clicking and interacting still work at ultra-high resolutions.
+
+### Letterbox
+
+Adds a fullscreen black background behind the game window to hide the desktop for an immersive experience with non-native aspect ratios.

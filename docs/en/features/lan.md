@@ -4,7 +4,7 @@ Browse and manage your gallery directly on a phone or tablet over the same local
 
 ## Connecting
 
-1. Go to **Settings → LAN Access** and toggle the switch on
+1. Go to **Settings > LAN Access** and toggle the switch on
 2. Scan the QR code with your mobile device, or open the displayed URL in a browser
 
 ::: warning Network Requirement

@@ -13,7 +13,7 @@ ADB (Android Debug Bridge) is Android's official debugging tool. By connecting t
 
 ## Quick Start (Emulators)
 
-1. **Enable the menu button**: Settings → Floating Window → Features, toggle on **ADB Mode**
+1. **Enable the menu button**: Settings > Floating Window > Features, toggle on **ADB Mode**
 2. Launch your emulator and start the game
 3. Click the **ADB Mode** button on the floating window to discover and connect
 
@@ -21,7 +21,7 @@ Once connected, taking screenshots and recording works just like standard window
 
 ## Recording Notes
 
-Records both screen video and in-game audio to MP4. Configure bitrate (default 40 Mbps), framerate, and video codec (H.264 / H.265) under **Settings → ADB Mode**.
+Records both screen video and in-game audio to MP4. Configure bitrate (default 40 Mbps), framerate, and video codec (H.264 / H.265) under **Settings > ADB Mode**.
 
 ## Aspect Ratio Safety Notice
 
@@ -50,5 +50,5 @@ For ultra-high resolution recording, use the emulator's built-in recorder. Physi
 **Connection Steps**
 
 1. Connect your phone to your PC via USB
-2. Go to **Settings → ADB Mode**, enable **Custom ADB Path**, and select your `adb.exe`
+2. Go to **Settings > ADB Mode**, enable **Custom ADB Path**, and select your `adb.exe`
 3. Select your device from the list, or enter its IP and port for wireless debugging

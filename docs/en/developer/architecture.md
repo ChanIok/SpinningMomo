@@ -102,8 +102,6 @@ Then open:
 vsxmake2026\SpinningMomo.sln
 ```
 
----
-
 ## Build
 
 > [!TIP]
@@ -152,7 +150,39 @@ When modifying Java code, set up JDK 21 and Android SDK (`platforms;android-36`,
 | Release | `build\windows\x64\release\` |
 | Packaged | `dist\` |
 
----
+## Testing
+
+Tests only protect deterministic, stable behavior and documented invariants — coverage is not the goal.
+
+### Unit Tests
+
+Backend regression tests use doctest and are carried by the separate `SpinningMomoTests` target:
+
+```bash
+xmake test -v
+```
+
+This target is not part of a regular build. If the test executable is reported missing, run `xmake build SpinningMomoTests` first.
+
+### Scenario Tests
+
+Scenario tests launch a real SpinningMomo process and call JSON-RPC over the HTTP `/rpc` port to verify end-to-end behavior.
+They run inside a portable sandbox under a temporary directory, with the database, settings, and thumbnails all kept in the sandbox, leaving your everyday instance untouched.
+Release artifacts are verified by default.
+
+Scenario scripts do not build anything, so prepare the Release artifacts first:
+
+```bash
+xmake config -m release
+xmake build
+xmake build SpinningMomoScenarioWindow    # scenario target window for screenshots and recording
+xmake config -m debug                     # optional, back to your daily dev config
+pnpm run test:scenarios                   # add a suite name substring to filter, e.g. gallery_core
+```
+
+Suites are `gallery_core`, `gallery_recovery`, and `capture`. Exit any running SpinningMomo instance first — RPC port `51206` must be free.
+
+GPU encoders and audio devices vary between machines, so capture and recording behavior on specific hardware still needs manual verification by running the app.
 
 ## Packaging
 
@@ -178,8 +208,6 @@ Then run:
 pnpm run build:installer
 ```
 
----
-
 ## Web Frontend Development
 
 Start the dev server (C++ backend needs to be running):
@@ -189,8 +217,6 @@ pnpm run dev:web
 ```
 
 Vite dev server proxies `/rpc` and `/static` to the C++ backend (`localhost:51206`).
-
----
 
 ## Code Generation Scripts
 

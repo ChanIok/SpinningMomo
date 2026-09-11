@@ -9,7 +9,7 @@ Two package types are available:
 - **Portable (.zip)** — no installation needed
 
 ::: warning Portable Version Usage Note
-Right-click the zip file → **Extract All** to extract all contents into a separate folder, then run `SpinningMomo.exe` inside it.
+Right-click the zip file > **Extract All** to extract all contents into a separate folder, then run `SpinningMomo.exe` inside it.
 
 Do not launch `SpinningMomo.exe` directly inside the zip archive, and do not extract only the exe file, as missing supporting assets will cause errors.
 :::

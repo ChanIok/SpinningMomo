@@ -63,6 +63,7 @@ tools/
 .windsurfrules
 .cursor
 .claude
+.workbuddy
 
 # Node.js dependencies
 node_modules/

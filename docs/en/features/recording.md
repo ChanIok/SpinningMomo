@@ -1,23 +1,42 @@
 # Video Recording
 
-Lightweight video and audio recording that automatically tracks custom window aspect ratios and resolutions.
+Records video and audio from the target window at the same resolution as the current window size.
 
-## How to Use
+## Starting & Stopping
 
-1. Adjust the game window to your desired ratio and resolution
-2. Click **Record** on the floating window to start recording (click again to stop)
+Click **Record** on the floating window to start, then click again to stop. Default hotkey: `F8`.
 
-Default hotkey: `F8`
+## Recording Settings
 
-Videos are saved as MP4 files under `SpinningMomo` in your system **Videos** folder (configurable in Settings), at the same resolution as the current window size.
+- **Frame Rate**: 60 FPS by default.
+- **Rate Control**: Quality-based (default, quality 80), constant bitrate, or manual QP.
+- **Codec**: H.264 or H.265.
+- **Encoder Mode**: Auto (default, prefers GPU hardware encoding), forced hardware encoding, or CPU software encoding.
+- **Audio Source**: System Audio (default), Game Audio Only, or No Audio.
+- **Show Cursor**: Whether the mouse cursor is recorded into the video.
+- **Borderless Capture**: Captures only the window client area, excluding the title bar and window borders.
 
-## Compared to OBS & External Tools
+## Auto Split On Resize
 
-Built-in recording uses native Windows capture pipelines (WGC + Media Foundation hardware acceleration) for minimal VRAM and system overhead, automatically matching window dimensions and aspect ratios.
+If the window ratio or resolution changes during recording, the current segment is ended automatically and recording continues at the new size. This prevents a mid-recording size change from stretching or cropping the whole clip. Can be turned off in settings.
 
-For live streaming, multi-track audio routing, or complex scene compositing, consider pairing with OBS or other dedicated software.
+## Output Location
 
-::: warning Performance & Format Requirements
-- **Hardware Requirements**: Recording at ultra-high resolutions (such as 6K / 8K) puts heavy demand on GPU hardware encoders and disk write speeds.
-- **Encoding Limits**: Resolutions above 4K require **H.265 (HEVC)** encoding in settings (H.264 does not support resolutions exceeding 4K).
+Output is an MP4 file, saved to the same output directory as screenshots.
+
+## HDR
+
+When enabled, records as HEVC HDR10 video, which requires GPU hardware encoding and the H.265 format. See [HDR Support](./hdr.md).
+
+## High-Resolution Recording
+
+::: warning Hardware & Encoding Limits
+- **Hardware Requirements**: 6K / 8K recording puts heavy demand on GPU encoders and disk write speeds.
+- **Codec Limits**: With GPU hardware encoding, H.264 tops out at roughly 4096 (a limit shared by NVIDIA, AMD, and Intel hardware encoders). For anything above 4K, switch to **H.265** (upper limit around 8192).
 :::
+
+## Compared to Other Recorders
+
+**Lower overhead**: Capture and encoding run on native Windows pipelines and prefer GPU hardware encoding, with no scene compositing or streaming, so VRAM and system usage stay below general-purpose screen recorders.
+
+For live streaming, multi-track audio, or complex scene compositing, use dedicated tools such as OBS.

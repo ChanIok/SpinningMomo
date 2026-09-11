@@ -103,8 +103,6 @@ xmake vs
 vsxmake2026\SpinningMomo.sln
 ```
 
----
-
 ## 构建
 
 > [!TIP]
@@ -153,18 +151,40 @@ Android 端是轻量屏幕/音频捕获服务，产物为 `build/android/momo-ca
 | Release | `build\windows\x64\release\` |
 | 打包产物 | `dist\` |
 
-### 后端自动化测试
+## 测试
 
-后端回归测试使用 doctest，并由独立的 `SpinningMomoTests` 目标承载：
+测试只保护确定性的稳定行为和已记录不变量，不以覆盖率为目标。
+
+### 单元测试
+
+后端回归测试使用 doctest，由独立的 `SpinningMomoTests` 目标承载：
 
 ```bash
 xmake test -v
 ```
 
-测试只保护确定性的稳定行为和已记录不变量，不以覆盖率为目标。涉及窗口、显卡、
-音频设备和其他 Windows 桌面环境的行为仍需运行应用进行手工验证。
+该目标默认不参与常规构建，如提示找不到测试程序，先执行 `xmake build SpinningMomoTests`。
 
----
+### 场景测试
+
+场景测试启动真实的 SpinningMomo 进程，通过 HTTP `/rpc` 端口调用 JSON-RPC 验证端到端行为。
+运行在临时目录下的便携版沙箱中，数据库、设置与缩略图全部落在沙箱内，不影响日常使用的实例。
+默认验证 Release 产物。
+
+场景脚本不会自动构建，需先准备 Release 产物：
+
+```bash
+xmake config -m release
+xmake build
+xmake build SpinningMomoScenarioWindow    # 截图与录制的场景目标窗口
+xmake config -m debug                     # 可选，切回日常开发配置
+pnpm run test:scenarios                   # 可加套件名子串筛选，如 gallery_core
+```
+
+套件为 `gallery_core`、`gallery_recovery`、`capture`。运行前需退出正在使用的 SpinningMomo，
+RPC 端口 `51206` 必须空闲。
+
+不同机器的显卡编码器与音频设备存在差异，采集与录制在这些硬件上的表现仍需运行应用手工验证。
 
 ## 打包发布产物
 
@@ -190,8 +210,6 @@ wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 pnpm run build:installer
 ```
 
----
-
 ## Web 前端开发
 
 启动开发服务器（需 C++ 后端同时运行）：
@@ -201,8 +219,6 @@ pnpm run dev:web
 ```
 
 Vite 开发服务器会将 `/rpc` 和 `/static` 代理到 C++ 后端（`localhost:51206`）。
-
----
 
 ## 代码生成脚本
 
