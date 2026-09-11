@@ -272,7 +272,7 @@
   "settings.function.windowControl.windowTitle.placeholder": "输入窗口标题...",
   "settings.function.windowControl.windowTitle.update": "更新",
   "settings.adbMode.title": "ADB 模式",
-  "settings.adbMode.description": "通过 ADB 临时调整安卓模拟器的分辨率，并直接截取设备画面。",
+  "settings.adbMode.description": "通过 ADB 临时调整安卓设备的分辨率，并直接截取设备画面。",
   "settings.adbMode.customPath.label": "自定义 ADB 路径",
   "settings.adbMode.customPath.description": "自动查找模拟器的 ADB，也可手动指定路径与调试网络设备。",
   "settings.adbMode.adbPath.label": "ADB 路径",

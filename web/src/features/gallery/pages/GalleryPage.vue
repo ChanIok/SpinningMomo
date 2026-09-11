@@ -190,7 +190,7 @@ watch(
   isSidebarOpen,
   (open) => {
     if (open) {
-      const restoredSize = normalizeOpenSize(leftSidebarOpenSize.value, LEFT_MIN_PX, '200px')
+      const restoredSize = normalizeOpenSize(leftSidebarOpenSize.value, LEFT_MIN_PX, '256px')
       leftSidebarSize.value = restoredSize
       leftSidebarOpenSize.value = restoredSize
       return

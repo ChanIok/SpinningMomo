@@ -61,9 +61,9 @@ export function createDefaultGallerySettings(): GallerySettings {
     layout: {
       sidebarOpen: true,
       detailsOpen: true,
-      leftSidebarSize: '200px',
+      leftSidebarSize: '256px',
       rightDetailsSize: '256px',
-      leftSidebarOpenSize: '200px',
+      leftSidebarOpenSize: '256px',
       rightDetailsOpenSize: '256px',
       sidebarFolderSplitSize: 0.5,
     },

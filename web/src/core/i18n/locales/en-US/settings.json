@@ -272,7 +272,7 @@
   "settings.function.windowControl.windowTitle.placeholder": "Enter window title...",
   "settings.function.windowControl.windowTitle.update": "Update",
   "settings.adbMode.title": "ADB Mode",
-  "settings.adbMode.description": "Temporarily adjust an Android emulator's resolution through ADB and capture its screen directly.",
+  "settings.adbMode.description": "Temporarily adjust an Android device's resolution through ADB and capture its screen directly.",
   "settings.adbMode.customPath.label": "Use Custom ADB Path",
   "settings.adbMode.customPath.description": "Automatically find your emulator's ADB, or specify its path and debug network devices.",
   "settings.adbMode.adbPath.label": "ADB Path",

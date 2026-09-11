@@ -115,7 +115,7 @@ function handlePrevious() {
 
     <!-- 卡片主体 (叠在水印上方) -->
     <div
-      class="relative z-10 flex w-full max-w-2xl flex-col rounded-md bg-background/80 dark:bg-background/85"
+      class="relative z-10 flex w-full max-w-2xl flex-col rounded-md bg-background/80 dark:bg-popover"
     >
       <!-- Header：说明来源 + 步骤进度 -->
       <div class="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">

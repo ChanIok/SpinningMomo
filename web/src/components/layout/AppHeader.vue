@@ -395,7 +395,6 @@ onBeforeUnmount(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-              :class="[!isSidebarOpen && 'text-muted-foreground']"
               :aria-label="
                 isSidebarOpen
                   ? t('app.header.gallery.toggleSidebar.hide')
@@ -425,7 +424,6 @@ onBeforeUnmount(() => {
               variant="ghost"
               size="icon"
               class="h-8 w-8 rounded-sm hover:bg-black/10 dark:hover:bg-white/10"
-              :class="[!isDetailsOpen && 'text-muted-foreground']"
               :aria-label="
                 isDetailsOpen
                   ? t('app.header.gallery.toggleDetails.hide')
@@ -462,7 +460,7 @@ onBeforeUnmount(() => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-[28rem] p-0">
-          <div class="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2">
+          <div class="flex items-center justify-between gap-3 px-3 py-2">
             <div class="min-w-0">
               <p class="text-sm font-medium text-foreground">{{ t('app.header.tasks.button') }}</p>
               <p class="text-[11px] text-muted-foreground">
@@ -489,7 +487,7 @@ onBeforeUnmount(() => {
           <ScrollArea v-else type="always" class="max-h-[28rem]">
             <template #scrollbar>
               <ScrollBar
-                class="w-3 p-[1px]"
+                class="p-[1px]"
                 thumb-class="bg-muted-foreground/35 hover:bg-muted-foreground/50"
               />
             </template>
