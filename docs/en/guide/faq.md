@@ -57,3 +57,12 @@ Check these two settings in *Infinity Nikki*:
 Make sure the program is fully closed first.
 - **Installer version**: Go to **Settings > Apps > Installed apps**, find SpinningMomo, and click **Uninstall**
 - **Portable version**: Just delete the program folder
+
+## Getting Help
+
+If your issue is not covered above, you can reach out via:
+
+- **GitHub Issues**: Submit an issue on [GitHub Issues](https://github.com/ChanIok/SpinningMomo/issues)
+- **Email**: Send an email to [hello@infinitymomo.com](mailto:hello@infinitymomo.com)
+
+Please provide reproduction steps, relevant screenshots, and log files whenever possible (you can open the log directory directly from the **About** page in the main window).

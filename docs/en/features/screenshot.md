@@ -1,5 +1,7 @@
 # High-Res Screenshots
 
+Capture current frames from target windows with support for ultra-high resolution output and lossless HDR saves.
+
 ## In-Game Camera (Recommended)
 
 For *Infinity Nikki*, we recommend using the in-game **Momo's Camera** for photos. The game pauses rendering when the camera is open, avoiding motion blur and temporal artifacts. It also saves photo metadata alongside the image.

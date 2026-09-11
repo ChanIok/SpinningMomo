@@ -1,7 +1,6 @@
 # Gallery
 
-## Overview
-The gallery provides local indexing, filtering, and organization for photos and videos without hosting or altering your original file structure.
+Local indexing, filtering, and organizing tool for photos and videos, designed non-intrusively without altering your original files.
 
 ## Culling & File Organization
 - **Ratings & Reject Culling**: Supports 1–5 star ratings and "Reject" flags. Quickly mark unwanted shots as "Reject" during culling, then filter and batch-delete them using the top toolbar.

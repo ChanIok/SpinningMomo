@@ -1,5 +1,7 @@
 # Video Recording
 
+Lightweight video and audio recording that automatically tracks custom window aspect ratios and resolutions.
+
 ## How to Use
 
 1. Adjust the game window to your desired ratio and resolution
@@ -9,9 +11,11 @@ Default hotkey: `F8`
 
 Videos are saved as MP4 files under `SpinningMomo` in your system **Videos** folder (configurable in Settings), at the same resolution as the current window size.
 
-## Compared to External Tools
+## Compared to OBS & External Tools
 
-The built-in recorder is a **lightweight convenience** — great for quick captures or when you don't want to switch tools. For higher quality, streaming, multi-track audio, or advanced controls, use OBS or another professional tool and set up your capture region manually.
+Built-in recording uses native Windows capture pipelines (WGC + Media Foundation hardware acceleration) for minimal VRAM and system overhead, automatically matching window dimensions and aspect ratios.
+
+For live streaming, multi-track audio routing, or complex scene compositing, consider pairing with OBS or other dedicated software.
 
 ::: warning Performance & Format Requirements
 - **Hardware Requirements**: Recording at ultra-high resolutions (such as 6K / 8K) puts heavy demand on GPU hardware encoders and disk write speeds.

@@ -62,3 +62,12 @@
 确认完全退出程序后：
 - **安装版**：打开 **系统设置 > 应用 > 应用和功能**，找到 SpinningMomo 后点击卸载
 - **便携版**：直接删除整个程序文件夹
+
+## 获取帮助
+
+如果上述内容未能解决您的问题，可通过以下途径反馈：
+
+- **GitHub Issues**：前往 [GitHub Issues](https://github.com/ChanIok/SpinningMomo/issues) 提交问题
+- **电子邮件**：发送邮件至 [hello@infinitymomo.com](mailto:hello@infinitymomo.com)
+
+反馈时请尽量提供复现步骤、相关截图和日志文件（可在主界面「关于」页一键打开日志目录）。

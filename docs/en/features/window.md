@@ -1,4 +1,6 @@
-# Window & Resolution
+# Window Adjustment
+
+Freely adjust target window aspect ratios and ultra-high resolutions beyond physical screen limits for photography and composition.
 
 ## Picking a Target Window
 
@@ -8,7 +10,6 @@ The tool defaults to *Infinity Nikki* but works with most modern games running i
 - *The Sims 4*
 - *Naraka: Bladepoint*
 - *Wuthering Waves*
-- *Where Winds Meet*
 - *Arknights: Endfield*
 - *Neverness to Everness*
 
@@ -49,8 +50,8 @@ Higher resolutions consume more VRAM, RAM, and virtual memory. On an RTX 3060 12
 
 ## Assistive Features
 
-**Preview**: When the game window extends beyond your screen, this floating preview (like Photoshop's Navigator) gives you a real-time view with scroll-to-zoom and drag-to-pan.
+When the window extends beyond your physical display, use the **Preview** window or **Overlay** to help inspect and interact:
 
-**Overlay**: Renders the oversized window scaled down into a fullscreen overlay, keeping mouse interactions normal at ultra-high resolutions. Adds CPU overhead — turn it off if you're already seeing lag.
-
-**Letterbox**: Adds a full-screen black background behind the window for a more immersive look when using non-native aspect ratios.
+- **Preview**: Floating window similar to Photoshop's Navigator. Provides real-time preview of off-screen content with scroll-to-zoom and drag-to-pan.
+- **Overlay**: Acts like an inverted downscaling mode (similar to a reverse Magpie). Captures and scales the oversized window to fit fullscreen while synchronizing mouse positions for normal clicking and interaction.
+- **Letterbox**: Adds a fullscreen black background behind the game window to hide the desktop for an immersive experience with non-native aspect ratios.

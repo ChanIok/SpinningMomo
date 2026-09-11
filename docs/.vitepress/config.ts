@@ -160,10 +160,12 @@ export default defineConfig({
             {
               text: "Features",
               items: [
-                { text: "Window & Resolution", link: "/en/features/window" },
+                { text: "Window Adjustment", link: "/en/features/window" },
                 { text: "Screenshots", link: "/en/features/screenshot" },
                 { text: "Video Recording", link: "/en/features/recording" },
                 { text: "Gallery", link: "/en/features/gallery" },
+                { text: "LAN Access", link: "/en/features/lan" },
+                { text: "ADB Mode", link: "/en/features/adb" },
               ],
             },
             {
@@ -230,10 +232,12 @@ export default defineConfig({
         {
           text: "功能",
           items: [
-            { text: "比例与分辨率调整", link: "/features/window" },
+            { text: "窗口调整", link: "/features/window" },
             { text: "超清截图", link: "/features/screenshot" },
             { text: "视频录制", link: "/features/recording" },
             { text: "图库", link: "/features/gallery" },
+            { text: "局域网访问", link: "/features/lan" },
+            { text: "ADB 模式", link: "/features/adb" },
           ],
         },
         {
