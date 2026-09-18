@@ -97,7 +97,6 @@ const isPathWithinBase = (target: string, base: string): boolean => {
 }
 
 const isSelectingOutputDir = ref(false)
-const isAddingOutputDirToGallery = ref(false)
 const isOutputDirGalleryDialogOpen = ref(false)
 const pendingOutputDir = ref('')
 const isSelectingGameAlbumDir = ref(false)
@@ -182,30 +181,20 @@ const handleSelectOutputDir = async () => {
   }
 }
 
-const handleAddOutputDirToGallery = async (event: Event) => {
-  event.preventDefault()
+// pendingOutputDir 的生命周期与对话框解耦：确认按钮实际渲染的是 reka-ui 的 DialogClose，
+// 它会先同步触发 update:open(false)，本回调在其之后才执行。所以待处理目录只能在这里自行持有，
+// 不能在 update:open 里清空，否则会读到空值导致扫描请求发不出去。
+const handleAddOutputDirToGallery = async () => {
   const outputDir = pendingOutputDir.value
+  pendingOutputDir.value = ''
   if (!outputDir) return
 
-  isAddingOutputDirToGallery.value = true
   try {
     await galleryApi.startScanAssets({ directory: outputDir })
-    isOutputDirGalleryDialogOpen.value = false
-    pendingOutputDir.value = ''
   } catch (error) {
     toast.error(t('settings.function.outputDir.galleryDialog.addFailedTitle'), {
       description: error instanceof Error ? error.message : String(error),
     })
-  } finally {
-    isAddingOutputDirToGallery.value = false
-  }
-}
-
-const handleOutputDirGalleryDialogOpenChange = (open: boolean) => {
-  if (isAddingOutputDirToGallery.value) return
-  isOutputDirGalleryDialogOpen.value = open
-  if (!open) {
-    pendingOutputDir.value = ''
   }
 }
 
@@ -284,10 +273,7 @@ const handleResetSettings = async () => {
   </div>
 
   <div v-else class="w-full">
-    <AlertDialog
-      :open="isOutputDirGalleryDialogOpen"
-      @update:open="handleOutputDirGalleryDialogOpenChange"
-    >
+    <AlertDialog v-model:open="isOutputDirGalleryDialogOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
@@ -298,13 +284,10 @@ const handleResetSettings = async () => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="isAddingOutputDirToGallery">
+          <AlertDialogCancel>
             {{ t('settings.function.outputDir.galleryDialog.cancel') }}
           </AlertDialogCancel>
-          <AlertDialogAction
-            :disabled="isAddingOutputDirToGallery"
-            @click="handleAddOutputDirToGallery"
-          >
+          <AlertDialogAction @click="handleAddOutputDirToGallery">
             {{ t('settings.function.outputDir.galleryDialog.add') }}
           </AlertDialogAction>
         </AlertDialogFooter>
