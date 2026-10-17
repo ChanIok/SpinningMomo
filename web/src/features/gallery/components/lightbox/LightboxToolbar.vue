@@ -95,8 +95,22 @@ const hasReviewFilter = computed(
   () => (store.filter.ratings?.length ?? 0) > 0 || store.filter.reviewFlag !== undefined
 )
 
+/**
+ * 暗房工具条是压在媒体上的浮层，交互态统一走中性遮罩，不复用 sidebar token。
+ * 全条共用一个悬停档位，避免同一行出现两种悬停强度。
+ */
+const toolbarButtonClass =
+  'text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15'
+/**
+ * 选中态必须比悬停态更重才读得出来，所以这里连带覆盖 hover/active 的遮罩强度，
+ * 否则悬停选中按钮会把它从 20% 拉回 10%。
+ */
 const toggleActiveClass =
-  'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
+  'bg-black/20 font-medium text-primary hover:bg-black/20 hover:text-primary active:bg-black/25 dark:bg-white/20 dark:hover:bg-white/20 dark:active:bg-white/25 [&_svg]:text-primary'
+// 返回按钮两种模式共用：紧凑档保留 40×40 触屏热区与 20px 图标，桌面档与工具条其余控件同为 32×32 / 16px。
+const backButtonSize = computed(() => (props.compressed ? ('icon' as const) : ('icon-sm' as const)))
+const backButtonBoxClass = computed(() => props.compressed && 'h-10 w-10')
+const backButtonIconClass = computed(() => (props.compressed ? 'size-5' : 'size-4'))
 
 function handleRotateClick(event: MouseEvent) {
   emit('rotate', event.altKey ? -90 : 90)
@@ -132,12 +146,13 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <TooltipTrigger as-child>
             <Button
               variant="ghost"
-              size="icon"
-              class="h-10 w-10 shrink-0 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              :size="backButtonSize"
+              class="shrink-0"
+              :class="cn(toolbarButtonClass, backButtonBoxClass)"
               :aria-label="t('gallery.lightbox.toolbar.backTitle')"
               @click="emit('back')"
             >
-              <ChevronLeft class="size-5" :stroke-width="1.5" />
+              <ChevronLeft :class="backButtonIconClass" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -168,8 +183,10 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Button
               variant="ghost"
               size="icon"
-              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
-              :class="props.detailsOpen ? 'text-primary hover:text-primary' : ''"
+              class="h-10 w-10"
+              :class="
+                cn(toolbarButtonClass, props.detailsOpen && 'text-primary hover:text-primary')
+              "
               :aria-label="t('gallery.lightbox.toolbar.detailsTitle')"
               @click="emit('toggleDetails')"
             >
@@ -186,7 +203,8 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Button
               variant="ghost"
               size="icon"
-              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              class="h-10 w-10"
+              :class="toolbarButtonClass"
               :aria-label="
                 isImmersive
                   ? t('gallery.lightbox.toolbar.exitImmersiveTitle')
@@ -219,11 +237,12 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
-                  variant="sidebarGhost"
+                  variant="ghost"
                   class="h-8 px-2.5 text-xs"
                   :disabled="!supportsZoom"
                   :class="
                     cn(
+                      toolbarButtonClass,
                       !supportsZoom && 'cursor-not-allowed',
                       supportsZoom && isFitMode && toggleActiveClass
                     )
@@ -242,11 +261,12 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
-                  variant="sidebarGhost"
+                  variant="ghost"
                   class="h-8 px-2.5 text-xs"
                   :disabled="!supportsZoom"
                   :class="
                     cn(
+                      toolbarButtonClass,
                       !supportsZoom && 'cursor-not-allowed',
                       supportsZoom && isActualSize && toggleActiveClass
                     )
@@ -267,13 +287,13 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="sidebarGhost"
+                variant="ghost"
                 size="icon-sm"
                 :disabled="!supportsZoom"
-                :class="!supportsZoom && 'cursor-not-allowed'"
+                :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
                 @click="emit('zoomOut')"
               >
-                <ZoomOut class="size-4" />
+                <ZoomOut class="size-4" :stroke-width="1.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -285,13 +305,13 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="sidebarGhost"
+                variant="ghost"
                 size="icon-sm"
                 :disabled="!supportsZoom"
-                :class="!supportsZoom && 'cursor-not-allowed'"
+                :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
                 @click="emit('zoomIn')"
               >
-                <ZoomIn class="size-4" />
+                <ZoomIn class="size-4" :stroke-width="1.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -305,12 +325,13 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip v-if="supportsRotate">
           <TooltipTrigger as-child>
             <Button
-              variant="sidebarGhost"
+              variant="ghost"
               size="icon-sm"
               class="mr-2 hidden @min-[420px]:inline-flex"
+              :class="toolbarButtonClass"
               @click="handleRotateClick"
             >
-              <RotateCw class="size-4" />
+              <RotateCw class="size-4" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -330,11 +351,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               <Popover>
                 <PopoverTrigger as-child>
                   <Button
-                    variant="sidebarGhost"
+                    variant="ghost"
                     size="icon-sm"
-                    :class="hasReviewFilter ? 'text-primary' : ''"
+                    :class="cn(toolbarButtonClass, hasReviewFilter && 'text-primary')"
                   >
-                    <Flag class="size-4" />
+                    <Flag class="size-4" :stroke-width="1.5" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" class="w-56 p-3">
@@ -357,12 +378,12 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="sidebarGhost"
+              variant="ghost"
               size="icon-sm"
-              :class="showFilmstrip ? toggleActiveClass : ''"
+              :class="cn(toolbarButtonClass, showFilmstrip && toggleActiveClass)"
               @click="emit('toggleFilmstrip')"
             >
-              <Film class="size-4 rotate-90" />
+              <Film class="size-4 rotate-90" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
@@ -382,12 +403,12 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <TooltipTrigger as-child>
             <Button
               variant="ghost"
-              size="icon"
-              class="h-10 w-10 text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15"
+              size="icon-sm"
+              :class="toolbarButtonClass"
               @click="emit('toggleImmersive')"
             >
-              <Minimize v-if="isImmersive" class="size-5" :stroke-width="1.5" />
-              <Maximize v-else class="size-5" :stroke-width="1.5" />
+              <Minimize v-if="isImmersive" class="size-4" :stroke-width="1.5" />
+              <Maximize v-else class="size-4" :stroke-width="1.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="flex items-center gap-2">
