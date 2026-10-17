@@ -70,16 +70,16 @@ namespace utils::string {
       value, [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; });
 }
 
-// 格式化时间戳为文件名安全的字符串
-[[nodiscard]] inline auto FormatTimestamp(const std::chrono::system_clock::time_point& time_point)
-    -> std::string {
-  using namespace std::chrono;
+// 生成文件名用的本地时间戳（YYYYMMDD_HHMMSS_mmm）
+// 只读取系统本地时间，不做时区换算：不要改用 std::chrono::current_zone()，
+// 它依赖 ICU 与 tzdb 对系统时区的映射，映射失败会抛异常并中断调用方。
+[[nodiscard]] inline auto FormatLocalTimestamp() -> std::string {
+  SYSTEMTIME local_time{};
+  GetLocalTime(&local_time);
 
-  auto now = time_point;
-  auto local_time = zoned_time{current_zone(), floor<seconds>(now)};
-  auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
-
-  return std::format("{:%Y%m%d_%H%M%S}_{:03d}.png", local_time, ms.count());
+  return std::format("{:04}{:02}{:02}_{:02}{:02}{:02}_{:03}", local_time.wYear, local_time.wMonth,
+                     local_time.wDay, local_time.wHour, local_time.wMinute, local_time.wSecond,
+                     local_time.wMilliseconds);
 }
 
 // Base64编码表

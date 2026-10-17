@@ -135,13 +135,10 @@ auto capture_adb(core::AppState& state) -> void {
     adb_format = features::adb_mode::AdbScreenshotFormat::JPEG;
   }
 
-  // 格式化当前系统时间戳作为截图文件名
-  auto file_path =
-      screenshots_dir /
-      std::filesystem::path(utils::string::FormatTimestamp(std::chrono::system_clock::now()));
-  if (adb_format == features::adb_mode::AdbScreenshotFormat::JPEG) {
-    file_path.replace_extension(L".jpg");
-  }
+  // 生成当前本地时间戳作为截图文件名，扩展名随输出格式
+  auto filename = utils::string::FormatLocalTimestamp();
+  filename += adb_format == features::adb_mode::AdbScreenshotFormat::JPEG ? ".jpg" : ".png";
+  auto file_path = screenshots_dir / std::filesystem::path(filename);
 
   // 构造异步截图完成回调：成功发出系统交互通知，失败上报错误提示
   auto completion_callback = [&state](bool success, const std::wstring& path, std::string error) {

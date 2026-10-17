@@ -140,13 +140,7 @@ auto build_working_output_path(const std::filesystem::path& final_output_path)
 
 auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path {
-  auto filename = utils::string::FormatTimestamp(std::chrono::system_clock::now());
-  auto dot_pos = filename.rfind('.');
-  if (dot_pos != std::string::npos) {
-    filename = filename.substr(0, dot_pos) + ".mp4";
-  } else {
-    filename += ".mp4";
-  }
+  auto filename = utils::string::FormatLocalTimestamp() + ".mp4";
   return output_directory / filename;
 }
 

@@ -388,7 +388,7 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
     }
 
     auto requested_name = std::filesystem::path(
-        utils::string::FromUtf8(utils::string::FormatTimestamp(std::chrono::system_clock::now())));
+        utils::string::FromUtf8(utils::string::FormatLocalTimestamp() + ".png"));
     auto commit_result =
         commit_clipboard_temp_file(app_state, temporary_path, target_folder, requested_name);
     if (!commit_result) {

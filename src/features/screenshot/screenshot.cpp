@@ -789,7 +789,7 @@ auto take_screenshot(core::AppState& app_state, HWND target_window,
     screenshots_dir = output_dir_result.value();
   }
 
-  auto filename = utils::string::FormatTimestamp(std::chrono::system_clock::now());
+  auto filename = utils::string::FormatLocalTimestamp();
   // 用户打开「HDR 截图」且当前输出处于 HDR10 路径时，走 Ultra HDR；否则维持原有 8-bit 流程。
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
@@ -803,13 +803,8 @@ auto take_screenshot(core::AppState& app_state, HWND target_window,
     }
   }
 
-  // Ultra HDR 仅 JPEG 容器；Motion Photo 也用 .jpg，统一在这里改扩展名。
-  if (use_hdr || format == utils::image::ImageFormat::JPEG) {
-    auto dot_pos = filename.rfind('.');
-    if (dot_pos != std::string::npos) {
-      filename = filename.substr(0, dot_pos) + ".jpg";
-    }
-  }
+  // Ultra HDR 仅 JPEG 容器；Motion Photo 也用 .jpg，统一在这里决定扩展名。
+  filename += ((use_hdr || format == utils::image::ImageFormat::JPEG) ? ".jpg" : ".png");
   auto file_path = screenshots_dir / std::filesystem::path(filename);
 
   // 自动初始化系统（如果尚未初始化）
