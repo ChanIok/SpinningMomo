@@ -96,17 +96,31 @@ const hasReviewFilter = computed(
 )
 
 /**
- * 暗房工具条是压在媒体上的浮层，交互态统一走中性遮罩，不复用 sidebar token。
- * 全条共用一个悬停档位，避免同一行出现两种悬停强度。
+ * 工具条横跨两种形态：非紧凑且非沉浸时它是页内 chrome，和侧栏、图库工具栏落在同一片底上，
+ * 交互态必须沿用 sidebar token；紧凑或沉浸时它压在媒体上，薄遮罩读不出来，只能用中性色。
  */
-const toolbarButtonClass =
-  'text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15'
+const isOverlayChrome = computed(() => props.compressed || isImmersive.value)
+const toolbarVariant = computed(() =>
+  isOverlayChrome.value ? ('ghost' as const) : ('sidebarGhost' as const)
+)
+/** 页内形态的悬停与焦点态由 sidebarGhost 自带，不需要额外类名。 */
+const toolbarButtonClass = computed(() =>
+  isOverlayChrome.value
+    ? 'text-foreground transition-colors hover:bg-black/10 active:bg-black/15 dark:hover:bg-white/10 dark:active:bg-white/15'
+    : ''
+)
 /**
- * 选中态必须比悬停态更重才读得出来，所以这里连带覆盖 hover/active 的遮罩强度，
- * 否则悬停选中按钮会把它从 20% 拉回 10%。
+ * 页内选中态与侧栏文件夹树同源。hover:bg-sidebar-accent 用来压住 sidebarGhost 自带的更浅悬停背景，
+ * 否则悬停已选中的按钮时底色会从 8% 掉回 4%。
  */
-const toggleActiveClass =
+const TOGGLE_ACTIVE_CHROME_CLASS =
+  'bg-sidebar-accent font-medium text-primary hover:bg-sidebar-accent hover:text-primary [&_svg]:text-primary'
+/** 浮层形态压在画面上，中性遮罩必须明显重于页内档位才读得出来。 */
+const TOGGLE_ACTIVE_OVERLAY_CLASS =
   'bg-black/20 font-medium text-primary hover:bg-black/20 hover:text-primary active:bg-black/25 dark:bg-white/20 dark:hover:bg-white/20 dark:active:bg-white/25 [&_svg]:text-primary'
+const toggleActiveClass = computed(() =>
+  isOverlayChrome.value ? TOGGLE_ACTIVE_OVERLAY_CLASS : TOGGLE_ACTIVE_CHROME_CLASS
+)
 // 返回按钮两种模式共用：紧凑档保留 40×40 触屏热区与 20px 图标，桌面档与工具条其余控件同为 32×32 / 16px。
 const backButtonSize = computed(() => (props.compressed ? ('icon' as const) : ('icon-sm' as const)))
 const backButtonBoxClass = computed(() => props.compressed && 'h-10 w-10')
@@ -145,7 +159,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               :size="backButtonSize"
               class="shrink-0"
               :class="cn(toolbarButtonClass, backButtonBoxClass)"
@@ -181,7 +195,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               size="icon"
               class="h-10 w-10"
               :class="
@@ -201,7 +215,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               size="icon"
               class="h-10 w-10"
               :class="toolbarButtonClass"
@@ -230,14 +244,16 @@ function handleToolbarContextMenu(event: MouseEvent) {
       </div>
 
       <!-- 桌面模式右侧：三阶渐进响应（>=600px 完整、420px~599px 图标、<420px 仅底片栏与沉浸） -->
-      <div v-else class="flex items-center gap-2">
-        <div class="mr-2 hidden items-center gap-1 @min-[420px]:flex">
+      <!-- 外层是 items-start，三块区域必须各自声明同一行高，否则右侧会按最高的子按钮收缩并顶对齐 -->
+      <!-- 全行只用 gap-2 一档间距，不再用 mr-2 表达分组：gap 与 margin 会叠加，组间距会变成 16px 的意外值 -->
+      <div v-else class="flex h-12 items-center gap-2">
+        <div class="hidden items-center gap-2 @min-[420px]:flex">
           <!-- 适屏与 1:1 文字按钮：>= 600px 显示 -->
-          <div class="hidden items-center gap-1 @min-[600px]:flex">
+          <div class="hidden items-center gap-2 @min-[600px]:flex">
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
-                  variant="ghost"
+                  :variant="toolbarVariant"
                   class="h-8 px-2.5 text-xs"
                   :disabled="!supportsZoom"
                   :class="
@@ -261,7 +277,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button
-                  variant="ghost"
+                  :variant="toolbarVariant"
                   class="h-8 px-2.5 text-xs"
                   :disabled="!supportsZoom"
                   :class="
@@ -287,7 +303,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="ghost"
+                :variant="toolbarVariant"
                 size="icon-sm"
                 :disabled="!supportsZoom"
                 :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
@@ -305,7 +321,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
-                variant="ghost"
+                :variant="toolbarVariant"
                 size="icon-sm"
                 :disabled="!supportsZoom"
                 :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
@@ -325,9 +341,9 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip v-if="supportsRotate">
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               size="icon-sm"
-              class="mr-2 hidden @min-[420px]:inline-flex"
+              class="hidden @min-[420px]:inline-flex"
               :class="toolbarButtonClass"
               @click="handleRotateClick"
             >
@@ -351,9 +367,9 @@ function handleToolbarContextMenu(event: MouseEvent) {
               <Popover>
                 <PopoverTrigger as-child>
                   <Button
-                    variant="ghost"
+                    :variant="toolbarVariant"
                     size="icon-sm"
-                    :class="cn(toolbarButtonClass, hasReviewFilter && 'text-primary')"
+                    :class="cn(toolbarButtonClass, hasReviewFilter && toggleActiveClass)"
                   >
                     <Flag class="size-4" :stroke-width="1.5" />
                   </Button>
@@ -378,7 +394,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               size="icon-sm"
               :class="cn(toolbarButtonClass, showFilmstrip && toggleActiveClass)"
               @click="emit('toggleFilmstrip')"
@@ -402,7 +418,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
-              variant="ghost"
+              :variant="toolbarVariant"
               size="icon-sm"
               :class="toolbarButtonClass"
               @click="emit('toggleImmersive')"
