@@ -9,6 +9,7 @@ using utils::path::IsPathWithinBase;
 using utils::path::NormalizeForComparison;
 using utils::path::PathStorageKind;
 using utils::path::TryParseUncServer;
+using utils::path::TryResolveNetworkServer;
 
 // 标准 UNC 与扩展 UNC 路径都应解析出同一个服务器段
 TEST_CASE("UNC parser accepts supported Windows network path forms") {
@@ -35,14 +36,28 @@ TEST_CASE("UNC parser rejects local and incomplete paths") {
   CHECK_FALSE(TryParseUncServer(LR"(relative\photo.jpg)").has_value());
 }
 
-// 存储分类只把具备服务器与共享段的 UNC 路径视为远程位置
-TEST_CASE("storage kind distinguishes UNC paths from local paths") {
-  CHECK(ClassifyPathStorageKind(LR"(\\server\share\photo.jpg)") == PathStorageKind::RemoteUnc);
-  CHECK(ClassifyPathStorageKind(LR"(\\?\UNC\server\share\photo.jpg)") ==
-        PathStorageKind::RemoteUnc);
+// 存储分类只把能解析出网络位置 server 的路径视为远程位置。
+// 盘符路径由网络提供者判定：映射网络驱动器算远程，普通本地盘算本地。
+TEST_CASE("storage kind distinguishes network paths from local paths") {
+  CHECK(ClassifyPathStorageKind(LR"(\\server\share\photo.jpg)") == PathStorageKind::Remote);
+  CHECK(ClassifyPathStorageKind(LR"(\\?\UNC\server\share\photo.jpg)") == PathStorageKind::Remote);
   CHECK(ClassifyPathStorageKind(LR"(C:\Photos\photo.jpg)") == PathStorageKind::Local);
   CHECK(ClassifyPathStorageKind(LR"(\\?\C:\Photos\photo.jpg)") == PathStorageKind::Local);
   CHECK(ClassifyPathStorageKind(LR"(relative\photo.jpg)") == PathStorageKind::Local);
+}
+
+// UNC 路径按语法解析；盘符路径回退到网络提供者查询映射目标。
+TEST_CASE("network server resolution covers UNC syntax and mapped drive letters") {
+  const auto unc_server = TryResolveNetworkServer(LR"(\\server\share\photo.jpg)");
+  const auto extended_server = TryResolveNetworkServer(LR"(\\?\UNC\server\share\photo.jpg)");
+
+  REQUIRE(unc_server.has_value());
+  REQUIRE(extended_server.has_value());
+  CHECK(*unc_server == L"server");
+  CHECK(*extended_server == L"server");
+
+  // 相对路径没有盘符，不需要也没有办法查询网络提供者。
+  CHECK_FALSE(TryResolveNetworkServer(LR"(relative\photo.jpg)").has_value());
 }
 
 // 比较键统一 Windows 大小写、分隔符和 lexical 冗余段

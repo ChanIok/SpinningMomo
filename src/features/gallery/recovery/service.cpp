@@ -101,9 +101,10 @@ auto is_path_under_root(const std::string& path_key, const std::string& root_key
   return path_key.size() > root_key.size() && path_key[root_key.size()] == '/';
 }
 
-auto is_unc_root(const std::filesystem::path& root_path) -> bool {
-  // USN 是本地 NTFS 卷语义；UNC 的结论可由路径形态直接决定，不能先碰卷 API。
-  return utils::path::ClassifyPathStorageKind(root_path) == utils::path::PathStorageKind::RemoteUnc;
+auto is_remote_root(const std::filesystem::path& root_path) -> bool {
+  // USN 是本地 NTFS 卷语义，网络位置没有本地卷。这里在卷查询前短路，
+  // 避免对不可达网络路径调用会阻塞的卷 API。映射网络驱动器同样属于网络位置。
+  return utils::path::ClassifyPathStorageKind(root_path) == utils::path::PathStorageKind::Remote;
 }
 
 auto strip_extended_path_prefix(std::wstring value) -> std::wstring {
@@ -155,9 +156,9 @@ auto query_journal_snapshot(const std::filesystem::path& root_path)
     -> std::expected<JournalSnapshot, std::string> {
   JournalSnapshot snapshot;
 
-  if (is_unc_root(root_path)) {
-    // GetVolumePathNameW 对不可达 UNC 也可能阻塞；这里必须在卷查询前短路。
-    snapshot.reason = "UNC roots do not expose a local USN journal";
+  if (is_remote_root(root_path)) {
+    // GetVolumePathNameW 对不可达网络路径也可能阻塞；这里必须在卷查询前短路。
+    snapshot.reason = "remote roots do not expose a local USN journal";
     return snapshot;
   }
 
@@ -574,9 +575,9 @@ auto prepare_startup_recovery(core::AppState& app_state, const std::filesystem::
     return plan;
   }
 
-  if (detail::is_unc_root(*normalized_root_result)) {
+  if (detail::is_remote_root(*normalized_root_result)) {
     plan.mode = StartupRecoveryMode::FullScan;
-    plan.reason = "UNC roots do not use USN startup recovery";
+    plan.reason = "remote roots do not use USN startup recovery";
     return plan;
   }
 

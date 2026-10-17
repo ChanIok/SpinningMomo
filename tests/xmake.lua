@@ -20,7 +20,7 @@ target("SpinningMomoTests")
     add_files("utils/path_test.cpp")
 
     add_packages("vcpkg::doctest", "vcpkg::spdlog")
-    add_links("shell32", "ole32")
+    add_links("shell32", "ole32", "Mpr")
     add_tests("default")
 
 target("SpinningMomoScenarioWindow")

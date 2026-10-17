@@ -311,7 +311,7 @@ auto get_folder_tree(core::AppState& app_state)
                         .created_at = folder.created_at,
                         .updated_at = folder.updated_at,
                         .is_network = utils::path::ClassifyPathStorageKind(std::filesystem::path(
-                                          folder.path)) == utils::path::PathStorageKind::RemoteUnc,
+                                          folder.path)) == utils::path::PathStorageKind::Remote,
                         .children = {}};
 
     node_map[folder.id] = std::move(node);

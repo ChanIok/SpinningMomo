@@ -100,7 +100,8 @@ auto initialize(core::AppState& app_state) -> std::expected<void, std::string> {
       continue;
     }
 
-    auto server = utils::path::TryParseUncServer(normalized_path);
+    // 映射网络驱动器也走这里：盘符先解析回 UNC，才能拿到要探测的 server。
+    auto server = utils::path::TryResolveNetworkServer(normalized_path);
     if (!server) {
       detail::store_availability(app_state, folder.id, normalized_path,
                                  features::gallery::RootAvailability::RemoteUnreachable);

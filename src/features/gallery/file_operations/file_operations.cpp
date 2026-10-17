@@ -137,8 +137,9 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
 
     const auto& asset = asset_result->value();
     std::filesystem::path file_path(asset.path);
+    // 网络位置（含映射网络驱动器）没有 Windows 回收站，只能永久删除。
     const bool permanent = permanent_mode || utils::path::ClassifyPathStorageKind(file_path) ==
-                                                 utils::path::PathStorageKind::RemoteUnc;
+                                                 utils::path::PathStorageKind::Remote;
     std::error_code ec;
     bool file_exists = std::filesystem::exists(file_path, ec);
     if (ec) {

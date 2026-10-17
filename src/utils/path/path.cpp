@@ -4,6 +4,7 @@
 
 #include "vendor/windows.hpp"
 #include "vendor/windows/shlobj_core.hpp"
+#include "vendor/windows/winnetwk.hpp"
 
 namespace utils::path::detail {
 
@@ -315,6 +316,42 @@ auto utils::path::NormalizePath(const std::filesystem::path& path,
   }
 }
 
+namespace utils::path::detail {
+
+// 盘符路径可能指向映射网络驱动器。Windows 只有网络提供者保存着盘符到 UNC 目标的映射，
+// 因此这里必须查询它，不能靠路径形态推断。
+auto resolve_mapped_drive_unc(const std::filesystem::path& path)
+    -> std::optional<std::filesystem::path> {
+  const auto drive = path.root_name().wstring();
+  if (drive.size() != 2 || drive[1] != L':') {
+    return std::nullopt;
+  }
+  const auto letter = drive[0];
+  if (!((letter >= L'A' && letter <= L'Z') || (letter >= L'a' && letter <= L'z'))) {
+    return std::nullopt;
+  }
+
+  DWORD length = MAX_PATH;
+  std::wstring buffer(MAX_PATH, L'\0');
+  auto status = WNetGetConnectionW(drive.c_str(), buffer.data(), &length);
+  if (status == ERROR_MORE_DATA) {
+    // length 已被填入所需字符数，按它重新取一次即可。
+    buffer.assign(length, L'\0');
+    status = WNetGetConnectionW(drive.c_str(), buffer.data(), &length);
+  }
+  if (status != NO_ERROR) {
+    // 典型情况：盘符未映射，或当前登录会话看不到该映射（进程已提权）。
+    return std::nullopt;
+  }
+
+  buffer.resize(std::wcslen(buffer.c_str()));
+  const auto remote_root = std::filesystem::path(buffer);
+  const auto relative = path.relative_path();
+  return relative.empty() ? remote_root : (remote_root / relative).lexically_normal();
+}
+
+}  // namespace utils::path::detail
+
 auto utils::path::TryParseUncServer(const std::filesystem::path& path)
     -> std::optional<std::wstring> {
   auto value = path.wstring();
@@ -343,8 +380,26 @@ auto utils::path::TryParseUncServer(const std::filesystem::path& path)
   return server;
 }
 
+auto utils::path::TryResolveNetworkServer(const std::filesystem::path& path)
+    -> std::optional<std::wstring> {
+  // UNC 路径按语法直接解析；盘符路径先查网络提供者拿到它真正的 UNC 目标。
+  auto server = TryParseUncServer(path);
+  if (server.has_value()) {
+    return server;
+  }
+
+  auto mapped_unc = detail::resolve_mapped_drive_unc(path);
+  if (!mapped_unc.has_value()) {
+    return std::nullopt;
+  }
+  return TryParseUncServer(*mapped_unc);
+}
+
 auto utils::path::ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind {
-  return TryParseUncServer(path).has_value() ? PathStorageKind::RemoteUnc : PathStorageKind::Local;
+  // 映射网络驱动器在语法上与本地盘符完全相同，只有网络提供者知道它指向哪个 UNC 目标，
+  // 因此分类必须走 TryResolveNetworkServer，不能只看路径形态。
+  return TryResolveNetworkServer(path).has_value() ? PathStorageKind::Remote
+                                                   : PathStorageKind::Local;
 }
 
 // 把路径转成适合比较的统一形式：先 lexically_normal 消除冗余分隔符，

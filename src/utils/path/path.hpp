@@ -11,9 +11,10 @@ enum class AppMode {
   Installed,
 };
 
+// 路径所在存储的类别。Remote 表示网络位置，包括 UNC 路径和映射到盘符的网络驱动器。
 enum class PathStorageKind {
   Local,
-  RemoteUnc,
+  Remote,
 };
 
 // 获取当前程序所在的目录路径
@@ -58,11 +59,19 @@ auto NormalizePath(const std::filesystem::path& path,
                    std::optional<std::filesystem::path> base = std::nullopt)
     -> std::expected<std::filesystem::path, std::string>;
 
-// 纯字符串判断路径存储类型，不访问文件系统。
-auto ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind;
-
 // 从 UNC 路径中提取 server 名称；支持 \\server\share 与 \\?\UNC\server\share。
+// 纯字符串解析，不访问文件系统或网络提供者。
 auto TryParseUncServer(const std::filesystem::path& path) -> std::optional<std::wstring>;
+
+// 解析路径所在网络位置的 server 名称，覆盖两种网络位置形态：
+// - UNC 路径：直接按语法解析；
+// - 映射网络驱动器（如 Z:\Photos）：语法上是普通盘符，需要向网络提供者查询盘符对应的
+//   UNC 目标后再解析。
+// 当前登录会话看不到该盘符映射时（例如进程已提权）返回 nullopt，此时无法判定为网络位置。
+auto TryResolveNetworkServer(const std::filesystem::path& path) -> std::optional<std::wstring>;
+
+// 判断路径位于本地存储还是网络位置。会向网络提供者查询盘符映射，不是纯字符串判断。
+auto ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind;
 
 // 获取用户视频文件夹路径 (FOLDERID_Videos)
 auto GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string>;
