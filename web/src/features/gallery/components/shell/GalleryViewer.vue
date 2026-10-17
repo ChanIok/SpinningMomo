@@ -501,7 +501,8 @@ function handleContentContextMenu(event: MouseEvent) {
     return
   }
 
-  // 背景右键只切换菜单上下文，不改变当前选区；“选择”子菜单需要基于现有选区执行反选。
+  // 背景右键先退出单张选中；多选保留选区，供“选择 > 反选”基于现有选区执行。
+  dismissSingleSelectionOnBlank(event.target)
   store.openContextMenuForBackground(event)
 }
 
@@ -509,6 +510,39 @@ function handleContentPointerDown(event: PointerEvent) {
   if (event.isPrimary !== false) {
     lastInputType.value = normalizeGalleryInputType(event.pointerType)
   }
+}
+
+// 空白点击等价于“轻量 ESC”：只取消桌面浏览态下的单张选中。
+function handleContentClick(event: MouseEvent) {
+  dismissSingleSelectionOnBlank(event.target)
+}
+
+// 空白表面上的“退出单张选中”：桌面浏览态、恰好一张选中、且落点为空白时才生效。
+// 桌面多选（≥2 张）属于批量流程，移动端点击语义与多选模式都不参与这套退出逻辑。
+function dismissSingleSelectionOnBlank(target: EventTarget | null) {
+  if (store.isCompactWindow || store.selection.mode === 'multi-select') {
+    return
+  }
+
+  if (store.selectedCount !== 1) {
+    return
+  }
+
+  if (!isGalleryBlankTarget(target)) {
+    return
+  }
+
+  // 与 ESC 走同一出口：清空选区并收起详情焦点。
+  gallerySelection.clearSelection()
+}
+
+// 卡片、列表行、时间线滚动轨道和可交互元素都不算空白表面。
+function isGalleryBlankTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || isEditableTarget(target)) {
+    return false
+  }
+
+  return !target.closest('[data-asset-card], [data-asset-list-row], .timeline-scrollbar, button, a')
 }
 
 // 区分资源管理器文件与图库内部资产拖拽，避免两套 drop 语义互相抢占。
@@ -693,6 +727,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
         :class="store.isCompactWindow && 'gallery-compact-touch-surface'"
         :style="galleryViewportStyle"
         @pointerdown="handleContentPointerDown"
+        @click="handleContentClick"
         @contextmenu="handleContentContextMenu"
         @dragenter="handleViewerDragEnter"
         @dragover="handleViewerDragOver"

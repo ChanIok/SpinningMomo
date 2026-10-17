@@ -7,7 +7,6 @@ import { useOriginalPreviewWorker } from '../../composables/useOriginalPreviewWo
 import { useGalleryStore } from '../../store'
 import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../../types'
-import { MIN_ORIGINAL_CARD_SHORT_EDGE_PX } from '../../constants'
 import {
   isGalleryTouchContextMenu,
   isGalleryTouchInput,
@@ -84,12 +83,6 @@ const originalUrl = computed(() => getAssetUrl(props.asset))
 const supportsOriginalCardImage = computed(
   () =>
     useOriginalImagesForCards.value && props.asset.type === 'photo' && originalUrl.value.length > 0
-)
-const suppressHoverMask = computed(
-  () =>
-    supportsOriginalCardImage.value &&
-    props.originalPreviewShortEdge * (window.devicePixelRatio || 1) >=
-      MIN_ORIGINAL_CARD_SHORT_EDGE_PX
 )
 const isOriginalUpgradeAllowed = computed(
   () =>
@@ -594,15 +587,8 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         <div class="mt-2 px-2 text-center text-xs font-medium">加载失败</div>
       </div>
 
-      <!-- 遮罩层 -->
-      <div
-        data-selection-mask
-        class="absolute inset-0 bg-black/0 transition-all duration-200"
-        :class="{
-          'bg-black/30': showSelectionVisual,
-          'group-hover:bg-black/10': !showSelectionVisual && !suppressHoverMask,
-        }"
-      />
+      <!-- 选中遮罩：只在选中时渲染，悬停不再压暗画面。 -->
+      <div v-if="showSelectionVisual" data-selection-mask class="absolute inset-0 bg-black/20" />
 
       <div
         v-if="isVideoAsset"
