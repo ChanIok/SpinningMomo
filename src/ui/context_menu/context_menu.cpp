@@ -152,7 +152,9 @@ void handle_menu_action(core::AppState& state, const ui::context_menu::MenuItem&
       try {
         auto action_id = std::any_cast<std::string>(action.data);
 
-        core::commands::invoke_command(state, action_id);
+        if (auto result = core::commands::invoke_command(state, action_id); !result) {
+          core::commands::report_command_failure(state, action_id, result.error());
+        }
 
         Logger().info("Feature action triggered: {}", action_id);
       } catch (const std::bad_any_cast& e) {

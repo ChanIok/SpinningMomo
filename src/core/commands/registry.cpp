@@ -6,6 +6,9 @@
 
 #include "core/commands/state.hpp"
 #include "core/commands/types.hpp"
+#include "core/i18n/state.hpp"
+#include "core/i18n/types.hpp"
+#include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
 #include "features/settings/state.hpp"
 #include "utils/logger/logger.hpp"
@@ -138,28 +141,44 @@ auto uninstall_mouse_hotkey_hook(core::commands::CommandState& cmd_state) -> voi
   }
 }
 
-// 按 ID 调用注册命令，并把查找失败或执行异常统一转换为 false
-auto invoke_command(core::AppState& state, const std::string& id) -> bool {
+// 按 ID 调用注册命令；失败原因原样返回，由调用方决定如何呈现
+auto invoke_command(core::AppState& state, const std::string& id)
+    -> std::expected<void, std::string> {
   auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
-    Logger().warn("Command not found: {}", id);
-    return false;
+    return std::unexpected("command not registered");
   }
 
   if (!it->second.action) {
-    Logger().warn("Command has no action: {}", id);
-    return false;
+    return std::unexpected("command has no action");
   }
 
   try {
     it->second.action();
     Logger().debug("Invoked command: {}", id);
-    return true;
+    return {};
   } catch (const std::exception& e) {
-    Logger().error("Failed to invoke command {}: {}", id, e.what());
-    return false;
+    return std::unexpected(e.what());
   }
+}
+
+// 记录失败原因，并用命令自身的 i18n 名称告诉用户是哪一步失败了
+auto report_command_failure(core::AppState& state, const std::string& id, const std::string& reason)
+    -> void {
+  Logger().error("Failed to invoke command {}: {}", id, reason);
+
+  const auto& texts = state.i18n->texts;
+  std::string message = core::i18n::get_text(texts, "message.command_failed");
+  if (const auto* descriptor = get_command(state, id)) {
+    message += ": " + core::i18n::get_text(texts, descriptor->i18n_key);
+  } else {
+    message += ": " + id;
+  }
+  message += " (" + reason + ")";
+
+  core::notifications::show_notification(state, core::i18n::get_text(texts, "label.app_name"),
+                                         message);
 }
 
 // 获取注册表中的命令描述符只读视图，不复制内部回调
@@ -339,7 +358,9 @@ auto handle_hotkey(core::AppState& state, int hotkey_id) -> std::optional<std::s
   if (it != cmd_state.hotkey_to_command.end()) {
     const auto& command_id = it->second;
     Logger().info("Hotkey {} mapped to command '{}', invoking...", hotkey_id, command_id);
-    invoke_command(state, command_id);
+    if (auto result = invoke_command(state, command_id); !result) {
+      report_command_failure(state, command_id, result.error());
+    }
     return command_id;
   }
 

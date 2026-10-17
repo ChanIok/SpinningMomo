@@ -11,8 +11,13 @@ namespace core::commands {
 
 // === API ===
 
-// 调用命令
-auto invoke_command(core::AppState& state, const std::string& id) -> bool;
+// 调用命令；失败时返回可直接展示的原因（未注册 / 无动作 / 动作抛出异常）
+auto invoke_command(core::AppState& state, const std::string& id)
+    -> std::expected<void, std::string>;
+
+// 把命令失败呈现给用户：记录日志并弹出带命令名称与原因的提示（需在 UI 线程调用）
+auto report_command_failure(core::AppState& state, const std::string& id, const std::string& reason)
+    -> void;
 
 // 获取单个命令描述符（零拷贝，只读）
 auto get_command(const core::AppState& state, const std::string& id) -> const CommandDescriptor*;

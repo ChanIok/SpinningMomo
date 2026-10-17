@@ -97,7 +97,9 @@ auto dispatch_item_click_event(core::AppState& state, const ui::floating_window:
     }
     case ui::floating_window::MenuItemCategory::Feature: {
       // 通过注册表调用命令
-      core::commands::invoke_command(state, item.action_id);
+      if (auto result = core::commands::invoke_command(state, item.action_id); !result) {
+        core::commands::report_command_failure(state, item.action_id, result.error());
+      }
       break;
     }
   }

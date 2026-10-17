@@ -40,15 +40,14 @@ auto handle_invoke_command(core::AppState& app_state,
                               .message = "Command id cannot be empty"});
     }
 
-    const auto success = core::commands::invoke_command(app_state, params.id);
+    const auto result = core::commands::invoke_command(app_state, params.id);
 
-    core::commands::InvokeCommandResult result{
-        .success = success,
-        .message =
-            success ? "Command invoked successfully" : "Command not found or failed: " + params.id,
+    core::commands::InvokeCommandResult invoke_result{
+        .success = result.has_value(),
+        .message = result ? "Command invoked successfully" : result.error(),
     };
 
-    co_return result;
+    co_return invoke_result;
   } catch (const std::exception& e) {
     co_return std::unexpected(
         core::rpc::RpcError{.code = static_cast<int>(core::rpc::ErrorCode::ServerError),

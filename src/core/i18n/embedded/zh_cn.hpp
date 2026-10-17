@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded Chinese JSON content as string_view
-// Size: 5785 bytes
+// Size: 5829 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -72,6 +72,7 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "adb.error.bind_stream_socket_failed": "绑定录制流通信端口失败: {message}",
   "adb.error.start_recording_failed": "录制启动失败: {message}",
 
+  "message.command_failed": "操作失败",
   "message.screenshot_success": "截图已保存：",
   "message.screenshot_failed": "截图失败",
   "message.screenshot_jpeg_failed": "JPEG 保存失败",

@@ -11,7 +11,7 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 6071 bytes
+// Size: 6116 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -72,6 +72,7 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "adb.error.bind_stream_socket_failed": "Failed to bind recording stream socket: {message}",
   "adb.error.start_recording_failed": "Failed to start recording: {message}",
 
+  "message.command_failed": "Action failed",
   "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",
   "message.screenshot_jpeg_failed": "Failed to save JPEG",
