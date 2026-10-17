@@ -28,6 +28,10 @@ const store = useGalleryStore()
 const settingsStore = useSettingsStore()
 const activeTab = ref<PreferencesTab>('view')
 
+// 亮色下弹窗底为纯白，surface-top（纯白）与底完全重合导致卡片消失；
+// 这里改用 muted 下沉层 + 细描边表达卡片层级，暗色仍沿用 surface-top 的 10% 白色叠加。
+const cardClass = 'bg-muted/20 border-border/60 dark:bg-surface-top dark:border-transparent'
+
 const isInfinityNikkiEnabled = computed(
   () => settingsStore.appSettings.extensions.infinityNikki.enable
 )
@@ -189,7 +193,7 @@ watch(
               <h4 class="text-sm font-medium text-foreground">
                 {{ t('gallery.preferences.view.layout.title') }}
               </h4>
-              <Item variant="surface" size="sm">
+              <Item variant="default" size="sm" :class="cardClass">
                 <ItemContent>
                   <ItemTitle>
                     {{ t('gallery.preferences.view.narrowSpacing.title') }}
@@ -202,7 +206,7 @@ watch(
                   <Switch v-model="useNarrowCardSpacing" />
                 </ItemActions>
               </Item>
-              <Item variant="surface" size="sm">
+              <Item variant="default" size="sm" :class="cardClass">
                 <ItemContent>
                   <ItemTitle>
                     {{ t('gallery.preferences.view.squareCorners.title') }}
@@ -221,7 +225,7 @@ watch(
               <h4 class="text-sm font-medium text-foreground">
                 {{ t('gallery.preferences.view.image.title') }}
               </h4>
-              <Item variant="surface" size="sm">
+              <Item variant="default" size="sm" :class="cardClass">
                 <ItemContent>
                   <ItemTitle>
                     {{ t('gallery.preferences.view.originalImages.title') }}
@@ -241,7 +245,7 @@ watch(
                 {{ t('gallery.preferences.view.markers.title') }}
               </h4>
               <div class="space-y-2">
-                <Item variant="surface" size="sm">
+                <Item variant="default" size="sm" :class="cardClass">
                   <ItemContent>
                     <ItemTitle>
                       {{ t('gallery.preferences.view.rating.title') }}
@@ -255,7 +259,7 @@ watch(
                   </ItemActions>
                 </Item>
 
-                <Item v-if="isInfinityNikkiEnabled" variant="surface" size="sm">
+                <Item v-if="isInfinityNikkiEnabled" variant="default" size="sm" :class="cardClass">
                   <ItemContent>
                     <ItemTitle>
                       {{ t('gallery.preferences.view.dyeCode.title') }}
@@ -269,7 +273,7 @@ watch(
                   </ItemActions>
                 </Item>
 
-                <Item variant="surface" size="sm">
+                <Item variant="default" size="sm" :class="cardClass">
                   <ItemContent>
                     <ItemTitle>
                       {{ t('gallery.preferences.view.tags.title') }}
@@ -297,7 +301,7 @@ watch(
             </div>
 
             <div class="space-y-2">
-              <Item variant="surface" size="sm">
+              <Item variant="default" size="sm" :class="cardClass">
                 <ItemContent>
                   <ItemTitle>
                     {{ t('gallery.preferences.deletion.mode.title') }}
@@ -323,7 +327,12 @@ watch(
                 </ItemActions>
               </Item>
 
-              <Item v-if="deleteMode === 'recycleBin'" variant="surface" size="sm">
+              <Item
+                v-if="deleteMode === 'recycleBin'"
+                variant="default"
+                size="sm"
+                :class="cardClass"
+              >
                 <ItemContent>
                   <ItemTitle>
                     {{ t('gallery.preferences.deletion.confirm.title') }}
