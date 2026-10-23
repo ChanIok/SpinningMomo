@@ -8,6 +8,7 @@ export interface GallerySettings {
     mode: ViewMode
     dateGrouping: DateGrouping
     useOriginalImagesForCards: boolean
+    preloadOriginalImagesForLightbox: boolean
     useNarrowCardSpacing: boolean
     useSquareCardCorners: boolean
     showRatingBadge: boolean
@@ -43,6 +44,7 @@ export function createDefaultGallerySettings(): GallerySettings {
       mode: 'grid' satisfies ViewMode,
       dateGrouping: 'none' satisfies DateGrouping,
       useOriginalImagesForCards: true,
+      preloadOriginalImagesForLightbox: true,
       useNarrowCardSpacing: false,
       useSquareCardCorners: false,
       showRatingBadge: true,

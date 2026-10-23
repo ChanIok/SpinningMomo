@@ -496,6 +496,8 @@
   "gallery.preferences.view.image.title": "图像显示",
   "gallery.preferences.view.originalImages.title": "照片卡片加载原图",
   "gallery.preferences.view.originalImages.description": "大尺寸浏览更清晰，但加载更慢、内存占用更高。",
+  "gallery.preferences.view.lightboxPreload.title": "暗房预加载原图",
+  "gallery.preferences.view.lightboxPreload.description": "切图更流畅，但内存占用更高。",
   "gallery.preferences.view.markers.title": "卡片标记",
   "gallery.preferences.view.rating.title": "评分标记",
   "gallery.preferences.view.rating.description": "在卡片上显示星级评分。弃置标记不受此开关影响。",

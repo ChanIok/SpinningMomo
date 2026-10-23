@@ -496,6 +496,8 @@
   "gallery.preferences.view.image.title": "Image Display",
   "gallery.preferences.view.originalImages.title": "Load Originals on Photo Cards",
   "gallery.preferences.view.originalImages.description": "Large cards look sharper, but load more slowly and use more memory.",
+  "gallery.preferences.view.lightboxPreload.title": "Preload Originals in Lightbox",
+  "gallery.preferences.view.lightboxPreload.description": "Smoother image navigation, but uses more memory.",
   "gallery.preferences.view.markers.title": "Card Markers",
   "gallery.preferences.view.rating.title": "Rating Marker",
   "gallery.preferences.view.rating.description": "Show star ratings on cards. Rejected markers remain visible.",

@@ -43,6 +43,13 @@ const useOriginalImagesForCards = computed({
   },
 })
 
+const preloadOriginalImagesForLightbox = computed({
+  get: () => store.view.preloadOriginalImagesForLightbox,
+  set: (value: boolean) => {
+    store.view.preloadOriginalImagesForLightbox = value
+  },
+})
+
 const useNarrowCardSpacing = computed({
   get: () => store.view.useNarrowCardSpacing,
   set: (value: boolean) => {
@@ -236,6 +243,19 @@ watch(
                 </ItemContent>
                 <ItemActions>
                   <Switch v-model="useOriginalImagesForCards" />
+                </ItemActions>
+              </Item>
+              <Item variant="default" size="sm" :class="cardClass">
+                <ItemContent>
+                  <ItemTitle>
+                    {{ t('gallery.preferences.view.lightboxPreload.title') }}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {{ t('gallery.preferences.view.lightboxPreload.description') }}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Switch v-model="preloadOriginalImagesForLightbox" />
                 </ItemActions>
               </Item>
             </div>

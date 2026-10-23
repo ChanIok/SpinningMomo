@@ -6,6 +6,7 @@ import { useGalleryLightbox, useLightboxSwipeNavigation } from '../../composable
 import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
 import { useGalleryStore } from '../../store'
 import { heroAnimating } from '../../composables/useHeroTransition'
+import { useLightboxImagePreload } from '../../composables/useLightboxImagePreload'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 
@@ -42,6 +43,7 @@ const props = defineProps<{
 }>()
 
 const store = useGalleryStore()
+const imagePreload = useLightboxImagePreload()
 const lightbox = useGalleryLightbox()
 const pagerRef = ref<HTMLElement | null>(null)
 const imageRef = ref<LightboxImageExposed | null>(null)
@@ -239,7 +241,7 @@ defineExpose({
     @pointerup.capture="handleSwipePointerUp"
     @pointercancel.capture="handleSwipePointerCancel"
   >
-    <!-- 相邻页只渲染缩略图；当前页由独立的图片/视频渲染器负责。 -->
+    <!-- 相邻页复用已解码原图；尚未准备好或视频页继续使用缩略图。 -->
     <div
       v-for="page in swipePreviewPages"
       :key="page.asset.id"
@@ -247,7 +249,9 @@ defineExpose({
       :style="page.style"
     >
       <img
-        :src="galleryApi.getAssetThumbnailUrl(page.asset)"
+        :src="
+          imagePreload.getReadyImage(page.asset)?.src ?? galleryApi.getAssetThumbnailUrl(page.asset)
+        "
         :alt="page.asset.name"
         class="h-full w-full object-contain select-none"
         draggable="false"

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
+import { provideLightboxImagePreload } from '../../composables/useLightboxImagePreload'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -33,7 +34,6 @@ import {
   normalizeGalleryInputType,
 } from '../../input'
 import type { GalleryInputType } from '../../input'
-import type { Asset } from '../../types'
 
 /** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
 const CLOSE_AFTER_REVERSE_HERO_MS = 260
@@ -71,6 +71,7 @@ const props = defineProps<{
 }>()
 
 const store = useGalleryStore()
+provideLightboxImagePreload()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const overlayHistory = useGalleryOverlayHistory()
@@ -97,8 +98,6 @@ let pendingTouchTapTimer: number | null = null
 let immersiveChromeHideTimer: number | null = null
 // inputType 记录打开来源；这里单独记录会话内最近一次指针模态，支持混合触控设备切换。
 const activeInputType = ref<GalleryInputType>('mouse')
-const preloadingAssetIds = new Set<number>()
-const preloadedAssetIds = new Set<number>()
 // 暗房工具栏紧凑模式与窗口级紧凑状态保持一致。
 const isToolbarCompressed = computed(() => store.isCompactWindow)
 const { t } = useI18n()
@@ -110,7 +109,7 @@ watch(isToolbarCompressed, (compressed) => {
   }
 })
 
-// 预加载只由唯一的暗房实例协调，避免 GalleryLightbox/Pager/Image 各自注册重复 watcher。
+// 切图时重置交互；原图预加载由会话内共享的 composable 统一协调。
 watch(
   () => store.selection.activeIndex,
   (newIndex, oldIndex) => {
@@ -122,10 +121,6 @@ watch(
       clearPendingTouchTap()
       store.resetLightboxView()
     }
-
-    void preloadRange(newIndex).catch((error) => {
-      console.warn('Failed to preload lightbox range:', error)
-    })
   },
   { immediate: true }
 )
@@ -214,81 +209,6 @@ watch(
 
 function handleLightboxPointerDown(event: PointerEvent) {
   activeInputType.value = normalizeGalleryInputType(event.pointerType)
-}
-
-function isPreloadableImageAsset(asset: Asset | null): boolean {
-  // 视频交给 <video> 自己按需拉取分片；这里的图片预热只服务 still image 的秒开体验。
-  return asset?.type === 'photo' || asset?.type === 'live_photo'
-}
-
-/** 使用 Image 写入浏览器缓存；预加载状态只属于当前暗房实例。 */
-async function preloadImage(asset: Asset): Promise<void> {
-  if (
-    !isPreloadableImageAsset(asset) ||
-    preloadedAssetIds.has(asset.id) ||
-    preloadingAssetIds.has(asset.id)
-  ) {
-    return
-  }
-
-  preloadingAssetIds.add(asset.id)
-  const url = galleryApi.getAssetUrl(asset)
-
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      preloadingAssetIds.delete(asset.id)
-      preloadedAssetIds.add(asset.id)
-      resolve()
-    }
-    img.onerror = () => {
-      preloadingAssetIds.delete(asset.id)
-      reject(new Error(`Failed to load image: ${asset.id}`))
-    }
-    img.src = url
-  })
-}
-
-async function preloadRange(currentIndex: number) {
-  const PRELOAD_RANGE = 2
-  const start = Math.max(0, currentIndex - PRELOAD_RANGE)
-  const end = Math.min(store.totalCount - 1, currentIndex + PRELOAD_RANGE)
-  const currentAsset = store.getAssetAt(currentIndex)
-  if (!currentAsset) {
-    return
-  }
-
-  if (isPreloadableImageAsset(currentAsset)) {
-    try {
-      await preloadImage(currentAsset)
-    } catch (error) {
-      console.warn(
-        `Failed to preload current image [index=${currentIndex}, id=${currentAsset.id}]`,
-        error
-      )
-    }
-  }
-
-  const preloadPromises: Promise<void>[] = []
-  for (let offset = 1; offset <= PRELOAD_RANGE; offset += 1) {
-    const indexes = [currentIndex + offset, currentIndex - offset]
-    for (const index of indexes) {
-      if (index < start || index > end) {
-        continue
-      }
-
-      const asset = store.getAssetAt(index)
-      if (asset) {
-        preloadPromises.push(
-          preloadImage(asset).catch((error) => {
-            console.warn(`Failed to preload image [index=${index}, id=${asset.id}]`, error)
-          })
-        )
-      }
-    }
-  }
-
-  await Promise.allSettled(preloadPromises)
 }
 
 const throttledPrevious = useThrottleFn(() => {

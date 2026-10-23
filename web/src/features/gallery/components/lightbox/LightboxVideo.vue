@@ -7,9 +7,11 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryStore } from '../../store'
+import { useLightboxImagePreload } from '../../composables/useLightboxImagePreload'
 import { useI18n } from '@/composables/useI18n'
 
 const store = useGalleryStore()
+const imagePreload = useLightboxImagePreload()
 const { t } = useI18n()
 const props = defineProps<{
   touchChromeEnabled: boolean
@@ -20,6 +22,7 @@ const emit = defineEmits<{
 const videoError = ref(false)
 const autoRecovering = ref(false)
 const videoReady = ref(false)
+const videoRef = ref<HTMLVideoElement | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 
@@ -179,7 +182,10 @@ async function tryAutoRecoverByReload() {
 }
 
 // 记录视频错误并启动一次受控的自动恢复。
-function handleVideoError() {
+function handleVideoError(event: Event) {
+  if (event.target !== videoRef.value) {
+    return
+  }
   videoError.value = true
   void tryAutoRecoverByReload().catch((error) => {
     console.warn('Failed to recover lightbox video:', error)
@@ -187,8 +193,12 @@ function handleVideoError() {
 }
 
 // video 有首帧数据后淡入，poster 在此之前继续作为稳定底图。
-function handleVideoLoadedData() {
+function handleVideoLoadedData(event: Event) {
+  if (event.target !== videoRef.value || !currentAsset.value) {
+    return
+  }
   videoReady.value = true
+  imagePreload.notifyCurrentMediaReady(currentAsset.value.id, assetUrl.value)
 }
 </script>
 
@@ -212,6 +222,8 @@ function handleVideoLoadedData() {
           />
 
           <video
+            :key="assetUrl"
+            ref="videoRef"
             :src="assetUrl"
             :poster="posterUrl"
             :aria-label="currentAsset.name"

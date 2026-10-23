@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { galleryApi } from '../../api'
-import { useGalleryData, useGalleryLightbox, useLightboxImageViewport } from '../../composables'
+import { useGalleryLightbox, useLightboxImageViewport } from '../../composables'
+import { useLightboxImagePreload } from '../../composables/useLightboxImagePreload'
 import { useGalleryStore } from '../../store'
 import type { Asset } from '../../types'
 import { useI18n } from '@/composables/useI18n'
@@ -9,7 +10,7 @@ import { useI18n } from '@/composables/useI18n'
 const { t } = useI18n()
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
-const galleryData = useGalleryData()
+const imagePreload = useLightboxImagePreload()
 const emit = defineEmits<{
   ready: [assetId: number]
   'pannable-change': [pannable: boolean]
@@ -20,8 +21,9 @@ const originalLoaded = ref(false)
 // 仅在同一张图原图 load 完成时启用淡入；切图和复原交接不做过渡，避免叠帧。
 const originalOpacityTransition = ref(false)
 const autoRecovering = ref(false)
-// 实际渲染的资产 id；切图时滞后于 selection，直到目标缩略图 decode 完成再切换。
+// 原图已预热时直接切换，否则等目标缩略图加载后再替换当前画面。
 const displayAssetId = ref<number | null>(null)
+const originalUrl = ref('')
 let displaySwapToken = 0
 
 // DOM 引用由组件持有，再交给视口 composable 处理交互和测量。
@@ -63,11 +65,6 @@ const displayAsset = computed(() => {
 const thumbnailUrl = computed(() => {
   if (!displayAsset.value) return ''
   return galleryApi.getAssetThumbnailUrl(displayAsset.value)
-})
-
-const originalUrl = computed(() => {
-  if (!displayAsset.value) return ''
-  return galleryData.getAssetUrl(displayAsset.value)
 })
 
 const fitMode = computed(() => store.lightbox.fitMode)
@@ -156,27 +153,35 @@ function preloadThumbnailForAsset(asset: Asset): Promise<void> {
 }
 
 // 切换当前渲染资产，并在 DOM 更新后通知 Pager 媒体已经可接管中心位置。
-async function commitDisplayAsset(assetId: number) {
+async function commitDisplayAsset(asset: Asset) {
+  const token = displaySwapToken
   originalOpacityTransition.value = false
   resetImageInteraction()
-  displayAssetId.value = assetId
-  originalLoaded.value = false
+  displayAssetId.value = asset.id
+  originalUrl.value = galleryApi.getAssetUrl(asset)
+  // 已解码的原图从首帧起就可见，不再先隐藏原图、等待 load 后淡入。
+  originalLoaded.value = imagePreload.getReadyImage(asset) !== undefined
   imageError.value = false
 
   await nextTick()
+  if (token !== displaySwapToken) {
+    return
+  }
   // 等 viewport 重新布局后再校正滚动位置。
   syncViewportPosition()
   // Pager 用这个事件结束 pending navigation，而不是依赖固定延时。
-  emit('ready', assetId)
+  emit('ready', asset.id)
 }
 
-// 跟随 Pinia activeIndex 切换图片；缩略图准备好后再替换 displayAsset。
+// 只消费已经就绪的原图，不等待正在进行的预加载，保持切图响应优先。
 watch(
-  () => ({
-    targetId: currentAsset.value?.id,
-    activeIndex: store.selection.activeIndex,
-  }),
-  async ({ targetId, activeIndex }) => {
+  [
+    () => store.selection.activeIndex,
+    () => currentAsset.value?.id,
+    () => (currentAsset.value ? galleryApi.getAssetUrl(currentAsset.value) : ''),
+  ],
+  async ([activeIndex, targetId, targetUrl]) => {
+    const token = ++displaySwapToken
     if (activeIndex === undefined) {
       // 灯箱关闭或没有焦点时清空当前渲染对象。
       resetImageInteraction()
@@ -188,24 +193,29 @@ watch(
       return
     }
 
-    if (displayAssetId.value === null) {
-      // 首次挂载无需等待旧图，直接显示当前资源。
-      await commitDisplayAsset(targetId)
-      return
-    }
-
-    if (displayAssetId.value === targetId) {
-      return
-    }
-
     const asset = currentAsset.value
     if (!asset) {
       return
     }
 
-    const token = ++displaySwapToken
-    // 先让目标缩略图进入缓存，避免 Pager 归零后出现空白帧。
-    await preloadThumbnailForAsset(asset)
+    if (displayAssetId.value === null) {
+      // 首次挂载无需等待旧图，直接显示当前资源。
+      await commitDisplayAsset(asset)
+      return
+    }
+
+    if (displayAssetId.value === targetId && originalUrl.value === targetUrl) {
+      // 快速切出去又返回时可能沿用同一个已显示节点，不会再有新的 load 事件。
+      if (originalLoaded.value) {
+        void notifyOriginalReady()
+      }
+      return
+    }
+
+    if (!imagePreload.getReadyImage(asset)) {
+      // 未命中预加载时沿用缩略图交接，不把原图请求变成导航的等待条件。
+      await preloadThumbnailForAsset(asset)
+    }
     if (token !== displaySwapToken) {
       return
     }
@@ -214,15 +224,43 @@ watch(
       return
     }
 
-    await commitDisplayAsset(targetId)
+    await commitDisplayAsset(asset)
   },
   { immediate: true, flush: 'post' }
 )
 
-// 原图加载完成后再显示原图层，缩略图作为过渡底图保持稳定。
-function handleOriginalLoad() {
-  originalOpacityTransition.value = true
-  originalLoaded.value = true
+// 与 Pager 的 ready 分开确认原图解码，过期的图片节点不能放行新目标的后台任务。
+async function notifyOriginalReady() {
+  const image = originalImageRef.value
+  const assetId = displayAssetId.value
+  const url = originalUrl.value
+  const token = displaySwapToken
+  if (!image || assetId === null) {
+    return
+  }
+
+  try {
+    await image.decode()
+  } catch {
+    // 解码未确认时不放行相邻预加载，原图显示和既有错误恢复仍由媒体自身处理。
+    return
+  }
+  if (token !== displaySwapToken || image !== originalImageRef.value || imageError.value) {
+    return
+  }
+  imagePreload.notifyCurrentMediaReady(assetId, url)
+}
+
+// 显示仍保持响应优先，不让原图解码确认阻塞缩略图或已缓存原图的交接。
+function handleOriginalLoad(event: Event) {
+  if (event.target !== originalImageRef.value) {
+    return
+  }
+  if (!originalLoaded.value) {
+    originalOpacityTransition.value = true
+    originalLoaded.value = true
+  }
+  void notifyOriginalReady()
 }
 
 function isRootMappedOriginalUrl(url: string): boolean {
@@ -262,7 +300,10 @@ async function tryAutoRecoverByReload() {
 }
 
 // 原图加载失败时尝试确认文件可达，并通过一次带参数的 reload 恢复映射。
-function handleImageError() {
+function handleImageError(event: Event) {
+  if (event.target !== originalImageRef.value) {
+    return
+  }
   resetImageInteraction()
   imageError.value = true
 
@@ -270,6 +311,10 @@ function handleImageError() {
     console.warn('Failed to recover lightbox image:', error)
   })
 }
+
+onScopeDispose(() => {
+  displaySwapToken += 1
+})
 
 defineExpose({
   showFitMode,
@@ -321,6 +366,7 @@ defineExpose({
           />
 
           <img
+            :key="`${displayAsset.id}:${originalUrl}`"
             ref="originalImageRef"
             :src="originalUrl"
             :alt="displayAsset.name"
