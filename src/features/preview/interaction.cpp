@@ -143,7 +143,12 @@ auto end_window_drag(core::AppState& state, HWND hwnd) -> void {
 }
 
 // 视口拖拽实现
-auto start_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
+auto start_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> bool {
+  // 游戏需要保持激活，后台预览窗可能收不到窗外的松开消息，因此只在拖拽期间检查按键。
+  if (SetTimer(hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG, 30, nullptr) == 0) {
+    Logger().error("Failed to start preview drag button tracking");
+    return false;
+  }
   state.preview->interaction.viewport_dragging = true;
 
   // 重置位置缓存，确保首次移动不会被跳过
@@ -164,6 +169,7 @@ auto start_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
   suppress_taskbar_redraw(state);
 
   SetCapture(hwnd);
+  return true;
 }
 
 auto update_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
@@ -186,21 +192,31 @@ auto update_viewport_drag(core::AppState& state, HWND hwnd, POINT pt) -> void {
 }
 
 auto end_viewport_drag(core::AppState& state, HWND hwnd) -> void {
+  state.preview->interaction.viewport_dragging = false;
+  KillTimer(hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG);
+
   // 确保最后一次移动被执行
   utils::throttle::flush(*state.preview->interaction.move_throttle,
                          [&state](float x, float y) { move_game_window_to_position(state, x, y); });
 
-  state.preview->interaction.viewport_dragging = false;
-  ReleaseCapture();
+  if (GetCapture() == hwnd) {
+    ReleaseCapture();
+  }
 
   // 启动延迟定时器恢复任务栏重绘
   if (state.preview->interaction.taskbar_redraw_suppressed) {
-    SetTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW,
-             features::preview::TASKBAR_REDRAW_DELAY_MS, nullptr);
+    if (SetTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW,
+                 features::preview::TASKBAR_REDRAW_DELAY_MS, nullptr) == 0) {
+      restore_taskbar_redraw(state);
+    }
   }
 }
 
 auto handle_mouse_move(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
+  if (state.preview->interaction.viewport_dragging && (wParam & MK_LBUTTON) == 0) {
+    end_viewport_drag(state, hwnd);
+    return 0;
+  }
   if (state.preview->interaction.is_dragging) {
     update_window_drag(state, hwnd, {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
   } else if (state.preview->interaction.viewport_dragging) {
@@ -226,7 +242,7 @@ auto handle_left_button_down(core::AppState& state, HWND hwnd, WPARAM wParam, LP
   }
 
   // 先开始视口拖拽（设置任务栏保护和位置缓存）
-  start_viewport_drag(state, hwnd, pt);
+  if (!start_viewport_drag(state, hwnd, pt)) return 0;
 
   // 检查是否点击在视口外，如果是则立即移动游戏窗口到点击位置
   if (!is_point_in_viewport(state, pt)) {
@@ -481,6 +497,20 @@ auto handle_paint(core::AppState& state, HWND hwnd) -> LRESULT {
 }
 
 auto handle_timer(core::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
+  if (wParam == features::preview::TIMER_ID_VIEWPORT_DRAG) {
+    if (!state.preview->interaction.viewport_dragging) {
+      KillTimer(hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG);
+      return 0;
+    }
+
+    // GetAsyncKeyState 查询物理按键，需要遵循系统的左右键交换设置。
+    const int button = GetSystemMetrics(SM_SWAPBUTTON) ? VK_RBUTTON : VK_LBUTTON;
+    if ((GetAsyncKeyState(button) & 0x8000) == 0) {
+      end_viewport_drag(state, hwnd);
+    }
+    return 0;
+  }
+
   if (wParam == features::preview::TIMER_ID_TASKBAR_REDRAW) {
     // 停止定时器
     KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
@@ -615,6 +645,8 @@ auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPAR
       return {true, handle_timer(state, hwnd, wParam)};
 
     case WM_DESTROY:
+      state.preview->interaction.viewport_dragging = false;
+      KillTimer(hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG);
       // 清理资源但不调用PostQuitMessage
       // 确保任务栏重绘被恢复
       KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);

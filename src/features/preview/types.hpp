@@ -48,6 +48,7 @@ struct ViewportState {
 // 定时器 ID 常量
 constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
 constexpr UINT_PTR TIMER_ID_PREVIEW_CLEANUP = 2;
+constexpr UINT_PTR TIMER_ID_VIEWPORT_DRAG = 3;
 
 // 任务栏重绘延迟时间（毫秒）
 constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;
