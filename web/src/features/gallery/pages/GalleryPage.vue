@@ -8,6 +8,7 @@ import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { Split } from '@/components/ui/split'
 import { useGalleryData } from '../composables/useGalleryData'
 import { useGallerySplitPresentation } from '../composables/useGallerySplitPresentation'
+import { provideGalleryKeyboardContext } from '../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -28,6 +29,7 @@ const COLLAPSED_SIZE = '0px'
 const COLLAPSE_TRIGGER_PX = 40
 
 const galleryStore = useGalleryStore()
+provideGalleryKeyboardContext()
 const overlayHistory = useGalleryOverlayHistory()
 const {
   isCompactWindow,

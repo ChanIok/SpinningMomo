@@ -4,6 +4,7 @@ import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
 import { provideLightboxImagePreload } from '../../composables/useLightboxImagePreload'
+import { useGalleryKeyboardContext } from '../../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -71,6 +72,7 @@ const props = defineProps<{
 }>()
 
 const store = useGalleryStore()
+const canHandleShortcut = useGalleryKeyboardContext()
 provideLightboxImagePreload()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
@@ -763,9 +765,30 @@ function handleMediaWheel(event: WheelEvent) {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (!store.lightbox.isOpen || isEditableTarget(event.target)) {
+  if (
+    !store.lightbox.isOpen ||
+    store.lightbox.isClosing ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    isEditableTarget(event.target)
+  ) {
     return
   }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    // Escape 按覆盖层层级退出：详情抽屉 -> 沉浸模式 -> 暗房。
+    if (mobileDetailsOpen.value) {
+      closeMobileDetails()
+    } else if (isImmersive.value) {
+      exitImmersive()
+    } else {
+      requestClose()
+    }
+    return
+  }
+
+  if (!canHandleShortcut(event, 'lightbox')) return
 
   if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
     const key = event.key.toLowerCase()
@@ -794,6 +817,8 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  if (event.ctrlKey || event.metaKey) return
+
   switch (event.key) {
     case 'ArrowLeft':
       event.preventDefault()
@@ -803,25 +828,14 @@ function handleKeydown(event: KeyboardEvent) {
       event.preventDefault()
       throttledNext()
       return
-    case 'Escape':
-      event.preventDefault()
-      // Escape 按覆盖层层级退出：详情抽屉 -> 沉浸模式 -> 暗房。
-      if (mobileDetailsOpen.value) {
-        closeMobileDetails()
-        return
-      }
-      if (isImmersive.value) {
-        exitImmersive()
-        return
-      }
-      requestClose()
-      return
     case 'f':
     case 'F':
       event.preventDefault()
       handleToolbarToggleImmersive()
       return
     case 'Tab':
+      // 控件上的 Tab 和 Shift+Tab 保留原生焦点导航。
+      if (event.shiftKey || event.target !== document.body) return
       event.preventDefault()
       handleToolbarToggleFilmstrip()
       return
@@ -972,6 +986,7 @@ onUnmounted(() => {
   <Teleport to="body" :disabled="!isImmersive">
     <div
       ref="lightboxRootRef"
+      data-gallery-keyboard-scope="lightbox"
       class="lightbox-container"
       :class="lightboxRootClass"
       style="--surface-opacity-scale: 0.96"

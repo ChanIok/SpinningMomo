@@ -18,6 +18,7 @@ import {
   useVisibleAssetTags,
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
+import { useGalleryKeyboardContext } from '../../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -39,6 +40,7 @@ import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
+const canHandleShortcut = useGalleryKeyboardContext()
 const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
@@ -370,7 +372,12 @@ function isEscapeHandledByOverlay(target: EventTarget | null): boolean {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (store.lightbox.isOpen || isEditableTarget(event.target)) {
+  if (
+    store.lightbox.isOpen ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    isEditableTarget(event.target)
+  ) {
     return
   }
 
@@ -397,6 +404,20 @@ function handleKeydown(event: KeyboardEvent) {
     }
     return
   }
+
+  // 文件夹粘贴与 Escape 保留页面级语义，其余图片快捷键属于当前操作区域。
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    isLocalAccess() &&
+    event.key.toLowerCase() === 'v'
+  ) {
+    event.preventDefault()
+    void folderActions.pasteClipboardToSelectedFolder()
+    return
+  }
+
+  if (!canHandleShortcut(event, 'gallery')) return
 
   if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
     const key = event.key.toLowerCase()
@@ -425,21 +446,13 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
-  // 普通 Ctrl+V 只导入到当前明确选中的文件夹，不占用标签粘贴快捷键。
-  // LAN 下不拦截默认粘贴，避免远端页面弹出本机 Clipboard API 错误。
-  if ((event.ctrlKey || event.metaKey) && isLocalAccess() && event.key.toLowerCase() === 'v') {
-    event.preventDefault()
-    void folderActions.pasteClipboardToSelectedFolder()
-    return
-  }
-
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
     event.preventDefault()
     void gallerySelection.selectAllCurrentQuery()
     return
   }
 
-  if (store.selection.selectedIds.size === 0) {
+  if (event.ctrlKey || event.metaKey || store.selection.selectedIds.size === 0) {
     return
   }
 
@@ -723,6 +736,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       </template>
       <div
         ref="contentRef"
+        data-gallery-keyboard-scope="gallery"
         class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
         :class="store.isCompactWindow && 'gallery-compact-touch-surface'"
         :style="galleryViewportStyle"
