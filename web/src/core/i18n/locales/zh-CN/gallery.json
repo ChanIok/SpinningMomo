@@ -136,6 +136,7 @@
   "gallery.details.infinityNikki.cameraParams": "相机参数码",
   "gallery.details.infinityNikki.contrast": "对比度",
   "gallery.details.infinityNikki.codeType.dye": "染色码",
+  "gallery.details.infinityNikki.dyeCodeDeprecation": "游戏在 2.11 版本后已支持从照片中查看搭配并一键使用。本项目将逐步取消染色码功能，已有记录仍可查看和编辑。外部导入的染色码，推荐使用功能更完善的 NUAN5.PRO 管理。",
   "gallery.details.infinityNikki.copyCameraParams": "复制",
   "gallery.details.infinityNikki.copyCameraParamsFailed": "复制相机参数码失败",
   "gallery.details.infinityNikki.copyCameraParamsSuccess": "相机参数码已复制",

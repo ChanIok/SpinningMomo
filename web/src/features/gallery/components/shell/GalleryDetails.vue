@@ -214,7 +214,10 @@ const infinityNikkiEnabled = computed(
 // 资产标签状态
 const assetTags = ref<Tag[]>([])
 const assetMainColors = ref<AssetMainColor[]>([])
-const infinityNikkiDetails = ref<InfinityNikkiDetails | null>(null)
+const infinityNikkiDetailsSnapshot = ref<{
+  assetId: number
+  details: InfinityNikkiDetails
+} | null>(null)
 const hasMainColors = computed(() => assetMainColors.value.length > 0)
 
 // 当前标签（详情面板焦点为 tag 时）
@@ -299,7 +302,7 @@ watch(
     if (!asset) {
       assetTags.value = []
       assetMainColors.value = []
-      infinityNikkiDetails.value = null
+      infinityNikkiDetailsSnapshot.value = null
       return
     }
 
@@ -338,10 +341,11 @@ watch(
     const asset = activeAsset.value
     const requestToken = ++infinityNikkiRequestToken
     if (assetId === undefined || !asset || !nikkiEnabled) {
-      infinityNikkiDetails.value = null
+      infinityNikkiDetailsSnapshot.value = null
       return
     }
 
+    // 加载期间保留带资产身份的详情快照；新结果就绪后整体替换，避免先收起再展开。
     try {
       const details = await getInfinityNikkiDetails(asset.id)
       if (
@@ -351,11 +355,11 @@ watch(
       ) {
         return
       }
-      infinityNikkiDetails.value = details
+      infinityNikkiDetailsSnapshot.value = { assetId: asset.id, details }
     } catch (error) {
       if (requestToken === infinityNikkiRequestToken) {
         console.error('Failed to load Infinity Nikki details:', error)
-        infinityNikkiDetails.value = null
+        infinityNikkiDetailsSnapshot.value = null
       }
     }
   },
@@ -640,7 +644,9 @@ async function handleBatchDescriptionCommit() {
 }
 
 function handleInfinityNikkiDetailsUpdated(details: InfinityNikkiDetails) {
-  infinityNikkiDetails.value = details
+  if (infinityNikkiDetailsSnapshot.value) {
+    infinityNikkiDetailsSnapshot.value.details = details
+  }
 }
 
 function copyWithExecCommand(text: string): boolean {
@@ -922,9 +928,12 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
           <template #after-info>
             <AssetInfinityNikkiDetails
-              v-if="infinityNikkiEnabled && infinityNikkiDetails && activeAsset"
-              :asset-id="activeAsset.id"
-              :details="infinityNikkiDetails"
+              v-if="infinityNikkiEnabled && infinityNikkiDetailsSnapshot && activeAsset"
+              :key="infinityNikkiDetailsSnapshot.assetId"
+              :asset-id="infinityNikkiDetailsSnapshot.assetId"
+              :details="infinityNikkiDetailsSnapshot.details"
+              :inert="infinityNikkiDetailsSnapshot.assetId !== activeAsset.id"
+              :aria-busy="infinityNikkiDetailsSnapshot.assetId !== activeAsset.id"
               @updated="handleInfinityNikkiDetailsUpdated"
             />
 

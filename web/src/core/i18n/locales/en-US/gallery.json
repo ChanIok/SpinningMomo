@@ -140,6 +140,7 @@
   "gallery.details.infinityNikki.saturation": "Saturation",
   "gallery.details.infinityNikki.shadow": "Shadows",
   "gallery.details.infinityNikki.codeType.dye": "Dye Code",
+  "gallery.details.infinityNikki.dyeCodeDeprecation": "After version 2.11, the game supports viewing outfits from photos and applying them with one click. This project's dye code feature will be phased out. Existing records remain viewable and editable. For imported dye codes, we recommend NUAN5.PRO for its more comprehensive management features.",
   "gallery.details.infinityNikki.copyCameraParams": "Copy",
   "gallery.details.infinityNikki.copyCameraParamsFailed": "Failed to copy camera params",
   "gallery.details.infinityNikki.copyCameraParamsSuccess": "Camera params copied",

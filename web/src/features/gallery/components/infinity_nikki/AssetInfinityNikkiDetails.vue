@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, ChevronDown } from '@lucide/vue'
+import { Check, ChevronDown, CircleAlert } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { readClipboardText } from '@/core/clipboard'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
@@ -65,6 +66,10 @@ const hasMultiplayerPoses = computed(
     extracted.value?.multiplayer?.pose !== undefined
 )
 const currentUserRecord = computed(() => props.details.userRecord)
+// 仅保留已有染色码的编辑入口；清空草稿时仍需等保存成功后再隐藏。
+const hasRecordedDyeCode = computed(
+  () => (currentUserRecord.value?.dyeCode?.trim().length ?? 0) > 0
+)
 const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
 // “读取剪贴板填充染色码”是宿主机能力，远端只允许手动输入。
@@ -601,14 +606,30 @@ watch(
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div v-if="hasRecordedDyeCode || extracted" class="space-y-3">
     <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
 
     <div class="space-y-2 text-xs">
-      <div class="flex items-center justify-between gap-2">
-        <span class="min-w-0 text-foreground/80">{{
-          t('gallery.details.infinityNikki.codeType.dye')
-        }}</span>
+      <div v-if="hasRecordedDyeCode" class="flex items-center justify-between gap-2">
+        <span class="flex shrink-0 items-center gap-1 text-foreground/80">
+          {{ t('gallery.details.infinityNikki.codeType.dye') }}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  class="inline-flex rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                  :aria-label="t('gallery.details.infinityNikki.dyeCodeDeprecation')"
+                >
+                  <CircleAlert class="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-80 text-left leading-relaxed text-wrap">
+                {{ t('gallery.details.infinityNikki.dyeCodeDeprecation') }}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </span>
 
         <div class="flex max-w-42 min-w-0 flex-1 items-center gap-2">
           <Input
@@ -637,7 +658,7 @@ watch(
       </div>
 
       <div
-        v-if="canShowSameOutfitDyeFillPrompt"
+        v-if="hasRecordedDyeCode && canShowSameOutfitDyeFillPrompt"
         class="space-y-1 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5"
       >
         <div class="text-muted-foreground">
