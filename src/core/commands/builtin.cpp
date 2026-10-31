@@ -111,6 +111,7 @@ auto register_builtin_commands(core::AppState& state) -> void {
                                          .modifiers = 0,  // 无修饰键
                                          .key = 44,       // VK_SNAPSHOT (PrintScreen)
                                          .settings_path = "app.hotkey.screenshot",
+                                         .allow_repeat = true,
                                      },
                              });
 

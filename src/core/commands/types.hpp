@@ -11,6 +11,7 @@ struct HotkeyBinding {
   UINT modifiers = 0;         // MOD_CONTROL=1, MOD_ALT=2, MOD_SHIFT=4
   UINT key = 0;               // 虚拟键码 (VK_*)
   std::string settings_path;  // 设置文件中的路径，如 "app.hotkey.floating_window"
+  bool allow_repeat = false;  // 是否允许键盘长按自动连发
 };
 
 // 命令描述符

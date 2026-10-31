@@ -309,7 +309,10 @@ auto register_all_hotkeys(core::AppState& state, HWND hwnd) -> void {
       continue;
     }
 
-    if (::RegisterHotKey(hwnd, hotkey_id, modifiers, key)) {
+    // 仅显式允许的热键响应键盘长按连发，避免开关操作被重复执行。
+    const UINT registration_modifiers =
+        binding.allow_repeat ? modifiers : (modifiers | MOD_NOREPEAT);
+    if (::RegisterHotKey(hwnd, hotkey_id, registration_modifiers, key)) {
       cmd_state.hotkey_to_command[hotkey_id] = id;
       Logger().info("Successfully registered hotkey {} for command '{}' (modifiers={}, key={})",
                     hotkey_id, id, modifiers, key);
