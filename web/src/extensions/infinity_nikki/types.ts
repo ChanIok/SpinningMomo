@@ -19,6 +19,11 @@ export interface PhotoMapPoint {
   officialWorldId: string
 }
 
+export interface InfinityNikkiMultiplayer {
+  pose?: number
+  localPose?: number
+}
+
 export interface InfinityNikkiExtractedParams {
   cameraParams?: string
   timeHour?: number
@@ -46,6 +51,10 @@ export interface InfinityNikkiExtractedParams {
   nikkiLocZ?: number
   nikkiHidden?: number
   poseId?: number
+  worldId?: number
+  worldName?: string
+  photoMode?: number
+  multiplayer?: InfinityNikkiMultiplayer
 }
 
 export interface InfinityNikkiUserRecord {
@@ -117,12 +126,14 @@ export interface GetInfinityNikkiMetadataNamesParams {
   poseId?: number
   lightId?: number
   locale?: 'zh-CN' | 'en-US'
+  otherPoseId?: number
 }
 
 export interface InfinityNikkiMetadataNames {
   filterName?: string
   poseName?: string
   lightName?: string
+  otherPoseName?: string
 }
 
 export interface SetInfinityNikkiUserRecordParams {

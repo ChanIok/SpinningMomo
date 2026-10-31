@@ -88,6 +88,11 @@ struct GetInfinityNikkiDetailsParams {
   std::int64_t asset_id;
 };
 
+struct InfinityNikkiMultiplayer {
+  std::optional<std::int64_t> pose;
+  std::optional<std::int64_t> local_pose;
+};
+
 struct InfinityNikkiExtractedParams {
   std::optional<std::string> camera_params;
   std::optional<std::int64_t> time_hour;
@@ -115,6 +120,10 @@ struct InfinityNikkiExtractedParams {
   std::optional<double> nikki_loc_z;
   std::optional<std::int64_t> nikki_hidden;
   std::optional<std::int64_t> pose_id;
+  std::optional<std::int64_t> world_id;
+  std::optional<std::string> world_name;
+  std::optional<std::int64_t> photo_mode;
+  std::optional<InfinityNikkiMultiplayer> multiplayer;
 };
 
 struct InfinityNikkiUserRecord {
@@ -177,12 +186,12 @@ struct InfinityNikkiMapConfig {
 };
 
 // 照片所属地图区域的解析结果。
-// auto_* 是根据坐标自动推断的世界，user_world_id 是用户手动选择的覆盖值，
-// world_id / official_world_id 是最终生效值（用户选择优先）。
+// auto_* 优先来自照片解码的世界 ID，缺少 ID 时才根据坐标推断。
+// user_world_id 仅在照片没有解码世界 ID 时生效；world_id / official_world_id 是最终结果。
 struct InfinityNikkiMapArea {
-  std::string auto_world_id;                 // 自动推断的内部 world_id
-  std::string auto_official_world_id;        // 自动推断的官方 world_id（带版本号）
-  std::optional<std::string> user_world_id;  // 用户手动设置的 world_id（可选）
+  std::string auto_world_id;                 // 自动确定的内部 world_id
+  std::string auto_official_world_id;        // 自动确定的官方 world_id（带版本号）
+  std::optional<std::string> user_world_id;  // 生效的用户世界覆盖值（可选）
   std::string world_id;                      // 最终生效的内部 world_id
   std::string official_world_id;             // 最终生效的官方 world_id
 };
@@ -202,12 +211,14 @@ struct GetInfinityNikkiMetadataNamesParams {
   std::optional<std::int64_t> pose_id;
   std::optional<std::int64_t> light_id;
   std::optional<std::string> locale = "zh-CN";
+  std::optional<std::int64_t> other_pose_id;
 };
 
 struct InfinityNikkiMetadataNames {
   std::optional<std::string> filter_name;
   std::optional<std::string> pose_name;
   std::optional<std::string> light_name;
+  std::optional<std::string> other_pose_name;
 };
 
 struct SetInfinityNikkiUserRecordParams {

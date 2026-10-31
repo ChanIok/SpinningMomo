@@ -3,6 +3,7 @@
 #include "vendor/std.hpp"
 
 #include "vendor/asio.hpp"
+#include "vendor/rfl.hpp"
 
 #include "core/database/database.hpp"
 #include "core/database/types.hpp"
@@ -41,8 +42,89 @@ struct PhotoMapPointWithWorldRecord {
   double nikki_loc_x;
   double nikki_loc_y;
   std::optional<double> nikki_loc_z;
+  std::optional<std::int64_t> world_id;
   std::optional<std::string> user_world_id;
 };
+
+// 数据库保存合照 JSON，RPC 返回结构化字段；不让 SQL 映射器承担 JSON 解析。
+struct InfinityNikkiExtractedParamsRow {
+  std::optional<std::string> camera_params;
+  std::optional<std::int64_t> time_hour;
+  std::optional<std::int64_t> time_min;
+  std::optional<double> camera_focal_length;
+  std::optional<double> rotation;
+  std::optional<double> aperture_value;
+  std::optional<std::int64_t> filter_id;
+  std::optional<double> filter_strength;
+  std::optional<double> vignette_intensity;
+  std::optional<std::int64_t> light_id;
+  std::optional<double> light_strength;
+  std::optional<std::int64_t> vertical;
+  std::optional<double> bloom_intensity;
+  std::optional<double> bloom_threshold;
+  std::optional<double> brightness;
+  std::optional<double> exposure;
+  std::optional<double> contrast;
+  std::optional<double> saturation;
+  std::optional<double> vibrance;
+  std::optional<double> highlights;
+  std::optional<double> shadow;
+  std::optional<double> nikki_loc_x;
+  std::optional<double> nikki_loc_y;
+  std::optional<double> nikki_loc_z;
+  std::optional<std::int64_t> nikki_hidden;
+  std::optional<std::int64_t> pose_id;
+  std::optional<std::int64_t> world_id;
+  std::optional<std::string> world_name;
+  std::optional<std::int64_t> photo_mode;
+  std::optional<std::string> multiplayer_json;
+};
+
+auto to_extracted_params(const InfinityNikkiExtractedParamsRow& row)
+    -> std::expected<InfinityNikkiExtractedParams, std::string> {
+  std::optional<InfinityNikkiMultiplayer> multiplayer;
+  if (row.multiplayer_json.has_value()) {
+    auto parsed = rfl::json::read<InfinityNikkiMultiplayer>(*row.multiplayer_json);
+    if (!parsed) {
+      return std::unexpected("Failed to parse Infinity Nikki multiplayer JSON: " +
+                             parsed.error().what());
+    }
+    multiplayer = std::move(parsed.value());
+  }
+
+  return InfinityNikkiExtractedParams{
+      .camera_params = row.camera_params,
+      .time_hour = row.time_hour,
+      .time_min = row.time_min,
+      .camera_focal_length = row.camera_focal_length,
+      .rotation = row.rotation,
+      .aperture_value = row.aperture_value,
+      .filter_id = row.filter_id,
+      .filter_strength = row.filter_strength,
+      .vignette_intensity = row.vignette_intensity,
+      .light_id = row.light_id,
+      .light_strength = row.light_strength,
+      .vertical = row.vertical,
+      .bloom_intensity = row.bloom_intensity,
+      .bloom_threshold = row.bloom_threshold,
+      .brightness = row.brightness,
+      .exposure = row.exposure,
+      .contrast = row.contrast,
+      .saturation = row.saturation,
+      .vibrance = row.vibrance,
+      .highlights = row.highlights,
+      .shadow = row.shadow,
+      .nikki_loc_x = row.nikki_loc_x,
+      .nikki_loc_y = row.nikki_loc_y,
+      .nikki_loc_z = row.nikki_loc_z,
+      .nikki_hidden = row.nikki_hidden,
+      .pose_id = row.pose_id,
+      .world_id = row.world_id,
+      .world_name = row.world_name,
+      .photo_mode = row.photo_mode,
+      .multiplayer = std::move(multiplayer),
+  };
+}
 
 struct InfinityNikkiUserRecordRow {
   std::string record_key;
@@ -94,44 +176,64 @@ auto has_user_record_value(const InfinityNikkiUserRecord& record) -> bool {
   return record.dye_code.has_value() || record.world_id.has_value();
 }
 
-// 根据照片的游戏坐标和用户记录，解析出所属地图区域。
-// 优先使用用户手动设置的 world_id，否则根据坐标自动推断。
+struct ResolvedPhotoWorld {
+  const InfinityNikkiMapWorld* auto_world = nullptr;
+  const InfinityNikkiMapWorld* world = nullptr;
+  std::optional<std::string> user_world_id;
+};
+
+// 照片自带的世界是事实；只有缺少它时，才使用用户修正或坐标推断。
+// 未收录的解码世界不回退到其他世界，避免生成错误地图点。
+auto resolve_photo_world(const InfinityNikkiMapConfig& map_config,
+                         const std::optional<std::int64_t>& decoded_world_id,
+                         const std::optional<std::string>& user_world_id,
+                         const std::optional<world_area::GamePoint>& game_point)
+    -> ResolvedPhotoWorld {
+  if (decoded_world_id.has_value()) {
+    const auto* world = world_area::find_world(map_config, std::to_string(*decoded_world_id));
+    return ResolvedPhotoWorld{.auto_world = world, .world = world};
+  }
+
+  const auto* auto_world = game_point.has_value()
+                               ? world_area::resolve_world_or_default(map_config, *game_point)
+                               : nullptr;
+  if (user_world_id.has_value()) {
+    if (const auto* world = world_area::find_world(map_config, *user_world_id); world != nullptr) {
+      return ResolvedPhotoWorld{
+          .auto_world = auto_world, .world = world, .user_world_id = world->world_id};
+    }
+  }
+  return ResolvedPhotoWorld{.auto_world = auto_world, .world = auto_world};
+}
+
 auto build_map_area(const InfinityNikkiMapConfig& map_config,
                     const std::optional<InfinityNikkiExtractedParams>& extracted,
                     const InfinityNikkiUserRecord& user_record)
     -> std::optional<InfinityNikkiMapArea> {
-  if (!extracted.has_value() || !extracted->nikki_loc_x.has_value() ||
-      !extracted->nikki_loc_y.has_value()) {
+  if (!extracted.has_value()) {
     return std::nullopt;
   }
 
-  const world_area::GamePoint game_point{
-      .x = *extracted->nikki_loc_x,
-      .y = *extracted->nikki_loc_y,
-      .z = extracted->nikki_loc_z,
-  };
-  const auto* auto_world = world_area::resolve_world_or_default(map_config, game_point);
-  if (auto_world == nullptr) {
-    return std::nullopt;
+  std::optional<world_area::GamePoint> game_point;
+  if (extracted->nikki_loc_x.has_value() && extracted->nikki_loc_y.has_value()) {
+    game_point = world_area::GamePoint{
+        .x = *extracted->nikki_loc_x,
+        .y = *extracted->nikki_loc_y,
+        .z = extracted->nikki_loc_z,
+    };
   }
-
-  // 用户手动设置的 world_id 优先于自动推断结果。
-  std::optional<std::string> user_world_id;
-  const auto* world = auto_world;
-  if (user_record.world_id.has_value()) {
-    if (const auto* user_world = world_area::find_world(map_config, *user_record.world_id);
-        user_world != nullptr) {
-      user_world_id = user_world->world_id;
-      world = user_world;
-    }
+  const auto resolved =
+      resolve_photo_world(map_config, extracted->world_id, user_record.world_id, game_point);
+  if (resolved.world == nullptr || resolved.auto_world == nullptr) {
+    return std::nullopt;
   }
 
   return InfinityNikkiMapArea{
-      .auto_world_id = auto_world->world_id,
-      .auto_official_world_id = auto_world->official_world_id,
-      .user_world_id = user_world_id,
-      .world_id = world->world_id,
-      .official_world_id = world->official_world_id,
+      .auto_world_id = resolved.auto_world->world_id,
+      .auto_official_world_id = resolved.auto_world->official_world_id,
+      .user_world_id = resolved.user_world_id,
+      .world_id = resolved.world->world_id,
+      .official_world_id = resolved.world->official_world_id,
   };
 }
 
@@ -331,6 +433,7 @@ auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPoints
            p.nikki_loc_x,
            p.nikki_loc_y,
            p.nikki_loc_z,
+           p.world_id,
            wr.record_value AS user_world_id
     FROM filtered_assets fa
     INNER JOIN asset_infinity_nikki_params p ON p.asset_id = fa.id
@@ -374,13 +477,9 @@ auto query_photo_map_points(core::AppState& app_state, const QueryPhotoMapPoints
         .z = point.nikki_loc_z,
     };
 
-    // 世界归属判定：优先使用用户手动设置的 world_id，否则根据坐标自动推断。
-    const auto* resolved_world = point.user_world_id.has_value()
-                                     ? world_area::find_world(map_config, *point.user_world_id)
-                                     : nullptr;
-    if (resolved_world == nullptr) {
-      resolved_world = world_area::resolve_world_or_default(map_config, game_point);
-    }
+    const auto resolved =
+        resolve_photo_world(map_config, point.world_id, point.user_world_id, game_point);
+    const auto* resolved_world = resolved.world;
     // 只保留属于请求世界的点位。
     if (resolved_world == nullptr || resolved_world->world_id != requested_world->world_id) {
       continue;
@@ -439,16 +538,29 @@ auto get_details(core::AppState& app_state, const GetInfinityNikkiDetailsParams&
            nikki_loc_y,
            nikki_loc_z,
            nikki_hidden,
-           pose_id
+           pose_id,
+           world_id,
+           world_name,
+           photo_mode,
+           multiplayer_json
     FROM asset_infinity_nikki_params
     WHERE asset_id = ?
   )";
 
-  auto extracted_result = core::database::query_single<InfinityNikkiExtractedParams>(
+  auto extracted_result = core::database::query_single<InfinityNikkiExtractedParamsRow>(
       app_state, extracted_sql, {params.asset_id});
   if (!extracted_result) {
     co_return std::unexpected("Failed to query Infinity Nikki extracted params: " +
                               extracted_result.error());
+  }
+
+  std::optional<InfinityNikkiExtractedParams> extracted;
+  if (extracted_result->has_value()) {
+    auto parsed = to_extracted_params(extracted_result->value());
+    if (!parsed) {
+      co_return std::unexpected(parsed.error());
+    }
+    extracted = std::move(parsed.value());
   }
 
   auto user_record_result = read_user_record(app_state, params.asset_id);
@@ -460,9 +572,9 @@ auto get_details(core::AppState& app_state, const GetInfinityNikkiDetailsParams&
   // 尝试加载地图配置以构建 map_area 增强信息；
   // 配置加载失败时降级：详情仍正常返回，只是不包含 map_area。
   std::optional<InfinityNikkiMapArea> map_area;
-  const auto& extracted = extracted_result.value();
-  if (extracted.has_value() && extracted->nikki_loc_x.has_value() &&
-      extracted->nikki_loc_y.has_value()) {
+  if (extracted.has_value() &&
+      (extracted->world_id.has_value() ||
+       (extracted->nikki_loc_x.has_value() && extracted->nikki_loc_y.has_value()))) {
     auto map_config_result = co_await world_area::load_map_config(app_state);
     if (map_config_result) {
       map_area = build_map_area(map_config_result.value(), extracted, user_record);
@@ -476,7 +588,7 @@ auto get_details(core::AppState& app_state, const GetInfinityNikkiDetailsParams&
                                   ? std::optional<InfinityNikkiUserRecord>{user_record}
                                   : std::nullopt;
 
-  co_return InfinityNikkiDetails{.extracted = extracted_result.value(),
+  co_return InfinityNikkiDetails{.extracted = std::move(extracted),
                                  .user_record = std::move(user_record_optional),
                                  .map_area = std::move(map_area)};
 }

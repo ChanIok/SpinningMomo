@@ -47,7 +47,8 @@ auto inherit_asset_data(core::AppState& app_state, std::int64_t new_asset_id,
           vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
           vibrance, highlights, shadow,
           nikki_loc_x, nikki_loc_y, nikki_loc_z,
-          nikki_hidden, pose_id, nikki_diy_json
+          nikki_hidden, pose_id, nikki_diy_json,
+          world_id, world_name, photo_mode, multiplayer_json
         )
         SELECT ?, uid, camera_params,
           time_hour, time_min,
@@ -57,7 +58,8 @@ auto inherit_asset_data(core::AppState& app_state, std::int64_t new_asset_id,
           vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
           vibrance, highlights, shadow,
           nikki_loc_x, nikki_loc_y, nikki_loc_z,
-          nikki_hidden, pose_id, nikki_diy_json
+          nikki_hidden, pose_id, nikki_diy_json,
+          world_id, world_name, photo_mode, multiplayer_json
         FROM asset_infinity_nikki_params
         WHERE asset_id = ?
       )",

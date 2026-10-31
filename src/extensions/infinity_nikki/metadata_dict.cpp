@@ -188,6 +188,7 @@ auto resolve_metadata_names(core::AppState& app_state,
       .filter_name = resolve_name(dictionary->filters, params.filter_id, locale_key),
       .pose_name = resolve_name(dictionary->poses, params.pose_id, locale_key),
       .light_name = resolve_name(dictionary->lights, params.light_id, locale_key),
+      .other_pose_name = resolve_name(dictionary->poses, params.other_pose_id, locale_key),
   };
 }
 

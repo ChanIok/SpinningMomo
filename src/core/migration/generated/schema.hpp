@@ -10,3 +10,4 @@
 #include "core/migration/generated/schema_003.hpp"
 #include "core/migration/generated/schema_004.hpp"
 #include "core/migration/generated/schema_005.hpp"
+#include "core/migration/generated/schema_006.hpp"

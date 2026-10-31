@@ -58,6 +58,16 @@ struct Nuan5DiyEntry {
   std::optional<std::int64_t> i;
   std::optional<std::string> t;
   std::optional<std::int64_t> grid;
+  std::optional<std::string> hex;
+  std::optional<std::int64_t> p;
+  std::optional<double> density;
+  std::optional<bool> bg_color;
+  std::optional<double> offset;
+};
+
+struct Nuan5World {
+  std::int64_t id;
+  std::optional<std::string> name;
 };
 
 struct Nuan5DecodedPhoto {
@@ -83,6 +93,9 @@ struct Nuan5DecodedPhoto {
   std::optional<std::vector<std::int64_t>> clothes;
   std::optional<std::map<std::string, std::vector<Nuan5DiyEntry>>> diy;
   std::optional<Nuan5RawData> raw;
+  std::optional<Nuan5World> world;
+  std::optional<std::int64_t> photo_mode;
+  std::optional<InfinityNikkiMultiplayer> multiplayer;
 };
 
 constexpr std::string_view kExtractApiUrl = "https://nuan5.pro/api/decode-photo2";
@@ -117,6 +130,14 @@ auto to_parsed_record(const Nuan5DecodedPhoto& photo) -> ParsedPhotoParamsRecord
   record.shadow = photo.shadow;
   record.nikki_hidden = photo.hide_nikki;
   record.pose_id = photo.pose;
+  if (photo.world.has_value()) {
+    record.world_id = photo.world->id;
+    record.world_name = photo.world->name;
+  }
+  record.photo_mode = photo.photo_mode;
+  if (photo.multiplayer.has_value()) {
+    record.multiplayer_json = rfl::json::write(*photo.multiplayer);
+  }
 
   if (photo.light.has_value()) {
     record.light_id = photo.light->l;
@@ -495,8 +516,10 @@ auto upsert_photo_params_batch(core::AppState& app_state, const std::string& uid
             vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
             vibrance, highlights, shadow,
             nikki_loc_x, nikki_loc_y, nikki_loc_z,
-            nikki_hidden, pose_id, nikki_diy_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            nikki_hidden, pose_id, nikki_diy_json,
+            world_id, world_name, photo_mode, multiplayer_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?)
           ON CONFLICT(asset_id) DO UPDATE SET
             uid = excluded.uid,
             camera_params = excluded.camera_params,
@@ -525,7 +548,11 @@ auto upsert_photo_params_batch(core::AppState& app_state, const std::string& uid
             nikki_loc_z = excluded.nikki_loc_z,
             nikki_hidden = excluded.nikki_hidden,
             pose_id = excluded.pose_id,
-            nikki_diy_json = excluded.nikki_diy_json
+            nikki_diy_json = excluded.nikki_diy_json,
+            world_id = excluded.world_id,
+            world_name = excluded.world_name,
+            photo_mode = excluded.photo_mode,
+            multiplayer_json = excluded.multiplayer_json
         )";
 
         std::int32_t inserted_clothes = 0;
@@ -564,6 +591,10 @@ auto upsert_photo_params_batch(core::AppState& app_state, const std::string& uid
               to_db_param(record.nikki_hidden),
               to_db_param(record.pose_id),
               to_db_param(record.nikki_diy_json),
+              to_db_param(record.world_id),
+              to_db_param(record.world_name),
+              to_db_param(record.photo_mode),
+              to_db_param(record.multiplayer_json),
           };
 
           auto upsert_result = core::database::execute(txn_app_state, upsert_sql, params);

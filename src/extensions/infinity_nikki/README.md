@@ -32,6 +32,12 @@
 - 变更消费基于 gallery 的 `ScanChange` 语义，避免依赖某个具体 RPC 用例。
 - 角色昵称只补全空的 `display_name`，不能覆盖用户手动名称；查询失败不影响图库扫描。
 - 角色昵称请求与 `allow_online_photo_metadata_extract` 共用在线授权，关闭后不得发送 UID。
+- 解码出的 `world_id` 优先于用户世界记录和坐标推断；用户覆盖只对没有解码世界 ID 的照片生效，
+  未被地图配置收录的解码世界保留原 ID/名称，不回退到其他世界。
+- 新增照片参数必须贯通解码、落库、详情 RPC、同内容继承四处；字段白名单就是
+  `ParsedPhotoParamsRecord` 与迁移 SQL，不做游戏 JSON 全量透传，缺失值保持 NULL 而不补默认值。
+- DIY 条目原样序列化进 `nikki_diy_json`，不按 `i` 去重、不丢 `0/false`；同搭配判断仍是服装关系 + 该 JSON。
+  已入库记录缺的参数只能重新提取原照片补齐，迁移不伪造、不自动联网重提。
 
 ## 改动 checklist
 

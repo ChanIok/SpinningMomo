@@ -56,6 +56,14 @@ const sameOutfitDyeFillPreviewCodeValue = ref('')
 const mapConfig = ref<InfinityNikkiMapConfig | null>(null)
 
 const extracted = computed(() => props.details.extracted)
+const displayPoseId = computed(
+  () => extracted.value?.multiplayer?.localPose ?? extracted.value?.poseId
+)
+const hasMultiplayerPoses = computed(
+  () =>
+    extracted.value?.multiplayer?.localPose !== undefined ||
+    extracted.value?.multiplayer?.pose !== undefined
+)
 const currentUserRecord = computed(() => props.details.userRecord)
 const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
@@ -70,12 +78,20 @@ const canShowSameOutfitDyeFillPrompt = computed(() => {
     sameOutfitDyeFillPreviewCodeValue.value === codeValueDraft.value.trim()
   )
 })
-const currentWorldId = computed(() => currentMapArea.value?.worldId)
-const currentWorldLabel = computed(() =>
-  currentWorldId.value
-    ? getInfinityNikkiWorldName(currentWorldId.value, locale.value, mapConfig.value)
-    : null
-)
+const hasDecodedWorld = computed(() => extracted.value?.worldId !== undefined)
+const currentWorldId = computed(() => {
+  const decodedWorldId = extracted.value?.worldId
+  return decodedWorldId !== undefined ? String(decodedWorldId) : currentMapArea.value?.worldId
+})
+const currentWorldLabel = computed(() => {
+  const worldId = currentWorldId.value
+  if (!worldId) return null
+  const configuredWorld = mapConfig.value?.worlds.find((world) => world.worldId === worldId)
+  if (hasDecodedWorld.value && !configuredWorld) {
+    return extracted.value?.worldName?.trim() || worldId
+  }
+  return getInfinityNikkiWorldName(worldId, locale.value, mapConfig.value)
+})
 const worldOptions = computed(() => getInfinityNikkiWorldOptions(mapConfig.value, locale.value))
 const currentMapLocationTarget = computed(() => {
   const params = extracted.value
@@ -90,8 +106,15 @@ const currentMapLocationTarget = computed(() => {
 })
 // 当前面板实际使用的“已翻译名称”结果。
 const metadataNames = ref<InfinityNikkiMetadataNames>({})
-// 面板级缓存：key=语言+filter/pose/light 三元组，value=映射结果。
+// 双方动作共用原有字典请求与缓存，不按每个动作单独请求。
 const metadataNamesCache = new Map<string, InfinityNikkiMetadataNames>()
+const metadataLookupParams = computed(() => ({
+  filterId: extracted.value?.filterId,
+  poseId: displayPoseId.value,
+  otherPoseId: extracted.value?.multiplayer?.pose,
+  lightId: extracted.value?.lightId,
+  locale: normalizeLocaleForMetadata(locale.value),
+}))
 
 async function loadMapConfig() {
   try {
@@ -364,7 +387,7 @@ async function handleCodeValueAction() {
 }
 
 async function handleSelectWorldId(nextWorldId: string | undefined) {
-  if (isSavingWorldRecord.value) {
+  if (isSavingWorldRecord.value || hasDecodedWorld.value) {
     return
   }
 
@@ -446,6 +469,21 @@ function formatPercentage(value: number | undefined): string | null {
   return `${formatNumber(value, 1) ?? '0'}%`
 }
 
+function formatEnum(value: number | undefined, labelKeys: string[]): string | undefined {
+  if (value === undefined) return undefined
+  const key = labelKeys[value]
+  return key ? t(key) : String(value)
+}
+
+const photoModeLabel = computed(() =>
+  formatEnum(extracted.value?.photoMode, [
+    'gallery.details.infinityNikki.photoMode.normal',
+    'gallery.details.infinityNikki.photoMode.timeStop',
+    'gallery.details.infinityNikki.photoMode.multiplayer',
+    'gallery.details.infinityNikki.photoMode.screenshot',
+  ])
+)
+
 function formatFocalLength(value: number | undefined): string | null {
   const formatted = formatNumber(value)
   return formatted ? `${formatted} mm` : null
@@ -481,10 +519,11 @@ function normalizeLocaleForMetadata(localeValue: string): 'zh-CN' | 'en-US' {
 function buildMetadataCacheKey(params: {
   filterId?: number
   poseId?: number
+  otherPoseId?: number
   lightId?: number
   locale: 'zh-CN' | 'en-US'
 }): string {
-  return `${params.locale}|${params.filterId ?? ''}|${params.poseId ?? ''}|${params.lightId ?? ''}`
+  return `${params.locale}|${params.filterId ?? ''}|${params.poseId ?? ''}|${params.otherPoseId ?? ''}|${params.lightId ?? ''}`
 }
 
 function formatMetadataDisplay(idText: string | null, name: string | undefined): string | null {
@@ -502,23 +541,21 @@ function formatMetadataTitle(idText: string | null, name: string | undefined): s
 }
 
 async function refreshMetadataNames() {
-  const filterId = extracted.value?.filterId
-  const poseId = extracted.value?.poseId
-  const lightId = extracted.value?.lightId
+  const params = metadataLookupParams.value
+  const { filterId, poseId, otherPoseId, lightId } = params
 
-  if (filterId === undefined && poseId === undefined && lightId === undefined) {
+  if (
+    filterId === undefined &&
+    poseId === undefined &&
+    otherPoseId === undefined &&
+    lightId === undefined
+  ) {
     // 当前资产没有相关参数时清空展示，避免沿用上一张图的结果。
     metadataNames.value = {}
     return
   }
 
-  const normalizedLocale = normalizeLocaleForMetadata(locale.value)
-  const cacheKey = buildMetadataCacheKey({
-    filterId,
-    poseId,
-    lightId,
-    locale: normalizedLocale,
-  })
+  const cacheKey = buildMetadataCacheKey(params)
 
   const cached = metadataNamesCache.get(cacheKey)
   if (cached) {
@@ -527,15 +564,13 @@ async function refreshMetadataNames() {
     return
   }
 
-  const result = await getInfinityNikkiMetadataNames({
-    filterId,
-    poseId,
-    lightId,
-    locale: normalizedLocale,
-  })
+  const result = await getInfinityNikkiMetadataNames(params)
   // 即使 result 为空对象也会缓存，避免失败场景下短时间重复请求。
   metadataNamesCache.set(cacheKey, result)
-  metadataNames.value = result
+  // 快速切图时，旧请求仅填充缓存，不覆盖当前照片的动作名称。
+  if (buildMetadataCacheKey(metadataLookupParams.value) === cacheKey) {
+    metadataNames.value = result
+  }
 }
 
 watch(
@@ -550,18 +585,15 @@ watch(
   () => props.assetId,
   () => {
     clearSameOutfitDyeFillPreview()
+    isWorldPopoverOpen.value = false
   }
 )
 
 watch(
-  () => [
-    extracted.value?.filterId,
-    extracted.value?.poseId,
-    extracted.value?.lightId,
-    locale.value,
-  ],
+  metadataLookupParams,
   () => {
     // 当资产切换或语言切换时刷新映射，保证展示始终与当前上下文一致。
+    metadataNames.value = {}
     void refreshMetadataNames()
   },
   { immediate: true }
@@ -630,6 +662,13 @@ watch(
       </div>
 
       <template v-if="extracted">
+        <div v-if="photoModeLabel" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-foreground/80">{{
+            t('gallery.details.infinityNikki.photoMode')
+          }}</span>
+          <span>{{ photoModeLabel }}</span>
+        </div>
+
         <div v-if="formatGameTime(extracted)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-foreground/80">{{
             t('gallery.details.infinityNikki.gameTime')
@@ -739,16 +778,42 @@ watch(
           }}</span>
           <span class="font-mono">{{ formatSignedNumber(extracted.shadow, 2) }}</span>
         </div>
-        <div v-if="formatPoseId(extracted.poseId)" class="flex justify-between gap-2">
+        <div v-if="formatPoseId(displayPoseId)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-foreground/80">{{
-            t('gallery.details.infinityNikki.poseId')
+            t(
+              hasMultiplayerPoses
+                ? 'gallery.details.infinityNikki.multiplayer.localPose'
+                : 'gallery.details.infinityNikki.poseId'
+            )
           }}</span>
           <span
             class="max-w-32 truncate"
             :class="{ 'font-mono': !metadataNames.poseName }"
-            :title="formatMetadataTitle(formatPoseId(extracted.poseId), metadataNames.poseName)"
+            :title="formatMetadataTitle(formatPoseId(displayPoseId), metadataNames.poseName)"
           >
-            {{ formatMetadataDisplay(formatPoseId(extracted.poseId), metadataNames.poseName) }}
+            {{ formatMetadataDisplay(formatPoseId(displayPoseId), metadataNames.poseName) }}
+          </span>
+        </div>
+        <div v-if="formatPoseId(extracted.multiplayer?.pose)" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-foreground/80">{{
+            t('gallery.details.infinityNikki.multiplayer.pose')
+          }}</span>
+          <span
+            class="max-w-32 truncate"
+            :class="{ 'font-mono': !metadataNames.otherPoseName }"
+            :title="
+              formatMetadataTitle(
+                formatPoseId(extracted.multiplayer?.pose),
+                metadataNames.otherPoseName
+              )
+            "
+          >
+            {{
+              formatMetadataDisplay(
+                formatPoseId(extracted.multiplayer?.pose),
+                metadataNames.otherPoseName
+              )
+            }}
           </span>
         </div>
         <div v-if="formatMetadataId(extracted.lightId)" class="flex justify-between gap-2">
@@ -792,7 +857,7 @@ watch(
               {{ currentWorldLabel }}
             </button>
             <span v-else class="min-w-0 truncate text-left">{{ currentWorldLabel }}</span>
-            <Popover v-model:open="isWorldPopoverOpen">
+            <Popover v-if="!hasDecodedWorld" v-model:open="isWorldPopoverOpen">
               <PopoverTrigger as-child>
                 <Button
                   variant="ghost"

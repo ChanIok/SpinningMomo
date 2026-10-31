@@ -125,6 +125,17 @@ auto migrate_v2_1_2_0(core::AppState& app_state) -> std::expected<void, std::str
   return {};
 }
 
+auto migrate_v2_2_2_0(core::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.2.2.0: Add Infinity Nikki decoded photo metadata");
+
+  auto result = execute_sql_schema<core::migration::schema::V006>(app_state);
+  if (!result) {
+    return std::unexpected("Failed to add Infinity Nikki decoded photo metadata: " +
+                           result.error());
+  }
+  return {};
+}
+
 auto migrate_v2_0_11_0(core::AppState& app_state) -> std::expected<void, std::string> {
   Logger().info("Executing migration to 2.0.11.0: Set update download sources");
 
@@ -179,6 +190,7 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
       {"2.0.9.0", "Rebuild Infinity Nikki user record as key-value", true, migrate_v2_0_9_0},
       {"2.0.11.0", "Set update download sources", false, migrate_v2_0_11_0},
       {"2.1.2.0", "Add gallery asset missing lifecycle", true, migrate_v2_1_2_0},
+      {"2.2.2.0", "Add Infinity Nikki decoded photo metadata", true, migrate_v2_2_2_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},
