@@ -46,10 +46,61 @@ auto calculate_video_buffer_size(GUID subtype, std::uint32_t width, std::uint32_
   return buffer_size;
 }
 
+// 编码参数属于视频流，通过 SetInputMediaType 交给编码器，而不是放进 Sink Writer 初始化属性。
+auto create_video_encoding_parameters(const EncoderConfig& config)
+    -> std::expected<wil::com_ptr<IMFAttributes>, std::string> {
+  wil::com_ptr<IMFAttributes> parameters;
+  HRESULT hr = MFCreateAttributes(parameters.put(), 3);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("Failed to create video encoding parameters: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
+  }
+
+  // 配置使用秒，编码器 GOP 使用帧数；零值保留编码器自动选择 GOP 的语义。
+  const auto gop_size = config.fps * config.keyframe_interval;
+  hr = parameters->SetUINT32(CODECAPI_AVEncMPVGOPSize, gop_size);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("Failed to set GOP size encoding parameter: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
+  }
+
+  const UINT32 rate_control_mode = config.rate_control == RateControlMode::CBR
+                                       ? eAVEncCommonRateControlMode_CBR
+                                       : eAVEncCommonRateControlMode_Quality;
+  hr = parameters->SetUINT32(CODECAPI_AVEncCommonRateControlMode, rate_control_mode);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("Failed to set rate control encoding parameter: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
+  }
+
+  if (config.rate_control == RateControlMode::VBR) {
+    hr = parameters->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality);
+    if (FAILED(hr)) {
+      return std::unexpected(std::format("Failed to set quality encoding parameter: hr=0x{:08X}",
+                                         static_cast<std::uint32_t>(hr)));
+    }
+    Logger().info("Requesting quality-based VBR encoding with quality: {}", config.quality);
+  } else if (config.rate_control == RateControlMode::ManualQP) {
+    // AVEncVideoEncodeQP 要求 VT_UI8，低 16 位指定默认 QP。
+    hr = parameters->SetUINT64(CODECAPI_AVEncVideoEncodeQP, config.qp);
+    if (FAILED(hr)) {
+      return std::unexpected(std::format("Failed to set QP encoding parameter: hr=0x{:08X}",
+                                         static_cast<std::uint32_t>(hr)));
+    }
+    Logger().info("Requesting Manual QP encoding with QP: {}", config.qp);
+  } else {
+    Logger().info("Requesting CBR encoding with bitrate: {} bps", config.bitrate);
+  }
+  Logger().info("Requesting video encoder GOP: {} frames ({}s @ {}fps)", gop_size,
+                config.keyframe_interval, config.fps);
+
+  return parameters;
+}
+
 // 辅助函数：创建输出媒体类型
 auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate,
-                              uint32_t keyframe_interval, VideoCodec codec, bool enable_hdr,
-                              std::uint32_t hdr_target_peak_nits) -> wil::com_ptr<IMFMediaType> {
+                              VideoCodec codec, bool enable_hdr, std::uint32_t hdr_target_peak_nits)
+    -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
@@ -108,10 +159,6 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
         return nullptr;
     }
   }
-
-  // 关键帧间隔
-  if (FAILED(media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * keyframe_interval)))
-    return nullptr;
 
   return media_type;
 }
@@ -263,9 +310,9 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     return std::unexpected("Failed to create MPEG4 media sink");
   }
 
-  // 6. 创建 Sink Writer 属性并预设编码器参数
+  // 6. 创建 Sink Writer 初始化属性
   wil::com_ptr<IMFAttributes> attributes;
-  if (FAILED(MFCreateAttributes(attributes.put(), 8))) {
+  if (FAILED(MFCreateAttributes(attributes.put(), 2))) {
     return std::unexpected("Failed to create MF attributes");
   }
 
@@ -279,45 +326,16 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     return std::unexpected("Failed to set D3D manager");
   }
 
-  // 在创建 Sink Writer 前预设 Rate Control Mode
-  UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
-
-  if (config.rate_control == RateControlMode::VBR) {
-    rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (config.rate_control == RateControlMode::ManualQP) {
-    rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
-  }
-
-  if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonRateControlMode, rate_control_mode))) {
-    Logger().warn("Failed to set rate control mode attribute");
-  }
-
-  // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (config.rate_control == RateControlMode::VBR) {
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
-      Logger().warn("Failed to set quality attribute");
-    }
-    Logger().info("GPU encoder configured for VBR mode with quality: {}", config.quality);
-  } else if (config.rate_control == RateControlMode::ManualQP) {
-    // 尝试设置 QP 参数（可能不被所有编码器支持）
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
-      Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
-    }
-    Logger().info("GPU encoder configured for Manual QP mode with QP: {}", config.qp);
-  } else {
-    Logger().info("GPU encoder configured for CBR mode");
-  }
-
-  // 7. 用预设属性创建 Sink Writer
+  // 7. 创建 Sink Writer
   if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
                                              ctx.sink_writer.put()))) {
     return std::unexpected("Failed to create Sink Writer from media sink");
   }
 
   // 8. 创建输出媒体类型
-  auto media_type_out = create_output_media_type(
-      config.width, config.height, config.fps, config.bitrate, config.keyframe_interval,
-      config.codec, config.enable_hdr, config.hdr_target_peak_nits);
+  auto media_type_out =
+      create_output_media_type(config.width, config.height, config.fps, config.bitrate,
+                               config.codec, config.enable_hdr, config.hdr_target_peak_nits);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -333,9 +351,16 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     return std::unexpected("Failed to create GPU input media type");
   }
 
-  if (FAILED(ctx.sink_writer->SetInputMediaType(ctx.video_stream_index, media_type_in.get(),
-                                                nullptr))) {
-    return std::unexpected("Failed to set GPU input media type");
+  auto encoding_parameters = create_video_encoding_parameters(config);
+  if (!encoding_parameters) {
+    return std::unexpected(encoding_parameters.error());
+  }
+  HRESULT hr = ctx.sink_writer->SetInputMediaType(ctx.video_stream_index, media_type_in.get(),
+                                                  encoding_parameters->get());
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set GPU input media type and encoding parameters: hr=0x{:08X}",
+                    static_cast<std::uint32_t>(hr)));
   }
 
   if (config.enable_hdr) {
@@ -356,8 +381,10 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
   }
 
   // 11. 开始写入
-  if (FAILED(ctx.sink_writer->BeginWriting())) {
-    return std::unexpected("Failed to begin writing with GPU encoder");
+  hr = ctx.sink_writer->BeginWriting();
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("Failed to begin writing with GPU encoder: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
 
   // 缓存尺寸信息
@@ -397,9 +424,9 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     return std::unexpected("Failed to create MPEG4 media sink");
   }
 
-  // 3. 创建 Sink Writer 属性并预设编码器参数
+  // 3. 创建 Sink Writer 初始化属性
   wil::com_ptr<IMFAttributes> attributes;
-  if (FAILED(MFCreateAttributes(attributes.put(), 8))) {
+  if (FAILED(MFCreateAttributes(attributes.put(), 1))) {
     return std::unexpected("Failed to create MF attributes");
   }
 
@@ -408,45 +435,15 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     Logger().warn("Failed to disable hardware transforms for CPU encoder");
   }
 
-  // 在创建 Sink Writer 前预设 Rate Control Mode
-  UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
-
-  if (config.rate_control == RateControlMode::VBR) {
-    rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (config.rate_control == RateControlMode::ManualQP) {
-    rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
-  }
-
-  if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonRateControlMode, rate_control_mode))) {
-    Logger().warn("Failed to set rate control mode attribute");
-  }
-
-  // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (config.rate_control == RateControlMode::VBR) {
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
-      Logger().warn("Failed to set quality attribute");
-    }
-    Logger().info("CPU encoder configured for VBR mode with quality: {}", config.quality);
-  } else if (config.rate_control == RateControlMode::ManualQP) {
-    // 尝试设置 QP 参数（可能不被所有编码器支持）
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
-      Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
-    }
-    Logger().info("CPU encoder configured for Manual QP mode with QP: {}", config.qp);
-  } else {
-    Logger().info("CPU encoder configured for CBR mode");
-  }
-
-  // 4. 用预设属性创建 Sink Writer
+  // 4. 创建 Sink Writer
   if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
                                              ctx.sink_writer.put()))) {
     return std::unexpected("Failed to create Sink Writer from media sink");
   }
 
   // 5. 创建输出媒体类型
-  auto media_type_out =
-      create_output_media_type(config.width, config.height, config.fps, config.bitrate,
-                               config.keyframe_interval, config.codec, false, 0);
+  auto media_type_out = create_output_media_type(config.width, config.height, config.fps,
+                                                 config.bitrate, config.codec, false, 0);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -462,9 +459,16 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     return std::unexpected("Failed to create input media type");
   }
 
-  if (FAILED(ctx.sink_writer->SetInputMediaType(ctx.video_stream_index, media_type_in.get(),
-                                                nullptr))) {
-    return std::unexpected("Failed to set input media type");
+  auto encoding_parameters = create_video_encoding_parameters(config);
+  if (!encoding_parameters) {
+    return std::unexpected(encoding_parameters.error());
+  }
+  HRESULT hr = ctx.sink_writer->SetInputMediaType(ctx.video_stream_index, media_type_in.get(),
+                                                  encoding_parameters->get());
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set CPU input media type and encoding parameters: hr=0x{:08X}",
+                    static_cast<std::uint32_t>(hr)));
   }
 
   // 7. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
@@ -476,8 +480,10 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
   }
 
   // 8. 开始写入
-  if (FAILED(ctx.sink_writer->BeginWriting())) {
-    return std::unexpected("Failed to begin writing");
+  hr = ctx.sink_writer->BeginWriting();
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("Failed to begin writing with CPU encoder: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
 
   // 缓存尺寸信息
