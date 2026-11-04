@@ -25,9 +25,13 @@ struct AdbModeState {
   // 表示队列中仍有未完成的 ADB 操作。
   bool operation_in_progress = false;
 
-  // 一个完整设备会话统一拥有 ADB 连接、Android 捕获服务、forward 和协议 socket。
-  std::shared_ptr<session::DeviceSession> device_session;
-  std::unique_ptr<recording::AdbRecordingSession> recording_session;
+  // 会话状态随模块存在；连接、服务与传输资源由 ADB 队列原地打开和关闭。
+  session::DeviceSession device_session;
+  // 空闲时为空；每段原地构造，工作线程退出并完成收尾后销毁。
+  std::optional<recording::AdbRecordingSession> recording_session;
+  std::uint64_t next_recording_id = 0;
+  // 只由录制开关请求管理，覆盖请求排队与执行，防止连按重复提交。
+  bool recording_control_pending = false;
   std::string last_error;
 
   // 仅表示本次进程会话中是否成功改写过显示状态，不持久化到磁盘。

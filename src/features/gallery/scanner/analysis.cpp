@@ -11,6 +11,7 @@
 #include "features/gallery/scanner/common.hpp"
 #include "features/gallery/scanner/progress.hpp"
 #include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
 #include "utils/logger/logger.hpp"
 
 namespace features::gallery::scanner::analysis {
@@ -176,6 +177,11 @@ auto run_hash_analysis_phase(core::AppState& app_state,
     -> std::expected<std::vector<FileAnalysisResult>, std::string> {
   auto analysis_results =
       analyze_file_changes(file_infos, asset_cache, options.force_reanalyze.value_or(false));
+
+  // 主动操作负责这些路径的索引；保留发现库存供 missing 对账，只排除本轮分析任务。
+  std::erase_if(analysis_results, [&app_state](const FileAnalysisResult& analysis) {
+    return watcher::is_path_in_manual_file_system_ignore(app_state, analysis.file_info.path);
+  });
 
   const auto hash_candidate_count = static_cast<std::size_t>(
       std::ranges::count_if(analysis_results, [](const FileAnalysisResult& analysis) {

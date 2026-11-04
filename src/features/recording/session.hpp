@@ -24,22 +24,12 @@ auto calculate_frame_crop_plan(HWND target_window,
 auto build_startup_capture_plan(HWND target_window, bool capture_client_area)
     -> std::expected<features::recording::CapturePlan, std::string>;
 
-// 生成无扩展名的临时输出路径，避免未 finalize 的文件被当成完整 MP4。
-auto build_working_output_path(const std::filesystem::path& final_output_path)
-    -> std::filesystem::path;
-
 // 在指定输出目录里生成一个时间戳 MP4 路径；首次录制和 resize 自动切段共用这套命名规则。
 auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path;
 
-// finalize 成功后把临时文件发布为最终 .mp4 文件。
-auto rename_working_output_to_final(const std::filesystem::path& working_output_path,
-                                    const std::filesystem::path& final_output_path)
-    -> std::expected<void, std::string>;
-
-// 删除失败或过短录制段留下的临时输出文件。
-auto delete_working_output_file(const std::filesystem::path& working_output_path,
-                                std::string_view reason) -> void;
+// 仅删除启动失败且没有有效输出的文件，或沿用误触短段丢弃规则。
+auto delete_output_file(const std::filesystem::path& output_path, std::string_view reason) -> void;
 
 // 清空单段录制会话状态，但保留可复用的 D3D 设备资源。
 auto clear_session_runtime_fields(core::AppState& app_state) -> void;

@@ -21,13 +21,12 @@
 #include "utils/graphics/capture_region.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/media/encoder.hpp"
+#include "utils/media/sink_writer.hpp"
 #include "utils/media/types.hpp"
 #include "utils/string/string.hpp"
 
 namespace features::recording::encoder_loop {
 
-// 视频帧数太少就整段丢弃、不写最终 mp4，避免误触留下半截文件。
-constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 // 编码线程如果落后太多，就直接跳过旧的视频格子，只保留少量 backlog 继续编码。
 constexpr std::int64_t k_encoding_overload_drop_threshold_frames = 6;
 constexpr std::int64_t k_encoding_overload_keep_backlog_frames = 2;
@@ -232,7 +231,7 @@ auto should_exit_finished_segment(RecordingState& state) -> bool {
 
 auto build_encoder_config(const RecordingState& state) -> utils::media::encoder::EncoderConfig {
   utils::media::encoder::EncoderConfig encoder_config;
-  encoder_config.output_path = state.working_output_path;
+  encoder_config.output_path = state.config.output_path;
   encoder_config.width = state.config.width;
   encoder_config.height = state.config.height;
   encoder_config.fps = state.config.fps;
@@ -579,6 +578,11 @@ auto encoder_thread_proc(core::AppState& app_state, std::stop_token stop_token,
 
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    auto close_on_exit = wil::scope_exit([&] {
+      auto closed = utils::media::sink_writer::close(state.encoder.sink_writer, false);
+      if (!closed) Logger().warn("Recording writer cleanup failed: {}", closed.error());
+      state.encoder = {};
+    });
 
     auto encoder_config = build_encoder_config(state);
     auto encoder_result = utils::media::encoder::create_encoder(encoder_config, state.device.get(),
@@ -707,15 +711,12 @@ auto encoder_thread_proc(core::AppState& app_state, std::stop_token stop_token,
         state.encoder_error = finalize_result.error();
         Logger().error("Failed to finalize encoder: {}", finalize_result.error());
       } else {
-        state.finalize_succeeded = true;
         Logger().info("Recording encoder finalized in {}ms", finalize_elapsed.count());
       }
     } else if (state.encoder_error.empty()) {
-      Logger().info("Discard recording segment: {} encoded video frames, publish requires > {}",
+      Logger().info("Discard recording segment: {} encoded video frames, keep requires > {}",
                     state.encoded_video_frames, k_discard_video_frame_threshold);
     }
-
-    state.encoder = {};
   } catch (const wil::ResultException& e) {
     state.encoder_error = std::format(
         "Encoder thread COM initialization failed: {} (HRESULT: "

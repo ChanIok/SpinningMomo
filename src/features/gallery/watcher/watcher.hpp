@@ -56,8 +56,9 @@ auto complete_manual_file_system_ignore(core::AppState& app_state,
 auto is_path_in_manual_file_system_ignore(core::AppState& app_state,
                                           const std::filesystem::path& path) -> bool;
 
-// 将手动文件操作产出的 ScanChange 分发到对应 root watcher 的 post_scan_callback。
-auto dispatch_manual_scan_changes(core::AppState& app_state, const std::vector<ScanChange>& changes)
+// 将手动操作的文件及目录事实按所属 root 分发到 post_scan_callback。
+// 回调仅消费 changes / created_folders；此分发不携带扫描统计，不推断新增或更新数量。
+auto dispatch_manual_scan_result(core::AppState& app_state, const ScanResult& scan_result)
     -> std::expected<void, std::string>;
 
 }  // namespace features::gallery::watcher

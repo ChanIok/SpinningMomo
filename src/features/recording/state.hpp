@@ -18,7 +18,6 @@ namespace features::recording {
 // 录制完整状态
 struct RecordingState {
   features::recording::RecordingConfig config;
-  std::filesystem::path working_output_path;
   HWND target_window = nullptr;
   features::recording::CapturePlan capture_plan;
 
@@ -64,7 +63,6 @@ struct RecordingState {
   std::atomic<bool> has_audio{false};
   bool encoder_ready = false;
   bool encoder_start_succeeded = false;
-  bool finalize_succeeded = false;
   std::uint32_t pending_video_frame_count = 0;
   std::string encoder_error;
 

@@ -9,9 +9,13 @@
 #include "vendor/windows/mfidl.hpp"
 #include "vendor/windows/mfreadwrite.hpp"
 
+#include "core/state/app_state.hpp"
 #include "features/adb_mode/capture_protocol.hpp"
 #include "features/adb_mode/device_session.hpp"
+#include "features/adb_mode/state.hpp"
 #include "utils/logger/logger.hpp"
+#include "utils/media/hybrid_mp4.hpp"
+#include "utils/media/sink_writer.hpp"
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
 
@@ -105,7 +109,8 @@ auto parse_record_ready(std::span<const std::uint8_t> payload)
 // 初始化 Media Foundation SinkWriter 为零转码 Passthrough 模式
 auto initialize_sink_writer(AdbRecordingSession& session, const RecordReadyInfo& info,
                             std::uint32_t target_bitrate) -> std::expected<void, std::string> {
-  const auto parent_dir = session.working_output_path.parent_path();
+  // 1. 准备输出目录与 Writer 属性，后续按 Android 已编码的格式直通写入。
+  const auto parent_dir = session.output_path.parent_path();
   if (!parent_dir.empty()) {
     auto ensure_dir = utils::path::EnsureDirectoryExists(parent_dir);
     if (!ensure_dir) {
@@ -113,36 +118,21 @@ auto initialize_sink_writer(AdbRecordingSession& session, const RecordReadyInfo&
     }
   }
 
-  // 1. 创建目标文件的 Byte Stream 与 MPEG-4 Media Sink
-  wil::com_ptr<IMFByteStream> byte_stream;
-  HRESULT hr = MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
-                            session.working_output_path.c_str(), byte_stream.put());
-  if (FAILED(hr)) {
-    return std::unexpected(std::format("MFCreateFile failed: hr=0x{:08X}", hr));
-  }
-
-  wil::com_ptr<IMFMediaSink> media_sink;
-  hr = MFCreateMPEG4MediaSink(byte_stream.get(), nullptr, nullptr, media_sink.put());
-  if (FAILED(hr)) {
-    return std::unexpected(std::format("MFCreateMPEG4MediaSink failed: hr=0x{:08X}", hr));
-  }
-
-  // 2. 创建 SinkWriter
+  // 禁用 Writer 自身节流，避免录制通道消费被额外限速。
   wil::com_ptr<IMFAttributes> attributes;
-  hr = MFCreateAttributes(attributes.put(), 2);
+  HRESULT hr = MFCreateAttributes(attributes.put(), 3);
   if (FAILED(hr)) {
     return std::unexpected("Failed to create MF attributes");
   }
   attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
   attributes->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
 
-  hr = MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
-                                       session.sink_writer.put());
-  if (FAILED(hr)) {
-    return std::unexpected(std::format("MFCreateSinkWriterFromMediaSink failed: hr=0x{:08X}", hr));
-  }
+  // 2. 创建分片 MP4 Writer，录制过程中持续落下可保留的完整分片。
+  auto writer_result = utils::media::sink_writer::create_fragmented(
+      session.output_path, attributes.get(), session.sink_writer);
+  if (!writer_result) return std::unexpected(writer_result.error());
 
-  // 3. 视频流直通配置
+  // 3. 按握手给出的视频参数配置直通流，不重新编码视频。
   wil::com_ptr<IMFMediaType> video_type;
   hr = MFCreateMediaType(video_type.put());
   if (FAILED(hr)) {
@@ -174,7 +164,7 @@ auto initialize_sink_writer(AdbRecordingSession& session, const RecordReadyInfo&
   session.is_h265 = info.is_h265;
   session.video_frame_duration_100ns = 10'000'000LL / (info.fps > 0 ? info.fps : 60);
 
-  // 4. 音频流直通配置
+  // 4. 配置可选 AAC 音频直通流，保持与设备端编码格式一致。
   if (info.has_audio) {
     wil::com_ptr<IMFMediaType> audio_type;
     hr = MFCreateMediaType(audio_type.put());
@@ -208,7 +198,7 @@ auto initialize_sink_writer(AdbRecordingSession& session, const RecordReadyInfo&
     }
   }
 
-  // 5. 开启写入
+  // 5. 所有流配置完成后开始写入，工作线程随后才能提交样本。
   hr = session.sink_writer->BeginWriting();
   if (FAILED(hr)) {
     return std::unexpected(std::format("BeginWriting failed: hr=0x{:08X}", hr));
@@ -224,9 +214,9 @@ auto initialize_sink_writer(AdbRecordingSession& session, const RecordReadyInfo&
 
 // 写入单个视频样本
 auto write_video_sample(AdbRecordingSession& session, const capture_protocol::Frame& frame)
-    -> void {
+    -> std::expected<void, std::string> {
   if (!session.sink_writer || !session.has_video_stream || frame.payload.empty()) {
-    return;
+    return {};
   }
 
   auto sample_time_100ns = static_cast<std::int64_t>(frame.timestamp) * 10;
@@ -237,13 +227,15 @@ auto write_video_sample(AdbRecordingSession& session, const capture_protocol::Fr
   wil::com_ptr<IMFMediaBuffer> media_buffer;
   HRESULT hr = MFCreateMemoryBuffer(static_cast<DWORD>(frame.payload.size()), media_buffer.put());
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
 
   BYTE* dest = nullptr;
   hr = media_buffer->Lock(&dest, nullptr, nullptr);
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
   std::memcpy(dest, frame.payload.data(), frame.payload.size());
   media_buffer->Unlock();
@@ -252,7 +244,8 @@ auto write_video_sample(AdbRecordingSession& session, const capture_protocol::Fr
   wil::com_ptr<IMFSample> sample;
   hr = MFCreateSample(sample.put());
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
   sample->AddBuffer(media_buffer.get());
   sample->SetSampleTime(sample_time_100ns);
@@ -264,19 +257,19 @@ auto write_video_sample(AdbRecordingSession& session, const capture_protocol::Fr
 
   hr = session.sink_writer->WriteSample(session.video_stream_index, sample.get());
   if (FAILED(hr)) {
-    Logger().warn("ADB IMFSinkWriter WriteSample (Video) failed: hr=0x{:08X}",
-                  static_cast<unsigned long>(hr));
-  } else {
-    session.last_video_mf_time = sample_time_100ns;
-    session.video_samples_written++;
+    return std::unexpected(std::format("ADB IMFSinkWriter WriteSample (Video) failed: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
+  session.last_video_mf_time = sample_time_100ns;
+  session.video_samples_written++;
+  return {};
 }
 
 // 写入单个音频样本
 auto write_audio_sample(AdbRecordingSession& session, const capture_protocol::Frame& frame)
-    -> void {
+    -> std::expected<void, std::string> {
   if (!session.sink_writer || !session.has_audio_stream || frame.payload.empty()) {
-    return;
+    return {};
   }
 
   auto sample_time_100ns = static_cast<std::int64_t>(frame.timestamp) * 10;
@@ -287,13 +280,15 @@ auto write_audio_sample(AdbRecordingSession& session, const capture_protocol::Fr
   wil::com_ptr<IMFMediaBuffer> media_buffer;
   HRESULT hr = MFCreateMemoryBuffer(static_cast<DWORD>(frame.payload.size()), media_buffer.put());
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
 
   BYTE* dest = nullptr;
   hr = media_buffer->Lock(&dest, nullptr, nullptr);
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
   std::memcpy(dest, frame.payload.data(), frame.payload.size());
   media_buffer->Unlock();
@@ -302,7 +297,8 @@ auto write_audio_sample(AdbRecordingSession& session, const capture_protocol::Fr
   wil::com_ptr<IMFSample> sample;
   hr = MFCreateSample(sample.put());
   if (FAILED(hr)) {
-    return;
+    return std::unexpected(std::format("Failed to prepare ADB recording sample: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
   sample->AddBuffer(media_buffer.get());
   sample->SetSampleTime(sample_time_100ns);
@@ -310,12 +306,12 @@ auto write_audio_sample(AdbRecordingSession& session, const capture_protocol::Fr
 
   hr = session.sink_writer->WriteSample(session.audio_stream_index, sample.get());
   if (FAILED(hr)) {
-    Logger().warn("ADB IMFSinkWriter WriteSample (Audio) failed: hr=0x{:08X}",
-                  static_cast<unsigned long>(hr));
-  } else {
-    session.last_audio_mf_time = sample_time_100ns;
-    session.audio_samples_written++;
+    return std::unexpected(std::format("ADB IMFSinkWriter WriteSample (Audio) failed: hr=0x{:08X}",
+                                       static_cast<std::uint32_t>(hr)));
   }
+  session.last_audio_mf_time = sample_time_100ns;
+  session.audio_samples_written++;
+  return {};
 }
 
 // 录制流后台消费线程：发送 StartRecord → 等待 RecordReady → 接收 Sample 直至 Finished
@@ -334,6 +330,14 @@ auto worker_thread_proc(AdbRecordingSession& session, std::uint32_t fps, std::ui
       MFShutdown();
     }
   });
+  const auto writer_guard = wil::scope_exit([&session]() {
+    auto closed = utils::media::sink_writer::close(session.sink_writer, false);
+    if (!closed) Logger().warn("ADB writer cleanup failed: {}", closed.error());
+  });
+  if (FAILED(hr_com) || FAILED(hr_mf)) {
+    session.error_message = "Failed to initialize ADB recording media runtime";
+    return;
+  }
 
   // 1. 向 Android 录制通道发送 START_RECORD 请求帧
   std::array<std::uint8_t, 9> start_payload{};
@@ -387,27 +391,39 @@ auto worker_thread_proc(AdbRecordingSession& session, std::uint32_t fps, std::ui
   }
 
   // 4. 循环读取并消费音视频样本
+  bool stop_sent = false;
   while (true) {
-    const auto timeout = session.stop_requested.load(std::memory_order_acquire)
-                             ? std::chrono::milliseconds(2000)
-                             : std::chrono::milliseconds(5000);
+    // 录制连接的局部 Asio 循环只归此线程；控制线程不能并发 restart/run 来发送停止。
+    if (!stop_sent && session.stop_requested.load(std::memory_order_acquire)) {
+      auto stopped =
+          session::send_stream_frame(session.connection, capture_protocol::MessageType::StopRecord);
+      if (!stopped) {
+        session.error_message = stopped.error();
+        break;
+      }
+      stop_sent = true;
+    }
+    const auto timeout =
+        stop_sent ? std::chrono::milliseconds(2000) : std::chrono::milliseconds(5000);
 
     auto frame_res = session::receive_stream_frame(session.connection, timeout);
     if (!frame_res) {
-      if (session.stop_requested.load(std::memory_order_acquire)) {
-        Logger().info("ADB recording stream read completed during stop: {}", frame_res.error());
-      } else {
-        session.error_message = frame_res.error();
-        Logger().warn("ADB recording stream read error: {}", frame_res.error());
-      }
+      // 只有 RecordFinished 才代表完整结束；停止期间断流也不能伪装成正常录像。
+      session.error_message = frame_res.error();
+      Logger().warn("ADB recording stream read error: {}", frame_res.error());
       break;
     }
 
     const auto& frame = *frame_res;
-    if (frame.type == capture_protocol::MessageType::VideoSample) {
-      write_video_sample(session, frame);
-    } else if (frame.type == capture_protocol::MessageType::AudioSample) {
-      write_audio_sample(session, frame);
+    if (frame.type == capture_protocol::MessageType::VideoSample ||
+        frame.type == capture_protocol::MessageType::AudioSample) {
+      auto written = frame.type == capture_protocol::MessageType::VideoSample
+                         ? write_video_sample(session, frame)
+                         : write_audio_sample(session, frame);
+      if (!written) {
+        session.error_message = written.error();
+        break;
+      }
     } else if (frame.type == capture_protocol::MessageType::AudioEnded) {
       Logger().info("ADB recording received AudioEnded; continuing video-only");
       session.has_audio_stream = false;
@@ -423,18 +439,17 @@ auto worker_thread_proc(AdbRecordingSession& session, std::uint32_t fps, std::ui
 
   // 5. 排空完成后执行 SinkWriter 落盘
   if (session.sink_writer && session.sink_writer_initialized) {
-    if (session.video_samples_written > 0) {
-      HRESULT hr = session.sink_writer->Finalize();
-      if (SUCCEEDED(hr)) {
-        session.finalize_succeeded = true;
+    if (session.video_samples_written > 0 && session.error_message.empty()) {
+      auto closed = utils::media::sink_writer::close(session.sink_writer, true);
+      if (closed) {
         Logger().info(
             "ADB IMFSinkWriter finalized successfully: {} video samples, {} audio samples",
             session.video_samples_written, session.audio_samples_written);
       } else {
-        Logger().error("ADB IMFSinkWriter Finalize failed: hr=0x{:08X}",
-                       static_cast<unsigned long>(hr));
+        session.error_message = closed.error();
+        Logger().error("ADB IMFSinkWriter close failed: {}", closed.error());
       }
-    } else {
+    } else if (session.video_samples_written == 0 && session.error_message.empty()) {
       session.error_message = "No video frames recorded";
       Logger().warn("ADB recording discarded: no video frames written");
     }
@@ -443,85 +458,113 @@ auto worker_thread_proc(AdbRecordingSession& session, std::uint32_t fps, std::ui
 
 }  // namespace
 
-auto start(std::shared_ptr<session::DeviceSession> device_session,
-           const std::filesystem::path& output_path, std::uint32_t fps, std::uint32_t bitrate,
-           bool is_h265) -> std::expected<std::unique_ptr<AdbRecordingSession>, std::string> {
-  if (!device_session) {
-    return std::unexpected("Device session is null");
+auto start(core::AppState& state, const std::filesystem::path& output_path, std::uint32_t fps,
+           std::uint32_t bitrate, bool is_h265, std::uint64_t id,
+           std::move_only_function<void(std::uint64_t)> on_finished)
+    -> std::expected<void, std::string> {
+  // 1. 校验设备连接并原地构造本段状态，段 ID 用于识别异步完成回报。
+  auto device_session = session::get_active(state);
+  if (!device_session) return std::unexpected(device_session.error());
+
+  auto& adb_state = *state.adb_mode;
+  AdbRecordingSession* recording;
+  {
+    std::scoped_lock lock(adb_state.mutex);
+    if (adb_state.recording_session)
+      return std::unexpected("ADB recording session is already active");
+    recording = &adb_state.recording_session.emplace();
+    recording->id = id;
   }
-
-  auto conn_result = session::open_recording_connection(*device_session);
-  if (!conn_result) {
-    return std::unexpected(conn_result.error());
-  }
-
-  auto adb_session = std::make_unique<AdbRecordingSession>();
-  adb_session->device_session = std::move(device_session);
-  adb_session->connection = std::move(conn_result.value());
-  adb_session->final_output_path = output_path;
-  adb_session->working_output_path = output_path;
-  adb_session->working_output_path += L".tmp";
-  adb_session->is_h265 = is_h265;
-
-  auto* session_ptr = adb_session.get();
-  adb_session->worker_thread = std::jthread([session_ptr, fps, bitrate, is_h265]() {
-    worker_thread_proc(*session_ptr, fps, bitrate, is_h265);
+  // 线程启动是最后一步；此前失败时尚无运行线程，可以直接清理并销毁本段。
+  auto rollback = wil::scope_exit([&] {
+    session::close_recording_connection(**device_session, recording->connection);
+    std::scoped_lock lock(adb_state.mutex);
+    adb_state.recording_session.reset();
   });
 
-  return adb_session;
-}
+  // 2. 拒绝覆盖已有录像，再保存本段输出参数。
+  std::error_code path_error;
+  if (std::filesystem::exists(output_path, path_error))
+    return std::unexpected("Recording output already exists: " + output_path.string());
+  if (path_error)
+    return std::unexpected("Failed to inspect recording output: " + path_error.message());
 
-auto stop(std::unique_ptr<AdbRecordingSession>& session) -> AdbRecordResult {
-  AdbRecordResult result;
-  if (!session) {
-    result.kind = AdbRecordResult::Kind::NotRecording;
-    return result;
+  recording->output_path = output_path;
+  recording->is_h265 = is_h265;
+  // 3. 建立独立录制通道，避免音视频流占用设备控制通道。
+  auto connection = session::open_recording_connection(**device_session);
+  if (!connection) return std::unexpected(connection.error());
+  recording->connection = std::move(*connection);
+
+  // 4. 最后启动消费线程；握手、媒体初始化和样本写入都由该线程执行。
+  try {
+    recording->worker_thread = std::jthread(
+        [recording, fps, bitrate, is_h265, id, on_finished = std::move(on_finished)]() mutable {
+          try {
+            worker_thread_proc(*recording, fps, bitrate, is_h265);
+          } catch (const std::exception& e) {
+            recording->error_message = e.what();
+          } catch (...) {
+            recording->error_message = "Unknown ADB recording worker error";
+          }
+          on_finished(id);
+        });
+  } catch (const std::system_error& e) {
+    return std::unexpected("Failed to start ADB recording worker: " + std::string(e.what()));
   }
 
-  result.output_path = session->final_output_path;
+  rollback.release();
+  return {};
+}
+
+auto stop(core::AppState& state) -> AdbRecordResult {
+  auto& adb_state = *state.adb_mode;
+  AdbRecordingSession* session;
+  {
+    std::scoped_lock lock(adb_state.mutex);
+    if (!adb_state.recording_session) return {};
+    session = &*adb_state.recording_session;
+  }
+  // 1. 提交停止意图；StopRecord 仍由消费线程发送，避免并发操作录制连接。
   session->stop_requested.store(true, std::memory_order_release);
 
-  // 步骤 1：向单条录制连接发送 StopRecord 指令（Android 端会注入 EOS 并回发 RecordFinished）
-  static_cast<void>(
-      session::send_stream_frame(session->connection, capture_protocol::MessageType::StopRecord));
-
-  // 步骤 2：等待后台消费线程排空落盘退出
+  // 2. 在状态锁外等待消费线程排空并关闭 Writer；自然结束时只需收集结果。
   if (session->worker_thread.joinable()) {
     session->worker_thread.join();
   }
 
-  // 步骤 3：关闭连接并移除端口映射
-  if (session->device_session) {
-    session::close_recording_connection(*session->device_session, session->connection);
-  }
+  // 3. Writer 已关闭，回收录制连接及其端口映射。
+  session::close_recording_connection(adb_state.device_session, session->connection);
 
-  // 步骤 4：根据落盘状态发布产物或清理临时文件
-  if (session->finalize_succeeded) {
-    std::error_code ec;
-    std::filesystem::rename(session->working_output_path, session->final_output_path, ec);
-    if (ec) {
-      result.kind = AdbRecordResult::Kind::PublishFailed;
-      result.error = ec.message();
-      Logger().error("Failed to rename temporary ADB recording to final file: {}", ec.message());
-    } else {
-      result.kind = AdbRecordResult::Kind::Saved;
-      if (!session->error_message.empty()) {
-        result.error = session->error_message;
-        Logger().warn("ADB recording saved with interruption/warning: {}", session->error_message);
-      } else {
-        Logger().info("ADB recording saved to: {}", session->final_output_path.string());
-      }
+  // join 在状态锁外完成；索引整理期间仍保留本段身份，之后才销毁可复用存储中的对象。
+  auto clear_session = wil::scope_exit([&] {
+    std::scoped_lock lock(adb_state.mutex);
+    adb_state.recording_session.reset();
+  });
+  AdbRecordResult result;
+  result.output_path = session->output_path;
+
+  // 4. 有效且正常结束时整理总索引；异常保留已有分片，没有视频样本才丢弃。
+  if (session->video_samples_written > 0) {
+    result.error = session->error_message;
+    if (result.error.empty()) {
+      auto finalized = utils::media::hybrid_mp4::finalize(session->output_path);
+      if (!finalized) result.error = finalized.error();
     }
+    result.kind =
+        result.error.empty() ? AdbRecordResult::Kind::Saved : AdbRecordResult::Kind::Failed;
+    if (!result.error.empty())
+      Logger().warn("ADB recording retained at '{}': {}", result.output_path.string(),
+                    result.error);
   } else {
     std::error_code ec;
-    std::filesystem::remove(session->working_output_path, ec);
+    std::filesystem::remove(session->output_path, ec);
     result.kind = AdbRecordResult::Kind::Discarded;
     result.error =
         session->error_message.empty() ? "ADB recording aborted" : session->error_message;
     Logger().warn("ADB recording discarded: {}", result.error);
   }
 
-  session.reset();
   return result;
 }
 

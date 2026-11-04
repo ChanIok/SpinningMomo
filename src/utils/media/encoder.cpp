@@ -14,6 +14,7 @@
 
 #include "utils/logger/logger.hpp"
 #include "utils/media/hdr_convert.hpp"
+#include "utils/media/sink_writer.hpp"
 
 namespace utils::media::encoder {
 
@@ -284,33 +285,20 @@ auto add_audio_stream(EncoderContext& encoder, WAVEFORMATEX* wave_format, uint32
 // 尝试创建 GPU 编码器
 auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID3D11Device* device,
                             WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
-  // 1. 创建 DXGI Device Manager
+  // 1. 创建 DXGI Device Manager，供 Media Foundation 共享 GPU 设备。
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
   }
 
-  // 2. 将 D3D11 设备关联到 DXGI Manager
+  // 2. 关联捕获使用的 D3D11 设备，使 GPU 纹理能进入编码路径。
   if (FAILED(ctx.dxgi_manager->ResetDevice(device, ctx.reset_token))) {
     return std::unexpected("Failed to reset DXGI device");
   }
 
-  // 3. 确保目录存在
+  // 3. 准备输出目录，随后直接写入最终 MP4 路径。
   std::filesystem::create_directories(config.output_path.parent_path());
 
-  // 4. 创建 Byte Stream
-  wil::com_ptr<IMFByteStream> byte_stream;
-  if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
-                          config.output_path.c_str(), byte_stream.put()))) {
-    return std::unexpected("Failed to create byte stream");
-  }
-
-  // 5. 创建 Media Sink
-  wil::com_ptr<IMFMediaSink> media_sink;
-  if (FAILED(MFCreateMPEG4MediaSink(byte_stream.get(), nullptr, nullptr, media_sink.put()))) {
-    return std::unexpected("Failed to create MPEG4 media sink");
-  }
-
-  // 6. 创建 Sink Writer 初始化属性
+  // 4. 配置硬件变换与 DXGI Manager，供 Writer 选择 GPU 编码路径。
   wil::com_ptr<IMFAttributes> attributes;
   if (FAILED(MFCreateAttributes(attributes.put(), 2))) {
     return std::unexpected("Failed to create MF attributes");
@@ -326,13 +314,12 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     return std::unexpected("Failed to set D3D manager");
   }
 
-  // 7. 创建 Sink Writer
-  if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
-                                             ctx.sink_writer.put()))) {
-    return std::unexpected("Failed to create Sink Writer from media sink");
-  }
+  // 5. 创建分片 MP4 Writer，完整分片不依赖正常停止时的总索引。
+  auto writer_result =
+      sink_writer::create_fragmented(config.output_path, attributes.get(), ctx.sink_writer);
+  if (!writer_result) return std::unexpected(writer_result.error());
 
-  // 8. 创建输出媒体类型
+  // 6. 配置输出视频格式，确定编码、尺寸、帧率及 HDR 参数。
   auto media_type_out =
       create_output_media_type(config.width, config.height, config.fps, config.bitrate,
                                config.codec, config.enable_hdr, config.hdr_target_peak_nits);
@@ -344,7 +331,7 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     return std::unexpected("Failed to add video stream");
   }
 
-  // 9. 创建 GPU 输入媒体类型
+  // 7. 配置 GPU 输入与编码参数；HDR 还需准备 scRGB 到 P010 的转换。
   auto media_type_in =
       create_input_media_type(config.width, config.height, config.fps, false, config.enable_hdr);
   if (!media_type_in) {
@@ -372,7 +359,7 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     ctx.hdr_converter = std::move(*hdr_converter_result);
   }
 
-  // 10. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
+  // 8. 在 BeginWriting 前配置可选音频流，之后不再添加新流。
   if (wave_format) {
     auto audio_result = add_audio_stream(ctx, wave_format, config.audio_bitrate);
     if (!audio_result) {
@@ -380,7 +367,7 @@ auto try_create_gpu_encoder(EncoderContext& ctx, const EncoderConfig& config, ID
     }
   }
 
-  // 11. 开始写入
+  // 9. 所有流就绪后开始写入，再保存后续送帧需要的格式信息。
   hr = ctx.sink_writer->BeginWriting();
   if (FAILED(hr)) {
     return std::unexpected(std::format("Failed to begin writing with GPU encoder: hr=0x{:08X}",
@@ -408,23 +395,10 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     return std::unexpected("HDR recording requires GPU encoder");
   }
 
-  // 确保目录存在
+  // 1. 准备输出目录，随后直接写入最终 MP4 路径。
   std::filesystem::create_directories(config.output_path.parent_path());
 
-  // 1. 创建 Byte Stream
-  wil::com_ptr<IMFByteStream> byte_stream;
-  if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
-                          config.output_path.c_str(), byte_stream.put()))) {
-    return std::unexpected("Failed to create byte stream");
-  }
-
-  // 2. 创建 Media Sink
-  wil::com_ptr<IMFMediaSink> media_sink;
-  if (FAILED(MFCreateMPEG4MediaSink(byte_stream.get(), nullptr, nullptr, media_sink.put()))) {
-    return std::unexpected("Failed to create MPEG4 media sink");
-  }
-
-  // 3. 创建 Sink Writer 初始化属性
+  // 2. 配置 Writer 属性，显式关闭硬件变换以遵守强制 CPU 编码设置。
   wil::com_ptr<IMFAttributes> attributes;
   if (FAILED(MFCreateAttributes(attributes.put(), 1))) {
     return std::unexpected("Failed to create MF attributes");
@@ -435,13 +409,12 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     Logger().warn("Failed to disable hardware transforms for CPU encoder");
   }
 
-  // 4. 创建 Sink Writer
-  if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
-                                             ctx.sink_writer.put()))) {
-    return std::unexpected("Failed to create Sink Writer from media sink");
-  }
+  // 3. 创建分片 MP4 Writer；CPU 与 GPU 路径采用相同的落盘格式。
+  auto writer_result =
+      sink_writer::create_fragmented(config.output_path, attributes.get(), ctx.sink_writer);
+  if (!writer_result) return std::unexpected(writer_result.error());
 
-  // 5. 创建输出媒体类型
+  // 4. 配置输出视频编码格式。
   auto media_type_out = create_output_media_type(config.width, config.height, config.fps,
                                                  config.bitrate, config.codec, false, 0);
   if (!media_type_out) {
@@ -452,7 +425,7 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     return std::unexpected("Failed to add video stream");
   }
 
-  // 6. 创建输入媒体类型
+  // 5. 配置从 GPU 回读的输入图像格式及软件编码参数。
   auto media_type_in =
       create_input_media_type(config.width, config.height, config.fps, true, false);
   if (!media_type_in) {
@@ -471,7 +444,7 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
                     static_cast<std::uint32_t>(hr)));
   }
 
-  // 7. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
+  // 6. 在 BeginWriting 前配置可选音频流。
   if (wave_format) {
     auto audio_result = add_audio_stream(ctx, wave_format, config.audio_bitrate);
     if (!audio_result) {
@@ -479,7 +452,7 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
     }
   }
 
-  // 8. 开始写入
+  // 7. 所有流就绪后开始写入，再保存后续回读与送帧需要的尺寸。
   hr = ctx.sink_writer->BeginWriting();
   if (FAILED(hr)) {
     return std::unexpected(std::format("Failed to begin writing with CPU encoder: hr=0x{:08X}",
@@ -497,6 +470,11 @@ auto create_cpu_encoder(EncoderContext& ctx, const EncoderConfig& config, WAVEFO
 auto create_encoder(const EncoderConfig& config, ID3D11Device* device, WAVEFORMATEX* wave_format)
     -> std::expected<EncoderContext, std::string> {
   auto ctx = std::make_unique<EncoderContext>();
+  // 初始化中途失败也必须关闭 sink；成功返回时 writer 已移动到调用方。
+  auto close_on_failure = wil::scope_exit([&] {
+    auto closed = sink_writer::close(ctx->sink_writer, false);
+    if (!closed) Logger().warn("Encoder initialization cleanup failed: {}", closed.error());
+  });
 
   if (config.enable_hdr) {
     // HDR 不允许走 CPU fallback；这里再次兜底，防止旧配置或手写配置绕过前端限制。
@@ -540,6 +518,9 @@ auto create_encoder(const EncoderConfig& config, ID3D11Device* device, WAVEFORMA
 
     // Auto + H.264：GPU 失败时降级到 CPU
     Logger().info("Falling back to CPU encoder");
+    auto closed = sink_writer::close(ctx->sink_writer, false);
+    if (!closed)
+      Logger().warn("GPU encoder cleanup before CPU fallback failed: {}", closed.error());
     ctx = std::make_unique<EncoderContext>();  // 重置 context
   }
 
@@ -757,12 +738,7 @@ auto encode_audio(EncoderContext& encoder, const BYTE* audio_data, UINT32 num_fr
 }
 
 auto finalize_encoder(EncoderContext& encoder) -> std::expected<void, std::string> {
-  if (encoder.sink_writer) {
-    if (FAILED(encoder.sink_writer->Finalize())) {
-      return std::unexpected("Failed to finalize sink writer");
-    }
-    encoder.sink_writer = nullptr;
-  }
+  auto closed = sink_writer::close(encoder.sink_writer, true);
 
   // 清理所有资源
   encoder.staging_texture = nullptr;
@@ -772,7 +748,7 @@ auto finalize_encoder(EncoderContext& encoder) -> std::expected<void, std::strin
   encoder.hdr_converter = {};
   encoder.hdr_encoding = false;
 
-  return {};
+  return closed;
 }
 
 }  // namespace utils::media::encoder

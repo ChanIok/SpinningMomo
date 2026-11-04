@@ -3,6 +3,7 @@
 #include "vendor/std.hpp"
 
 #include "vendor/rfl.hpp"
+#include "vendor/wil.hpp"
 
 #include "core/events/events.hpp"
 #include "core/i18n/state.hpp"
@@ -18,12 +19,19 @@
 #include "features/adb_mode/recording.hpp"
 #include "features/adb_mode/state.hpp"
 #include "features/adb_mode/types.hpp"
+#include "features/gallery/gallery.hpp"
+#include "features/gallery/watcher/watcher.hpp"
+#include "features/recording/session.hpp"
+#include "features/recording/types.hpp"
+#include "features/recording/usecase.hpp"
 #include "features/settings/menu.hpp"
 #include "features/settings/state.hpp"
 #include "features/settings/types.hpp"
 #include "features/window_control/types.hpp"
+#include "ui/floating_window/events.hpp"
 #include "ui/floating_window/state.hpp"
 #include "utils/logger/logger.hpp"
+#include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
 
 namespace features::adb_mode {
@@ -33,6 +41,9 @@ namespace {
 using AdbTask = std::move_only_function<void()>;
 
 constexpr auto kDisplaySettleDelay = std::chrono::milliseconds(400);
+
+auto finish_recording_segment(core::AppState& state,
+                              std::optional<std::uint64_t> expected_id = std::nullopt) -> void;
 
 // 在设置锁保护下复制 ADB 模式配置，供后台任务独立使用。
 auto get_adb_mode_settings(const core::AppState& state)
@@ -61,13 +72,6 @@ auto build_connection_config(const core::AppState& state)
   });
 }
 
-// 清除当前会话的所有派生状态，调用方必须持有状态锁。
-auto clear_session_locked(AdbModeState& adb_state) -> void {
-  adb_state.recording_session.reset();
-  adb_state.device_session.reset();
-  adb_state.restore_pending = false;
-}
-
 // 更新当前操作阶段，并让状态查询立即反映队列正在处理的任务。
 auto set_operation_state(core::AppState& state, ConnectionState connection_state) -> void {
   auto& adb_state = *state.adb_mode;
@@ -79,14 +83,17 @@ auto set_operation_state(core::AppState& state, ConnectionState connection_state
 
 // 记录失败原因；连接仍可用时保留会话，确保用户还能执行恢复。
 auto set_error_state(core::AppState& state, std::string error, bool retain_connection) -> void {
+  if (!retain_connection) {
+    finish_recording_segment(state);
+    auto closed = session::close(state.adb_mode->device_session);
+    if (!closed) Logger().warn("Failed to close ADB session after error: {}", closed.error());
+  }
   auto& adb_state = *state.adb_mode;
   std::scoped_lock lock(adb_state.mutex);
   adb_state.connection_state =
       retain_connection ? ConnectionState::Connected : ConnectionState::Error;
   adb_state.last_error = core::i18n::get_text(state.i18n->texts, error);
-  if (!retain_connection) {
-    clear_session_locked(adb_state);
-  }
+  if (!retain_connection) adb_state.restore_pending = false;
 }
 
 // 读取运行时状态并通过 RPC 通知推送给 Web 前端。
@@ -201,7 +208,8 @@ auto adb_thread_proc(core::AppState& state, std::stop_token stop_token) -> void 
       bool retain_connection = false;
       {
         std::scoped_lock lock(adb_state.mutex);
-        retain_connection = adb_state.device_session != nullptr;
+        retain_connection = adb_state.connection_state == ConnectionState::Connected ||
+                            adb_state.connection_state == ConnectionState::Restoring;
       }
       set_error_state(state, std::string("ADB worker task failed: ") + e.what(), retain_connection);
     } catch (...) {
@@ -209,7 +217,8 @@ auto adb_thread_proc(core::AppState& state, std::stop_token stop_token) -> void 
       bool retain_connection = false;
       {
         std::scoped_lock lock(adb_state.mutex);
-        retain_connection = adb_state.device_session != nullptr;
+        retain_connection = adb_state.connection_state == ConnectionState::Connected ||
+                            adb_state.connection_state == ConnectionState::Restoring;
       }
       set_error_state(state, "ADB worker task failed with unknown exception", retain_connection);
     }
@@ -276,7 +285,7 @@ auto get_adb_calculation_settings(const core::AppState& state) -> std::pair<bool
 // 执行设备连接：状态切 Connecting → 构造并解析配置 → 打开完整设备会话 → 保存会话并广播状态
 auto connect_impl(core::AppState& state) -> std::expected<void, std::string> {
   // 已经处于连接状态时直接返回
-  if (is_connected(state)) {
+  if (session::is_connected(state)) {
     return {};
   }
 
@@ -293,18 +302,17 @@ auto connect_impl(core::AppState& state) -> std::expected<void, std::string> {
   const auto config = config_result.value();
 
   // 建立完整的底层设备会话（连接、推服务、起进程、建立转发）
-  auto session_result = session::open(config);
+  auto session_result = session::open(state.adb_mode->device_session, config);
   if (!session_result) {
     set_error_state(state, session_result.error(), false);
     publish_status_changed(state);
     return std::unexpected(session_result.error());
   }
 
-  // 在状态锁保护下更新连接成功状态与会话实例
+  // 资源就绪后再发布 Connected，状态查询不会读取正在初始化的会话。
   {
     std::scoped_lock lock(state.adb_mode->mutex);
     state.adb_mode->connection_state = ConnectionState::Connected;
-    state.adb_mode->device_session = std::move(session_result.value());
     state.adb_mode->restore_pending = false;
     state.adb_mode->last_error.clear();
   }
@@ -315,50 +323,107 @@ auto connect_impl(core::AppState& state) -> std::expected<void, std::string> {
   return {};
 }
 
+// 只在 ADB 队列执行；旧完成回报不能影响新段，录制会话保留到媒体收尾结束。
+auto finish_recording_segment(core::AppState& state, std::optional<std::uint64_t> expected_id)
+    -> void {
+  auto& adb_state = *state.adb_mode;
+  {
+    std::scoped_lock lock(adb_state.mutex);
+    if (!adb_state.recording_session ||
+        (expected_id && adb_state.recording_session->id != *expected_id))
+      return;
+  }
+  auto publish_stopped = wil::scope_exit([&] {
+    core::events::post(state, ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+  });
+
+  auto result = recording::stop(state);
+  auto indexed = features::gallery::complete_created_file_operation(state, result.output_path);
+  if (!indexed)
+    Logger().warn("Failed to complete ADB recording gallery operation '{}': {}",
+                  result.output_path.string(), indexed.error());
+
+  using Kind = recording::AdbRecordResult::Kind;
+  if (result.kind == Kind::Saved) {
+    features::recording::notify_recording_saved(state, result.output_path);
+  } else if (result.kind == Kind::Discarded) {
+    auto detail = core::i18n::get_text(state.i18n->texts, result.error);
+    post_adb_notification(state, state.i18n->texts["message.recording_discarded"] + ": " + detail);
+  } else if (result.kind == Kind::Failed) {
+    auto detail = utils::string::ToUtf8(result.output_path.wstring());
+    if (!result.error.empty())
+      detail += "\n" + core::i18n::get_text(state.i18n->texts, result.error);
+    post_adb_notification(state, state.i18n->texts["message.recording_stop_failed"] + detail);
+  }
+}
+
+auto start_recording_segment(core::AppState& state) -> std::expected<void, std::string> {
+  std::string output_directory;
+  {
+    std::scoped_lock lock(state.settings->mutation_mutex);
+    output_directory = state.settings->raw.features.output_dir_path;
+  }
+  auto directory = utils::path::GetOutputDirectory(output_directory);
+  if (!directory) return std::unexpected(directory.error());
+  auto path = features::recording::session::build_output_path_in_directory(*directory);
+  const auto settings = get_adb_mode_settings(state);
+  const auto fps = settings.record_fps > 0 ? settings.record_fps : 60;
+  const auto bitrate = settings.record_bitrate > 0 ? settings.record_bitrate : 16'000'000;
+  const bool is_h265 = features::recording::video_codec_from_string(settings.record_codec) ==
+                       features::recording::VideoCodec::H265;
+  auto ignored = features::gallery::watcher::begin_manual_file_system_ignore(state, path, path);
+  if (!ignored) return std::unexpected(ignored.error());
+  auto cancel_ignore = wil::scope_exit([&] {
+    auto completed =
+        features::gallery::watcher::complete_manual_file_system_ignore(state, path, path);
+    if (!completed)
+      Logger().warn("Failed to complete failed ADB recording watcher ignore: {}",
+                    completed.error());
+  });
+
+  std::uint64_t id;
+  {
+    std::scoped_lock lock(state.adb_mode->mutex);
+    id = ++state.adb_mode->next_recording_id;
+  }
+  auto started =
+      recording::start(state, path, fps, bitrate, is_h265, id, [&state](std::uint64_t finished_id) {
+        // shutdown 关闭任务接收后，由队列末尾的 restore_impl 负责最终收集。
+        (void)enqueue_task(state,
+                           [&state, finished_id] { finish_recording_segment(state, finished_id); });
+      });
+  if (!started) return started;
+  cancel_ignore.release();
+  post_adb_notification(state, state.i18n->texts["message.recording_started"]);
+  return {};
+}
+
 // 恢复物理尺寸：状态切 Restoring → 区分断开或保留模式 → 恢复分辨率或关闭会话 → 广播连接变更
 auto restore_impl(core::AppState& state, bool disconnect_after)
     -> std::expected<void, std::string> {
-  // 检查当前是否有活动会话
-  auto session_result = get_active_session(state);
-  if (!session_result) {
+  // 1. 判断当前连接状态；恢复期间先退出 Connected，拒绝新的设备操作。
+  const bool connected = session::is_connected(state);
+  if (connected) {
+    set_operation_state(state, ConnectionState::Restoring);
+  }
+
+  if (disconnect_after || !connected) {
+    // 2. 完整断开或失去连接时，先结束录制，再恢复设备并关闭会话资源。
+    finish_recording_segment(state);
+    auto close_result = session::close(state.adb_mode->device_session);
     {
       std::scoped_lock lock(state.adb_mode->mutex);
       state.adb_mode->connection_state = ConnectionState::Disconnected;
+      state.adb_mode->restore_pending = false;
       state.adb_mode->last_error.clear();
-      clear_session_locked(*state.adb_mode);
     }
-    if (disconnect_after) {
-      post_connection_changed(state, false);
-    }
+    if (disconnect_after) post_connection_changed(state, false);
     publish_status_changed(state);
-    return {};
+    return close_result;
   }
 
-  auto adb_session = session_result.value();
-  // 标记当前状态为恢复中
-  set_operation_state(state, ConnectionState::Restoring);
-
-  // 若要求断开连接：关闭会话、移除端口转发并视情况断开 ADB
-  if (disconnect_after) {
-    if (is_recording(state)) {
-      static_cast<void>(stop_recording(state));
-    }
-    auto close_result = session::close(adb_session);
-    {
-      std::scoped_lock lock(state.adb_mode->mutex);
-      state.adb_mode->connection_state = ConnectionState::Disconnected;
-      clear_session_locked(*state.adb_mode);
-    }
-    post_connection_changed(state, false);
-    publish_status_changed(state);
-    if (!close_result) {
-      return std::unexpected(close_result.error());
-    }
-    return {};
-  }
-
-  // 仅恢复显示尺寸：调用 wm size reset
-  auto reset_result = session::restore_display(*adb_session);
+  // 3. 只恢复尺寸时保留设备会话，成功后回到 Connected，后续仍可截图和录制。
+  auto reset_result = session::restore_display(state.adb_mode->device_session);
   if (!reset_result) {
     set_error_state(state, reset_result.error(), true);
     publish_status_changed(state);
@@ -385,7 +450,7 @@ auto apply_resolution_impl(core::AppState& state, const Resolution& target)
   }
 
   // 获取当前活动会话
-  auto session_result = get_active_session(state);
+  auto session_result = session::get_active(state);
   if (!session_result) {
     return std::unexpected(session_result.error());
   }
@@ -468,8 +533,9 @@ auto get_status(const core::AppState& state) -> AdbModeStatus {
   status.connection_state = connection_state_to_string(adb_state.connection_state);
   status.restore_pending = adb_state.restore_pending;
   status.last_error = adb_state.last_error;
-  if (adb_state.device_session) {
-    const auto& session = *adb_state.device_session;
+  if (adb_state.connection_state == ConnectionState::Connected ||
+      adb_state.connection_state == ConnectionState::Restoring) {
+    const auto& session = adb_state.device_session;
     std::scoped_lock session_lock(session.metadata_mutex);
     status.connected = adb_state.connection_state == ConnectionState::Connected;
     status.adb_path = utils::string::ToUtf8(session.config.executable.wstring());
@@ -482,74 +548,47 @@ auto get_status(const core::AppState& state) -> AdbModeStatus {
   return status;
 }
 
-// 判断当前是否已建立可执行显示操作的连接。
-auto is_connected(const core::AppState& state) -> bool {
+auto is_recording_active(const core::AppState& state) -> bool {
   std::scoped_lock lock(state.adb_mode->mutex);
-  return state.adb_mode->connection_state == ConnectionState::Connected &&
-         state.adb_mode->device_session;
+  return state.adb_mode->recording_session || state.adb_mode->recording_control_pending;
 }
 
-// 获取当前活动的设备会话句柄。
-auto get_active_session(const core::AppState& state)
-    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string> {
-  const auto& adb_state = *state.adb_mode;
-  std::scoped_lock lock(adb_state.mutex);
-  if (adb_state.connection_state != ConnectionState::Connected || !adb_state.device_session) {
-    return std::unexpected("ADB device is not connected");
-  }
-  return adb_state.device_session;
-}
-
-// 启动 ADB 设备端屏幕与音频录制，通过 MF SinkWriter 混流写入 output_path。
-auto start_recording(core::AppState& state, const std::filesystem::path& output_path,
-                     std::uint32_t fps, std::uint32_t bitrate, bool is_h265)
-    -> std::expected<void, std::string> {
-  auto session_result = get_active_session(state);
-  if (!session_result) {
-    return std::unexpected(session_result.error());
-  }
-
-  auto& adb_state = *state.adb_mode;
-  {
-    std::scoped_lock lock(adb_state.mutex);
-    if (adb_state.recording_session) {
-      return std::unexpected("ADB recording session is already active");
-    }
-  }
-
-  auto start_result = recording::start(*session_result, output_path, fps, bitrate, is_h265);
-  if (!start_result) {
-    return std::unexpected(start_result.error());
-  }
-
-  std::scoped_lock lock(adb_state.mutex);
-  adb_state.recording_session = std::move(start_result.value());
-  return {};
-}
-
-// 停止 ADB 设备录制，排空数据并完成 MP4 文件落盘。
-auto stop_recording(core::AppState& state) -> recording::AdbRecordResult {
-  std::unique_ptr<recording::AdbRecordingSession> session;
+auto toggle_recording_async(core::AppState& state) -> bool {
+  std::optional<std::uint64_t> stop_id;
   {
     std::scoped_lock lock(state.adb_mode->mutex);
-    session = std::move(state.adb_mode->recording_session);
+    if (state.adb_mode->recording_control_pending) return true;
+    if (state.adb_mode->recording_session) stop_id = state.adb_mode->recording_session->id;
+    state.adb_mode->recording_control_pending = true;
   }
-
-  if (!session) {
-    return recording::AdbRecordResult{.kind = recording::AdbRecordResult::Kind::NotRecording};
+  const bool queued = enqueue_task(state, [&state, stop_id] {
+    auto complete_request = wil::scope_exit([&] {
+      bool active;
+      {
+        std::scoped_lock lock(state.adb_mode->mutex);
+        state.adb_mode->recording_control_pending = false;
+        active = state.adb_mode->recording_session.has_value();
+      }
+      // 停止状态由实际收尾发布；这里只发布启动请求的结果（包括启动失败）。
+      if (!stop_id)
+        core::events::post(state,
+                           ui::floating_window::events::RecordingToggleEvent{.enabled = active});
+    });
+    // 请求的含义在入队时确定，不能因旧段先自然结束而把“停止”变成“启动”。
+    if (stop_id) {
+      finish_recording_segment(state, *stop_id);
+    } else {
+      auto started = start_recording_segment(state);
+      if (!started)
+        post_adb_notification(state, state.i18n->texts["message.recording_start_failed"] +
+                                         core::i18n::get_text(state.i18n->texts, started.error()));
+    }
+  });
+  if (!queued) {
+    std::scoped_lock lock(state.adb_mode->mutex);
+    state.adb_mode->recording_control_pending = false;
   }
-
-  auto result = recording::stop(session);
-  if (!result.error.empty()) {
-    result.error = core::i18n::get_text(state.i18n->texts, result.error);
-  }
-  return result;
-}
-
-// 检查当前是否有活动的 ADB 录制会话。
-auto is_recording(const core::AppState& state) -> bool {
-  std::scoped_lock lock(state.adb_mode->mutex);
-  return state.adb_mode->recording_session != nullptr;
+  return queued;
 }
 
 // 异步设备截图：校验连接状态 → 投递截图任务至 ADB 队列 → 调用底层截图 → 更新错误状态 → 执行回调
@@ -558,7 +597,7 @@ auto capture_screen_async(
     std::move_only_function<void(bool success, const std::wstring& path, std::string error)>
         completion_callback) -> bool {
   // 未连接时直接拒绝截图请求
-  if (!is_connected(state)) {
+  if (!session::is_connected(state)) {
     return false;
   }
 
@@ -566,7 +605,7 @@ auto capture_screen_async(
   return enqueue_task(state, [&state, output_path, format,
                               completion_callback = std::move(completion_callback)]() mutable {
     // 获取活动会话
-    auto session_result = get_active_session(state);
+    auto session_result = session::get_active(state);
     std::expected<void, std::string> result = {};
     if (session_result) {
       // 调用长期会话的截图接口截取并保存为指定格式
@@ -616,7 +655,7 @@ auto toggle_async(core::AppState& state) -> bool {
   }
 
   return enqueue_task(state, [&state]() {
-    if (is_connected(state)) {
+    if (session::is_connected(state)) {
       auto result = restore_impl(state, true);
       post_operation_notification(state, result, "message.adb_disconnect_success",
                                   "message.adb_disconnect_failed");
@@ -631,7 +670,7 @@ auto toggle_async(core::AppState& state) -> bool {
 
 // 设置变化后保持 ADB toggle 开启，按新配置恢复旧设备并连接新设备。
 auto handle_settings_changed(core::AppState& state) -> void {
-  if (!is_connected(state)) {
+  if (!session::is_connected(state)) {
     return;
   }
 
@@ -692,7 +731,7 @@ auto handle_ratio_changed(core::AppState& state, std::size_t ratio_index, double
 
   if (!enqueue_task(state, [&state, ratio_index, ratio_value, current_resolution_index,
                             resolution_preset, align_to_8, use_long_edge]() {
-        auto session_result = get_active_session(state);
+        auto session_result = session::get_active(state);
         if (!session_result) {
           const std::expected<void, std::string> failure = std::unexpected(session_result.error());
           post_display_transform_result(state, ratio_index, std::nullopt, failure);
@@ -736,7 +775,7 @@ auto handle_resolution_changed(core::AppState& state, std::size_t resolution_ind
 
   if (!enqueue_task(state, [&state, resolution_index, resolution_preset, ratio, align_to_8,
                             use_long_edge]() {
-        auto session_result = get_active_session(state);
+        auto session_result = session::get_active(state);
         if (!session_result) {
           const std::expected<void, std::string> failure = std::unexpected(session_result.error());
           post_display_transform_result(state, std::nullopt, resolution_index, failure);

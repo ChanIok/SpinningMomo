@@ -252,7 +252,8 @@ auto delete_assets(core::AppState& app_state, const DeleteAssetsParams& params)
   if (!manual_changes.empty()) {
     Logger().info("Gallery delete_assets: dispatching {} manual scan change(s)",
                   manual_changes.size());
-    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_result(
+        app_state, ScanResult{.changes = std::move(manual_changes)});
     if (!dispatch_result) {
       Logger().warn("Failed to dispatch manual scan changes after asset deletion: {}",
                     dispatch_result.error());
@@ -439,7 +440,8 @@ auto move_assets_to_folder(core::AppState& app_state, const MoveAssetsToFolderPa
   }
 
   if (!manual_changes.empty()) {
-    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_result(
+        app_state, ScanResult{.changes = std::move(manual_changes)});
     if (!dispatch_result) {
       Logger().warn("Failed to dispatch manual scan changes after folder move: {}",
                     dispatch_result.error());

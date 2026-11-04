@@ -400,7 +400,8 @@ auto paste_to_folder(core::AppState& app_state, std::int64_t folder_id)
 
   // 索引已经落库后再把真实 UPSERT 分发给扩展消费者。
   if (!indexed_changes.empty()) {
-    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, indexed_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_result(
+        app_state, ScanResult{.changes = std::move(indexed_changes)});
     if (!dispatch_result) {
       errors.push_back("Failed to dispatch pasted file changes: " + dispatch_result.error());
     }

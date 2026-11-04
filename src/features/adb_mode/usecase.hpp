@@ -3,8 +3,6 @@
 #include "vendor/std.hpp"
 
 #include "core/state/app_state.hpp"
-#include "features/adb_mode/device_session.hpp"
-#include "features/adb_mode/recording.hpp"
 #include "features/adb_mode/types.hpp"
 
 namespace features::adb_mode {
@@ -15,16 +13,17 @@ auto initialize(core::AppState& state) -> std::expected<void, std::string>;
 // 在 UI 和通知服务就绪后启动自动连接任务。
 auto schedule_startup_tasks(core::AppState& state) -> void;
 
-// 停止接收任务，恢复物理尺寸并等待 ADB 专用线程退出。
+// 停止接收任务，收尾录制、恢复物理尺寸并等待 ADB 专用线程退出。
 auto shutdown(core::AppState& state) -> void;
 
 // 合并设置和运行时状态，生成可安全发送给前端的状态快照。
 auto get_status(const core::AppState& state) -> AdbModeStatus;
-// 只检查当前是否存在可以执行显示操作的已连接设备。
-auto is_connected(const core::AppState& state) -> bool;
-// 获取当前活动的设备会话句柄。
-auto get_active_session(const core::AppState& state)
-    -> std::expected<std::shared_ptr<session::DeviceSession>, std::string>;
+
+// 将录制开关放入同一个 ADB 队列；录制线程自行退出也由该队列完成收尾。
+auto toggle_recording_async(core::AppState& state) -> bool;
+
+// 包含启动请求排队及停止收尾阶段，不依赖设备当前是否仍连接。
+auto is_recording_active(const core::AppState& state) -> bool;
 
 // 发现所有当前可用的 Android 设备（包括运行中模拟器与已识别的真机）。
 auto list_devices(core::AppState& state)
@@ -33,17 +32,6 @@ auto list_devices(core::AppState& state)
 // 手动连接网络端点（用于无线调试或未自动探测到的模拟器）。
 auto connect_endpoint(core::AppState& state, std::string host, int port)
     -> std::expected<ConnectEndpointResult, std::string>;
-
-// 启动 ADB 设备端屏幕与音频录制，通过 MF SinkWriter 混流写入 output_path。
-auto start_recording(core::AppState& state, const std::filesystem::path& output_path,
-                     std::uint32_t fps, std::uint32_t bitrate, bool is_h265 = false)
-    -> std::expected<void, std::string>;
-
-// 停止 ADB 设备录制，排空数据并完成 MP4 文件落盘。
-auto stop_recording(core::AppState& state) -> recording::AdbRecordResult;
-
-// 检查当前是否有活动的 ADB 录制会话。
-auto is_recording(const core::AppState& state) -> bool;
 
 // 将截图任务放入 ADB 专用队列，并在完成后通过回调返回结果。
 auto capture_screen_async(

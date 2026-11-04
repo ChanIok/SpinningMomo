@@ -7,6 +7,7 @@
 #include "vendor/windows/mfidl.hpp"
 #include "vendor/windows/mfreadwrite.hpp"
 
+#include "core/state/app_state.hpp"
 #include "features/adb_mode/capture_protocol.hpp"
 #include "features/adb_mode/device_session.hpp"
 
@@ -16,7 +17,7 @@ struct AdbRecordResult {
   enum class Kind {
     Saved,
     Discarded,
-    PublishFailed,
+    Failed,
     NotRecording,
   };
 
@@ -27,10 +28,9 @@ struct AdbRecordResult {
 
 // ADB 录制会话实体：统管单通道流 Socket 读取与 IMFSinkWriter MP4 混流落盘
 struct AdbRecordingSession {
-  std::shared_ptr<session::DeviceSession> device_session;
+  std::uint64_t id = 0;
   session::RecordingConnection connection;
-  std::filesystem::path final_output_path;
-  std::filesystem::path working_output_path;
+  std::filesystem::path output_path;
 
   wil::com_ptr<IMFSinkWriter> sink_writer;
   DWORD video_stream_index = 0;
@@ -39,7 +39,6 @@ struct AdbRecordingSession {
   bool has_audio_stream = false;
   bool is_h265 = false;
   bool sink_writer_initialized = false;
-  bool finalize_succeeded = false;
 
   std::uint64_t video_samples_written = 0;
   std::uint64_t audio_samples_written = 0;
@@ -53,14 +52,14 @@ struct AdbRecordingSession {
   std::string error_message;
 };
 
-// 启动 ADB 录制会话：连接流 socket → 发送 StartRecord → 接收 RecordReady 初始化 SinkWriter →
-// 开启流式消费
-auto start(std::shared_ptr<session::DeviceSession> device_session,
-           const std::filesystem::path& output_path, std::uint32_t fps, std::uint32_t bitrate,
-           bool is_h265 = false)
-    -> std::expected<std::unique_ptr<AdbRecordingSession>, std::string>;
+// 在 AppState 中原地构造本段录制状态，启动失败时清理资源并恢复为空。
+// 仅由 ADB 操作队列调用；完成回调在录制线程关闭 writer 后触发，只能投递任务。
+auto start(core::AppState& state, const std::filesystem::path& output_path, std::uint32_t fps,
+           std::uint32_t bitrate, bool is_h265, std::uint64_t id,
+           std::move_only_function<void(std::uint64_t)> on_finished)
+    -> std::expected<void, std::string>;
 
-// 停止 ADB 录制会话：发送 StopRecord 指令 → Finalize IMFSinkWriter → 发布 mp4 文件
-auto stop(std::unique_ptr<AdbRecordingSession>& session) -> AdbRecordResult;
+// 由 ADB 操作队列收集结果；会话身份保留到媒体收尾结束，返回后 writer 与连接均已关闭。
+auto stop(core::AppState& state) -> AdbRecordResult;
 
 }  // namespace features::adb_mode::recording

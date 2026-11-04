@@ -11,6 +11,7 @@ target("SpinningMomoTests")
     add_includedirs("../src")
 
     add_files("../src/features/recording/time.cpp")
+    add_files("../src/utils/media/hybrid_mp4.cpp")
     add_files("../src/features/gallery/ignore/matcher.cpp")
     add_files("../src/utils/logger/logger.cpp")
     add_files("../src/utils/path/path.cpp")
@@ -18,8 +19,9 @@ target("SpinningMomoTests")
     add_files("features/gallery/ignore/matcher_test.cpp")
     add_files("features/recording/time_test.cpp")
     add_files("utils/path_test.cpp")
+    add_files("utils/hybrid_mp4_test.cpp")
 
-    add_packages("vcpkg::doctest", "vcpkg::spdlog")
+    add_packages("vcpkg::doctest", "vcpkg::spdlog", "vcpkg::wil")
     add_links("shell32", "ole32", "Mpr")
     add_tests("default")
 

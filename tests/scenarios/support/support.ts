@@ -371,7 +371,10 @@ export async function assertPngDimensions(
   assert.equal(data.readUInt32BE(20), expectedHeight, `PNG 高度不符：${path}`);
 }
 
-export async function assertMp4Structure(path: string): Promise<void> {
+export async function assertMp4Structure(
+  path: string,
+  layout?: "fragmented" | "regular",
+): Promise<void> {
   const data = await readFile(path);
   const boxTypes = new Set<string>();
   let offset = 0;
@@ -397,6 +400,14 @@ export async function assertMp4Structure(path: string): Promise<void> {
   assert.equal(offset, data.length, `MP4 末尾存在无法解析的数据：${path}`);
   assert.ok(boxTypes.has("ftyp"), `MP4 缺少 ftyp box：${path}`);
   assert.ok(boxTypes.has("moov"), `MP4 缺少 moov box：${path}`);
+  if (layout !== undefined) {
+    assert.ok(boxTypes.has("mdat"), `MP4 缺少媒体数据：${path}`);
+    assert.equal(
+      boxTypes.has("moof"),
+      layout === "fragmented",
+      `MP4 不是预期的 ${layout} 结构：${path}`,
+    );
+  }
 }
 
 // 每个 fixture 必须是内容唯一（hash 不同）的有效图片。

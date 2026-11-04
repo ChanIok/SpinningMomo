@@ -215,6 +215,14 @@ auto batch_create_folders_for_paths(core::AppState& app_state,
             continue;
           }
 
+          // 旧清单里没有的目录，可能已被其他任务写入数据库；创建前再次查询，存在则复用。
+          auto concurrent = repository::get_folder_by_path(txn_app_state, path_str);
+          if (!concurrent) return std::unexpected(concurrent.error());
+          if (concurrent->has_value()) {
+            result.folder_ids_by_path.emplace(path_str, concurrent->value().id);
+            continue;
+          }
+
           std::optional<std::int64_t> parent_id;
           auto parent_path = folder_path.parent_path();
           if (!parent_path.empty() && parent_path != folder_path.root_path()) {

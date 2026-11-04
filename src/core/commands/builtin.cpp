@@ -8,6 +8,7 @@
 #include "core/commands/state.hpp"
 #include "core/commands/types.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/usecase.hpp"
 #include "features/letterbox/state.hpp"
 #include "features/letterbox/usecase.hpp"
@@ -96,7 +97,7 @@ auto register_builtin_commands(core::AppState& state) -> void {
                                        ui::floating_window::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
-                                   return features::adb_mode::is_connected(state);
+                                   return features::adb_mode::session::is_connected(state);
                                  },
                              });
 
@@ -247,6 +248,7 @@ auto register_builtin_commands(core::AppState& state) -> void {
                           ui::floating_window::request_repaint(state);
                         },
                     .get_state = [&state]() -> bool {
+                      if (features::adb_mode::is_recording_active(state)) return true;
                       if (!state.recording) {
                         return false;
                       }

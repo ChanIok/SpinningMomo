@@ -26,7 +26,7 @@ auto encode_audio(utils::media::encoder::EncoderContext& encoder, const BYTE* au
                   UINT32 num_frames, UINT32 bytes_per_frame, std::int64_t timestamp_100ns)
     -> std::expected<void, std::string>;
 
-// 完成编码
+// 排空编码器并关闭分片文件；调用方随后通过 hybrid_mp4 补全普通 MP4 索引。
 auto finalize_encoder(utils::media::encoder::EncoderContext& encoder)
     -> std::expected<void, std::string>;
 

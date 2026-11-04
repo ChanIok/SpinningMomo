@@ -689,9 +689,10 @@ auto is_path_in_manual_file_system_ignore(core::AppState& app_state,
   return it->second.in_flight_count > 0 || it->second.ignore_until > now;
 }
 
-auto dispatch_manual_scan_changes(core::AppState& app_state, const std::vector<ScanChange>& changes)
+auto dispatch_manual_scan_result(core::AppState& app_state, const ScanResult& scan_result)
     -> std::expected<void, std::string> {
-  if (changes.empty()) {
+  const auto& changes = scan_result.changes;
+  if (changes.empty() && scan_result.created_folders.empty()) {
     return {};
   }
 
@@ -755,29 +756,20 @@ auto dispatch_manual_scan_changes(core::AppState& app_state, const std::vector<S
 
   for (const auto& target : targets) {
     auto bucket_it = changes_by_watcher_root.find(target.root_path.string());
-    if (bucket_it == changes_by_watcher_root.end() || bucket_it->second.empty()) {
-      continue;
-    }
-
     ScanResult result;
-    result.total_files = static_cast<int>(bucket_it->second.size());
+    result.errors = scan_result.errors;
     result.scan_duration = "manual_dispatch";
-    result.changes = std::move(bucket_it->second);
-
-    for (const auto& change : result.changes) {
-      if (change.action == ScanChangeAction::REMOVE) {
-        result.missing_items++;
-      } else {
-        // 手动上报场景中，UPSERT 语义是“确保目标状态存在”，统一计入 updated。
-        result.updated_items++;
-      }
+    if (bucket_it != changes_by_watcher_root.end()) result.changes = std::move(bucket_it->second);
+    for (const auto& folder : scan_result.created_folders) {
+      if (utils::path::IsPathWithinBase(std::filesystem::path(folder.path), target.root_path))
+        result.created_folders.push_back(folder);
     }
+    if (result.changes.empty() && result.created_folders.empty()) continue;
 
     if (target.post_scan_callback) {
       Logger().info(
-          "Gallery manual scan change dispatch: root='{}', changes={}, updated={}, missing={}",
-          target.root_path.string(), result.changes.size(), result.updated_items,
-          result.missing_items);
+          "Gallery manual scan change dispatch: root='{}', changes={}, created_folders={}",
+          target.root_path.string(), result.changes.size(), result.created_folders.size());
       target.post_scan_callback(result);
     }
   }

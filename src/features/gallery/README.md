@@ -92,7 +92,7 @@ Gallery 负责把文件系统中的照片和视频维护为可查询的图库索
 
 ## 主动文件操作与 watcher
 
-粘贴、移动、删除和创建目录等应用主动操作由程序同步维护磁盘与索引，不能再让 watcher
+录制、粘贴、移动、删除和创建目录等应用主动操作由程序同步维护磁盘与索引，不能再让 watcher
 重复应用同一事实。统一时序为：
 
 ```text
@@ -104,13 +104,13 @@ begin 精确路径屏蔽
 ```
 
 `begin_manual_file_system_ignore` 会先登记规范化后的精确源/目标路径，再清除这些路径尚未消费的
-`pending_file_changes` 和 `pending_stable_file_changes`。通知入口与增量同步真正应用
-`REMOVE/UPSERT` 前都会检查屏蔽状态，因此 begin 之前已经形成、但尚未执行的增量变化也会跳过。
-源和目标规范化后相同时只登记一次。
+`pending_file_changes` 和 `pending_stable_file_changes`。通知入口、增量及全量扫描都会检查屏蔽状态，
+跳过屏蔽路径的分析处理，但全量扫描仍保留其库存快照以防误标 missing。源和目标规范化后相同时只登记一次。
 
-每个文件的磁盘与索引操作结束后应立即调用 `complete_manual_file_system_ignore`，不应把整批路径
-一直持有到函数退出。complete 会保留短暂 grace period 过滤延迟通知；失败只记录维护警告，
-不反转已经完成的业务结果。begin 失败时不得继续对应的磁盘操作。
+每个文件的磁盘与索引操作结束后应立即调用 `complete_manual_file_system_ignore`。录制等生成流程
+在创建文件前 begin，并在编码收尾或丢弃后通过 `complete_created_file_operation` 统一完成入库、解除屏蔽与结果分发
+（非图库根路径直接跳过）。complete 会保留短暂 grace period 过滤延迟通知；失败只记录警告，
+不反转业务结果。begin 失败时不得继续对应的磁盘操作。
 
 屏蔽只匹配明确登记的精确路径，不递归覆盖目录后代，也不强制取消已经进入媒体分析的任务。
 它负责消除正常主动操作与 watcher 的重复消费，不提供跨文件系统和数据库的强事务语义。

@@ -6,6 +6,7 @@
 #include "core/notifications/notifications.hpp"
 #include "core/notifications/types.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/usecase.hpp"
 #include "features/photography/state.hpp"
 #include "features/screenshot/screenshot.hpp"
@@ -181,7 +182,7 @@ auto capture_adb(core::AppState& state) -> void {
 // 统一截图入口：检查 ADB 状态分流 → 查找目标游戏窗口 → 解析目录与格式 → 启动截图管道
 auto capture(core::AppState& state) -> void {
   // ADB 模式已连接时，优先走 ADB 专用通道采集模拟器画面
-  if (features::adb_mode::is_connected(state)) {
+  if (features::adb_mode::session::is_connected(state)) {
     capture_adb(state);
     return;
   }

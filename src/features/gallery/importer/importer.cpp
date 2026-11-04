@@ -294,7 +294,8 @@ auto import_files_to_folder(core::AppState& app_state, std::int64_t folder_id,
 
   // 整批文件落库后再统一分发变化，避免扩展观察到未完成的批次中间态。
   if (!indexed_changes.empty()) {
-    auto dispatch_result = watcher::dispatch_manual_scan_changes(app_state, indexed_changes);
+    auto dispatch_result = watcher::dispatch_manual_scan_result(
+        app_state, ScanResult{.changes = std::move(indexed_changes)});
     if (!dispatch_result) {
       errors.push_back("Failed to dispatch imported file changes: " + dispatch_result.error());
     }

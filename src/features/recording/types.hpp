@@ -147,7 +147,7 @@ enum class StopResultKind {
   NotRecording,
   Saved,
   Discarded,
-  PublishFailed,
+  Failed,
 };
 
 struct StopResult {
@@ -165,5 +165,7 @@ struct QueuedAudioPacket {
 };
 
 constexpr std::size_t k_max_audio_queue_size = 120;
+// 桌面录制保留既有误触判定：编码帧数不超过三帧时丢弃。
+constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 
 }  // namespace features::recording

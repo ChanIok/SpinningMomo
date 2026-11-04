@@ -3,12 +3,15 @@
 #include "vendor/std.hpp"
 
 #include "vendor/rfl.hpp"
+#include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 
 #include "core/build_config.hpp"
 #include "core/i18n/types.hpp"
+#include "core/state/app_state.hpp"
 #include "features/adb_mode/adb_client.hpp"
 #include "features/adb_mode/display_control.hpp"
+#include "features/adb_mode/state.hpp"
 #include "utils/path/path.hpp"
 #include "utils/string/string.hpp"
 
@@ -542,6 +545,19 @@ auto stop_capture_transport(DeviceSession& session) -> std::expected<void, std::
   return {};
 }
 
+// 传输停止后重置可复用数据，保留会话地址和互斥量。
+auto reset_session(DeviceSession& session) -> void {
+  session.io_context.reset();
+  session.server_process = {};
+  session.socket_name.clear();
+  session.next_request_id = 1;
+  session.connection_owned = false;
+  std::scoped_lock lock(session.metadata_mutex);
+  session.config = {};
+  session.physical_display = {};
+  session.current_display = {};
+}
+
 // 会话打开中途失败时的清理回滚
 auto abort_open(DeviceSession& session) -> void {
   // 停用已创建的传输层与服务端
@@ -550,6 +566,7 @@ auto abort_open(DeviceSession& session) -> void {
   if (session.connection_owned) {
     static_cast<void>(adb::disconnect(session.config, session.config.serial));
   }
+  reset_session(session);
 }
 
 // 建立本地转发传输通道：建立单次 adb forward → 连接本地端口并完成握手
@@ -617,95 +634,67 @@ auto start_server(DeviceSession& session) -> std::expected<void, std::string> {
 }  // namespace
 
 // 建立完整设备会话：连接设备 → 查询初始分辨率 → 推送 JAR 服务 → 启动服务端 → 建立 socket 传输
-auto open(const AdbConnectionConfig& config)
-    -> std::expected<std::shared_ptr<DeviceSession>, std::string> {
-  // 建立 ADB 连接或复用已连接设备
+auto open(DeviceSession& session, const AdbConnectionConfig& config)
+    -> std::expected<void, std::string> {
+  // 1. 建立或复用 ADB 连接，区分是否需要在退出时主动断开。
   auto connection_result = adb::connect(config);
-  if (!connection_result) {
-    return std::unexpected(connection_result.error());
-  }
+  if (!connection_result) return std::unexpected(connection_result.error());
 
-  // 初始化会话对象基础信息
-  auto session = std::make_shared<DeviceSession>();
-  session->config = config;
-  session->config.serial = connection_result->serial;
-  session->connection_owned = connection_result->connected_by_us;
-  session->socket_name = make_socket_name();
+  // 2. 保存本次连接参数并登记回滚，后续任一步失败都清理本次资源。
+  session.config = config;
+  session.config.serial = connection_result->serial;
+  session.connection_owned = connection_result->connected_by_us;
+  auto rollback = wil::scope_exit([&] { abort_open(session); });
+  session.socket_name = make_socket_name();
 
-  // 读取设备物理分辨率作为基准，用于后续比例计算与还原
-  auto display_result = display_control::query(session->config, session->config.serial);
-  if (!display_result) {
-    abort_open(*session);
-    return std::unexpected(display_result.error());
-  }
-  session->physical_display = *display_result;
-  session->current_display = *display_result;
+  // 3. 记录设备初始显示尺寸，供后续比例计算与恢复使用。
+  auto display_result = display_control::query(session.config, session.config.serial);
+  if (!display_result) return std::unexpected(display_result.error());
+  session.physical_display = *display_result;
+  session.current_display = *display_result;
 
-  // 定位并推送服务端 JAR 文件到设备临时目录
+  // 4. 定位并推送捕获服务 JAR，确保设备端运行本次部署的服务。
   auto jar_result = resolve_capture_service_jar();
-  if (!jar_result) {
-    abort_open(*session);
-    return std::unexpected(jar_result.error());
-  }
+  if (!jar_result) return std::unexpected(jar_result.error());
   auto deploy_result = adb::run_on_device(
-      session->config, session->config.serial,
+      session.config, session.config.serial,
       {L"push", jar_result->wstring(), std::wstring(kRemoteCaptureJar)}, std::chrono::seconds(60));
-  if (!deploy_result) {
-    abort_open(*session);
+  if (!deploy_result)
     return std::unexpected("Failed to deploy Android capture service: " + deploy_result.error());
-  }
 
-  // 启动设备端的 app_process 服务
-  auto server_result = start_server(*session);
-  if (!server_result) {
-    abort_open(*session);
-    return std::unexpected(server_result.error());
-  }
+  // 5. 启动设备端服务，再建立转发并等待 READY 握手确认服务可用。
+  auto server_result = start_server(session);
+  if (!server_result) return std::unexpected(server_result.error());
+  auto transport_result = establish_transport(session);
+  if (!transport_result) return std::unexpected(transport_result.error());
 
-  // 建立本地端口转发并完成握手连接
-  auto transport_result = establish_transport(*session);
-  if (!transport_result) {
-    const auto error = transport_result.error();
-    abort_open(*session);
-    return std::unexpected(error);
-  }
-
-  return session;
+  // 6. 所有资源就绪，交由正常关闭流程管理。
+  rollback.release();
+  return {};
 }
 
-// 关闭设备会话：停传输与服务 → 恢复初始分辨率 → 断开自建连接 → 释放会话指针
-auto close(std::shared_ptr<DeviceSession>& session) -> std::expected<void, std::string> {
-  if (!session) {
-    return {};
-  }
-
+// 关闭资源但保留会话状态对象，供下一次连接复用。
+auto close(DeviceSession& session) -> std::expected<void, std::string> {
+  if (session.config.serial.empty()) return {};
   std::optional<std::string> first_error;
 
-  // 停用网络传输层与后台进程
-  auto transport_result = stop_capture_transport(*session);
-  if (!transport_result) {
-    first_error = transport_result.error();
+  // 1. 停止捕获服务与传输，回收进程、端口转发和诊断文件。
+  auto transport_result = stop_capture_transport(session);
+  if (!transport_result) first_error = transport_result.error();
+
+  // 2. 恢复设备物理显示尺寸，避免退出后留下本程序设置的尺寸。
+  auto restore_result = display_control::reset(session.config, session.config.serial);
+  if (!restore_result && !first_error) first_error = restore_result.error();
+
+  // 3. 只断开本程序建立的 ADB 连接，外部已有连接仍由原使用者管理。
+  if (session.connection_owned) {
+    auto disconnect_result = adb::disconnect(session.config, session.config.serial);
+    if (!disconnect_result && !first_error) first_error = disconnect_result.error();
   }
 
-  // 退出时恢复设备的物理显示分辨率
-  auto restore_result = display_control::reset(session->config, session->config.serial);
-  if (!restore_result && !first_error) {
-    first_error = restore_result.error();
-  }
-
-  // 如果连接由本程序主动建立，则负责主动断开
-  if (session->connection_owned) {
-    auto disconnect_result = adb::disconnect(session->config, session->config.serial);
-    if (!disconnect_result && !first_error) {
-      first_error = disconnect_result.error();
-    }
-  }
-
-  // 释放会话所有权
-  session.reset();
-  if (first_error) {
-    return std::unexpected(*first_error);
-  }
+  // 4. 清空本次连接数据供重连复用；会话对象和互斥量继续存在。
+  reset_session(session);
+  if (first_error) return std::unexpected(*first_error);
   return {};
 }
 
@@ -905,6 +894,20 @@ auto receive_stream_frame(RecordingConnection& conn, std::chrono::milliseconds t
 auto capture_error(const capture_protocol::Frame& frame) -> std::string {
   // 将负载中的原始字节转为错误描述文本
   return std::string(frame.payload.begin(), frame.payload.end());
+}
+
+auto is_connected(const core::AppState& state) -> bool {
+  std::scoped_lock lock(state.adb_mode->mutex);
+  return state.adb_mode->connection_state == ConnectionState::Connected;
+}
+
+auto get_active(core::AppState& state) -> std::expected<DeviceSession*, std::string> {
+  auto& adb_state = *state.adb_mode;
+  std::scoped_lock lock(adb_state.mutex);
+  if (adb_state.connection_state != ConnectionState::Connected) {
+    return std::unexpected("ADB device is not connected");
+  }
+  return &adb_state.device_session;
 }
 
 }  // namespace features::adb_mode::session

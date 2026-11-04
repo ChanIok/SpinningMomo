@@ -18,6 +18,7 @@
 #include "features/gallery/scanner/progress.hpp"
 #include "features/gallery/state.hpp"
 #include "features/gallery/types.hpp"
+#include "features/gallery/watcher/watcher.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/path/path.hpp"
 
@@ -137,6 +138,9 @@ auto scan_asset_directory(core::AppState& app_state, const ScanOptions& options,
   restored_asset_ids.reserve(file_infos.size());
   restored_paths.reserve(file_infos.size());
   for (const auto& file_info : file_infos) {
+    if (watcher::is_path_in_manual_file_system_ignore(app_state, file_info.path)) {
+      continue;
+    }
     auto cached = context.asset_cache.find(file_info.path.string());
     if (cached != context.asset_cache.end() && cached->second.missing_at.has_value()) {
       restored_asset_ids.push_back(cached->second.id);

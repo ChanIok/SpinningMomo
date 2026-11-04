@@ -2,126 +2,28 @@
 
 #include "vendor/std.hpp"
 
-#include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 #include "vendor/windows/audioclient.hpp"
 #include "vendor/windows/mfapi.hpp"
 
-#include "core/events/events.hpp"
-#include "core/i18n/state.hpp"
-#include "core/notifications/notifications.hpp"
-#include "core/notifications/types.hpp"
 #include "core/state/app_state.hpp"
 #include "features/recording/encoder_loop.hpp"
 #include "features/recording/session.hpp"
 #include "features/recording/state.hpp"
 #include "features/recording/time.hpp"
 #include "features/recording/types.hpp"
-#include "features/settings/state.hpp"
-#include "ui/floating_window/events.hpp"
-#include "ui/floating_window/floating_window.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/media/audio_capture.hpp"
-#include "utils/string/string.hpp"
-#include "utils/system/system.hpp"
+#include "utils/media/hybrid_mp4.hpp"
 
 namespace features::recording {
 
-// 录制模块的大致数据流：
-// WGC 帧回调只负责唤醒编码线程；音频采集线程只复制 PCM 数据并入队；
-// 编码线程按固定 fps 消费捕获（每次最多取一帧 Copy 到自有纹理），是唯一写 SinkWriter 的地方；
-// 控制线程负责把 start / stop / resize restart 串起来，避免多个重操作互相打架。
+// 桌面录制的数据流与线程分工：
+// WGC 帧回调只唤醒编码线程；音频采集线程复制 PCM 数据入队后唤醒编码线程。
+// 编码线程按固定 fps 取帧并混流，是唯一写入 SinkWriter 的线程。
+// usecase 的控制线程串行执行启动、停止和尺寸变化后的分段重启，并安排图库同步与通知。
 
-auto handle_saved_file_view_action(core::AppState& state, const std::filesystem::path& path,
-                                   std::string_view file_kind) -> void {
-  const auto& action = state.settings->raw.features.saved_file_view_action;
-  auto action_result = action == "reveal_in_explorer"
-                           ? utils::system::reveal_file_in_explorer(path)
-                           : utils::system::open_file_with_default_app(path);
-  if (!action_result) {
-    Logger().warn("Failed to handle {} view action '{}': {}", file_kind, action,
-                  action_result.error());
-  }
-}
-
-auto notify_message(core::AppState& state, const std::string& message) -> void {
-  core::notifications::NotificationOptions options;
-  options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message = utils::string::FromUtf8(message);
-  core::notifications::post_notification_request(state, std::move(options));
-}
-
-auto notify_stopping(core::AppState& state) -> void {
-  core::notifications::NotificationOptions options;
-  options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message = utils::string::FromUtf8(state.i18n->texts["message.recording_stopping"]);
-  options.duration = std::chrono::milliseconds(1500);
-  core::notifications::post_notification_request(state, std::move(options));
-}
-
-auto take_pending_start_request(RecordingState& state)
-    -> std::optional<features::recording::StartRequest> {
-  std::lock_guard request_lock(state.control_request_mutex);
-  if (!state.pending_start_request) {
-    return std::nullopt;
-  }
-
-  auto request = std::move(state.pending_start_request);
-  state.pending_start_request.reset();
-  return request;
-}
-
-auto show_recording_saved_notification(core::AppState& state,
-                                       const std::filesystem::path& saved_path) -> void {
-  core::notifications::NotificationOptions options;
-  options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message =
-      utils::string::FromUtf8(state.i18n->texts["message.recording_saved"]) + saved_path.wstring();
-
-  core::notifications::NotificationAction view_action;
-  view_action.label = utils::string::FromUtf8(state.i18n->texts["notification.action.view"]);
-  view_action.callback = [saved_path](core::AppState& app_state) {
-    handle_saved_file_view_action(app_state, saved_path, "recording");
-  };
-  options.action = std::move(view_action);
-
-  core::notifications::post_notification_request(state, std::move(options));
-}
-
-auto show_recording_stop_result_notification(core::AppState& state,
-                                             const features::recording::StopResult& stop_result)
-    -> void {
-  using features::recording::StopResultKind;
-
-  switch (stop_result.kind) {
-    case StopResultKind::Saved:
-      show_recording_saved_notification(state, stop_result.output_path);
-      return;
-
-    case StopResultKind::Discarded: {
-      auto detail = stop_result.error.empty()
-                        ? utils::string::ToUtf8(stop_result.output_path.wstring())
-                        : stop_result.error;
-      notify_message(state, state.i18n->texts["message.recording_failed"] + detail);
-      return;
-    }
-
-    case StopResultKind::PublishFailed: {
-      auto detail = stop_result.error.empty()
-                        ? utils::string::ToUtf8(stop_result.output_path.wstring())
-                        : stop_result.error;
-      notify_message(state, state.i18n->texts["message.recording_stop_failed"] + detail);
-      return;
-    }
-
-    case StopResultKind::NotRecording:
-    default:
-      return;
-  }
-}
-
-// 启动 WASAPI 音频采集线程：PCM 数据入队后唤醒编码线程消费
 auto start_audio_capture_thread(core::AppState& app_state) -> void {
   auto& state = *app_state.recording;
 
@@ -176,7 +78,7 @@ auto start_audio_capture_thread(core::AppState& app_state) -> void {
       });
 }
 
-// 请求优先级从高到低：ShutdownStop > AbortWithError > UserStop > RestartAfterResize > CleanupD3D
+// 同一请求槽按 ShutdownStop、AbortWithError、UserStop、Resize、Cleanup 的优先级合并。
 auto request_control_action(core::AppState& app_state,
                             features::recording::RecordingControlAction action) -> bool {
   auto& state = *app_state.recording;
@@ -265,319 +167,6 @@ auto request_control_action(core::AppState& app_state,
   return false;
 }
 
-// 真正执行 stop 收尾；调用前状态必须已经切到 Stopping。
-auto perform_stop(core::AppState& app_state) -> features::recording::StopResult {
-  features::recording::StopResult result;
-
-  if (!app_state.recording) {
-    return result;
-  }
-
-  auto& state = *app_state.recording;
-  result.output_path = state.config.output_path;
-
-  if (state.status.load(std::memory_order_acquire) !=
-      features::recording::RecordingStatus::Stopping) {
-    return result;
-  }
-
-  // 第一步：关入口，已经在队列里的数据继续处理，新来的拒绝
-  state.accepting_input.store(false, std::memory_order_release);
-
-  // 第二步：停 WGC 产帧，但保留 frame pool 让编码线程排空已到达的帧
-  auto stop_capture_start = std::chrono::steady_clock::now();
-  features::recording::session::stop_capture_input(app_state);
-  Logger().debug("Recording capture stopped in {}ms",
-                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                     std::chrono::steady_clock::now() - stop_capture_start)
-                     .count());
-
-  // 第三步：停音频采集
-  if (state.has_audio.load(std::memory_order_acquire)) {
-    auto stop_audio_start = std::chrono::steady_clock::now();
-    utils::media::audio_capture::stop(state.audio);
-    Logger().debug("Recording audio stopped in {}ms",
-                   std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now() - stop_audio_start)
-                       .count());
-  }
-
-  // 第四步：冻结 stop 的目标时间线。之后编码线程只能追这个固定目标，不能继续跟着墙钟走
-  state.frozen_finish_target_100ns.store(
-      features::recording::time::elapsed_since_start_100ns(state.start_qpc_100ns),
-      std::memory_order_release);
-
-  // 第五步：通知编码线程收尾，等它把队列排空并 finalize 编码器
-  features::recording::encoder_loop::signal_encoder_finish(app_state);
-
-  if (state.encoder_thread.joinable()) {
-    Logger().debug("Waiting for recording encoder thread to finish");
-    auto join_start = std::chrono::steady_clock::now();
-    state.encoder_thread.join();
-    Logger().debug("Recording encoder thread joined in {}ms",
-                   std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now() - join_start)
-                       .count());
-  }
-
-  // 第六步：清理音频和捕获会话
-  utils::media::audio_capture::cleanup(state.audio);
-  features::recording::session::cleanup_capture_session(app_state);
-
-  // 第七步：finalize 成功就把无扩展名临时文件改名成 .mp4，否则删掉
-  if (state.finalize_succeeded) {
-    auto rename_result = features::recording::session::rename_working_output_to_final(
-        state.working_output_path, state.config.output_path);
-    if (!rename_result) {
-      Logger().error("Failed to publish finalized recording '{}': {}",
-                     state.config.output_path.string(), rename_result.error());
-      result.kind = features::recording::StopResultKind::PublishFailed;
-      result.error = rename_result.error();
-    } else {
-      result.kind = features::recording::StopResultKind::Saved;
-    }
-  } else {
-    auto reason = state.encoder_error.empty() ? "too few video frames or finalize skipped"
-                                              : state.encoder_error;
-    features::recording::session::delete_working_output_file(state.working_output_path, reason);
-    result.kind = features::recording::StopResultKind::Discarded;
-    result.error = reason;
-  }
-
-  auto dropped_audio = state.dropped_audio_packets.load(std::memory_order_relaxed);
-  if (dropped_audio > 0) {
-    Logger().warn("Recording queue dropped audio packets: {}", dropped_audio);
-  }
-  if (state.skipped_video_frames_due_to_encoding_lag > 0) {
-    Logger().warn("Recording skipped video frames due to encoding lag: {}",
-                  state.skipped_video_frames_due_to_encoding_lag);
-  }
-  if (state.discarded_tail_audio_packets > 0) {
-    Logger().info("Recording discarded tail audio packets outside video timeline: {}",
-                  state.discarded_tail_audio_packets);
-  }
-
-  // 第八步：清空会话态，状态改回 Idle，启动延迟 5 秒的 D3D 清理定时器
-  features::recording::session::clear_session_runtime_fields(app_state);
-  state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
-  features::recording::session::start_cleanup_timer(app_state, [&app_state]() {
-    request_control_action(app_state, RecordingControlAction::CleanupD3D);
-  });
-  Logger().info("Recording stopped");
-  return result;
-}
-
-// 窗口尺寸变化时停止当前段，用新尺寸启动新段，对用户无感
-auto restart_after_resize(core::AppState& app_state) -> void {
-  auto& state = *app_state.recording;
-
-  if (state.shutdown_requested.load(std::memory_order_acquire)) {
-    return;
-  }
-
-  if (state.status.load(std::memory_order_acquire) !=
-      features::recording::RecordingStatus::Recording) {
-    return;
-  }
-
-  auto restart_config = state.config;
-  auto target_window = state.target_window;
-
-  if (!target_window || !IsWindow(target_window)) {
-    Logger().error("Skip recording auto restart after resize: target window is invalid");
-    return;
-  }
-
-  // 尺寸变了 → 老编码器不能再继续写入，先保存当前段，再用新尺寸开新段
-  restart_config.output_path = features::recording::session::build_output_path_in_directory(
-      restart_config.output_path.parent_path());
-  Logger().info("Recording restarted with timestamp output after resize: {}",
-                restart_config.output_path.string());
-
-  stop(app_state);
-  if (state.shutdown_requested.load(std::memory_order_acquire)) {
-    return;
-  }
-
-  auto restart_result = start(app_state, target_window, restart_config);
-  if (!restart_result) {
-    Logger().error("Failed to restart recording after resize: {}", restart_result.error());
-  } else {
-    ui::floating_window::request_repaint(app_state);
-  }
-}
-
-// 处理单个控制动作。返回 false 时控制线程退出循环。
-auto handle_control_action(core::AppState& app_state, features::recording::RecordingState& state,
-                           features::recording::RecordingControlAction action) -> bool {
-  switch (action) {
-    case RecordingControlAction::UserStart: {
-      // 取出用户提交的启动请求参数
-      auto start_request = take_pending_start_request(state);
-      // 请求参数缺失时回退到空闲态并记录告警
-      if (!start_request) {
-        state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
-        ui::floating_window::request_repaint(app_state);
-        Logger().warn("Recording start request is missing");
-        return true;
-      }
-
-      auto start_result = start(app_state, start_request->target_window, start_request->config);
-      if (!start_result) {
-        // 启动失败时回退状态并提示用户
-        state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
-        ui::floating_window::request_repaint(app_state);
-        notify_message(app_state, app_state.i18n->texts["message.recording_start_failed"] +
-                                      start_result.error());
-      } else {
-        // 启动成功后通知浮窗切换录制态
-        notify_message(app_state, app_state.i18n->texts["message.recording_started"]);
-        core::events::post(app_state,
-                           ui::floating_window::events::RecordingToggleEvent{.enabled = true});
-      }
-      return true;
-    }
-
-    case RecordingControlAction::UserStop: {
-      auto stop_result = perform_stop(app_state);
-      // 确实处于录制中时才推送停止结果通知与切换事件
-      if (stop_result.kind != features::recording::StopResultKind::NotRecording) {
-        show_recording_stop_result_notification(app_state, stop_result);
-        core::events::post(app_state,
-                           ui::floating_window::events::RecordingToggleEvent{.enabled = false});
-      }
-      return true;
-    }
-
-    case RecordingControlAction::AbortWithError: {
-      // 若正在录制，先进入停止中状态以冻结收尾时间线
-      if (state.status.load(std::memory_order_acquire) ==
-          features::recording::RecordingStatus::Recording) {
-        (void)enter_stopping(app_state);
-      }
-      auto stop_result = perform_stop(app_state);
-      // 推送停止结果通知与切换事件
-      if (stop_result.kind != features::recording::StopResultKind::NotRecording) {
-        show_recording_stop_result_notification(app_state, stop_result);
-        core::events::post(app_state,
-                           ui::floating_window::events::RecordingToggleEvent{.enabled = false});
-      }
-      return true;
-    }
-
-    case RecordingControlAction::RestartAfterResize:
-      // 窗口尺寸变了，停当前段、用新尺寸开新段
-      restart_after_resize(app_state);
-      return true;
-
-    case RecordingControlAction::ShutdownStop:
-      // 关闭阶段若仍在录制，先进入停止中状态以冻结收尾时间线
-      if (state.status.load(std::memory_order_acquire) ==
-          features::recording::RecordingStatus::Recording) {
-        (void)enter_stopping(app_state);
-      }
-      // 进入停止中后执行最终落盘
-      if (state.status.load(std::memory_order_acquire) ==
-          features::recording::RecordingStatus::Stopping) {
-        (void)perform_stop(app_state);
-      }
-      // 返回 false 通知控制线程退出循环
-      return false;
-
-    case RecordingControlAction::CleanupD3D:
-      // 空闲 5 秒后释放 D3D 设备，减少显存占用
-      if (state.status.load(std::memory_order_acquire) ==
-          features::recording::RecordingStatus::Idle) {
-        features::recording::session::cleanup_d3d_resources(app_state);
-        Logger().debug("Recording reusable D3D resources cleaned up");
-      }
-      return true;
-
-    default:
-      return true;
-  }
-}
-
-// 控制线程主循环：睡在 condition_variable 上，收到请求就串行执行 start/stop/restart
-auto control_thread_proc(core::AppState& app_state, features::recording::RecordingState& state,
-                         std::stop_token stop_token) -> void {
-  try {
-    auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
-
-    // stop_token 变化时唤醒控制线程，避免 join/shutdown 时长时间睡眠
-    std::stop_callback wake_on_stop(stop_token, [&state]() { state.control_cv.notify_all(); });
-
-    while (true) {
-      RecordingControlAction action{RecordingControlAction::None};
-
-      {
-        std::unique_lock request_lock(state.control_request_mutex);
-        // 平时睡在这里，有请求或 stop_token 时醒来
-        state.control_cv.wait(request_lock, [&]() {
-          return stop_token.stop_requested() ||
-                 state.pending_action != RecordingControlAction::None;
-        });
-
-        // 只是被 stop_token 唤醒但没有 pending 请求 → 退出
-        if (stop_token.stop_requested() && state.pending_action == RecordingControlAction::None) {
-          break;
-        }
-
-        // 取出请求后立刻释放锁，这样 UI 线程可以继续提交新请求而不被 start/stop 阻塞
-        action = state.pending_action;
-        state.pending_action = RecordingControlAction::None;
-        state.control_action_running.store(true, std::memory_order_release);
-      }
-
-      // 执行请求时已经不拿锁了
-      bool keep_running = true;
-      try {
-        keep_running = handle_control_action(app_state, state, action);
-      } catch (const std::exception& e) {
-        Logger().error("Recording control thread action exception: {}", e.what());
-      } catch (...) {
-        Logger().error("Recording control thread action exception: unknown");
-      }
-
-      state.control_action_running.store(false, std::memory_order_release);
-      if (!keep_running) {
-        break;
-      }
-    }
-  } catch (const wil::ResultException& e) {
-    Logger().error("Recording control thread COM initialization failed: {} (HRESULT: 0x{:08X})",
-                   e.what(), static_cast<unsigned>(e.GetErrorCode()));
-    state.control_action_running.store(false, std::memory_order_release);
-  } catch (const std::exception& e) {
-    Logger().error("Recording control thread exception: {}", e.what());
-    state.control_action_running.store(false, std::memory_order_release);
-  } catch (...) {
-    Logger().error("Recording control thread exception: unknown");
-    state.control_action_running.store(false, std::memory_order_release);
-  }
-}
-
-// 懒启动控制线程，首次录制时创建，后续复用
-auto ensure_control_thread_started(core::AppState& app_state) -> std::expected<void, std::string> {
-  auto& state = *app_state.recording;
-
-  // shutdown 中不允许启动新控制线程
-  if (state.shutdown_requested.load(std::memory_order_acquire)) {
-    return std::unexpected("Recording shutdown is in progress");
-  }
-
-  // 线程已启动则直接返回
-  if (state.control_thread.joinable()) {
-    return {};
-  }
-
-  state.control_thread = std::jthread([&app_state](std::stop_token stop_token) {
-    auto& rec = *app_state.recording;
-    control_thread_proc(app_state, rec, stop_token);
-  });
-  return {};
-}
-
 auto enter_stopping(core::AppState& app_state) -> bool {
   if (!app_state.recording) {
     return false;
@@ -591,15 +180,6 @@ auto enter_stopping(core::AppState& app_state) -> bool {
   }
 
   return true;
-}
-
-auto join_control_thread(core::AppState& app_state) -> void {
-  // 等待控制线程退出（shutdown 时调用）
-  auto& state = *app_state.recording;
-
-  if (state.control_thread.joinable()) {
-    state.control_thread.join();
-  }
 }
 
 auto request_restart_after_resize(core::AppState& app_state) -> void {
@@ -627,7 +207,6 @@ auto on_frame_arrived(core::AppState& app_state) -> void {
   features::recording::encoder_loop::mark_video_frame_pending(app_state);
 }
 
-// start 中途失败时的统一清理：释放已分配的资源，保持和 stop 一致的顺序
 auto cleanup_failed_start(core::AppState& app_state, std::string_view reason) -> void {
   auto& state = *app_state.recording;
 
@@ -645,11 +224,15 @@ auto cleanup_failed_start(core::AppState& app_state, std::string_view reason) ->
 
   utils::media::audio_capture::cleanup(state.audio);
   features::recording::session::cleanup_capture_session(app_state);
-  features::recording::session::delete_working_output_file(state.working_output_path, reason);
+  if (state.encoded_video_frames > k_discard_video_frame_threshold) {
+    Logger().warn("Recording startup interrupted; file retained at '{}': {}",
+                  state.config.output_path.string(), reason);
+  } else {
+    features::recording::session::delete_output_file(state.config.output_path, reason);
+  }
   features::recording::session::clear_session_runtime_fields(app_state);
 }
 
-// 启动一个录制段：算尺寸 → 起 D3D → 起音频 → 起编码线程 → 起 WGC 捕获
 auto start(core::AppState& app_state, HWND target_window,
            const features::recording::RecordingConfig& config) -> std::expected<void, std::string> {
   if (!app_state.recording) {
@@ -669,6 +252,12 @@ auto start(core::AppState& app_state, HWND target_window,
     return std::unexpected("Target window is minimized");
   }
 
+  std::error_code path_error;
+  if (std::filesystem::exists(config.output_path, path_error))
+    return std::unexpected("Recording output already exists: " + config.output_path.string());
+  if (path_error)
+    return std::unexpected("Failed to inspect recording output: " + path_error.message());
+
   // 清空上一次录制残留的会话状态，取消 D3D 延迟释放定时器
   features::recording::session::clear_session_runtime_fields(app_state);
   features::recording::session::cancel_cleanup_timer(app_state);
@@ -682,8 +271,6 @@ auto start(core::AppState& app_state, HWND target_window,
 
   state.config = config;
   state.target_window = target_window;
-  state.working_output_path =
-      features::recording::session::build_working_output_path(config.output_path);
   state.capture_plan = *capture_plan_result;
   state.last_frame_width = capture_plan_result->source_width;
   state.last_frame_height = capture_plan_result->source_height;
@@ -787,23 +374,100 @@ auto start(core::AppState& app_state, HWND target_window,
 }
 
 auto stop(core::AppState& app_state) -> features::recording::StopResult {
-  if (!enter_stopping(app_state)) {
-    return {};
-  }
-  return perform_stop(app_state);
-}
+  features::recording::StopResult result;
 
-// 录制模块退出清理：先停录制，再关闭 Media Foundation 运行时
-auto cleanup(core::AppState& app_state) -> void {
-  // 应用退出时：先停录制，再关闭 Media Foundation
-  (void)stop(app_state);
   if (!app_state.recording) {
-    MFShutdown();
-    return;
+    return result;
   }
 
-  features::recording::session::cleanup_d3d_resources(app_state);
-  MFShutdown();
+  auto& state = *app_state.recording;
+  result.output_path = state.config.output_path;
+
+  if (state.status.load(std::memory_order_acquire) == RecordingStatus::Recording) {
+    (void)enter_stopping(app_state);
+  }
+  if (state.status.load(std::memory_order_acquire) != RecordingStatus::Stopping) {
+    return result;
+  }
+
+  // 第一步：关入口，已经在队列里的数据继续处理，新来的拒绝
+  state.accepting_input.store(false, std::memory_order_release);
+
+  // 第二步：停 WGC 产帧，但保留 frame pool 让编码线程排空已到达的帧
+  auto stop_capture_start = std::chrono::steady_clock::now();
+  features::recording::session::stop_capture_input(app_state);
+  Logger().debug("Recording capture stopped in {}ms",
+                 std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - stop_capture_start)
+                     .count());
+
+  // 第三步：停音频采集
+  if (state.has_audio.load(std::memory_order_acquire)) {
+    auto stop_audio_start = std::chrono::steady_clock::now();
+    utils::media::audio_capture::stop(state.audio);
+    Logger().debug("Recording audio stopped in {}ms",
+                   std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - stop_audio_start)
+                       .count());
+  }
+
+  // 第四步：冻结 stop 的目标时间线。之后编码线程只能追这个固定目标，不能继续跟着墙钟走
+  state.frozen_finish_target_100ns.store(
+      features::recording::time::elapsed_since_start_100ns(state.start_qpc_100ns),
+      std::memory_order_release);
+
+  // 第五步：通知编码线程收尾，等它把队列排空并 finalize 编码器
+  features::recording::encoder_loop::signal_encoder_finish(app_state);
+
+  if (state.encoder_thread.joinable()) {
+    Logger().debug("Waiting for recording encoder thread to finish");
+    auto join_start = std::chrono::steady_clock::now();
+    state.encoder_thread.join();
+    Logger().debug("Recording encoder thread joined in {}ms",
+                   std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - join_start)
+                       .count());
+  }
+
+  // 第六步：清理音频和捕获会话
+  utils::media::audio_capture::cleanup(state.audio);
+  features::recording::session::cleanup_capture_session(app_state);
+
+  // 第七步：正常结束才整理总索引，异常时直接保留原路径下的分片 MP4。
+  if (state.encoded_video_frames > k_discard_video_frame_threshold) {
+    result.error = state.encoder_error;
+    if (result.error.empty()) {
+      auto finalized = utils::media::hybrid_mp4::finalize(state.config.output_path);
+      if (!finalized) result.error = finalized.error();
+    }
+    result.kind = result.error.empty() ? StopResultKind::Saved : StopResultKind::Failed;
+    if (!result.error.empty())
+      Logger().warn("Recording retained at '{}': {}", result.output_path.string(), result.error);
+  } else {
+    auto reason = state.encoder_error.empty() ? "too few video frames" : state.encoder_error;
+    features::recording::session::delete_output_file(state.config.output_path, reason);
+    result.kind = StopResultKind::Discarded;
+    result.error = reason;
+  }
+
+  auto dropped_audio = state.dropped_audio_packets.load(std::memory_order_relaxed);
+  if (dropped_audio > 0) {
+    Logger().warn("Recording queue dropped audio packets: {}", dropped_audio);
+  }
+  if (state.skipped_video_frames_due_to_encoding_lag > 0) {
+    Logger().warn("Recording skipped video frames due to encoding lag: {}",
+                  state.skipped_video_frames_due_to_encoding_lag);
+  }
+  if (state.discarded_tail_audio_packets > 0) {
+    Logger().info("Recording discarded tail audio packets outside video timeline: {}",
+                  state.discarded_tail_audio_packets);
+  }
+
+  // 第八步：清空会话态。图库同步、通知与延迟释放策略由 usecase 安排。
+  features::recording::session::clear_session_runtime_fields(app_state);
+  state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
+  Logger().info("Recording stopped");
+  return result;
 }
 
 }  // namespace features::recording

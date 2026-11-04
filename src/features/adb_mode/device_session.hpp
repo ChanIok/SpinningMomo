@@ -4,6 +4,7 @@
 
 #include "vendor/asio.hpp"
 
+#include "core/state/app_state.hpp"
 #include "features/adb_mode/capture_protocol.hpp"
 #include "features/adb_mode/types.hpp"
 #include "utils/process/process.hpp"
@@ -35,12 +36,19 @@ struct RecordingConnection {
   std::uint16_t local_port = 0;
 };
 
-// 建立完整设备会话：连接设备 → 查询初始分辨率 → 推送 JAR 服务 → 启动服务端 → 建立 socket 传输
-auto open(const AdbConnectionConfig& config)
-    -> std::expected<std::shared_ptr<DeviceSession>, std::string>;
+// 只检查当前是否处于可以执行设备操作的已连接状态。
+auto is_connected(const core::AppState& state) -> bool;
 
-// 关闭设备会话：停传输与服务 → 恢复初始分辨率 → 断开自建连接 → 释放会话指针
-auto close(std::shared_ptr<DeviceSession>& session) -> std::expected<void, std::string>;
+// 仅供 ADB 队列内借用当前会话，不跨任务保存；生命周期由 AppState 保证。
+auto get_active(core::AppState& state) -> std::expected<DeviceSession*, std::string>;
+
+// 建立完整设备会话：连接设备 → 查询初始分辨率 → 推送 JAR 服务 → 启动服务端 → 建立 socket 传输
+// 原地初始化；调用前必须已关闭旧连接，失败时清理本次建立的资源。
+auto open(DeviceSession& session, const AdbConnectionConfig& config)
+    -> std::expected<void, std::string>;
+
+// 调用前须结束录制；关闭传输与服务、恢复显示、断开自建连接并清空会话数据。
+auto close(DeviceSession& session) -> std::expected<void, std::string>;
 
 // 恢复物理显示尺寸：重置 wm size → 更新当前会话尺寸快照
 auto restore_display(DeviceSession& session) -> std::expected<void, std::string>;

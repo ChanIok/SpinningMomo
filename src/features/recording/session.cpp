@@ -129,75 +129,27 @@ auto build_startup_capture_plan(HWND target_window, bool capture_client_area)
                               capture_size_result->second);
 }
 
-auto build_working_output_path(const std::filesystem::path& final_output_path)
-    -> std::filesystem::path {
-  auto working_output_path = final_output_path;
-  // 录制没成功封尾前不直接写 .mp4，避免图库或播放器误以为这是一个完整视频。
-  // 例如 final 是 20260511_xxx.mp4，这里会先写到 20260511_xxx。
-  working_output_path.replace_extension();
-  return working_output_path;
-}
-
 auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path {
   auto filename = utils::string::FormatLocalTimestamp() + ".mp4";
   return output_directory / filename;
 }
 
-// finalize 成功后把临时文件 rename 为 .mp4，比复制更快
-auto rename_working_output_to_final(const std::filesystem::path& working_output_path,
-                                    const std::filesystem::path& final_output_path)
-    -> std::expected<void, std::string> {
-  if (working_output_path.empty() || final_output_path.empty() ||
-      working_output_path == final_output_path) {
-    return {};
-  }
-
-  std::error_code ec;
-  if (std::filesystem::exists(final_output_path, ec)) {
-    if (ec) {
-      return std::unexpected("Failed to probe final output path: " + ec.message());
-    }
-
-    std::filesystem::remove(final_output_path, ec);
-    if (ec) {
-      return std::unexpected("Failed to remove existing final output file: " + ec.message());
-    }
-  }
-
-  // 只有编码线程 finalize 成功后才走到这里。
-  // rename 比复制更快，也能减少半成品 .mp4 被看到的时间窗口。
-  std::filesystem::rename(working_output_path, final_output_path, ec);
-  if (ec) {
-    return std::unexpected("Failed to move finalized recording to destination: " + ec.message());
-  }
-
-  return {};
-}
-
-auto delete_working_output_file(const std::filesystem::path& working_output_path,
-                                std::string_view reason) -> void {
-  if (working_output_path.empty()) {
+auto delete_output_file(const std::filesystem::path& output_path, std::string_view reason) -> void {
+  if (output_path.empty()) {
     return;
   }
 
   std::error_code ec;
-  if (!std::filesystem::exists(working_output_path, ec)) {
-    if (ec) {
-      Logger().warn("Failed to probe discarded recording file '{}': {}",
-                    working_output_path.string(), ec.message());
-    }
-    return;
-  }
-
-  std::filesystem::remove(working_output_path, ec);
+  const bool removed = std::filesystem::remove(output_path, ec);
   if (ec) {
-    Logger().warn("Failed to delete discarded recording file '{}': {}",
-                  working_output_path.string(), ec.message());
+    Logger().warn("Failed to delete discarded recording file '{}': {}", output_path.string(),
+                  ec.message());
     return;
   }
+  if (!removed) return;
 
-  Logger().info("Discarded recording file '{}': {}", working_output_path.string(), reason);
+  Logger().info("Discarded recording file '{}': {}", output_path.string(), reason);
 }
 
 // 清空单段录制的会话态，但保留可复用的 D3D 设备，支持高频启停
@@ -210,7 +162,6 @@ auto clear_session_runtime_fields(core::AppState& app_state) -> void {
 
   // 清空一个录制段的会话态，不动可复用 D3D 设备。
   state.config = {};
-  state.working_output_path.clear();
   state.target_window = nullptr;
   state.capture_plan = {};
   state.capture_session = {};
@@ -238,7 +189,6 @@ auto clear_session_runtime_fields(core::AppState& app_state) -> void {
   state.has_audio.store(false, std::memory_order_release);
   state.encoder_ready = false;
   state.encoder_start_succeeded = false;
-  state.finalize_succeeded = false;
   state.encoder_error.clear();
 }
 

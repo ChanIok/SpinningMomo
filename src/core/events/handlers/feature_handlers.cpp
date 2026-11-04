@@ -7,6 +7,7 @@
 #include "core/notifications/events.hpp"
 #include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
+#include "features/adb_mode/device_session.hpp"
 #include "features/adb_mode/events.hpp"
 #include "features/adb_mode/usecase.hpp"
 #include "features/screenshot/usecase.hpp"
@@ -35,7 +36,7 @@ auto register_feature_handlers(core::AppState& app_state) -> void {
   // 注：handle_xxx 会启动协程在 UI 线程执行，协程内部会在完成后请求重绘
   subscribe<ui::floating_window::events::RatioChangeEvent>(
       app_state, [&app_state](const ui::floating_window::events::RatioChangeEvent& event) {
-        if (features::adb_mode::is_connected(app_state)) {
+        if (features::adb_mode::session::is_connected(app_state)) {
           features::adb_mode::handle_ratio_changed(app_state, event.index, event.ratio_value);
         } else {
           features::window_control::handle_ratio_changed(app_state, event);
@@ -44,7 +45,7 @@ auto register_feature_handlers(core::AppState& app_state) -> void {
 
   subscribe<ui::floating_window::events::ResolutionChangeEvent>(
       app_state, [&app_state](const ui::floating_window::events::ResolutionChangeEvent& event) {
-        if (features::adb_mode::is_connected(app_state)) {
+        if (features::adb_mode::session::is_connected(app_state)) {
           features::adb_mode::handle_resolution_changed(app_state, event.index);
         } else {
           features::window_control::handle_resolution_changed(app_state, event);

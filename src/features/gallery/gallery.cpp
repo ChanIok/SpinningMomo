@@ -3,6 +3,7 @@
 #include "vendor/std.hpp"
 
 #include "vendor/asio.hpp"
+#include "vendor/wil.hpp"
 #include "vendor/windows/mfapi.hpp"
 
 #include "core/async/async.hpp"
@@ -10,7 +11,9 @@
 #include "core/state/app_state.hpp"
 #include "features/gallery/asset/thumbnail.hpp"
 #include "features/gallery/download/download.hpp"
+#include "features/gallery/folder/repository.hpp"
 #include "features/gallery/folder/service.hpp"
+#include "features/gallery/ignore/service.hpp"
 #include "features/gallery/root_availability.hpp"
 #include "features/gallery/scanner/common.hpp"
 #include "features/gallery/scanner/scanner.hpp"
@@ -293,6 +296,86 @@ auto scan_directory(core::AppState& app_state, const ScanOptions& options,
   }
 
   return result;
+}
+
+auto index_created_file(core::AppState& app_state, const std::filesystem::path& path)
+    -> std::expected<ScanResult, std::string> {
+  auto normalized = utils::path::NormalizePath(path);
+  if (!normalized) return std::unexpected(normalized.error());
+
+  std::error_code ec;
+  const bool exists = std::filesystem::exists(*normalized, ec);
+  if (ec) return std::unexpected("Failed to inspect created file: " + ec.message());
+  if (!exists) return ScanResult{};
+
+  // 新输出子目录可能尚未被 watcher 物化；沿祖先寻找已有图库归属，不能另建根。
+  std::optional<Folder> ancestor;
+  for (auto parent = normalized->parent_path(); !parent.empty();) {
+    auto found = folder::repository::get_folder_by_path(app_state, parent.string());
+    if (!found) return std::unexpected(found.error());
+    if (found->has_value()) {
+      ancestor = std::move(found->value());
+      break;
+    }
+    auto next = parent.parent_path();
+    if (next == parent) break;
+    parent = std::move(next);
+  }
+  if (!ancestor) return ScanResult{};
+  auto root_id = ignore::service::resolve_root_folder_id(app_state, ancestor->id);
+  if (!root_id) return std::unexpected(root_id.error());
+  auto root = folder::repository::get_folder_by_id(app_state, *root_id);
+  if (!root) return std::unexpected(root.error());
+  if (!root->has_value()) return std::unexpected("Gallery root no longer exists");
+  const auto root_path = std::filesystem::path(root->value().path);
+  auto rules = ignore::service::load_ignore_rules(app_state, *root_id);
+  if (!rules) return std::unexpected(rules.error());
+  if (!scanner::common::is_supported_file(*normalized,
+                                          scanner::common::default_supported_extensions()) ||
+      ignore::service::apply_ignore_rules(*normalized, root_path, *rules))
+    return ScanResult{};
+
+  auto paths = folder::service::extract_unique_folder_paths({*normalized}, root_path);
+  auto folders = folder::service::batch_create_folders_for_paths(app_state, paths);
+  if (!folders) return std::unexpected(folders.error());
+  auto indexed = scanner::upsert_created_file(
+      app_state, folders->folder_ids_by_path.at(normalized->parent_path().string()), *normalized);
+  if (!indexed) {
+    // 目录事务已提交，资产失败不能吞掉实际创建的目录事实。
+    ScanResult result;
+    result.created_folders = std::move(folders->created_folders);
+    result.errors.push_back(indexed.error());
+    return result;
+  }
+  indexed->created_folders = std::move(folders->created_folders);
+  return indexed;
+}
+
+auto publish_scan_result(core::AppState& app_state, const ScanResult& result)
+    -> std::expected<void, std::string> {
+  if (result.changes.empty() && result.created_folders.empty()) return {};
+  auto dispatched = watcher::dispatch_manual_scan_result(app_state, result);
+  core::rpc::notification_hub::send_notification(app_state, "gallery.changed");
+  return dispatched;
+}
+
+auto complete_created_file_operation(core::AppState& app_state, const std::filesystem::path& path)
+    -> std::expected<void, std::string> {
+  std::expected<ScanResult, std::string> indexed;
+  {
+    auto complete = wil::scope_exit([&] {
+      auto result = watcher::complete_manual_file_system_ignore(app_state, path, path);
+      if (!result)
+        Logger().warn("Failed to complete created file watcher ignore '{}': {}", path.string(),
+                      result.error());
+    });
+    indexed = index_created_file(app_state, path);
+  }
+  if (!indexed) return std::unexpected(indexed.error());
+  auto published = publish_scan_result(app_state, *indexed);
+  if (!published) return published;
+  if (!indexed->errors.empty()) return std::unexpected(indexed->errors.front());
+  return {};
 }
 
 // 清理已经没有任何资产引用的缩略图文件。
