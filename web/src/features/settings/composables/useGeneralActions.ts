@@ -43,6 +43,16 @@ export const useGeneralActions = () => {
     })
   }
 
+  const updatePreferHighPerformanceGpu = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      app: {
+        ...appSettings.value.app,
+        preferHighPerformanceGpu: enabled,
+      },
+    })
+  }
+
   const updateAutoCheck = async (enabled: boolean) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -123,6 +133,7 @@ export const useGeneralActions = () => {
       ...appSettings.value,
       app: {
         ...appSettings.value.app,
+        preferHighPerformanceGpu: DEFAULT_APP_SETTINGS.app.preferHighPerformanceGpu,
         language: {
           current: DEFAULT_APP_SETTINGS.app.language.current,
         },
@@ -157,6 +168,7 @@ export const useGeneralActions = () => {
       ...appSettings.value,
       app: {
         ...appSettings.value.app,
+        preferHighPerformanceGpu: DEFAULT_APP_SETTINGS.app.preferHighPerformanceGpu,
         language: {
           current: DEFAULT_APP_SETTINGS.app.language.current,
         },
@@ -198,6 +210,7 @@ export const useGeneralActions = () => {
   return {
     updateLanguage,
     updateLoggerLevel,
+    updatePreferHighPerformanceGpu,
     updateAutoCheck,
     updateAutoUpdateOnExit,
     updateDownloadSourceMode,

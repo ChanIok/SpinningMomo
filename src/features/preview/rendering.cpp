@@ -12,6 +12,7 @@
 #include "features/preview/state.hpp"
 #include "features/preview/types.hpp"
 #include "features/preview/viewport.hpp"
+#include "features/settings/state.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/logger/logger.hpp"
 
@@ -43,7 +44,8 @@ auto initialize_rendering(core::AppState& state, HWND hwnd, int width, int heigh
 
   // 创建D3D上下文
   auto d3d_result =
-      utils::graphics::d3d::create_d3d_context(hwnd, width, height, state.preview->enable_hdr);
+      utils::graphics::d3d::create_d3d_context(hwnd, width, height, state.preview->enable_hdr,
+                                               state.settings->raw.app.prefer_high_performance_gpu);
   if (!d3d_result) {
     Logger().error("Failed to create D3D context for preview rendering: {}", d3d_result.error());
     return std::unexpected(d3d_result.error().find("device") != std::string::npos

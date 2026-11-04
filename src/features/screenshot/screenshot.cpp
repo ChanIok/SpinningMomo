@@ -667,7 +667,8 @@ auto initialize_d3d_resources_only(core::AppState& app_state) -> std::expected<v
     auto co_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
 
     // 创建无头D3D设备（不需要窗口和交换链）
-    auto d3d_result = utils::graphics::d3d::create_headless_d3d_device();
+    auto d3d_result = utils::graphics::d3d::create_headless_d3d_device(
+        app_state.settings->raw.app.prefer_high_performance_gpu);
     if (!d3d_result) {
       return std::unexpected("Failed to create headless D3D device: " + d3d_result.error());
     }

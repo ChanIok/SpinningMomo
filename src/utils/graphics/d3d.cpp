@@ -8,14 +8,76 @@
 #include "vendor/windows/d3dcompiler.hpp"
 #include "vendor/windows/dxgi.hpp"
 #include "vendor/windows/dxgi1_4.hpp"
+#include "vendor/windows/dxgi1_6.hpp"
 
 #include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace utils::graphics::d3d {
 
 // d3d11.h 宏在头文件单元 import 后不可见，取值与 Windows SDK 一致
 constexpr UINT k_d3d11_sdk_version = 7;
 constexpr float k_d3d11_float32_max = 3.402823466e+38f;
+
+auto select_adapter(bool prefer_high_performance_gpu)
+    -> std::expected<wil::com_ptr<IDXGIAdapter1>, std::string> {
+  // 空适配器保留 D3D 的系统默认选择语义。
+  if (!prefer_high_performance_gpu) {
+    return wil::com_ptr<IDXGIAdapter1>{};
+  }
+
+  wil::com_ptr<IDXGIFactory6> factory;
+  HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(factory.put()));
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to create DXGI factory: 0x{:08X}", static_cast<unsigned>(hr)));
+  }
+
+  for (UINT index = 0;; ++index) {
+    wil::com_ptr<IDXGIAdapter1> adapter;
+    hr = factory->EnumAdapterByGpuPreference(index, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                                             IID_PPV_ARGS(adapter.put()));
+    if (hr == DXGI_ERROR_NOT_FOUND) {
+      return std::unexpected("No hardware GPU found");
+    }
+    if (FAILED(hr)) {
+      return std::unexpected(std::format("Failed to select high-performance GPU: 0x{:08X}",
+                                         static_cast<unsigned>(hr)));
+    }
+
+    DXGI_ADAPTER_DESC1 desc{};
+    hr = adapter->GetDesc1(&desc);
+    if (FAILED(hr)) {
+      return std::unexpected(
+          std::format("Failed to query GPU: 0x{:08X}", static_cast<unsigned>(hr)));
+    }
+    if (!(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
+      return adapter;
+    }
+  }
+}
+
+auto log_device_adapter(ID3D11Device* device, bool prefer_high_performance_gpu) -> void {
+  wil::com_ptr<IDXGIDevice> dxgi_device;
+  wil::com_ptr<IDXGIAdapter> adapter;
+  DXGI_ADAPTER_DESC desc{};
+  HRESULT hr = device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()));
+  if (SUCCEEDED(hr)) {
+    hr = dxgi_device->GetAdapter(adapter.put());
+  }
+  if (SUCCEEDED(hr)) {
+    hr = adapter->GetDesc(&desc);
+  }
+  if (FAILED(hr)) {
+    Logger().warn("Failed to query actual D3D GPU: 0x{:08X}", static_cast<unsigned>(hr));
+    return;
+  }
+
+  Logger().info("D3D GPU: preference={}, adapter={}, LUID={:08X}:{:08X}",
+                prefer_high_performance_gpu ? "high_performance" : "system_default",
+                utils::string::ToUtf8(desc.Description),
+                static_cast<unsigned>(desc.AdapterLuid.HighPart), desc.AdapterLuid.LowPart);
+}
 
 auto resolve_swap_chain_format(bool enable_hdr) -> DXGI_FORMAT {
   return enable_hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -44,11 +106,18 @@ auto configure_swap_chain_color_space(const D3DContext& context)
   return {};
 }
 
-auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr)
+auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr,
+                        bool prefer_high_performance_gpu)
     -> std::expected<D3DContext, std::string> {
   D3DContext context;
   context.enable_hdr = enable_hdr;
   context.swap_chain_format = resolve_swap_chain_format(enable_hdr);
+
+  auto adapter_result = select_adapter(prefer_high_performance_gpu);
+  if (!adapter_result) {
+    return std::unexpected(adapter_result.error());
+  }
+  auto& adapter = *adapter_result;
 
   // 创建交换链描述
   DXGI_SWAP_CHAIN_DESC scd = {};
@@ -73,10 +142,10 @@ auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr)
   createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-  HRESULT hr =
-      D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
-                                    nullptr, 0, k_d3d11_sdk_version, &scd, context.swap_chain.put(),
-                                    context.device.put(), &featureLevel, context.context.put());
+  HRESULT hr = D3D11CreateDeviceAndSwapChain(
+      adapter.get(), adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE, nullptr,
+      createDeviceFlags, nullptr, 0, k_d3d11_sdk_version, &scd, context.swap_chain.put(),
+      context.device.put(), &featureLevel, context.context.put());
 
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create D3D device and swap chain, HRESULT: 0x{:08X}",
@@ -95,32 +164,30 @@ auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr)
     return std::unexpected(result.error());
   }
 
+  log_device_adapter(context.device.get(), prefer_high_performance_gpu);
   return context;
 }
 
-auto create_headless_d3d_device()
+auto create_headless_d3d_device(bool prefer_high_performance_gpu)
     -> std::expected<std::pair<wil::com_ptr<ID3D11Device>, wil::com_ptr<ID3D11DeviceContext>>,
                      std::string> {
   wil::com_ptr<ID3D11Device> device;
   wil::com_ptr<ID3D11DeviceContext> context;
+
+  auto adapter_result = select_adapter(prefer_high_performance_gpu);
+  if (!adapter_result) {
+    return std::unexpected(adapter_result.error());
+  }
+  auto& adapter = *adapter_result;
 
   UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
   createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-  // 创建无头D3D设备（参考旧代码的实现）
-  HRESULT hr = D3D11CreateDevice(nullptr,                   // 使用默认适配器
-                                 D3D_DRIVER_TYPE_HARDWARE,  // 硬件驱动
-                                 nullptr,                   // 软件光栅化器句柄
-                                 createDeviceFlags,         // 创建标志
-                                 nullptr,                   // 功能级别数组
-                                 0,                         // 功能级别数组大小
-                                 k_d3d11_sdk_version,
-                                 device.put(),  // 输出设备
-                                 nullptr,       // 输出功能级别
-                                 context.put()  // 输出设备上下文
-  );
+  HRESULT hr = D3D11CreateDevice(
+      adapter.get(), adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE, nullptr,
+      createDeviceFlags, nullptr, 0, k_d3d11_sdk_version, device.put(), nullptr, context.put());
 
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create headless D3D device, HRESULT: 0x{:08X}",
@@ -129,7 +196,7 @@ auto create_headless_d3d_device()
     return std::unexpected(error_msg);
   }
 
-  Logger().debug("Headless D3D device created successfully");
+  log_device_adapter(device.get(), prefer_high_performance_gpu);
   return std::make_pair(device, context);
 }
 

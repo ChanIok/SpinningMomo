@@ -23,6 +23,7 @@ const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
   updateLanguage,
   updateLoggerLevel,
+  updatePreferHighPerformanceGpu,
   updateAutoCheck,
   updateAutoUpdateOnExit,
   updateDownloadSourceMode,
@@ -102,6 +103,32 @@ const handleReset = async () => {
                 <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+      </div>
+
+      <!-- Performance -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold text-foreground">
+          {{ t('settings.general.performance.title') }}
+        </h3>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle id="prefer-high-performance-gpu-label">
+              {{ t('settings.general.performance.preferHighPerformanceGpu.label') }}
+            </ItemTitle>
+            <ItemDescription id="prefer-high-performance-gpu-description" class="line-clamp-none">
+              {{ t('settings.general.performance.preferHighPerformanceGpu.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.app.preferHighPerformanceGpu"
+              aria-labelledby="prefer-high-performance-gpu-label"
+              aria-describedby="prefer-high-performance-gpu-description"
+              @update:model-value="(value) => updatePreferHighPerformanceGpu(Boolean(value))"
+            />
           </ItemActions>
         </Item>
       </div>

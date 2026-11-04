@@ -118,6 +118,7 @@ export interface AppSettings {
   app: {
     // 始终以管理员权限运行
     alwaysRunAsAdmin: boolean
+    preferHighPerformanceGpu: boolean // 新建捕获与渲染设备时优先使用高性能 GPU
 
     // 局域网图库访问设置；访问令牌由后端单独管理。
     lanAccess: {
@@ -284,6 +285,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // app 设置
   app: {
     alwaysRunAsAdmin: true,
+    preferHighPerformanceGpu: true,
     lanAccess: {
       enabled: false,
       preferredAdapterId: '',

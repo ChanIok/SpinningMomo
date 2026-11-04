@@ -11,6 +11,7 @@
 #include "features/overlay/shaders.hpp"
 #include "features/overlay/state.hpp"
 #include "features/overlay/types.hpp"
+#include "features/settings/state.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/logger/logger.hpp"
 
@@ -56,7 +57,8 @@ auto initialize_rendering(core::AppState& state) -> std::expected<void, std::str
   // 创建D3D上下文
   auto d3d_result = utils::graphics::d3d::create_d3d_context(
       overlay_state.window.overlay_hwnd, overlay_state.window.window_width,
-      overlay_state.window.window_height, overlay_state.enable_hdr);
+      overlay_state.window.window_height, overlay_state.enable_hdr,
+      state.settings->raw.app.prefer_high_performance_gpu);
 
   if (!d3d_result) {
     auto error_msg = std::format("Failed to initialize D3D rendering: {}", d3d_result.error());

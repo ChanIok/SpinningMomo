@@ -66,7 +66,8 @@ struct AppSettings {
 
   // app 分组 - 应用核心设置
   struct App {
-    bool always_run_as_admin = true;  // 始终以管理员权限运行
+    bool always_run_as_admin = true;          // 始终以管理员权限运行
+    bool prefer_high_performance_gpu = true;  // 新建捕获与渲染设备时优先使用高性能 GPU
 
     // 局域网图库访问设置；令牌单独保存在 HTTP 服务配置中，不进入 AppSettings。
     struct LanAccess {

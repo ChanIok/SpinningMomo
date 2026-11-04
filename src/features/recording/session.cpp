@@ -9,6 +9,7 @@
 #include "core/state/app_state.hpp"
 #include "features/recording/state.hpp"
 #include "features/recording/types.hpp"
+#include "features/settings/state.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/capture_region.hpp"
 #include "utils/graphics/d3d.hpp"
@@ -257,7 +258,8 @@ auto ensure_d3d_resources_ready(core::AppState& app_state) -> std::expected<void
     return {};
   }
 
-  auto d3d_result = utils::graphics::d3d::create_headless_d3d_device();
+  auto d3d_result = utils::graphics::d3d::create_headless_d3d_device(
+      app_state.settings->raw.app.prefer_high_performance_gpu);
   if (!d3d_result) {
     cleanup_d3d_resources(app_state);
     return std::unexpected("Failed to create D3D device: " + d3d_result.error());

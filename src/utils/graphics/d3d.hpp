@@ -29,11 +29,12 @@ struct ShaderResources {
 };
 
 // 创建D3D设备和交换链
-auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr = false)
+auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr = false,
+                        bool prefer_high_performance_gpu = false)
     -> std::expected<D3DContext, std::string>;
 
 // 创建无头D3D设备（仅设备和上下文，无交换链）
-auto create_headless_d3d_device()
+auto create_headless_d3d_device(bool prefer_high_performance_gpu = false)
     -> std::expected<std::pair<wil::com_ptr<ID3D11Device>, wil::com_ptr<ID3D11DeviceContext>>,
                      std::string>;
 
