@@ -62,7 +62,8 @@ const galleryStore = useGalleryStore()
 const overlayHistory = useGalleryOverlayHistory()
 const settingsStore = useSettingsStore()
 const router = useRouter()
-const { sidebarFolderSplitSize } = storeToRefs(galleryStore)
+const { sidebarFolderSplitSize, isFoldersCollapsed, isTagsCollapsed } = storeToRefs(galleryStore)
+const { toggleFoldersCollapse, toggleTagsCollapse } = galleryStore
 const { toast } = useToast()
 const { t } = useI18n()
 const { showHandle: showSplitHandle, dividerSize: splitDividerSize } = useGallerySplitPresentation()
@@ -71,17 +72,6 @@ const canUseLocalFileSystem = computed(() => isLocalAccess())
 const showMapEntry = computed(
   () => isLocalAccess() && settingsStore.appSettings.extensions.infinityNikki.enable
 )
-
-const isFoldersCollapsed = ref(false)
-const isTagsCollapsed = ref(false)
-
-function toggleFoldersCollapse() {
-  isFoldersCollapsed.value = !isFoldersCollapsed.value
-}
-
-function toggleTagsCollapse() {
-  isTagsCollapsed.value = !isTagsCollapsed.value
-}
 
 const isSplitDisabled = computed(() => isFoldersCollapsed.value || isTagsCollapsed.value)
 

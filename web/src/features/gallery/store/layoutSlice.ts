@@ -56,6 +56,26 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
       settings.value.layout.sidebarFolderSplitSize = size
     },
   })
+  const isFoldersCollapsed = computed({
+    get: () => settings.value.layout.foldersCollapsed ?? false,
+    set: (collapsed: boolean) => {
+      settings.value.layout.foldersCollapsed = collapsed
+    },
+  })
+  const isTagsCollapsed = computed({
+    get: () => settings.value.layout.tagsCollapsed ?? false,
+    set: (collapsed: boolean) => {
+      settings.value.layout.tagsCollapsed = collapsed
+    },
+  })
+
+  function toggleFoldersCollapse() {
+    isFoldersCollapsed.value = !isFoldersCollapsed.value
+  }
+
+  function toggleTagsCollapse() {
+    isTagsCollapsed.value = !isTagsCollapsed.value
+  }
 
   function resetLayoutState() {
     const defaults = createDefaultGallerySettings()
@@ -70,6 +90,10 @@ export function createLayoutSlice(args: LayoutSliceArgs) {
     leftSidebarOpenSize,
     rightDetailsOpenSize,
     sidebarFolderSplitSize,
+    isFoldersCollapsed,
+    isTagsCollapsed,
+    toggleFoldersCollapse,
+    toggleTagsCollapse,
     resetLayoutState,
   }
 }

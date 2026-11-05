@@ -32,6 +32,8 @@ export interface GallerySettings {
     leftSidebarOpenSize: string
     rightDetailsOpenSize: string
     sidebarFolderSplitSize: number | string
+    foldersCollapsed: boolean
+    tagsCollapsed: boolean
   }
 }
 
@@ -68,6 +70,8 @@ export function createDefaultGallerySettings(): GallerySettings {
       leftSidebarOpenSize: '256px',
       rightDetailsOpenSize: '256px',
       sidebarFolderSplitSize: 0.5,
+      foldersCollapsed: false,
+      tagsCollapsed: false,
     },
   }
 }
