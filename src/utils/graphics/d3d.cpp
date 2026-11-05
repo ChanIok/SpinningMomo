@@ -168,7 +168,7 @@ auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr,
   return context;
 }
 
-auto create_headless_d3d_device(bool prefer_high_performance_gpu)
+auto create_headless_d3d_device(bool prefer_high_performance_gpu, bool video_support)
     -> std::expected<std::pair<wil::com_ptr<ID3D11Device>, wil::com_ptr<ID3D11DeviceContext>>,
                      std::string> {
   wil::com_ptr<ID3D11Device> device;
@@ -181,6 +181,7 @@ auto create_headless_d3d_device(bool prefer_high_performance_gpu)
   auto& adapter = *adapter_result;
 
   UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+  if (video_support) createDeviceFlags |= D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
 #ifdef _DEBUG
   createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif

@@ -23,40 +23,22 @@ constexpr AudioSource audio_source_from_string(std::string_view str) {
   return AudioSource::System;  // 默认
 }
 
-// 音频捕获上下文
+// 两种loopback都显式协商48kHz/stereo/s16，设备变化不改变编码流格式。
 struct AudioCaptureContext {
-  wil::com_ptr<IMMDevice> device;                    // 音频设备
-  wil::com_ptr<IAudioClient> audio_client;           // 音频客户端
-  wil::com_ptr<IAudioCaptureClient> capture_client;  // 捕获客户端
-
-  wil::unique_cotaskmem_ptr<WAVEFORMATEX> wave_format;  // 音频格式
-  UINT32 buffer_frame_count = 0;                        // 缓冲区帧数
-
-  wil::unique_handle audio_event;  // WASAPI 缓冲就绪事件
-  wil::unique_handle stop_event;   // 捕获线程停止唤醒事件
-  std::jthread capture_thread;     // 捕获线程
+  wil::com_ptr<IMMDevice> device;
+  wil::com_ptr<IAudioClient> audio_client;
+  wil::com_ptr<IAudioCaptureClient> capture_client;
+  wil::unique_cotaskmem_ptr<WAVEFORMATEX> wave_format;
+  UINT32 buffer_frame_count = 0;
+  wil::unique_handle audio_event, stop_event, restart_event;
+  std::jthread capture_thread;
 };
-
-// 音频数据包回调:
-// (audio_data, num_frames, bytes_per_frame, qpc_position_100ns, flags)
-// qpc_position_100ns 是 WASAPI 给出的包首帧 QPC 时间，单位为 100ns。
-using AudioPacketCallback = std::function<void(const BYTE*, UINT32, UINT32, UINT64, DWORD)>;
-
-// 是否支持 Process Loopback API（Windows 10 2004+）
+// 数据只在回调期间有效；QPC是包首采样时刻，单位100ns。
+using AudioPacketCallback = std::function<void(const BYTE*, UINT32, UINT64, UINT64, DWORD)>;
+using CaptureStateCallback = std::function<void(bool, const std::string&)>;
 auto is_process_loopback_supported() -> bool;
-
-// 初始化音频捕获（根据音频源类型选择不同的初始化方式）
-auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id)
+auto start(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id,
+           AudioPacketCallback on_packet, CaptureStateCallback on_state)
     -> std::expected<void, std::string>;
-
-// 启动音频捕获线程（回调式）
-// on_packet: 音频数据包回调；模块本身只负责产出 PCM 包，不感知上层录制状态。
-auto start_capture_thread(AudioCaptureContext& ctx, AudioPacketCallback on_packet) -> void;
-
-// 停止音频捕获
 auto stop(AudioCaptureContext& ctx) -> void;
-
-// 清理音频资源
-auto cleanup(AudioCaptureContext& ctx) -> void;
-
 }  // namespace utils::media::audio_capture

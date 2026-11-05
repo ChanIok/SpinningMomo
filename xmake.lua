@@ -64,7 +64,7 @@ target("SpinningMomo")
     add_links("dwmapi", "dcomp", "windowsapp", "RuntimeObject", "d3d11", "dxgi", "d3dcompiler", 
               "d2d1", "dwrite", "shell32", "Shlwapi", "gdi32", "user32", "Ws2_32", "Secur32", 
               "Advapi32", "Bcrypt", "Iphlpapi", "Dbghelp", "Userenv", "mf", "mfplat", "mfreadwrite", "mfuuid", "strmiids",
-              "Mpr")
+              "Mpr", "winmm", "avrt")
 
     -- vcpkg的传递依赖
     add_links("fmt", "yyjson", "sqlite3", "uSockets", "libuv")

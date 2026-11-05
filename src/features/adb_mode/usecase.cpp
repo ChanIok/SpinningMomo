@@ -21,7 +21,6 @@
 #include "features/adb_mode/types.hpp"
 #include "features/gallery/gallery.hpp"
 #include "features/gallery/watcher/watcher.hpp"
-#include "features/recording/session.hpp"
 #include "features/recording/types.hpp"
 #include "features/recording/usecase.hpp"
 #include "features/settings/menu.hpp"
@@ -364,8 +363,15 @@ auto start_recording_segment(core::AppState& state) -> std::expected<void, std::
     output_directory = state.settings->raw.features.output_dir_path;
   }
   auto directory = utils::path::GetOutputDirectory(output_directory);
-  if (!directory) return std::unexpected(directory.error());
-  auto path = features::recording::session::build_output_path_in_directory(*directory);
+  if (!directory) {
+    return std::unexpected(directory.error());
+  }
+
+  // 1. 生成带时间戳的文件名
+  const auto filename = std::format("{}.mp4", utils::string::FormatLocalTimestamp());
+
+  // 2. 拼接目标路径
+  const auto path = directory.value() / filename;
   const auto settings = get_adb_mode_settings(state);
   const auto fps = settings.record_fps > 0 ? settings.record_fps : 60;
   const auto bitrate = settings.record_bitrate > 0 ? settings.record_bitrate : 16'000'000;

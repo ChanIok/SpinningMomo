@@ -16,7 +16,6 @@
 #include "features/gallery/gallery.hpp"
 #include "features/gallery/watcher/watcher.hpp"
 #include "features/recording/recording.hpp"
-#include "features/recording/session.hpp"
 #include "features/recording/state.hpp"
 #include "features/recording/types.hpp"
 #include "features/settings/state.hpp"
@@ -34,6 +33,13 @@ namespace features::recording {
 
 namespace {
 
+// 根据本地时间戳格式化生成录制分片文件的完整存储路径
+auto build_output_path_in_directory(const std::filesystem::path& directory)
+    -> std::filesystem::path {
+  const auto filename = std::format("{}.mp4", utils::string::FormatLocalTimestamp());
+  return directory / filename;
+}
+
 // 响应通知栏查看动作：根据用户设置在资源管理器定位文件或用默认应用打开
 auto handle_saved_file_view_action(core::AppState& state, const std::filesystem::path& path,
                                    std::string_view file_kind) -> void {
@@ -47,6 +53,7 @@ auto handle_saved_file_view_action(core::AppState& state, const std::filesystem:
   }
 }
 
+// 弹出通用录制消息通知浮条
 auto notify_message(core::AppState& state, const std::string& message) -> void {
   core::notifications::NotificationOptions options;
   options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
@@ -54,6 +61,7 @@ auto notify_message(core::AppState& state, const std::string& message) -> void {
   core::notifications::post_notification_request(state, std::move(options));
 }
 
+// 弹出录制正在停止通知
 auto notify_stopping(core::AppState& state) -> void {
   core::notifications::NotificationOptions options;
   options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
@@ -96,7 +104,9 @@ auto show_recording_stop_result_notification(core::AppState& state,
 
     case StopResultKind::Failed: {
       auto detail = utils::string::ToUtf8(stop_result.output_path.wstring());
-      if (!stop_result.error.empty()) detail += "\n" + stop_result.error;
+      if (!stop_result.error.empty()) {
+        detail += "\n" + stop_result.error;
+      }
       notify_message(state, state.i18n->texts["message.recording_stop_failed"] + detail);
       return;
     }
@@ -107,47 +117,55 @@ auto show_recording_stop_result_notification(core::AppState& state,
   }
 }
 
+// 结束录制输出：将新生成的视频文件完整登记并加入画廊索引
 auto finish_recording_output(core::AppState& state, const std::filesystem::path& path) -> void {
   auto result = features::gallery::complete_created_file_operation(state, path);
-  if (!result)
+  if (!result) {
     Logger().warn("Failed to complete recording gallery operation '{}': {}", path.string(),
                   result.error());
+  }
 }
 
-// 校验输出路径、设置画廊监控白名单并启动桌面分段录制，失败时保留产物入库
+// 校验输出路径 → 挂载画廊监控白名单 → 启动分段录制流水线
 auto start_desktop_segment(core::AppState& state, HWND target_window, const RecordingConfig& config)
     -> std::expected<void, std::string> {
-  // 启动失败后的入库只能处理本次创建的文件，不能误接管已有文件。
+  // 启动失败后的入库只能处理本次创建的文件，不能误接管已有文件
   std::error_code ec;
   if (std::filesystem::exists(config.output_path, ec)) {
     return std::unexpected("Recording output already exists: " + config.output_path.string());
   }
-  if (ec) return std::unexpected("Failed to inspect recording output: " + ec.message());
+  if (ec) {
+    return std::unexpected("Failed to inspect recording output: " + ec.message());
+  }
 
+  // 通知文件系统监听器忽略正在写入的录制临时文件
   auto ignored = features::gallery::watcher::begin_manual_file_system_ignore(
       state, config.output_path, config.output_path);
-  if (!ignored) return std::unexpected(ignored.error());
+  if (!ignored) {
+    return std::unexpected(ignored.error());
+  }
 
+  // 启动底层录制会话
   auto started = features::recording::start(state, target_window, config);
   if (!started) {
-    // 引擎返回失败前已关闭 writer 并处理短段，保留的文件仍要尝试入库。
+    // 引擎返回失败前已关闭 writer 并处理短段，保留的文件仍要尝试入库
     finish_recording_output(state, config.output_path);
   }
   return started;
 }
 
-// 停止桌面分段录制、完成画廊入库，并安排空闲 D3D 资源延迟释放
+// 停止桌面录制段并完成产物画廊入库
 auto stop_desktop_segment(core::AppState& state) -> StopResult {
   auto result = features::recording::stop(state);
-  if (result.kind == StopResultKind::NotRecording) return result;
+  if (result.kind == StopResultKind::NotRecording) {
+    return result;
+  }
 
   finish_recording_output(state, result.output_path);
-  session::start_cleanup_timer(
-      state, [&state]() { request_control_action(state, RecordingControlAction::CleanupD3D); });
   return result;
 }
 
-// 窗口尺寸变更时停止当前分段，以新尺寸和新时间戳路径启动新分段
+// 窗口尺寸变更切段：停止旧编码器分段 → 生成新时间戳路径 → 启动新尺寸分段
 auto restart_after_resize(core::AppState& app_state) -> void {
   auto& state = *app_state.recording;
 
@@ -160,41 +178,75 @@ auto restart_after_resize(core::AppState& app_state) -> void {
     return;
   }
 
-  auto restart_config = state.config;
-  auto target_window = state.target_window;
-
-  if (!target_window || !IsWindow(target_window)) {
-    Logger().error("Skip recording auto restart after resize: target window is invalid");
+  if (!state.session) {
     return;
   }
 
-  // 尺寸变了 → 老编码器不能再继续写入，先保存当前段，再用新尺寸开新段
-  restart_config.output_path = features::recording::session::build_output_path_in_directory(
-      restart_config.output_path.parent_path());
+  auto restart_config = state.session->config;
+  auto target_window = state.session->target_window;
+
+  // 尺寸变了 → 旧编码器不能继续写入，先保存当前段，再用新尺寸开新段
+  restart_config.output_path =
+      build_output_path_in_directory(restart_config.output_path.parent_path());
   Logger().info("Recording restarted with timestamp output after resize: {}",
                 restart_config.output_path.string());
 
-  (void)stop_desktop_segment(app_state);
+  const auto stopped = stop_desktop_segment(app_state);
+  if (stopped.kind == StopResultKind::Failed) {
+    show_recording_stop_result_notification(app_state, stopped);
+    core::events::post(app_state,
+                       ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+    return;
+  }
+
+  if (!target_window || !IsWindow(target_window)) {
+    show_recording_stop_result_notification(app_state, stopped);
+    core::events::post(app_state,
+                       ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+    return;
+  }
+
   if (state.shutdown_requested.load(std::memory_order_acquire)) {
     return;
   }
 
+  // 检查在停止旧段期间是否提交了用户主动停止动作
+  bool cancelled = false;
+  {
+    std::lock_guard lock(state.control_request_mutex);
+    cancelled = state.pending_action == RecordingControlAction::UserStop ||
+                state.pending_action == RecordingControlAction::AbortWithError ||
+                state.pending_action == RecordingControlAction::ShutdownStop;
+  }
+  if (cancelled) {
+    show_recording_stop_result_notification(app_state, stopped);
+    core::events::post(app_state,
+                       ui::floating_window::events::RecordingToggleEvent{.enabled = false});
+    return;
+  }
+
+  // 以新尺寸重新拉起下一段录制
   auto restart_result = start_desktop_segment(app_state, target_window, restart_config);
   if (!restart_result) {
+    state.status.store(RecordingStatus::Idle);
+    notify_message(app_state, app_state.i18n->texts["message.recording_start_failed"] +
+                                  restart_result.error());
+    core::events::post(app_state,
+                       ui::floating_window::events::RecordingToggleEvent{.enabled = false});
     Logger().error("Failed to restart recording after resize: {}", restart_result.error());
   } else {
     ui::floating_window::request_repaint(app_state);
   }
 }
 
-// 控制线程动作处理器：串行执行录制启停、尺寸变更重启、退出收尾与 D3D 资源清理
-auto handle_control_action(core::AppState& app_state, features::recording::RecordingState& state,
+// 控制线程串行执行录制启停、尺寸切段和退出收尾
+auto handle_control_action(core::AppState& app_state,
                            features::recording::RecordingControlAction action) -> bool {
+  auto& state = *app_state.recording;
   switch (action) {
     case RecordingControlAction::UserStart: {
       // 取出用户提交的启动请求参数
       auto start_request = take_pending_start_request(state);
-      // 请求参数缺失时回退到空闲态并记录告警
       if (!start_request) {
         state.status.store(features::recording::RecordingStatus::Idle, std::memory_order_release);
         ui::floating_window::request_repaint(app_state);
@@ -239,23 +291,14 @@ auto handle_control_action(core::AppState& app_state, features::recording::Recor
       (void)stop_desktop_segment(app_state);
       return false;
 
-    case RecordingControlAction::CleanupD3D:
-      // 空闲 5 秒后释放 D3D 设备，减少显存占用
-      if (state.status.load(std::memory_order_acquire) ==
-          features::recording::RecordingStatus::Idle) {
-        features::recording::session::cleanup_d3d_resources(app_state);
-        Logger().debug("Recording reusable D3D resources cleaned up");
-      }
-      return true;
-
     default:
       return true;
   }
 }
 
 // 控制线程主循环：初始化 COM、监听控制动作请求并保证执行期间不阻塞 UI 线程
-auto control_thread_proc(core::AppState& app_state, features::recording::RecordingState& state,
-                         std::stop_token stop_token) -> void {
+auto control_thread_proc(core::AppState& app_state, std::stop_token stop_token) -> void {
+  auto& state = *app_state.recording;
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
 
@@ -287,7 +330,7 @@ auto control_thread_proc(core::AppState& app_state, features::recording::Recordi
       // 执行请求时已经不拿锁了
       bool keep_running = true;
       try {
-        keep_running = handle_control_action(app_state, state, action);
+        keep_running = handle_control_action(app_state, action);
       } catch (const std::exception& e) {
         Logger().error("Recording control thread action exception: {}", e.what());
       } catch (...) {
@@ -326,10 +369,8 @@ auto ensure_control_thread_started(core::AppState& app_state) -> std::expected<v
     return {};
   }
 
-  state.control_thread = std::jthread([&app_state](std::stop_token stop_token) {
-    auto& rec = *app_state.recording;
-    control_thread_proc(app_state, rec, stop_token);
-  });
+  state.control_thread = std::jthread(
+      [&app_state](std::stop_token stop_token) { control_thread_proc(app_state, stop_token); });
   return {};
 }
 
@@ -344,7 +385,17 @@ auto join_control_thread(core::AppState& app_state) -> void {
 
 }  // namespace
 
-// 桌面与 ADB 共用保存通知及查看动作。
+// 发送编码过载通知
+auto notify_recording_overload(core::AppState& state) -> void {
+  notify_message(state, state.i18n->texts["message.recording_overload"]);
+}
+
+// 发送文件写入积压通知，不中断录制。
+auto notify_recording_write_backlog(core::AppState& state) -> void {
+  notify_message(state, state.i18n->texts["message.recording_write_backlog"]);
+}
+
+// 发送录制完成保存的通知及资源管理器查看动作
 auto notify_recording_saved(core::AppState& state, const std::filesystem::path& saved_path)
     -> void {
   core::notifications::NotificationOptions options;
@@ -362,7 +413,7 @@ auto notify_recording_saved(core::AppState& state, const std::filesystem::path& 
   core::notifications::post_notification_request(state, std::move(options));
 }
 
-// 响应用户录制开关请求，负责查找窗口、组装配置并提交控制动作。
+// 响应用户开关快捷键/按钮：校验目标窗口与配置 → 提交 UserStart 或 UserStop 控制动作
 auto toggle_recording(core::AppState& state) -> std::expected<void, std::string> {
   if (!state.recording) {
     return std::unexpected("Recording state is not initialized");
@@ -373,10 +424,11 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return std::unexpected("Recording shutdown is in progress");
   }
 
-  // 停止路由由活动会话决定，即使设备已经断开也必须交回 ADB 队列收尾。
+  // 停止路由由活动会话决定，即使设备已经断开也必须交回 ADB 队列收尾
   if (features::adb_mode::is_recording_active(state)) {
-    if (!features::adb_mode::toggle_recording_async(state))
+    if (!features::adb_mode::toggle_recording_async(state)) {
       return std::unexpected("Failed to queue ADB recording request");
+    }
     return {};
   }
 
@@ -387,17 +439,14 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     if (!features::recording::enter_stopping(state)) {
       return std::unexpected("Failed to enter recording stopping state");
     }
-    if (!features::recording::request_control_action(
-            state, features::recording::RecordingControlAction::UserStop)) {
-      state.recording->status.store(features::recording::RecordingStatus::Recording,
-                                    std::memory_order_release);
-      return std::unexpected("Failed to queue recording stop request");
-    }
+    // 截止点已冻结，不能回滚为Recording；若被Abort/Shutdown合并，它们也会完成停止
+    (void)features::recording::request_control_action(state, RecordingControlAction::UserStop);
     return {};
   }
 
-  // 正在停止时不再重复发 stop，请直接告知用户当前仍在封装
+  // 正在停止时提示封装进度；再次停止也可取消resize后的自动重启
   if (status == features::recording::RecordingStatus::Stopping) {
+    features::recording::request_control_action(state, RecordingControlAction::UserStop);
     notify_stopping(state);
     return {};
   }
@@ -407,10 +456,16 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return {};
   }
 
-  // 没有桌面活动段时才按连接状态选择新录制的后端。
+  // 切段/入库期间可能短暂Idle，但控制线程仍拥有当前操作，不能插入第二次启动
+  if (state.recording->control_action_running.load(std::memory_order_acquire)) {
+    return {};
+  }
+
+  // 没有桌面活动段时才按连接状态选择新录制的后端
   if (features::adb_mode::session::is_connected(state)) {
-    if (!features::adb_mode::toggle_recording_async(state))
+    if (!features::adb_mode::toggle_recording_async(state)) {
       return std::unexpected("Failed to queue ADB recording request");
+    }
     return {};
   }
 
@@ -424,7 +479,7 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     return std::unexpected("Target window not found");
   }
 
-  // 输出目录在录制开始时确定，后续自动切段沿用同一个窗口目录。
+  // 输出目录在录制开始时确定，后续自动切段沿用同一个窗口目录
   auto output_dir_result =
       utils::path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
   if (state.settings->raw.features.organize_output_by_window_title) {
@@ -445,8 +500,7 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
   // 从用户设置组装录制配置（码率、帧率、编码器、HDR 等）
   const auto& recording_settings = state.settings->raw.features.recording;
   features::recording::RecordingConfig config;
-  config.output_path =
-      features::recording::session::build_output_path_in_directory(*output_dir_result);
+  config.output_path = build_output_path_in_directory(*output_dir_result);
   config.fps = recording_settings.fps;
   config.bitrate = recording_settings.bitrate;
   config.quality = recording_settings.quality;
@@ -524,35 +578,43 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
     notify_message(state, state.i18n->texts["message.recording_start_failed"] + error);
     return std::unexpected(error);
   }
+
   return {};
 }
 
-// 应用关闭时关闭 ADB 后端并停止桌面录制，等待各自的线程完成收尾。
+// 应用退出或停机时停止进行中的录制会话并等待后台工作线程退出
 auto stop_recording_if_running(core::AppState& state) -> void {
-  // 先拒绝新的 toggle；ADB 由最终队列任务收尾录制并关闭设备，只等待一次线程退出。
-  if (state.recording) state.recording->shutdown_requested.store(true, std::memory_order_release);
-  if (state.adb_mode) features::adb_mode::shutdown(state);
-  if (!state.recording) return;
+  // 先拒绝新的 toggle；ADB 由最终队列任务收尾录制并关闭设备，只等待一次线程退出
+  if (state.recording) {
+    state.recording->shutdown_requested.store(true, std::memory_order_release);
+    if (state.recording->control_thread.joinable()) {
+      features::recording::request_control_action(state, RecordingControlAction::ShutdownStop);
+    }
+  }
+
+  if (state.adb_mode) {
+    features::adb_mode::shutdown(state);
+  }
+
+  if (!state.recording) {
+    return;
+  }
 
   if (state.recording->control_thread.joinable()) {
-    // 控制线程已启动 → 投递 ShutdownStop 请求，让控制线程自己执行 stop
-    features::recording::request_control_action(
-        state, features::recording::RecordingControlAction::ShutdownStop);
+    // ShutdownStop 已先投递，等待控制线程完成收尾
     join_control_thread(state);
   } else if (state.recording->status.load(std::memory_order_acquire) ==
              features::recording::RecordingStatus::Recording) {
-    // 控制线程是懒启动的，没有消费者时它不存在。
-    // 这个分支代表状态异常（没控制线程却在录制），直接兜底 stop
+    // 控制线程是懒启动的，没有消费者时它不存在；直接兜底停止
     Logger().warn(
         "Recording is active but control thread is not running during shutdown; stopping directly");
     (void)stop_desktop_segment(state);
   }
 }
 
-// 完成停止流程后释放录制设备与 Media Foundation 运行时。
+// 清理录制子系统资源并关闭 Media Foundation 运行时
 auto cleanup(core::AppState& state) -> void {
   stop_recording_if_running(state);
-  session::cleanup_d3d_resources(state);
   MFShutdown();
 }
 

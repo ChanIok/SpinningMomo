@@ -12,6 +12,10 @@ auto toggle_recording(core::AppState& state) -> std::expected<void, std::string>
 // 桌面与 ADB 共用保存通知及查看动作。
 auto notify_recording_saved(core::AppState& state, const std::filesystem::path& saved_path) -> void;
 
+// 工作线程检测到编码过载或写入积压时，投递相应通知。
+auto notify_recording_overload(core::AppState& state) -> void;
+auto notify_recording_write_backlog(core::AppState& state) -> void;
+
 // 应用关闭时关闭 ADB 后端并停止桌面录制，等待各自的线程完成收尾。
 auto stop_recording_if_running(core::AppState& state) -> void;
 

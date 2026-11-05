@@ -74,6 +74,7 @@
   "message.recording_failed": "Recording failed: ",
   "message.recording_stopping": "Recording is stopping and finalizing. Please wait.",
   "message.recording_overload": "Encoder overloaded. Reduce the resolution or frame rate.",
+  "message.recording_write_backlog": "Recording data is waiting to be written. Recording may fail if the backlog continues. Check the write speed of the save location or lower the recording bitrate.",
   "message.recording_stop_failed": "Failed to stop recording: ",
   "message.gallery_folder_sync_failed": "Automatic gallery sync for this folder has been paused. Resolve the problem, then retry.",
   "message.http_server_start_failed": "The local service failed to start. Some features may be unavailable. Check the logs for details.",

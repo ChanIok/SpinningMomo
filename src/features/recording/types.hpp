@@ -139,7 +139,6 @@ enum class RecordingControlAction {
   UserStop,
   AbortWithError,
   RestartAfterResize,
-  CleanupD3D,
   ShutdownStop,
 };
 
@@ -159,12 +158,17 @@ struct StopResult {
 struct QueuedAudioPacket {
   std::vector<std::uint8_t> data;
   std::uint32_t num_frames = 0;
-  std::uint32_t bytes_per_frame = 0;
-  std::uint32_t sample_rate = 0;
+  std::uint32_t offset_frames = 0;
   std::int64_t timestamp_100ns = 0;
 };
 
-constexpr std::size_t k_max_audio_queue_size = 120;
+constexpr std::uint32_t k_audio_sample_rate = 48000;
+constexpr std::uint32_t k_audio_channels = 2;
+constexpr std::uint32_t k_audio_bytes_per_frame = 4;
+constexpr std::uint32_t k_video_pool_size = 4;
+constexpr std::size_t k_max_pcm_frames = k_audio_sample_rate;  // 来源缓冲最多1秒，异常后重新对齐。
+constexpr std::size_t k_max_packet_bytes = 256 * 1024 * 1024;
+constexpr std::size_t k_packet_warning_bytes = k_max_packet_bytes / 4;
 // 桌面录制保留既有误触判定：编码帧数不超过三帧时丢弃。
 constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 

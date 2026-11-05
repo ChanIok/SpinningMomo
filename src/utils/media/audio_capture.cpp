@@ -10,8 +10,9 @@
 #include "vendor/windows/mmreg.hpp"
 #include "vendor/windows/wrl/implements.hpp"
 
-#include "AudioSessionTypes.h"
 #include "utils/logger/logger.hpp"
+#include "vendor/windows/audiosessiontypes.hpp"
+#include "vendor/windows/avrt.hpp"
 
 namespace utils::media::audio_capture::detail {
 
@@ -27,11 +28,13 @@ class ProcessLoopbackActivator
 
  public:
   ProcessLoopbackActivator() { m_completion_event.create(); }
+  auto has_event() const -> bool { return bool(m_completion_event); }
 
   STDMETHOD(ActivateCompleted)(IActivateAudioInterfaceAsyncOperation* operation) {
     wil::com_ptr<IUnknown> audio_interface;
     HRESULT hr = operation->GetActivateResult(&m_activation_result, &audio_interface);
 
+    if (FAILED(hr)) m_activation_result = hr;
     if (SUCCEEDED(hr) && SUCCEEDED(m_activation_result)) {
       audio_interface.query_to(&m_audio_client);
     }
@@ -40,8 +43,12 @@ class ProcessLoopbackActivator
     return S_OK;
   }
 
-  auto wait_and_get_client() -> std::expected<wil::com_ptr<IAudioClient>, std::string> {
-    m_completion_event.wait();
+  auto wait_and_get_client(HANDLE stop_event)
+      -> std::expected<wil::com_ptr<IAudioClient>, std::string> {
+    if (!m_completion_event) return std::unexpected("Cannot create audio activation event");
+    HANDLE events[] = {stop_event, m_completion_event.get()};
+    if (WaitForMultipleObjects(2, events, FALSE, INFINITE) != WAIT_OBJECT_0 + 1)
+      return std::unexpected("Audio activation cancelled");
 
     if (FAILED(m_activation_result)) {
       return std::unexpected(std::format("Audio activation failed: {:08X}",
@@ -55,16 +62,6 @@ class ProcessLoopbackActivator
     return m_audio_client;
   }
 };
-
-auto create_capture_events(utils::media::audio_capture::AudioCaptureContext& ctx,
-                           std::string_view mode_name) -> std::expected<void, std::string> {
-  ctx.audio_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
-  ctx.stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
-  if (!ctx.audio_event || !ctx.stop_event) {
-    return std::unexpected(std::format("Failed to create audio capture events for {}", mode_name));
-  }
-  return {};
-}
 
 auto finish_audio_client_setup(utils::media::audio_capture::AudioCaptureContext& ctx,
                                WAVEFORMATEX* format, DWORD stream_flags)
@@ -122,11 +119,6 @@ auto create_pcm_wave_format(std::uint16_t channels, std::uint32_t sample_rate,
 // Process Loopback 初始化
 auto initialize_process_loopback(utils::media::audio_capture::AudioCaptureContext& ctx,
                                  std::uint32_t process_id) -> std::expected<void, std::string> {
-  auto event_result = create_capture_events(ctx, "process loopback");
-  if (!event_result) {
-    return event_result;
-  }
-
   AUDIOCLIENT_ACTIVATION_PARAMS activation_params = {};
   activation_params.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
   activation_params.ProcessLoopbackParams.TargetProcessId = process_id;
@@ -139,7 +131,7 @@ auto initialize_process_loopback(utils::media::audio_capture::AudioCaptureContex
   activate_params.blob.pBlobData = reinterpret_cast<BYTE*>(&activation_params);
 
   auto activator = Microsoft::WRL::Make<ProcessLoopbackActivator>();
-  if (!activator) {
+  if (!activator || !activator->has_event()) {
     return std::unexpected("Failed to create activation callback handler");
   }
 
@@ -152,7 +144,7 @@ auto initialize_process_loopback(utils::media::audio_capture::AudioCaptureContex
         std::format("Failed to activate audio interface async: {:08X}", static_cast<uint32_t>(hr)));
   }
 
-  auto client_result = activator->wait_and_get_client();
+  auto client_result = activator->wait_and_get_client(ctx.stop_event.get());
   if (!client_result) {
     return std::unexpected(client_result.error());
   }
@@ -186,11 +178,6 @@ auto initialize_process_loopback(utils::media::audio_capture::AudioCaptureContex
 // System Loopback 初始化
 auto initialize_system_loopback(utils::media::audio_capture::AudioCaptureContext& ctx)
     -> std::expected<void, std::string> {
-  auto event_result = create_capture_events(ctx, "system loopback");
-  if (!event_result) {
-    return event_result;
-  }
-
   wil::com_ptr<IMMDeviceEnumerator> enumerator;
   HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                 IID_PPV_ARGS(enumerator.put()));
@@ -235,170 +222,175 @@ auto initialize_system_loopback(utils::media::audio_capture::AudioCaptureContext
   return {};
 }
 
-// 通用音频捕获循环
-auto audio_capture_loop(utils::media::audio_capture::AudioCaptureContext& ctx,
-                        std::stop_token stop_token,
-                        utils::media::audio_capture::AudioPacketCallback on_packet) -> void {
-  try {
-    auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
-    std::stop_callback wake_on_stop(stop_token, [&ctx]() {
-      if (ctx.stop_event) {
-        SetEvent(ctx.stop_event.get());
-      }
-    });
-
-    if (!ctx.audio_client || !ctx.capture_client || !ctx.wave_format || !ctx.audio_event ||
-        !ctx.stop_event) {
-      Logger().error("Audio capture loop started with incomplete context");
-      return;
-    }
-
-    HRESULT hr = ctx.audio_client->Start();
-    if (FAILED(hr)) {
-      Logger().error("Failed to start audio client: {:08X}", static_cast<uint32_t>(hr));
-      return;
-    }
-
-    Logger().info("Audio capture thread started");
-
-    HANDLE wait_handles[] = {ctx.stop_event.get(), ctx.audio_event.get()};
-    while (!stop_token.stop_requested()) {
-      DWORD wait_result = WaitForMultipleObjects(static_cast<DWORD>(std::size(wait_handles)),
-                                                 wait_handles, FALSE, INFINITE);
-      if (wait_result == WAIT_OBJECT_0) {
-        break;
-      }
-      if (wait_result != WAIT_OBJECT_0 + 1) {
-        Logger().error("Audio capture wait failed: {}", static_cast<unsigned>(GetLastError()));
-        break;
-      }
-
-      UINT32 packet_length = 0;
-      hr = ctx.capture_client->GetNextPacketSize(&packet_length);
-      if (FAILED(hr)) {
-        Logger().error("GetNextPacketSize failed: {:08X}", static_cast<uint32_t>(hr));
-        break;
-      }
-
-      while (packet_length > 0) {
-        BYTE* data = nullptr;
-        UINT32 frames_available = 0;
-        DWORD flags = 0;
-        UINT64 device_position = 0;
-        UINT64 qpc_position = 0;
-
-        hr = ctx.capture_client->GetBuffer(&data, &frames_available, &flags, &device_position,
-                                           &qpc_position);
-        if (FAILED(hr)) {
-          Logger().error("GetBuffer failed: {:08X}", static_cast<uint32_t>(hr));
-          break;
-        }
-
-        if (frames_available > 0) {
-          UINT32 bytes_per_frame = ctx.wave_format->nBlockAlign;
-          on_packet(data, frames_available, bytes_per_frame, qpc_position, flags);
-        }
-
-        hr = ctx.capture_client->ReleaseBuffer(frames_available);
-        if (FAILED(hr)) {
-          Logger().error("ReleaseBuffer failed: {:08X}", static_cast<uint32_t>(hr));
-          break;
-        }
-
-        hr = ctx.capture_client->GetNextPacketSize(&packet_length);
-        if (FAILED(hr)) {
-          Logger().error("GetNextPacketSize failed: {:08X}", static_cast<uint32_t>(hr));
-          break;
-        }
-      }
-    }
-
-    ctx.audio_client->Stop();
-    Logger().info("Audio capture thread stopped");
-  } catch (const wil::ResultException& e) {
-    Logger().error("Audio capture thread COM initialization failed: {} (HRESULT: 0x{:08X})",
-                   e.what(), static_cast<unsigned>(e.GetErrorCode()));
-  } catch (const std::exception& e) {
-    Logger().error("Audio capture thread exception: {}", e.what());
-  } catch (...) {
-    Logger().error("Audio capture thread exception: unknown");
+// 通知只负责唤醒；设备初始化/释放全部由同一个采集线程执行。
+class DefaultDeviceChanged final
+    : public Microsoft::WRL::RuntimeClass<
+          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IMMNotificationClient> {
+ public:
+  explicit DefaultDeviceChanged(HANDLE signal) {
+    HANDLE copy = nullptr;
+    if (DuplicateHandle(GetCurrentProcess(), signal, GetCurrentProcess(), &copy, 0, FALSE,
+                        DUPLICATE_SAME_ACCESS))
+      signal_.reset(copy);
   }
+  auto has_signal() const -> bool { return bool(signal_); }
+  STDMETHODIMP OnDeviceStateChanged(LPCWSTR, DWORD) override { return S_OK; }
+  STDMETHODIMP OnDeviceAdded(LPCWSTR) override { return S_OK; }
+  STDMETHODIMP OnDeviceRemoved(LPCWSTR) override { return S_OK; }
+  STDMETHODIMP OnPropertyValueChanged(LPCWSTR, const PROPERTYKEY) override { return S_OK; }
+  STDMETHODIMP OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR) override {
+    if (flow == eRender && role == eConsole && signal_) SetEvent(signal_.get());
+    return S_OK;
+  }
+
+ private:
+  wil::unique_handle signal_;
+};
+
+auto release_client(AudioCaptureContext& ctx) -> void {
+  if (ctx.audio_client) ctx.audio_client->Stop();
+  ctx.capture_client.reset();
+  ctx.audio_client.reset();
+  ctx.device.reset();
+  ctx.wave_format.reset();
 }
 
+auto read_packets(AudioCaptureContext& ctx, const AudioPacketCallback& on_packet,
+                  bool cancellable = true) -> HRESULT {
+  // 以WASAPI当前包数为边界；高频生产不能阻止观察停止/重连请求。
+  for (unsigned count = 0; count < 64; ++count) {
+    if (cancellable && WaitForSingleObject(ctx.stop_event.get(), 0) == WAIT_OBJECT_0) return S_OK;
+    UINT32 size = 0;
+    auto hr = ctx.capture_client->GetNextPacketSize(&size);
+    if (FAILED(hr) || !size) return hr;
+    BYTE* bytes = nullptr;
+    UINT32 frames = 0;
+    DWORD flags = 0;
+    UINT64 position = 0, timestamp = 0;
+    hr = ctx.capture_client->GetBuffer(&bytes, &frames, &flags, &position, &timestamp);
+    if (FAILED(hr)) return hr;
+    if (frames) on_packet(bytes, frames, timestamp, position, flags);
+    hr = ctx.capture_client->ReleaseBuffer(frames);
+    if (FAILED(hr)) return hr;
+  }
+  return S_OK;
+}
+
+auto capture_loop(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id,
+                  AudioPacketCallback on_packet, CaptureStateCallback on_state) -> void {
+  const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  if (FAILED(com)) {
+    on_state(false, "Audio capture COM initialization failed");
+    return;
+  }
+  auto uninitialize = wil::scope_exit([] { CoUninitialize(); });
+  DWORD task = 0;
+  const HANDLE mmcss = AvSetMmThreadCharacteristicsW(L"Audio", &task);
+  auto scheduling = wil::scope_exit([&] {
+    if (mmcss) AvRevertMmThreadCharacteristics(mmcss);
+  });
+  wil::com_ptr<IMMDeviceEnumerator> monitor;
+  Microsoft::WRL::ComPtr<DefaultDeviceChanged> notification;
+  if (source == AudioSource::System) {
+    auto hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                               IID_PPV_ARGS(monitor.put()));
+    if (FAILED(hr)) {
+      on_state(false, "Cannot monitor default audio device");
+      return;
+    }
+    notification = Microsoft::WRL::Make<DefaultDeviceChanged>(ctx.restart_event.get());
+    if (!notification || !notification->has_signal() ||
+        FAILED(monitor->RegisterEndpointNotificationCallback(notification.Get()))) {
+      on_state(false, "Cannot register default audio device notification");
+      return;
+    }
+  }
+  auto unregister = wil::scope_exit([&] {
+    release_client(ctx);
+    if (monitor && notification)
+      monitor->UnregisterEndpointNotificationCallback(notification.Get());
+  });
+  HANDLE retry_events[] = {ctx.stop_event.get(), ctx.restart_event.get()};
+  while (WaitForSingleObject(ctx.stop_event.get(), 0) != WAIT_OBJECT_0) {
+    auto initialized = source == AudioSource::GameOnly
+                           ? initialize_process_loopback(ctx, process_id)
+                           : initialize_system_loopback(ctx);
+    HRESULT hr = initialized ? ctx.audio_client->Start() : E_FAIL;
+    if (!initialized || FAILED(hr)) {
+      on_state(false, initialized ? std::format("Start audio client: 0x{:08X}", unsigned(hr))
+                                  : initialized.error());
+      release_client(ctx);
+      if (WaitForMultipleObjects(2, retry_events, FALSE, 3000) == WAIT_OBJECT_0) break;
+      continue;
+    }
+    on_state(true, "Audio capture connected");
+    HANDLE events[] = {ctx.stop_event.get(), ctx.restart_event.get(), ctx.audio_event.get()};
+    bool restart = false;
+    while (!restart) {
+      const auto ready = WaitForMultipleObjects(3, events, FALSE, 20);
+      if (ready == WAIT_OBJECT_0) {
+        read_packets(ctx, on_packet, false);
+        return;
+      }
+      if (ready == WAIT_OBJECT_0 + 1) {
+        on_state(false, "Default audio device changed");
+        restart = true;
+      } else if (ready == WAIT_OBJECT_0 + 2 || ready == WAIT_TIMEOUT) {
+        hr = read_packets(ctx, on_packet);
+        if (FAILED(hr)) {
+          on_state(false, std::format("Audio capture interrupted: 0x{:08X}", unsigned(hr)));
+          release_client(ctx);
+          if (WaitForMultipleObjects(2, retry_events, FALSE, 3000) == WAIT_OBJECT_0) return;
+          restart = true;
+        }
+      } else {
+        on_state(false, "Audio capture wait failed");
+        release_client(ctx);
+        if (WaitForMultipleObjects(2, retry_events, FALSE, 3000) == WAIT_OBJECT_0) return;
+        restart = true;
+      }
+    }
+    release_client(ctx);
+  }
+}
 }  // namespace utils::media::audio_capture::detail
 
 namespace utils::media::audio_capture {
-
 auto is_process_loopback_supported() -> bool {
-  OSVERSIONINFOEXW osvi = {sizeof(osvi)};
-  osvi.dwMajorVersion = 10;
-  osvi.dwMinorVersion = 0;
-  osvi.dwBuildNumber = 19041;  // Windows 10 2004
-
+  OSVERSIONINFOEXW version{sizeof(OSVERSIONINFOEXW)};
+  version.dwMajorVersion = 10;
+  version.dwBuildNumber = 19041;
   DWORDLONG mask = 0;
   VER_SET_CONDITION(mask, VER_MAJORVERSION, VER_GREATER_EQUAL);
   VER_SET_CONDITION(mask, VER_MINORVERSION, VER_GREATER_EQUAL);
   VER_SET_CONDITION(mask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
-
-  return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, mask);
+  return VerifyVersionInfoW(&version, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, mask);
 }
-
-auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id)
+auto start(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id,
+           AudioPacketCallback on_packet, CaptureStateCallback on_state)
     -> std::expected<void, std::string> {
-  if (source == AudioSource::None) {
-    Logger().info("Audio capture disabled by configuration");
-    return {};
-  }
-
-  if (source == AudioSource::GameOnly) {
-    Logger().info("Using Process Loopback mode (Game audio only)");
-    return detail::initialize_process_loopback(ctx, process_id);
-  }
-
-  Logger().info("Using System Loopback mode (All system audio)");
-  return detail::initialize_system_loopback(ctx);
-}
-
-auto start_capture_thread(AudioCaptureContext& ctx, AudioPacketCallback on_packet) -> void {
-  if (!ctx.audio_client || !ctx.capture_client || !ctx.wave_format || !ctx.audio_event ||
-      !ctx.stop_event) {
-    Logger().error("Cannot start audio capture thread: context is not initialized");
-    return;
-  }
-
-  if (ctx.capture_thread.joinable()) {
-    stop(ctx);
-  }
-
-  ResetEvent(ctx.stop_event.get());
-  ctx.capture_thread =
-      std::jthread([&ctx, on_packet = std::move(on_packet)](std::stop_token stop_token) {
-        detail::audio_capture_loop(ctx, stop_token, on_packet);
+  if (ctx.capture_thread.joinable()) return std::unexpected("Audio capture already started");
+  if (source == AudioSource::None) return {};
+  ctx.audio_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
+  ctx.restart_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
+  ctx.stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+  if (!ctx.audio_event || !ctx.restart_event || !ctx.stop_event)
+    return std::unexpected("Cannot create audio capture events");
+  ctx.capture_thread = std::jthread(
+      [&ctx, source, process_id, on_packet = std::move(on_packet), on_state = std::move(on_state)] {
+        do {
+          try {
+            detail::capture_loop(ctx, source, process_id, on_packet, on_state);
+          } catch (const std::exception& error) {
+            on_state(false, error.what());
+          }
+          // 初始化通知或COM失败同样可重试；停止信号始终能取消等待。
+        } while (WaitForSingleObject(ctx.stop_event.get(), 3000) == WAIT_TIMEOUT);
       });
+  return {};
 }
-
 auto stop(AudioCaptureContext& ctx) -> void {
-  if (ctx.capture_thread.joinable()) {
-    ctx.capture_thread.request_stop();
-  }
-  if (ctx.stop_event) {
-    SetEvent(ctx.stop_event.get());
-  }
-  if (ctx.capture_thread.joinable()) {
-    ctx.capture_thread.join();
-  }
+  if (ctx.stop_event) SetEvent(ctx.stop_event.get());
+  if (ctx.capture_thread.joinable()) ctx.capture_thread.join();
 }
-
-auto cleanup(AudioCaptureContext& ctx) -> void {
-  stop(ctx);
-
-  ctx.capture_client = nullptr;
-  ctx.audio_client = nullptr;
-  ctx.device = nullptr;
-  ctx.wave_format.reset();
-  ctx.audio_event.reset();
-  ctx.stop_event.reset();
-  ctx.buffer_frame_count = 0;
-}
-
 }  // namespace utils::media::audio_capture

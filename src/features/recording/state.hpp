@@ -1,96 +1,101 @@
 #pragma once
 
 #include "vendor/std.hpp"
-
 #include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
-#include "vendor/windows/d3d11.hpp"
-#include "vendor/windows/winrt/windows_graphics_capture.hpp"
+#include "vendor/windows/mfidl.hpp"
 
 #include "features/recording/types.hpp"
-#include "utils/graphics/capture.hpp"
-#include "utils/media/audio_capture.hpp"
-#include "utils/media/state.hpp"
-#include "utils/timer/timeout.hpp"
+#include "utils/media/mft.hpp"
 
 namespace features::recording {
 
-// 录制完整状态
-struct RecordingState {
-  features::recording::RecordingConfig config;
+// 单路编码输出流缓冲区与状态
+struct EncodedStream {
+  wil::com_ptr<IMFMediaType> type;
+  std::deque<utils::media::mft::Packet> packets;
+  bool ready = false;
+  bool done = false;
+};
+
+// 单段录制会话：持有音视频工作线程、互斥锁、帧池与时间锚点
+// 单段资源存活到所有工作线程退出，回调解除后才能销毁会话
+struct RecordingSession {
+  RecordingConfig config;
   HWND target_window = nullptr;
-  features::recording::CapturePlan capture_plan;
+  bool prefer_high_performance_gpu = true;
 
-  // 状态标志 - 使用 atomic 避免锁竞争
-  std::atomic<features::recording::RecordingStatus> status{
-      features::recording::RecordingStatus::Idle};
+  std::mutex mutex;
+  std::condition_variable changed;
 
-  // D3D / WGC / 音频 / 编码器资源
-  wil::com_ptr<ID3D11Device> device;
-  wil::com_ptr<ID3D11DeviceContext> context;
-  winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
-  bool d3d_initialized = false;
-  utils::graphics::capture::CaptureSession capture_session;
-  wil::com_ptr<ID3D11Texture2D> cropped_texture;
-  utils::media::audio_capture::AudioCaptureContext audio;
-  utils::media::encoder::EncoderContext encoder;
+  // 0=video，1=audio
+  std::array<EncodedStream, 2> streams;
 
-  // 帧和队列状态
+  // 压缩数据包总内存追踪与峰值
+  std::size_t packet_bytes = 0;
+  std::size_t peak_packet_bytes = 0;
+  // 告警水位起始 QPC，低于水位归零；由 mutex 保护。
+  std::int64_t packet_warning_since_100ns = 0;
+
+  // 连续 PCM 采样缓冲与时钟基准
+  std::deque<QueuedAudioPacket> pcm;
+  std::size_t pcm_frames = 0;
+  std::int64_t audio_anchor_qpc_100ns = 0;
+  std::uint64_t audio_source_frames = 0;
+  bool audio_available = false;
+
+  // 定时精度与原子生命周期标志
+  bool timer_period_requested = false;
+  std::atomic<bool> started{false};
+  std::atomic<bool> failed{false};
+  std::atomic<bool> output_created{false};
+
+  // 绝对时间基准戳（100ns）
   std::int64_t start_qpc_100ns = 0;
-  // 固定 fps 视频时钟与自有编码输入（Copy 自 WGC/crop，无新帧时重复此纹理输出）。
-  std::int64_t video_frame_interval_100ns = 10'000'000LL / 30;
-  std::int64_t next_video_timestamp_100ns = -1;
-  std::int64_t last_emitted_video_timestamp_100ns = -1;
-  // stop 一旦开始，就把本段最终要补到的视频时间线冻结下来，避免收尾目标继续跟着墙钟增长。
-  std::atomic<std::int64_t> frozen_finish_target_100ns{-1};
-  wil::com_ptr<ID3D11Texture2D> encoder_input_texture;
-  bool has_encoder_input_texture = false;
+  std::atomic<std::int64_t> stop_qpc_100ns{-1};
+  std::string error;
 
-  int last_frame_width = 0;
-  int last_frame_height = 0;
-  std::deque<features::recording::QueuedAudioPacket> audio_queue;
-  std::atomic<std::uint64_t> dropped_audio_packets{0};
-  std::uint64_t discarded_tail_audio_packets = 0;
-  std::uint64_t skipped_video_frames_due_to_encoding_lag = 0;
-  bool encoder_overload_notified = false;
-  std::uint64_t encoded_video_frames = 0;
-  std::uint64_t encoded_audio_packets = 0;
+  // 视频统计与监控指标
+  std::atomic<std::uint64_t> video_captured{0};
+  std::atomic<std::uint64_t> video_submitted{0};
+  std::atomic<std::uint64_t> video_encoded{0};
+  std::atomic<std::uint64_t> video_skipped{0};
+  std::atomic<std::int64_t> video_delay_100ns{0};
 
-  // 编码线程：唯一接触 SinkWriter 的线程
-  std::jthread encoder_thread;
-  std::atomic<bool> accepting_input{false};
-  std::atomic<bool> finish_requested{false};
-  std::atomic<bool> has_audio{false};
-  bool encoder_ready = false;
-  bool encoder_start_succeeded = false;
-  std::uint32_t pending_video_frame_count = 0;
-  std::string encoder_error;
+  // 音频统计指标
+  std::atomic<std::uint64_t> audio_encoded{0};
+  std::atomic<std::uint64_t> audio_silent_frames{0};
+  std::atomic<std::uint64_t> audio_discarded_frames{0};
 
-  // 懒启动的录制控制线程：首次录制请求时启动，之后睡眠等待 toggle / resize / shutdown。
-  std::jthread control_thread;
-  // 控制线程当前是否正在执行 start/stop/restart；用户 toggle 忙时会被忽略。
+  // 纹理池占用峰值与流水线运行阶段
+  std::atomic<UINT> pool_peak{0};
+  std::atomic<const char*> video_stage{"prepare"};
+  std::atomic<const char*> audio_stage{"prepare"};
+  std::atomic<const char*> mux_stage{"prepare"};
+
+  // 三路核心工作线程
+  std::jthread video_thread;
+  std::jthread audio_thread;
+  std::jthread mux_thread;
+};
+
+// 全局录制模块状态（挂载于 AppState）
+struct RecordingState {
+  std::atomic<RecordingStatus> status{RecordingStatus::Idle};
+
+  // 空闲时为空，每段原地构造；发布/销毁使用 control_request_mutex，数据面使用 session.mutex
+  std::optional<RecordingSession> session;
+
   std::atomic<bool> control_action_running{false};
-  // 控制请求只用单槽合并；用户 start 请求的参数也挂在这里，避免窗口拖拽时堆积任务。
-  features::recording::RecordingControlAction pending_action{
-      features::recording::RecordingControlAction::None};
-  std::optional<features::recording::StartRequest> pending_start_request;
-  // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
   std::atomic<bool> shutdown_requested{false};
+  RecordingControlAction pending_action{RecordingControlAction::None};
+  std::optional<StartRequest> pending_start_request;
 
-  // 线程同步
-  // frame_mutex: 保护编码线程主动读取 WGC frame pool 与停止/清理流程。
-  std::mutex frame_mutex;
-  // queue_mutex: 保护音频队列、待消费视频帧计数和 finish 请求唤醒。
-  std::mutex queue_mutex;
-  std::condition_variable queue_cv;
-  std::mutex encoder_ready_mutex;
-  std::condition_variable encoder_ready_cv;
-  // control_request_mutex: 保护 pending_action / pending_start_request，不包住真正的 start/stop。
   std::mutex control_request_mutex;
   std::condition_variable control_cv;
 
-  // 延迟释放可复用 D3D 资源，优化高频启停体验。
-  std::optional<utils::timeout::Timeout> cleanup_timer;
+  // 后台控制线程：最先析构，停止唤醒所依赖的锁/CV仍存活
+  std::jthread control_thread;
 };
 
 }  // namespace features::recording

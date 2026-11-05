@@ -8,11 +8,11 @@
 
 namespace utils::media::sink_writer {
 
-// 显式创建 MF 分片 MP4 sink，桌面编码与 ADB 压缩样本直通共用。
+// 创建分片 MP4 写入器：创建字节流 → 构造 FMPEG4 MediaSink → 包装为 IMFSinkWriter
 auto create_fragmented(const std::filesystem::path& path, IMFAttributes* attributes,
                        wil::com_ptr<IMFSinkWriter>& writer) -> std::expected<void, std::string>;
 
-// finish=true 排空编码器；失败退出时仅关闭资源，保留已输出的片段。
+// 关闭写入器：finish=true 时执行 Finalize 正常封装，否则仅安全释放与 Shutdown
 auto close(wil::com_ptr<IMFSinkWriter>& writer, bool finish) -> std::expected<void, std::string>;
 
 }  // namespace utils::media::sink_writer

@@ -34,7 +34,8 @@ auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr = fals
     -> std::expected<D3DContext, std::string>;
 
 // 创建无头D3D设备（仅设备和上下文，无交换链）
-auto create_headless_d3d_device(bool prefer_high_performance_gpu = false)
+auto create_headless_d3d_device(bool prefer_high_performance_gpu = false,
+                                bool video_support = false)
     -> std::expected<std::pair<wil::com_ptr<ID3D11Device>, wil::com_ptr<ID3D11DeviceContext>>,
                      std::string>;
 
