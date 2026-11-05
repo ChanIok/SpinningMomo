@@ -183,7 +183,7 @@ const handleReset = async () => {
             </p>
           </div>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             class="cursor-pointer"
             @click="router.push({ name: 'about' })"

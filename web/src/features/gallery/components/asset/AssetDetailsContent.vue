@@ -91,7 +91,9 @@ async function handleCopyFileName() {
       </div>
       <div class="flex justify-between gap-2">
         <span class="text-foreground/80">{{ t('gallery.details.asset.type') }}</span>
-        <span class="rounded-sm bg-secondary px-2 py-0.5">{{ getAssetTypeLabel(asset.type) }}</span>
+        <span class="rounded-sm bg-black/5 px-2 py-0.5 text-foreground/80 dark:bg-white/8">
+          {{ getAssetTypeLabel(asset.type) }}
+        </span>
       </div>
       <div v-if="asset.width && asset.height" class="flex justify-between gap-2">
         <span class="text-foreground/80">{{ t('gallery.details.asset.resolution') }}</span>

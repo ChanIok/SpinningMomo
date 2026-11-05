@@ -62,10 +62,10 @@ const STARS = [1, 2, 3, 4, 5] as const
               hoverRating > 0
                 ? star <= hoverRating
                   ? 'fill-amber-400 text-amber-400'
-                  : 'text-muted-foreground/30'
+                  : 'text-muted-foreground/45'
                 : !ratingIndeterminate && star <= rating
                   ? 'fill-amber-400 text-amber-400'
-                  : 'text-muted-foreground/30'
+                  : 'text-muted-foreground/45'
             "
           />
         </button>
@@ -78,8 +78,8 @@ const STARS = [1, 2, 3, 4, 5] as const
             class="flex h-5 w-5 items-center justify-center rounded-md transition-colors"
             :class="
               !flagIndeterminate && reviewFlag === 'rejected'
-                ? 'bg-secondary text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300'
-                : 'bg-muted/40 text-muted-foreground hover:text-foreground'
+                ? 'bg-rose-500/12 text-rose-600 hover:bg-rose-500/20 hover:text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30 dark:hover:text-rose-300'
+                : 'bg-black/4 text-muted-foreground hover:bg-black/8 hover:text-foreground dark:bg-white/6 dark:hover:bg-white/12'
             "
             @click="onRejectedClick"
           >
