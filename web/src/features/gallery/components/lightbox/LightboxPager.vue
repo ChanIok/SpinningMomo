@@ -250,7 +250,7 @@ defineExpose({
     >
       <img
         :src="
-          imagePreload.getReadyImage(page.asset)?.src ?? galleryApi.getAssetThumbnailUrl(page.asset)
+          imagePreload.getReadyImage(page.asset)?.src ?? galleryApi.getThumbnailUrl(page.asset.hash)
         "
         :alt="page.asset.name"
         class="h-full w-full object-contain select-none"

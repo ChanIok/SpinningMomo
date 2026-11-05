@@ -87,7 +87,7 @@ const posterUrl = computed(() => {
     return ''
   }
 
-  return galleryApi.getAssetThumbnailUrl(currentAsset.value)
+  return galleryApi.getThumbnailUrl(currentAsset.value.hash)
 })
 
 const mediaWidth = computed(() => currentAsset.value?.width || 0)

@@ -57,7 +57,7 @@ const filmstripItems = computed(() => {
     return {
       ...item,
       asset,
-      thumbnailUrl: asset ? galleryApi.getAssetThumbnailUrl(asset) : '',
+      thumbnailUrl: asset ? galleryApi.getThumbnailUrl(asset.hash) : '',
       isSelected,
       isVideo: asset?.type === 'video',
       isCurrent: item.index === currentIndex.value,

@@ -692,10 +692,10 @@ export function useGalleryData() {
   }
 
   /**
-   * 获取资产缩略图URL
+   * 根据内容 hash 获取缩略图URL
    */
-  function getAssetThumbnailUrl(asset: any) {
-    return galleryApi.getAssetThumbnailUrl(asset)
+  function getThumbnailUrl(hash?: string | null) {
+    return galleryApi.getThumbnailUrl(hash)
   }
 
   function getAssetUrl(asset: Asset) {
@@ -721,7 +721,7 @@ export function useGalleryData() {
     startScanAssets,
 
     // 工具函数
-    getAssetThumbnailUrl,
+    getThumbnailUrl,
     getAssetUrl,
   }
 }

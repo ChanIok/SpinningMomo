@@ -629,12 +629,13 @@ auto get_missing_assets(core::AppState& app_state)
     std::int64_t id = 0;
     std::string name;
     std::string path;
+    std::optional<std::string> hash;
     std::int64_t missing_at = 0;
   };
 
   auto items_result = core::database::query<MissingAssetRow>(app_state,
                                                              R"(
-        SELECT id, name, path, missing_at
+        SELECT id, name, path, hash, missing_at
         FROM assets
         WHERE missing_at IS NOT NULL
         ORDER BY path COLLATE NOCASE
@@ -684,6 +685,7 @@ auto get_missing_assets(core::AppState& app_state)
         .id = row.id,
         .name = std::move(row.name),
         .path = std::move(row.path),
+        .hash = std::move(row.hash),
         .missing_at = row.missing_at,
     });
   }

@@ -189,7 +189,7 @@ function openAssetLightbox(
   const cardEl = (event.target as HTMLElement).closest('[data-asset-card]')
   if (cardEl) {
     const rect = cardEl.getBoundingClientRect()
-    const thumbnailUrl = galleryApi.getAssetThumbnailUrl(asset)
+    const thumbnailUrl = galleryApi.getThumbnailUrl(asset.hash)
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
   void galleryLightbox.openLightbox(index, inputType)

@@ -25,12 +25,12 @@ const emit = defineEmits<{
   'drag-start': [asset: Asset, event: DragEvent]
 }>()
 
-const { getAssetThumbnailUrl } = useGalleryData()
+const { getThumbnailUrl } = useGalleryData()
 
 const imageError = ref(false)
 let lastInputType: GalleryInputType = 'mouse'
 
-const thumbnailUrl = computed(() => getAssetThumbnailUrl(props.asset))
+const thumbnailUrl = computed(() => getThumbnailUrl(props.asset.hash))
 const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
 const isVideoAsset = computed(() => props.asset.type === 'video')
 // 文件类型标签：优先显示扩展名，其次 MIME 子类型，最后回退到 type 字段

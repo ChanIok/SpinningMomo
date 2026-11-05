@@ -319,6 +319,7 @@ struct MissingAssetItem {
   std::int64_t id = 0;
   std::string name;
   std::string path;
+  std::optional<std::string> hash;
   std::int64_t missing_at = 0;
 };
 

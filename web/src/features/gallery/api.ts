@@ -1,6 +1,6 @@
 import { call, callWithAdditionalObjects } from '@/core/rpc'
 import type { FolderTreeNode, Tag, TagTreeNode } from './types'
-import { getAssetThumbnailUrl, getAssetUrl } from './api/urls'
+import { getAssetUrl, getThumbnailUrl } from './api/urls'
 import type {
   OperationResult,
   ScanAssetsParams,
@@ -324,7 +324,7 @@ export const galleryApi = {
   getTagsByAssetIds,
 
   // URL 工具
-  getAssetThumbnailUrl,
+  getThumbnailUrl,
   getAssetUrl,
 
   // 资产动作

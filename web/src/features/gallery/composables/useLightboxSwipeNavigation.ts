@@ -236,7 +236,7 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
 
   // 预热一张缩略图，让拖动过程中相邻页尽量直接可见。
   function preloadThumbnailForAsset(asset: Asset): Promise<void> {
-    const url = galleryApi.getAssetThumbnailUrl(asset)
+    const url = galleryApi.getThumbnailUrl(asset.hash)
     if (!url) {
       return Promise.resolve()
     }

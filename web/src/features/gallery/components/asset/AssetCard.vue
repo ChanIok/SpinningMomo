@@ -64,7 +64,7 @@ let longPressTriggered = false
 let longPressBlocked = false
 let lastInputType: GalleryInputType = 'mouse'
 
-const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
+const { getThumbnailUrl, getAssetUrl } = useGalleryData()
 const { generateOriginalPreview } = useOriginalPreviewWorker()
 const store = useGalleryStore()
 const useOriginalImagesForCards = computed(() => store.view.useOriginalImagesForCards)
@@ -77,7 +77,7 @@ const assetTags = computed(() =>
   showTagBadges.value ? (store.assetTagsById.get(props.asset.id) ?? []) : []
 )
 
-const thumbnailUrl = computed(() => getAssetThumbnailUrl(props.asset))
+const thumbnailUrl = computed(() => getThumbnailUrl(props.asset.hash))
 const scheduledThumbnailUrl = computed(() => (props.allowThumbnailLoad ? thumbnailUrl.value : ''))
 const originalUrl = computed(() => getAssetUrl(props.asset))
 const supportsOriginalCardImage = computed(

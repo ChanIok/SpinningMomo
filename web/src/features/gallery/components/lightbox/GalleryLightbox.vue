@@ -298,7 +298,7 @@ function animateClose() {
         if (exitGestureOffset !== null) {
           fromRect = transformHeroRectForVerticalGesture(fromRect, exitGestureOffset)
         }
-        startExitReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
+        startExitReverseHero(fromRect, cardRect, galleryApi.getThumbnailUrl(asset.hash))
         didReverseHero = true
       }
     }

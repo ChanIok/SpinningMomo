@@ -64,7 +64,7 @@ const displayAsset = computed(() => {
 
 const thumbnailUrl = computed(() => {
   if (!displayAsset.value) return ''
-  return galleryApi.getAssetThumbnailUrl(displayAsset.value)
+  return galleryApi.getThumbnailUrl(displayAsset.value.hash)
 })
 
 const fitMode = computed(() => store.lightbox.fitMode)
@@ -136,7 +136,7 @@ watch(
 
 // 预热目标缩略图，切换时先保证稳定的低清底图。
 function preloadThumbnailForAsset(asset: Asset): Promise<void> {
-  const url = galleryApi.getAssetThumbnailUrl(asset)
+  const url = galleryApi.getThumbnailUrl(asset.hash)
   if (!url) {
     return Promise.resolve()
   }

@@ -13,11 +13,10 @@ function encodeRelativePathForUrl(relativePath: string): string {
 }
 
 /**
- * 获取资产缩略图URL
+ * 根据内容 hash 获取缩略图 URL
  * 路径格式: thumbnails/[hash前2位]/[hash第3-4位]/{hash}.webp
  */
-export function getAssetThumbnailUrl(asset: Asset): string {
-  const hash = asset.hash
+export function getThumbnailUrl(hash?: string | null): string {
   if (!hash) {
     return ''
   }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ChevronDown, ChevronRight, Clipboard, Folder, Trash2 } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Folder, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -18,6 +18,7 @@ import { useToast } from '@/composables/useToast'
 import { copyToClipboard, formatFileSize } from '@/lib/utils'
 import { galleryApi } from '../../api'
 import type { MissingAssetItem, MissingAssetsResponse } from '../../types'
+import MissingAssetThumbnailPreview from './MissingAssetThumbnailPreview.vue'
 
 const { t } = useI18n()
 const { toast } = useToast()
@@ -219,19 +220,17 @@ onMounted(load)
               class="group flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/45"
             >
               <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-medium">{{ item.name }}</p>
+                <p
+                  class="truncate text-sm font-medium transition-colors hover:text-primary"
+                  @click="copyPath(item.path)"
+                >
+                  {{ item.name }}
+                </p>
                 <p class="truncate text-xs text-muted-foreground">
                   {{ truncateMiddle(getParentPath(item.path), 72) }}
                 </p>
               </div>
-              <Button
-                variant="sidebarGhost"
-                size="icon-xs"
-                :title="t('gallery.preferences.maintenance.copyPath')"
-                @click="copyPath(item.path)"
-              >
-                <Clipboard class="h-3.5 w-3.5" />
-              </Button>
+              <MissingAssetThumbnailPreview :item="item" />
               <Button
                 variant="sidebarGhost"
                 size="icon-xs"

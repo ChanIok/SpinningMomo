@@ -110,7 +110,7 @@ let assetDetailsRequestToken = 0
 let infinityNikkiRequestToken = 0
 
 // 使用gallery数据composable
-const { getAssetThumbnailUrl, getAssetUrl, loadTagTree } = useGalleryData()
+const { getThumbnailUrl, getAssetUrl, loadTagTree } = useGalleryData()
 
 const selectedCount = computed(() => store.selectedCount)
 const batchSummary = computed(() => store.batchSummary)
@@ -173,7 +173,7 @@ const batchActiveAsset = computed(() => {
 // 计算缩略图URL
 const thumbnailUrl = computed(() => {
   if (!activeAsset.value) return ''
-  return getAssetThumbnailUrl(activeAsset.value)
+  return getThumbnailUrl(activeAsset.value.hash)
 })
 
 const assetUrl = computed(() => {
@@ -183,7 +183,7 @@ const assetUrl = computed(() => {
 
 const batchThumbnailUrl = computed(() => {
   if (!batchActiveAsset.value) return ''
-  return getAssetThumbnailUrl(batchActiveAsset.value)
+  return getThumbnailUrl(batchActiveAsset.value.hash)
 })
 
 const batchAssetUrl = computed(() => {

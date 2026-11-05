@@ -122,7 +122,7 @@ function handleAssetDoubleClick(
   const thumbnailEl = (event.target as HTMLElement).closest('[data-asset-thumbnail]')
   if (thumbnailEl) {
     const rect = thumbnailEl.getBoundingClientRect()
-    const thumbnailUrl = galleryApi.getAssetThumbnailUrl(asset)
+    const thumbnailUrl = galleryApi.getThumbnailUrl(asset.hash)
     prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
   }
 

@@ -183,6 +183,7 @@ export interface MissingAssetItem {
   id: number
   name: string
   path: string
+  hash?: string
   missingAt: number
 }
 
