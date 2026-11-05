@@ -2,12 +2,32 @@
 
 #include "vendor/std.hpp"
 #include "vendor/windows/codecapi.hpp"
+#include "vendor/windows/combaseapi.hpp"
 #include "vendor/windows/mferror.hpp"
 #include "vendor/windows/strmif.hpp"
 
+#include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 
 namespace utils::media::mft {
+
+// 激活前读取身份，确保驱动 MFT 创建失败时仍能定位具体实现。
+auto activation_identity(IMFActivate* activation) -> std::string {
+  GUID clsid{};
+  wchar_t clsid_text[39]{};
+  const auto clsid_hr = activation->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &clsid);
+  const auto has_clsid = SUCCEEDED(clsid_hr) && StringFromGUID2(clsid, clsid_text, 39) > 0;
+
+  wchar_t* vendor = nullptr;
+  UINT32 vendor_length = 0;
+  const auto vendor_hr = activation->GetAllocatedString(MFT_ENUM_HARDWARE_VENDOR_ID_Attribute,
+                                                        &vendor, &vendor_length);
+  auto cleanup = wil::scope_exit([&] { CoTaskMemFree(vendor); });
+
+  return std::format("name=\"{}\", CLSID={}, vendor={}", describe(activation),
+                     has_clsid ? utils::string::ToUtf8(clsid_text) : "unavailable",
+                     SUCCEEDED(vendor_hr) ? utils::string::ToUtf8(vendor) : "unavailable");
+}
 
 #define MF_TRY(call)                                               \
   do {                                                             \
@@ -46,6 +66,18 @@ auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO&
   if (FAILED(hr)) {
     return std::unexpected(hr_error("MFTEnum2", hr));
   }
+
+  // 每次视频编码器选择仅输出一条摘要；未选中的候选只在 Debug 下展开。
+  if (category == MFT_CATEGORY_VIDEO_ENCODER) {
+    Logger().info("Video encoder MFT: hardware={}, candidates={}, selected=[{}]",
+                  (flags & MFT_ENUM_FLAG_HARDWARE) != 0, count,
+                  count ? activation_identity(list[0]) : "none");
+    for (UINT32 i = 1; i < count; ++i) {
+      Logger().debug("Video encoder MFT alternative: index={}, {}", i,
+                     activation_identity(list[i]));
+    }
+  }
+
   if (!count) {
     return std::unexpected("No MFT matches the selected adapter and formats");
   }

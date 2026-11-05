@@ -272,7 +272,15 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
   }
 
   result.name = utils::media::mft::describe(activation->get());
-  MF_TRY((*activation)->ActivateObject(IID_PPV_ARGS(result.transform.put())));
+  const auto activation_hr = (*activation)->ActivateObject(IID_PPV_ARGS(result.transform.put()));
+  if (FAILED(activation_hr)) {
+    return std::unexpected(utils::media::mft::hr_error(
+        std::format("ActivateObject video encoder \"{}\" (GPU={}, codec={}, input={}, "
+                    "LUID={:08X}:{:08X})",
+                    result.name, gpu, video_codec_to_string(config.codec),
+                    config.enable_hdr ? "P010" : "NV12", UINT(luid.HighPart), luid.LowPart),
+        activation_hr));
+  }
 
   auto failed = wil::scope_exit([&] {
     if (result.transform) {
@@ -292,7 +300,9 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
     MF_TRY(attributes->GetUINT32(MF_SA_D3D11_AWARE, &aware));
 
     if (!async || !aware) {
-      return std::unexpected("Hardware video MFT must be asynchronous and D3D11-aware");
+      return std::unexpected(std::format(
+          "Hardware video MFT must be asynchronous and D3D11-aware: async={}, D3D11_aware={}",
+          async, aware));
     }
 
     // 解锁异步 MFT 处理模式
