@@ -529,13 +529,14 @@ function getAdjustedPlaceholderColor(hex?: string): string {
       :class="store.cardCornerClass"
     >
       <!-- 缩略图直接覆盖常驻背景，后续原图升级继续用缩略图兜底。 -->
+      <!-- 图片层对指针事件透明：触摸长按必须命中普通容器，否则会进入浏览器针对 <img> 的原生长按手势（pointercancel 杀掉长按定时器并弹出默认图片菜单）。 -->
       <img
         v-if="hasThumbnail && !imageError"
         :src="scheduledThumbnailUrl"
         :alt="asset.name"
         loading="eager"
         decoding="async"
-        class="h-full w-full object-cover"
+        class="pointer-events-none h-full w-full object-cover"
         :class="{
           'transition-transform duration-200 group-hover:scale-105': enableHoverScale,
         }"
@@ -550,7 +551,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         :alt="asset.name"
         loading="eager"
         decoding="async"
-        class="absolute inset-0 h-full w-full object-cover"
+        class="pointer-events-none absolute inset-0 h-full w-full object-cover"
         :class="{
           'transition-transform duration-200 group-hover:scale-105': enableHoverScale,
         }"
