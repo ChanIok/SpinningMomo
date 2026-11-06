@@ -87,6 +87,8 @@
   "settings.appearance.theme.light": "浅色",
   "settings.appearance.theme.enableRoundedCorners.description": "开启后主界面及组件使用圆角外观，关闭后使用直角外观。",
   "settings.appearance.theme.enableRoundedCorners.label": "界面圆角",
+  "settings.appearance.theme.enableAnimations.description": "平滑呈现页面与弹窗等过渡动画。关闭可提升界面响应速度。",
+  "settings.appearance.theme.enableAnimations.label": "界面动效",
   "settings.appearance.theme.menuBlur.description": "为弹出菜单和面板启用毛玻璃模糊效果。",
   "settings.appearance.theme.menuBlur.label": "弹出层毛玻璃",
   "settings.appearance.theme.mode.description": "控制文字和界面元素的明暗配色，不影响背景叠加色。",

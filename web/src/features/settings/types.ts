@@ -71,6 +71,7 @@ export interface WebThemeSettings {
   customCss: string
   menuBlur: boolean
   enableRoundedCorners: boolean
+  enableAnimations: boolean
 }
 
 // 深色主题颜色配置
@@ -439,6 +440,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       customCss: '',
       menuBlur: false,
       enableRoundedCorners: true,
+      enableAnimations: true,
     },
     background: {
       type: 'none',

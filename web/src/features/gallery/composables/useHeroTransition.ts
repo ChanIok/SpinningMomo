@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useSettingsStore } from '@/features/settings/store'
 
 // PC 暗房根节点使用 px-[1px]；紧凑模式不保留这层边距。真实媒体 viewport 已经是内容盒，不应重复扣除。
 export const LIGHTBOX_VIEWPORT_PADDING = 1
@@ -14,6 +15,12 @@ let pendingHero: HeroSource | null = null
 export const heroAnimating = ref(false)
 
 export function prepareHero(rect: DOMRect, thumbnailUrl: string, width: number, height: number) {
+  if (useSettingsStore().appSettings.ui.webTheme.enableAnimations === false) {
+    pendingHero = null
+    endHeroAnimation()
+    return
+  }
+
   pendingHero = { rect, thumbnailUrl, width, height }
   heroAnimating.value = true
 }
@@ -21,6 +28,11 @@ export function prepareHero(rect: DOMRect, thumbnailUrl: string, width: number, 
 export function consumeHero(): HeroSource | null {
   const h = pendingHero
   pendingHero = null
+  // 来源准备与灯箱挂载之间存在异步选择流程，消费时以最新设置为准。
+  if (useSettingsStore().appSettings.ui.webTheme.enableAnimations === false) {
+    endHeroAnimation()
+    return null
+  }
   return h
 }
 
@@ -44,6 +56,7 @@ export function computeLightboxHeroRect(
 }
 
 export function endHeroAnimation() {
+  pendingHero = null
   heroAnimating.value = false
 }
 

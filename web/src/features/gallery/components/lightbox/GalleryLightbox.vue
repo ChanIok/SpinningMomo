@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
-import { provideLightboxImagePreload } from '../../composables/useLightboxImagePreload'
+import {
+  provideLightboxImageLoading,
+  type LightboxImageRequest,
+} from '../../composables/useLightboxImageLoading'
 import { useGalleryKeyboardContext } from '../../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
@@ -29,6 +32,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/component
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
+import { useSettingsStore } from '@/features/settings/store'
 import {
   isGalleryTouchContextMenu,
   isGalleryTouchInput,
@@ -70,10 +74,18 @@ type VerticalGesturePhase = 'idle' | 'dragging' | 'settling'
 const props = defineProps<{
   galleryContentRef: GalleryContentRef
 }>()
+const emit = defineEmits<{
+  'preview-visible': []
+}>()
+const firstFrameReady = ref(false)
 
 const store = useGalleryStore()
+const settingsStore = useSettingsStore()
+const animationsEnabled = computed(
+  () => settingsStore.appSettings.ui.webTheme.enableAnimations !== false
+)
 const canHandleShortcut = useGalleryKeyboardContext()
-provideLightboxImagePreload()
+const imageLoading = provideLightboxImageLoading()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const overlayHistory = useGalleryOverlayHistory()
@@ -111,7 +123,7 @@ watch(isToolbarCompressed, (compressed) => {
   }
 })
 
-// 切图时重置交互；原图预加载由会话内共享的 composable 统一协调。
+// 切图时重置交互；图片准备和预加载由会话服务统一协调。
 watch(
   () => store.selection.activeIndex,
   (newIndex, oldIndex) => {
@@ -129,6 +141,10 @@ watch(
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const isClosing = computed(() => store.lightbox.isClosing)
+const mediaSurfaceClass = computed(() => [
+  animationsEnabled.value ? 'transition-opacity duration-[180ms]' : '',
+  isClosing.value ? 'opacity-0' : 'opacity-100',
+])
 // 普通桌面模式给工具栏和底片栏留出真实布局空间；紧凑/沉浸模式继续覆盖媒体。
 const isReservedDesktopLayout = computed(() => !store.isCompactWindow && !isImmersive.value)
 const isTouchInput = computed(() => isGalleryTouchInput(activeInputType.value))
@@ -168,7 +184,10 @@ const lightboxRootClass = computed(() => {
     cls += ' px-[1px]'
   }
   if (immersive && closing) {
-    cls += ' pointer-events-none opacity-0 transition-opacity duration-[280ms] ease-out'
+    cls += ' pointer-events-none opacity-0'
+    if (animationsEnabled.value) {
+      cls += ' transition-opacity duration-[280ms] ease-out'
+    }
   }
   return cls
 })
@@ -266,7 +285,7 @@ function exitImmersive() {
   lightbox.setImmersive(false)
 }
 
-// 播放暗房退场动画；动画完成后再清理选择，避免反向 hero 动画失去来源卡片。
+// 无动效时立即关闭；有动效时延后清理焦点，避免反向 hero 动画失去来源卡片。
 function animateClose() {
   clearPendingTouchTap()
 
@@ -277,6 +296,21 @@ function animateClose() {
 
   const exitGestureOffset = pendingExitGestureOffset
   pendingExitGestureOffset = null
+
+  // 暗房关闭后保留当前选择；没有选择时才清理临时焦点，两种关闭路径使用同一规则。
+  const shouldClearBrowseFocus = store.selectedCount === 0
+  const finishClose = () => {
+    lightbox.closeLightbox()
+    if (shouldClearBrowseFocus) {
+      store.clearActiveAsset()
+    }
+  }
+
+  if (!firstFrameReady.value || !animationsEnabled.value) {
+    finishClose()
+    return
+  }
+
   store.setLightboxClosing(true)
 
   let didReverseHero = false
@@ -305,14 +339,7 @@ function animateClose() {
   }
 
   const delay = didReverseHero ? CLOSE_AFTER_REVERSE_HERO_MS : CLOSE_AFTER_NO_HERO_MS
-  // 暗房关闭后保留当前选择，方便用户回到图库继续操作或查看详情；没有选择时才清理临时焦点。
-  const shouldClearBrowseFocus = store.selectedCount === 0
-  window.setTimeout(() => {
-    lightbox.closeLightbox()
-    if (shouldClearBrowseFocus) {
-      store.clearActiveAsset()
-    }
-  }, delay)
+  window.setTimeout(finishClose, delay)
 }
 
 // Hero 的目标区域必须和图片实际可见的 viewport 一致，避免普通桌面模式落到上下 chrome 下方。
@@ -788,6 +815,8 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  if (!firstFrameReady.value) return
+
   if (!canHandleShortcut(event, 'lightbox')) return
 
   if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
@@ -906,16 +935,19 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 const heroOverlay = ref<{ thumbnailUrl: string } | null>(null)
+const heroOverlayRef = ref<HTMLImageElement | null>(null)
 const heroOverlayStyle = ref<Record<string, string>>({})
 let heroRafId: number | null = null
+let presentationFrame: number | null = null
+let pendingPresentation: { assetId: number; request?: LightboxImageRequest } | null = null
 
 const reverseHeroOverlay = ref<{ thumbnailUrl: string } | null>(null)
 const reverseHeroOverlayStyle = ref<Record<string, string>>({})
 let reverseHeroRafId: number | null = null
 
-function startEnterHero() {
+function startEnterHero(thumbnailReady: boolean) {
   const hero = consumeHero()
-  if (!hero) {
+  if (!hero || !thumbnailReady) {
     endHeroAnimation()
     return
   }
@@ -937,15 +969,25 @@ function startEnterHero() {
   heroOverlayStyle.value = rectToFixedStyle(hero.rect, 'none')
 
   heroRafId = requestAnimationFrame(() => {
-    heroRafId = requestAnimationFrame(() => {
+    heroRafId = requestAnimationFrame(async () => {
+      heroRafId = null
+      const overlay = heroOverlayRef.value
+      if (!overlay) return
       heroOverlayStyle.value = rectToFixedStyle(toRect, 'enter')
+      await nextTick()
+      // 等实际过渡完成；起止位置相同或过渡被取消时也能正常完成交接。
+      await Promise.all(
+        overlay.getAnimations().map((animation) => animation.finished.catch(() => {}))
+      )
+      if (overlay === heroOverlayRef.value) finishEnterHero()
     })
   })
 }
 
-function onHeroTransitionEnd() {
+function finishEnterHero() {
   heroOverlay.value = null
   endHeroAnimation()
+  void presentCurrentPreview()
 }
 
 function startExitReverseHero(fromRect: DOMRect, toRect: DOMRect, thumbnailUrl: string) {
@@ -963,10 +1005,54 @@ function onReverseHeroTransitionEnd() {
   reverseHeroOverlay.value = null
 }
 
-onMounted(async () => {
+async function presentCurrentPreview() {
+  const preview = pendingPresentation
+  if (!preview || heroOverlay.value) return
+  if (presentationFrame !== null) cancelAnimationFrame(presentationFrame)
   await nextTick()
-  startEnterHero()
-})
+  if (pendingPresentation !== preview || !lightboxRootRef.value) return
+  // 可见性和 Pager 都已提交，给真实媒体层一个绘制机会，再允许新原图任务。
+  presentationFrame = requestAnimationFrame(() => {
+    presentationFrame = requestAnimationFrame(() => {
+      presentationFrame = null
+      if (
+        pendingPresentation !== preview ||
+        !lightboxRootRef.value ||
+        !store.lightbox.isOpen ||
+        store.lightbox.isClosing ||
+        preview.assetId !== currentAsset.value?.id
+      )
+        return
+      imageLoading.notifyPreviewPresented(preview.assetId, preview.request)
+    })
+  })
+}
+
+async function handlePreviewReady(
+  assetId: number,
+  thumbnailReady: boolean,
+  request?: LightboxImageRequest
+) {
+  if (assetId !== currentAsset.value?.id) return
+  if (request && request !== imageLoading.currentRequest.value) return
+  const preview = { assetId, request }
+  pendingPresentation = preview
+  await nextTick()
+  if (
+    pendingPresentation !== preview ||
+    !lightboxRootRef.value ||
+    !store.lightbox.isOpen ||
+    store.lightbox.isClosing
+  )
+    return
+  if (!firstFrameReady.value) {
+    // 准备期间保留图库；缩略图可用后才显示暗房并启动入场。
+    firstFrameReady.value = true
+    startEnterHero(thumbnailReady)
+    emit('preview-visible')
+  }
+  await presentCurrentPreview()
+}
 
 useEventListener(window, 'keydown', handleKeydown)
 onUnmounted(() => {
@@ -977,6 +1063,8 @@ onUnmounted(() => {
   pendingExitGestureOffset = null
   clearVerticalGestureSurfaceStyles()
   endHeroAnimation()
+  pendingPresentation = null
+  if (presentationFrame !== null) cancelAnimationFrame(presentationFrame)
   if (heroRafId !== null) cancelAnimationFrame(heroRafId)
   if (reverseHeroRafId !== null) cancelAnimationFrame(reverseHeroRafId)
 })
@@ -989,6 +1077,9 @@ onUnmounted(() => {
       data-gallery-keyboard-scope="lightbox"
       class="lightbox-container"
       :class="lightboxRootClass"
+      :style="!firstFrameReady ? { visibility: 'hidden' } : undefined"
+      :inert="!firstFrameReady"
+      :aria-hidden="!firstFrameReady ? true : undefined"
       style="--surface-opacity-scale: 0.96"
       @click.self="requestClose"
       @pointerdown.capture="handleLightboxPointerDown"
@@ -999,6 +1090,7 @@ onUnmounted(() => {
         :class="isReservedDesktopLayout ? 'flex flex-col' : ''"
       >
         <Transition
+          :css="animationsEnabled"
           appear
           enter-active-class="transition-opacity duration-[200ms] ease-out"
           enter-from-class="opacity-0"
@@ -1042,11 +1134,11 @@ onUnmounted(() => {
           <!-- Enter hero overlay 正在放大的图片处于媒体视口内 (z-10)，处于上下渐变栏下方 -->
           <img
             v-if="heroOverlay"
+            ref="heroOverlayRef"
             :src="heroOverlay.thumbnailUrl"
             :style="heroOverlayStyle"
             class="pointer-events-none fixed z-10 rounded-[4px] object-cover"
             alt=""
-            @transitionend="onHeroTransitionEnd"
           />
 
           <!-- Exit reverse hero overlay 正在飞回缩略图的图片也处于媒体视口内 (z-10)，处于上下渐变栏下方 -->
@@ -1063,8 +1155,8 @@ onUnmounted(() => {
             <ContextMenuTrigger as-child :disabled="isTouchInput">
               <div
                 ref="mediaGestureSurfaceRef"
-                class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
-                :class="isClosing ? 'opacity-0' : 'opacity-100'"
+                class="absolute inset-0 z-0 overflow-hidden"
+                :class="mediaSurfaceClass"
                 @contextmenu.capture="handleMediaContextMenu"
                 @wheel="handleMediaWheel"
               >
@@ -1073,6 +1165,7 @@ onUnmounted(() => {
                   ref="lightboxPagerRef"
                   :vertical-gesture-enabled="canUseVerticalGesture"
                   :touch-chrome-enabled="canToggleChromeByTap"
+                  @preview-ready="handlePreviewReady"
                   @touch-tap="handleTouchTap"
                   @vertical-gesture-move="handleVerticalGestureMove"
                   @vertical-gesture-cancel="handleVerticalGestureCancel"
@@ -1094,8 +1187,8 @@ onUnmounted(() => {
           <div
             v-else
             ref="mediaGestureSurfaceRef"
-            class="absolute inset-0 z-0 overflow-hidden transition-opacity duration-[180ms]"
-            :class="isClosing ? 'opacity-0' : 'opacity-100'"
+            class="absolute inset-0 z-0 overflow-hidden"
+            :class="mediaSurfaceClass"
             @contextmenu.prevent.stop
             @wheel="handleMediaWheel"
           >
@@ -1103,6 +1196,7 @@ onUnmounted(() => {
               ref="lightboxPagerRef"
               :vertical-gesture-enabled="canUseVerticalGesture"
               :touch-chrome-enabled="canToggleChromeByTap"
+              @preview-ready="handlePreviewReady"
               @touch-tap="handleTouchTap"
               @vertical-gesture-move="handleVerticalGestureMove"
               @vertical-gesture-cancel="handleVerticalGestureCancel"
@@ -1124,6 +1218,7 @@ onUnmounted(() => {
           :class="isReservedDesktopLayout ? 'relative shrink-0' : 'absolute inset-x-0 bottom-0'"
         >
           <Transition
+            :css="animationsEnabled"
             appear
             enter-active-class="transition-opacity duration-[200ms] ease-out"
             enter-from-class="opacity-0"
@@ -1142,6 +1237,7 @@ onUnmounted(() => {
           </Transition>
 
           <Transition
+            :css="animationsEnabled"
             appear
             enter-active-class="transition-all duration-300"
             enter-from-class="translate-y-full opacity-0"
@@ -1161,7 +1257,7 @@ onUnmounted(() => {
         </div>
 
         <MobileDrawer
-          :open="isToolbarCompressed && mobileDetailsOpen && !isClosing"
+          :open="firstFrameReady && isToolbarCompressed && mobileDetailsOpen && !isClosing"
           side="bottom"
           :aria-label="t('gallery.details.title')"
           :z-index="110"

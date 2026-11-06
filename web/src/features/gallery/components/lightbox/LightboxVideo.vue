@@ -7,11 +7,9 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryStore } from '../../store'
-import { useLightboxImagePreload } from '../../composables/useLightboxImagePreload'
 import { useI18n } from '@/composables/useI18n'
 
 const store = useGalleryStore()
-const imagePreload = useLightboxImagePreload()
 const { t } = useI18n()
 const props = defineProps<{
   touchChromeEnabled: boolean
@@ -198,7 +196,6 @@ function handleVideoLoadedData(event: Event) {
     return
   }
   videoReady.value = true
-  imagePreload.notifyCurrentMediaReady(currentAsset.value.id, assetUrl.value)
 }
 </script>
 

@@ -56,6 +56,7 @@ const {
   updateCustomCss,
   updateMenuBlur,
   updateEnableRoundedCorners,
+  updateEnableAnimations,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -227,6 +228,14 @@ const handleEnableRoundedCornersChange = async (enabled: boolean) => {
     await updateEnableRoundedCorners(enabled)
   } catch (error) {
     console.error('Failed to update enable rounded corners setting:', error)
+  }
+}
+
+const handleEnableAnimationsChange = async (enabled: boolean) => {
+  try {
+    await updateEnableAnimations(enabled)
+  } catch (error) {
+    console.error('Failed to update interface animations setting:', error)
   }
 }
 
@@ -545,6 +554,23 @@ const handleClearError = () => {
             <Switch
               :model-value="appSettings.ui.webTheme.enableRoundedCorners !== false"
               @update:model-value="(value) => handleEnableRoundedCornersChange(Boolean(value))"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.enableAnimations.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.enableAnimations.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.ui.webTheme.enableAnimations !== false"
+              @update:model-value="(value) => handleEnableAnimationsChange(Boolean(value))"
             />
           </ItemActions>
         </Item>

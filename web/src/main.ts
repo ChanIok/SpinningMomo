@@ -62,6 +62,8 @@ initializeRPC()
       settingsStore.appSettings.ui.webTheme.mode,
       settingsStore.appSettings.ui.webTheme.customCss,
       settingsStore.appSettings.ui.webTheme.menuBlur,
+      settingsStore.appSettings.ui.webTheme.enableRoundedCorners,
+      settingsStore.appSettings.ui.webTheme.enableAnimations,
       settingsStore.appSettings.ui.background.type,
       settingsStore.appSettings.ui.background.imageFileName,
       settingsStore.appSettings.ui.background.backgroundBlurAmount,

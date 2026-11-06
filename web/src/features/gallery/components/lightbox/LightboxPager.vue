@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryLightbox, useLightboxSwipeNavigation } from '../../composables'
 import type { LightboxVerticalGestureAction } from '../../composables/useLightboxSwipeNavigation'
 import { useGalleryStore } from '../../store'
 import { heroAnimating } from '../../composables/useHeroTransition'
-import { useLightboxImagePreload } from '../../composables/useLightboxImagePreload'
+import {
+  useLightboxImageLoading,
+  type LightboxImageRequest,
+} from '../../composables/useLightboxImageLoading'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 
@@ -43,7 +46,7 @@ const props = defineProps<{
 }>()
 
 const store = useGalleryStore()
-const imagePreload = useLightboxImagePreload()
+const imageLoading = useLightboxImageLoading()
 const lightbox = useGalleryLightbox()
 const pagerRef = ref<HTMLElement | null>(null)
 const imageRef = ref<LightboxImageExposed | null>(null)
@@ -52,6 +55,7 @@ const imagePannable = ref(false)
 const { width, height } = useElementSize(pagerRef)
 
 const emit = defineEmits<{
+  'preview-ready': [assetId: number, thumbnailReady: boolean, request?: LightboxImageRequest]
   'touch-tap': [isDoubleTap: boolean]
   'vertical-gesture-move': [offsetY: number]
   'vertical-gesture-cancel': [offsetY: number]
@@ -146,6 +150,7 @@ const {
   swipePreviewPages,
   swipeViewportStyle,
   swipeGestureSurfaceStyle,
+  pendingNavigationIndex,
   consumeSuppressedClick,
   completeNavigation,
   handleSwipePointerDown,
@@ -195,10 +200,42 @@ const {
   },
 })
 
-// 媒体完成挂载后，通知导航状态机把目标页提升为新的基准页。
-function handleMediaReady(assetId: number) {
+const pendingPreview = shallowRef<{
+  assetId: number
+  thumbnailReady: boolean
+  request?: LightboxImageRequest
+} | null>(null)
+
+function handleImagePreviewReady(request: LightboxImageRequest, thumbnailReady: boolean) {
+  pendingPreview.value = { assetId: request.asset.id, thumbnailReady, request }
+  completeNavigation(request.asset.id)
+}
+
+// 视频继续沿用挂载通知，不改变播放器的加载流程。
+function handleVideoReady(assetId: number) {
+  pendingPreview.value = { assetId, thumbnailReady: true }
   completeNavigation(assetId)
 }
+
+// 预览就绪还不等于轨道已接管；连续手势期间等 Pager 稳定后再交给外层呈现。
+watch(
+  [pendingPreview, swipePhase, multiTouchActive, pendingNavigationIndex],
+  () => {
+    const preview = pendingPreview.value
+    if (
+      !preview ||
+      swipePhase.value !== 'idle' ||
+      multiTouchActive.value ||
+      pendingNavigationIndex.value !== null
+    )
+      return
+    pendingPreview.value = null
+    if (preview.assetId !== currentAsset.value?.id) return
+    if (preview.request && preview.request !== imageLoading.currentRequest.value) return
+    emit('preview-ready', preview.assetId, preview.thumbnailReady, preview.request)
+  },
+  { flush: 'post' }
+)
 
 // 图片放大到需要拖拽时，Pager 先转发平移；水平边界转交由手势状态机继续处理。
 function handleImagePannableChange(pannable: boolean) {
@@ -250,7 +287,8 @@ defineExpose({
     >
       <img
         :src="
-          imagePreload.getReadyImage(page.asset)?.src ?? galleryApi.getThumbnailUrl(page.asset.hash)
+          imageLoading.getReadyOriginal(page.asset)?.src ??
+          galleryApi.getThumbnailUrl(page.asset.hash)
         "
         :alt="page.asset.name"
         class="h-full w-full object-contain select-none"
@@ -258,7 +296,7 @@ defineExpose({
       />
     </div>
 
-    <!-- 当前媒体页使用轨道偏移移动，ready 后才会被重新放回中心。 -->
+    <!-- 当前媒体页使用轨道偏移移动，预览就绪后才会被重新放回中心。 -->
     <div
       class="absolute inset-0 z-10"
       :style="[swipeViewportStyle, heroAnimating ? { visibility: 'hidden' } : {}]"
@@ -266,14 +304,14 @@ defineExpose({
       <LightboxImage
         v-if="!isVideo"
         ref="imageRef"
-        @ready="handleMediaReady"
+        @preview-ready="handleImagePreviewReady"
         @pannable-change="handleImagePannableChange"
       />
       <LightboxVideo
         v-else
         ref="videoRef"
         :touch-chrome-enabled="props.touchChromeEnabled"
-        @ready="handleMediaReady"
+        @ready="handleVideoReady"
       />
     </div>
   </div>

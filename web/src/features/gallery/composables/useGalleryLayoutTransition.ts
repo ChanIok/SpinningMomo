@@ -63,7 +63,7 @@ async function waitForVisibleCardImages(doc: Document): Promise<void> {
 export async function runWithLayoutTransition(update: () => Promise<void> | void): Promise<void> {
   const doc = typeof document !== 'undefined' ? (document as DocumentWithViewTransition) : undefined
 
-  if (!doc?.startViewTransition) {
+  if (!doc?.startViewTransition || doc.documentElement.dataset.motion === 'off') {
     await update()
     return
   }

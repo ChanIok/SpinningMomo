@@ -307,6 +307,43 @@ body,
   transition: opacity 220ms ease;
 }
 
+/* 按容器标识关闭结构动效，不依赖 Tailwind 变体类名，也不影响内部加载指示和直接操作反馈。 */
+:root[data-motion='off']
+  :is(
+    [data-slot='context-menu-content'],
+    [data-slot='context-menu-sub-content'],
+    [data-slot='dropdown-menu-content'],
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='popover-content'],
+    [data-slot='select-content'],
+    [data-slot='tooltip-content'],
+    [data-slot='hover-card-content'],
+    [data-slot='dialog-content'],
+    [data-slot='dialog-overlay'],
+    [data-slot='alert-dialog-content'],
+    [data-slot='alert-dialog-overlay'],
+    [data-slot='sheet-content'],
+    [data-slot='sheet-overlay'],
+    [data-slot='accordion-content']
+  ),
+:root[data-motion='off'] [class*='-enter-active'],
+:root[data-motion='off'] [class*='-leave-active'] {
+  animation: none !important;
+  transition: none !important;
+}
+
+:root[data-motion='off'] .app-background-image,
+:root[data-motion='off'] .app-background-overlay {
+  transition: none !important;
+}
+
+:root[data-motion='off'] [class*='-enter-active'] .mobile-drawer-panel,
+:root[data-motion='off'] [class*='-leave-active'] .mobile-drawer-panel,
+:root[data-motion='off'] [class*='-enter-active'] .mobile-drawer-overlay,
+:root[data-motion='off'] [class*='-leave-active'] .mobile-drawer-overlay {
+  transition: none !important;
+}
+
 .route-scene {
   view-transition-name: route-scene;
 }
@@ -322,6 +359,15 @@ body,
 
 ::view-transition-new(route-scene) {
   animation-name: route-scene-fade-in;
+}
+
+html[data-motion='off']::view-transition-group(route-scene),
+html[data-motion='off']::view-transition-old(route-scene),
+html[data-motion='off']::view-transition-new(route-scene),
+html[data-motion='off']::view-transition-group(gallery-layout),
+html[data-motion='off']::view-transition-old(gallery-layout),
+html[data-motion='off']::view-transition-new(gallery-layout) {
+  animation: none !important;
 }
 
 @keyframes route-scene-fade-out {

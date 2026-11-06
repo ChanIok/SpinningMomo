@@ -9,6 +9,7 @@ import {
 import { LoaderCircle, Upload, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
+import { useSettingsStore } from '@/features/settings/store'
 import {
   useGalleryAssetActions,
   useGalleryData,
@@ -40,6 +41,10 @@ import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
+const settingsStore = useSettingsStore()
+const animationsEnabled = computed(
+  () => settingsStore.appSettings.ui.webTheme.enableAnimations !== false
+)
 const canHandleShortcut = useGalleryKeyboardContext()
 const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
@@ -47,6 +52,7 @@ const folderActions = useGalleryFolderActions()
 const gallerySelection = useGallerySelection()
 const { t } = useI18n()
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
+const lightboxReady = ref(false)
 const contentRef = ref<HTMLElement | null>(null)
 const compactToolbarRef = ref<HTMLElement | null>(null)
 const actionBarRef = ref<HTMLElement | null>(null)
@@ -60,7 +66,9 @@ const galleryViewportStyle = computed(() => ({
   '--gallery-action-bar-height': `${Math.ceil(actionBarHeight.value)}px`,
 }))
 const reduceMotion = usePreferredReducedMotion()
-const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
+const shouldReduceMotion = computed(
+  () => !animationsEnabled.value || reduceMotion.value === 'reduce'
+)
 const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
 const isExternalDragActive = ref(false)
 const isDropImporting = ref(false)
@@ -82,7 +90,7 @@ useGalleryPinchZoom({
 useVisibleAssetTags()
 
 const galleryColumnClass = computed(() => {
-  const hidden = store.lightbox.isOpen && !store.lightbox.isClosing
+  const hidden = store.lightbox.isOpen && lightboxReady.value && !store.lightbox.isClosing
   const transition = shouldReduceMotion.value ? '' : 'transition-opacity duration-[220ms] ease-out'
   return [
     'flex h-full flex-col',
@@ -210,6 +218,7 @@ watch(
   () => store.lightbox.isOpen,
   (isOpen) => {
     if (!isOpen) {
+      lightboxReady.value = false
       pendingGalleryScrollIndex = undefined
       if (galleryScrollRafId !== null) {
         cancelAnimationFrame(galleryScrollRafId)
@@ -689,10 +698,12 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 
 <template>
   <div class="relative h-full">
-    <!-- gallery 始终渲染；打开时用 opacity 隐藏以便过渡，关闭阶段 isClosing 时与 lightbox 同步淡入 -->
+    <!-- 首帧就绪前保留图库画面；交接后隐藏，退场时与暗房同步恢复。 -->
     <div
       :class="galleryColumnClass"
-      :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
+      :aria-hidden="
+        store.lightbox.isOpen && lightboxReady && !store.lightbox.isClosing ? true : undefined
+      "
     >
       <!-- 紧凑窗口下工具栏浮动层叠在顶部，不占用滚动区域高度 -->
       <div
@@ -774,6 +785,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 
         <!-- 悬浮多选底栏 -->
         <Transition
+          :css="animationsEnabled"
           enter-active-class="transition-transform duration-200 ease-out"
           enter-from-class="translate-y-full"
           enter-to-class="translate-y-0"
@@ -794,7 +806,11 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
     </div>
 
     <!-- lightbox 按需挂载/销毁，绝对定位覆盖在 gallery 上层 -->
-    <GalleryLightbox v-if="store.lightbox.isOpen" :gallery-content-ref="galleryContentRef" />
+    <GalleryLightbox
+      v-if="store.lightbox.isOpen"
+      :gallery-content-ref="galleryContentRef"
+      @preview-visible="lightboxReady = true"
+    />
 
     <GalleryPreferencesDialog
       :open="store.preferencesDialogOpen"

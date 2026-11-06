@@ -79,7 +79,8 @@ interface UseLightboxImageViewportOptions {
   actualZoom: Readonly<Ref<number>>
   rotationDegrees: Readonly<Ref<number>>
   originalLoaded: Ref<boolean>
-  originalOpacityTransition: Ref<boolean>
+  thumbnailCoverVisible: Ref<boolean>
+  thumbnailOpacityTransition: Ref<boolean>
   lightbox: {
     showFitMode: () => void
     setActualZoom: (zoom: number) => void
@@ -89,7 +90,7 @@ interface UseLightboxImageViewportOptions {
 /**
  * 管理暗房图片的 viewport 与交互状态。
  *
- * 资产的选择和加载仍由 LightboxImage 负责；这里只关心已经选中的图片如何布局、缩放和移动。
+ * 加载由会话服务协调，画面由 LightboxImage 交接；这里只关心图片如何布局、缩放和移动。
  */
 export function useLightboxImageViewport(options: UseLightboxImageViewportOptions) {
   const {
@@ -105,7 +106,8 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     actualZoom,
     rotationDegrees,
     originalLoaded,
-    originalOpacityTransition,
+    thumbnailCoverVisible,
+    thumbnailOpacityTransition,
     lightbox,
   } = options
 
@@ -254,9 +256,22 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
   const originalLayerStyle = computed(() => ({
     ...imageLayerStyle.value,
     opacity: originalLoaded.value && !touchZoomRestoreFallback.value ? 1 : 0,
-    transition:
-      touchZoomRestoreFallback.value || !originalOpacityTransition.value ? 'none' : 'opacity 200ms',
+    transition: 'none',
   }))
+
+  const thumbnailLayerStyle = computed(() => {
+    const visible = touchZoomRestoreFallback.value || thumbnailCoverVisible.value
+    return {
+      ...imageLayerStyle.value,
+      opacity: visible ? 1 : 0,
+      // 淡出后停止绘制，但保留节点与解码结果供双击缩小复原使用。
+      visibility: visible ? undefined : ('hidden' as const),
+      transition:
+        !touchZoomRestoreFallback.value && thumbnailOpacityTransition.value
+          ? 'opacity 150ms ease-out, visibility 0s 150ms'
+          : 'none',
+    }
+  })
 
   // 等待图片可以被浏览器绘制；不重新请求资源，也不人为延长显示时间。
   async function waitForImageReady(image: HTMLImageElement | null): Promise<boolean> {
@@ -1014,7 +1029,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
 
     let restoreTransition: ThumbnailRestoreTransition | null = null
     if (isFitting) {
-      // 放大分支继续使用原有 stage transform，保留原图的渐进式显示效果。
+      // 放大分支继续使用原有 stage transform，原图加载交接由媒体组件处理。
       applyTouchZoomTransform(transition, 0)
     } else {
       // 复原从第一帧开始只显示缩略图；先确认缩略图已解码，避免代理层接管后反而出现空白。
@@ -1027,7 +1042,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
       }
 
       touchZoomRestoreFallback.value = true
-      originalOpacityTransition.value = false
+      thumbnailOpacityTransition.value = false
       // stage 仍保留真实布局，但由独立代理层显示画面，避免 8K stage 被 transform 合成。
       restoreThumbnailActive.value = true
       await nextTick()
@@ -1154,9 +1169,10 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
             return
           }
 
-          // 原图已可绘制后直接切回，不复用首次加载的淡入过渡。
+          // 原图已可绘制后直接切回，不重播首次加载时的缩略图淡出。
           originalLoaded.value = true
-          originalOpacityTransition.value = false
+          thumbnailCoverVisible.value = false
+          thumbnailOpacityTransition.value = false
           touchZoomRestoreFallback.value = false
           await nextTick()
         } else {
@@ -1463,6 +1479,7 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     canvasStyle,
     stageStyle,
     imageLayerStyle,
+    thumbnailLayerStyle,
     originalLayerStyle,
     resetImageInteraction,
     syncViewportPosition,

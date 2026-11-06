@@ -17,6 +17,7 @@ struct WebThemeSettings {
   std::string custom_css = "";
   bool menu_blur = false;              // 弹出菜单和面板毛玻璃模糊效果
   bool enable_rounded_corners = true;  // 界面圆角效果（Win10 系统下默认初始化为 false）
+  bool enable_animations = true;       // 页面切换、弹出层和布局过渡动画
 };
 
 // Web 背景设置

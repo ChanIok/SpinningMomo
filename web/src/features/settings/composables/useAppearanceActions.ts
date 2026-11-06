@@ -235,6 +235,19 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const updateEnableAnimations = async (enableAnimations: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: {
+          ...appSettings.value.ui.webTheme,
+          enableAnimations,
+        },
+      },
+    })
+  }
+
   const applyWallpaperAnalysis = async (imageFileName: string, persistImage = false) => {
     const currentBackground = appSettings.value.ui.background
     const overlayMode = getOverlayPaletteFromBackground(currentBackground).mode
@@ -317,6 +330,7 @@ export const useAppearanceActions = () => {
     updateCustomCss,
     updateMenuBlur,
     updateEnableRoundedCorners,
+    updateEnableAnimations,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
