@@ -43,14 +43,12 @@ export async function startInitializeInfinityNikkiMediaHardlinks(): Promise<stri
 }
 
 /**
- * 从 Infinity Nikki 标准相册路径中提取 UID。
- * 例如：.../GamePlayPhotos/123456/NikkiPhotos_HighQuality
+ * 从 Infinity Nikki 目录路径中提取账号 UID。
+ * 支持 UID 根目录及其任意子目录（例如 GamePlayPhotos/123456、NikkiPhotos_HighQuality、Videos 等）。
  */
 export function extractInfinityNikkiUidFromFolderPath(path: string): string | null {
   const normalizedPath = path.replace(/\\/g, '/')
-  const match = normalizedPath.match(
-    /(?:^|\/)GamePlayPhotos\/(\d+)\/NikkiPhotos_HighQuality(?:\/|$)/
-  )
+  const match = normalizedPath.match(/(?:^|\/)GamePlayPhotos\/(\d+)(?:\/|$)/)
   return match?.[1] ?? null
 }
 
