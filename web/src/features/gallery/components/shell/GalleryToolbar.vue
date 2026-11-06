@@ -142,7 +142,7 @@ const handleOpenPreferences = () => {
 
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
-const isWide = computed(() => toolbarWidth.value >= 720)
+const isWide = computed(() => toolbarWidth.value >= 540)
 const isFilterCompact = computed(
   () => toolbarWidth.value > 0 && toolbarWidth.value < GALLERY_TOOLBAR_COMPACT_BREAKPOINT
 )
@@ -216,25 +216,6 @@ function handleToolbarContextMenu(event: MouseEvent) {
               class="w-full"
             />
           </div>
-
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <div class="inline-flex">
-                <Toggle
-                  size="sm"
-                  :model-value="!includeSubfolders"
-                  :aria-label="t('gallery.toolbar.folderOptions.currentFolderOnly')"
-                  class="text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 data-[state=on]:bg-sidebar-accent data-[state=on]:text-sidebar-foreground data-[state=on]:hover:bg-sidebar-accent data-[state=on]:hover:text-sidebar-foreground"
-                  @update:model-value="(val) => setIncludeSubfolders(!val)"
-                >
-                  <Folder class="h-4 w-4" />
-                </Toggle>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {{ t('gallery.toolbar.folderOptions.currentFolderOnly') }}
-            </TooltipContent>
-          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger as-child>
@@ -360,6 +341,25 @@ function handleToolbarContextMenu(event: MouseEvent) {
             </TooltipTrigger>
             <TooltipContent side="bottom">
               {{ t('gallery.toolbar.viewSettings.tooltip') }}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <div class="inline-flex">
+                <Toggle
+                  size="sm"
+                  :model-value="!includeSubfolders"
+                  :aria-label="t('gallery.toolbar.folderOptions.currentFolderOnly')"
+                  class="text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 data-[state=on]:bg-sidebar-accent data-[state=on]:text-sidebar-foreground data-[state=on]:hover:bg-sidebar-accent data-[state=on]:hover:text-sidebar-foreground"
+                  @update:model-value="(val) => setIncludeSubfolders(!val)"
+                >
+                  <Folder class="h-4 w-4" />
+                </Toggle>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {{ t('gallery.toolbar.folderOptions.currentFolderOnly') }}
             </TooltipContent>
           </Tooltip>
 

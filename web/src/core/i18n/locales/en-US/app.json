@@ -14,7 +14,6 @@
   "app.header.tasks.collapse": "Collapse",
   "app.header.tasks.expand": "Expand",
   "app.header.tasks.none": "No background tasks yet.",
-  "app.header.tasks.recordCount": "{count} records",
   "app.header.tasks.status.cancelled": "Cancelled",
   "app.header.tasks.status.failed": "Failed",
   "app.header.tasks.status.queued": "Queued",

@@ -702,9 +702,9 @@ watch(
             t('gallery.details.infinityNikki.cameraParams')
           }}</span>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            class="h-6 px-2 text-xs"
+            class="h-6 rounded-md bg-black/5 px-2 text-xs text-foreground/80 hover:bg-black/10 hover:text-foreground dark:bg-white/8 dark:hover:bg-white/15"
             @click="handleCopyCameraParams(extracted.cameraParams)"
           >
             {{ t('gallery.details.infinityNikki.copyCameraParams') }}

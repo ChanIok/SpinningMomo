@@ -14,7 +14,6 @@
   "app.header.tasks.collapse": "收起",
   "app.header.tasks.expand": "展开",
   "app.header.tasks.none": "暂无后台任务。",
-  "app.header.tasks.recordCount": "共 {count} 条记录",
   "app.header.tasks.status.cancelled": "已取消",
   "app.header.tasks.status.failed": "失败",
   "app.header.tasks.status.queued": "排队中",

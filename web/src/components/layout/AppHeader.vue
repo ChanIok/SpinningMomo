@@ -92,13 +92,6 @@ const taskButtonText = computed(() => {
   }
   return t('app.header.tasks.button')
 })
-const taskPanelSummaryText = computed(() => {
-  if (activeTaskCount.value > 0) {
-    return t('app.header.tasks.activeCount', { count: activeTaskCount.value })
-  }
-
-  return t('app.header.tasks.recordCount', { count: displayTasks.value.length })
-})
 const isTaskMenuOpen = ref(false)
 const isClearingFinished = ref(false)
 const expandedTaskIds = ref<Record<string, boolean>>({})
@@ -460,13 +453,8 @@ onBeforeUnmount(() => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-[28rem] p-0">
-          <div class="flex items-center justify-between gap-3 px-3 py-2">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-foreground">{{ t('app.header.tasks.button') }}</p>
-              <p class="text-[11px] text-muted-foreground">
-                {{ taskPanelSummaryText }}
-              </p>
-            </div>
+          <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+            <p class="text-sm font-medium text-foreground">{{ t('app.header.tasks.button') }}</p>
             <Button
               variant="ghost"
               size="sm"
@@ -484,7 +472,7 @@ onBeforeUnmount(() => {
             {{ t('app.header.tasks.none') }}
           </div>
 
-          <ScrollArea v-else type="always" class="max-h-[28rem]">
+          <ScrollArea v-else type="auto" class="max-h-[28rem]">
             <template #scrollbar>
               <ScrollBar
                 class="p-[1px]"
@@ -528,8 +516,12 @@ onBeforeUnmount(() => {
                   {{ task.context }}
                 </p>
 
-                <div v-if="resolveTaskMessage(task)" class="mt-1 flex items-start gap-2">
+                <div
+                  v-if="resolveTaskMessage(task) || resolveTaskPercent(task) !== null"
+                  class="mt-1 flex items-start gap-2"
+                >
                   <p
+                    v-if="resolveTaskMessage(task)"
                     :ref="(element) => setTaskMessageRef(task.taskId, element)"
                     class="min-w-0 flex-1 text-[11px] leading-4 break-words"
                     :class="[
@@ -556,18 +548,21 @@ onBeforeUnmount(() => {
                       class="ml-1 h-3 w-3"
                     />
                   </Button>
+                  <span
+                    v-if="resolveTaskPercent(task) !== null"
+                    class="ml-auto shrink-0 text-[10px] leading-4 text-muted-foreground"
+                  >
+                    {{ resolveTaskPercent(task) }}%
+                  </span>
                 </div>
 
-                <div v-if="resolveTaskPercent(task) !== null" class="mt-2 space-y-1">
+                <div v-if="resolveTaskPercent(task) !== null" class="mt-2">
                   <div class="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       class="h-full transition-all"
                       :class="task.status === 'failed' ? 'bg-destructive' : 'bg-primary'"
                       :style="{ width: `${resolveTaskPercent(task)}%` }"
                     />
-                  </div>
-                  <div class="text-right text-[10px] text-muted-foreground">
-                    {{ resolveTaskPercent(task) }}%
                   </div>
                 </div>
               </div>

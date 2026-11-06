@@ -49,7 +49,22 @@ function interpolate(text: string, params: Record<string, any>): string {
  * 翻译函数
  */
 function t(key: string, params?: Record<string, any>): string {
-  const text = messages.value[key] ?? fallbackMessages[key] ?? key
+  let resolvedKey = key
+  if (params && typeof params.count === 'number') {
+    if (params.count === 1) {
+      const singleKey = `${key}_one`
+      if (messages.value[singleKey] !== undefined || fallbackMessages[singleKey] !== undefined) {
+        resolvedKey = singleKey
+      }
+    } else {
+      const otherKey = `${key}_other`
+      if (messages.value[otherKey] !== undefined || fallbackMessages[otherKey] !== undefined) {
+        resolvedKey = otherKey
+      }
+    }
+  }
+
+  const text = messages.value[resolvedKey] ?? fallbackMessages[resolvedKey] ?? key
   return params ? interpolate(text, params) : text
 }
 
