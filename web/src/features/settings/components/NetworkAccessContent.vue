@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import QRCode from 'qrcode'
 import { Copy } from '@lucide/vue'
@@ -17,16 +17,14 @@ import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useSettingsStore } from '../store'
 import { settingsApi, type LanAccessInfo } from '../api'
-import { on, off } from '@/core/rpc'
 
 const store = useSettingsStore()
 const { appSettings, isInitialized } = storeToRefs(store)
 const { t } = useI18n()
 const { toast } = useToast()
 
-// 设置页状态只保存后端返回的运行快照，令牌本身不写入前端持久化状态。
+// 区块是否出现只取决于配置态；运行快照只负责填充内部内容，缺失时保留占位。
 const info = ref<LanAccessInfo | null>(null)
-const isLoading = ref(false)
 const isResetting = ref(false)
 const qrDataUrl = ref('')
 
@@ -44,17 +42,14 @@ const selectedAdapter = computed(
   () => appSettings.value.app.lanAccess.preferredAdapterId || '__auto__'
 )
 
-// 刷新服务状态、网卡地址和当前可分享链接。
+// 读取后端运行快照，供区块内的链接、网卡列表和二维码使用。
 const refreshInfo = async () => {
-  isLoading.value = true
   try {
     info.value = await settingsApi.getLanAccessInfo()
   } catch (error) {
     toast.error(t('settings.networkAccess.error.title'), {
       description: error instanceof Error ? error.message : String(error),
     })
-  } finally {
-    isLoading.value = false
   }
 }
 
@@ -70,7 +65,12 @@ const updateEnabled = async (enabled: boolean) => {
         },
       },
     })
-    await refreshInfo()
+    if (enabled) {
+      await refreshInfo()
+    } else {
+      // 区块随配置隐藏，清空快照，重新开启时按需重新拉取。
+      info.value = null
+    }
   } catch (error) {
     toast.error(t('settings.networkAccess.error.title'), {
       description: error instanceof Error ? error.message : String(error),
@@ -152,18 +152,9 @@ watch(
   { immediate: true }
 )
 
-const settingsChangedHandler = () => {
-  void refreshInfo()
-}
-
-// 首次进入设置页时读取当前服务状态。
+// 区块结构由配置态直接渲染，这里只负责补内容。
 onMounted(() => {
-  on('settings.changed', settingsChangedHandler)
   void refreshInfo()
-})
-
-onUnmounted(() => {
-  off('settings.changed', settingsChangedHandler)
 })
 </script>
 
@@ -207,8 +198,8 @@ onUnmounted(() => {
         </ItemActions>
       </Item>
 
-      <!-- 只有服务开启且可访问时，才展示访问链接与二维码小节 -->
-      <div v-if="info?.preferredUrl" class="space-y-4">
+      <!-- 区块由配置态决定，运行快照只在内部填充内容，结构不随请求结果变化 -->
+      <div v-if="appSettings.app.lanAccess.enabled" class="space-y-4">
         <div>
           <h4 class="font-medium text-foreground">{{ t('settings.networkAccess.link.title') }}</h4>
           <p class="mt-1 text-sm text-muted-foreground">
@@ -219,12 +210,15 @@ onUnmounted(() => {
         <div
           class="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/50 p-4 sm:flex-row sm:items-start"
         >
-          <img
-            v-if="qrDataUrl"
-            :src="qrDataUrl"
-            :alt="t('settings.networkAccess.qr.alt')"
-            class="h-36 w-36 shrink-0 rounded border border-border/30 bg-white p-2"
-          />
+          <!-- 容器固定尺寸，二维码异步生成完成时只填充不推移右侧内容 -->
+          <div class="h-36 w-36 shrink-0 rounded border border-border/30 bg-white p-2">
+            <img
+              v-if="qrDataUrl"
+              :src="qrDataUrl"
+              :alt="t('settings.networkAccess.qr.alt')"
+              class="h-full w-full"
+            />
+          </div>
           <div class="min-w-0 flex-1 space-y-3">
             <!-- 融合后的网卡选择器行 -->
             <div class="flex items-center justify-between gap-2">
@@ -233,7 +227,7 @@ onUnmounted(() => {
               </span>
               <Select
                 :model-value="selectedAdapter"
-                :disabled="isLoading"
+                :disabled="!info"
                 @update:model-value="(value) => updatePreferredAdapter(String(value))"
               >
                 <SelectTrigger class="h-8 w-52 text-xs">
@@ -255,16 +249,25 @@ onUnmounted(() => {
               </Select>
             </div>
 
-            <!-- 访问链接展示框 -->
+            <!-- 访问链接展示框：min-h 固定一行高度，内容缺失时也不塌陷 -->
             <p
-              class="rounded border border-border/30 bg-muted/50 px-3 py-2.5 font-mono text-xs break-all text-foreground"
+              class="min-h-[2.375rem] rounded border border-border/30 bg-muted/50 px-3 py-2.5 font-mono text-xs break-all text-foreground"
             >
-              {{ info.preferredUrl }}
+              <span
+                v-if="!info"
+                class="block h-4 w-2/3 animate-pulse rounded bg-muted-foreground/20"
+              ></span>
+              <span v-if="info?.preferredUrl">{{ info.preferredUrl }}</span>
             </p>
 
             <!-- 操作按钮组合 -->
             <div class="flex flex-wrap gap-2 pt-0.5">
-              <Button variant="outline" size="sm" @click="copyUrl(info.preferredUrl)">
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="!info?.preferredUrl"
+                @click="copyUrl(info?.preferredUrl ?? '')"
+              >
                 <Copy class="mr-1.5 h-3.5 w-3.5" />
                 {{ t('settings.networkAccess.copy.button') }}
               </Button>
