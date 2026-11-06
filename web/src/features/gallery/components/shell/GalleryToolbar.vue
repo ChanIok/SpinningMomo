@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
-import { Toggle } from '@/components/ui/toggle'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -187,13 +186,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
             class="h-4 w-4 shrink-0 text-primary"
           />
           <Tag v-else class="h-4 w-4 shrink-0 text-primary" />
-          <span class="shrink-0">
+          <span v-if="currentSource.type !== 'all'" class="shrink-0">
             {{
               currentSource.type === 'folder'
                 ? t('gallery.toolbar.browse.folder')
-                : currentSource.type === 'tag'
-                  ? t('gallery.toolbar.browse.tag')
-                  : t('gallery.toolbar.browse.source')
+                : t('gallery.toolbar.browse.tag')
             }}
           </span>
           <span class="min-w-0 truncate">{{ currentSource.label }}</span>
@@ -201,7 +198,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
       </div>
 
       <TooltipProvider :delay-duration="300">
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 items-center gap-1.5">
           <div
             v-if="isWide"
             class="mr-2 flex w-28 items-center"
@@ -222,8 +219,15 @@ function handleToolbarContextMenu(event: MouseEvent) {
               <span class="inline-flex">
                 <DropdownMenu>
                   <DropdownMenuTrigger as-child>
-                    <Button variant="sidebarGhost" size="icon-sm">
+                    <Button
+                      variant="toolbarFilter"
+                      :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                    >
                       <ArrowUpDown class="h-4 w-4" />
+                      <template v-if="!isFilterCompact">
+                        <span class="min-w-0 truncate">{{ t('gallery.toolbar.sort.button') }}</span>
+                        <ChevronDown class="-ml-0.5 size-3" />
+                      </template>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" class="w-48">
@@ -266,8 +270,17 @@ function handleToolbarContextMenu(event: MouseEvent) {
               <span class="inline-flex">
                 <Popover>
                   <PopoverTrigger as-child>
-                    <Button variant="sidebarGhost" size="icon-sm">
+                    <Button
+                      variant="toolbarFilter"
+                      :size="isFilterCompact ? 'icon-sm' : 'filter-sm'"
+                    >
                       <component :is="currentViewModeIcon" class="h-4 w-4" />
+                      <template v-if="!isFilterCompact">
+                        <span class="min-w-0 truncate">{{
+                          t('gallery.toolbar.viewSettings.button')
+                        }}</span>
+                        <ChevronDown class="-ml-0.5 size-3" />
+                      </template>
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" class="w-72">
@@ -315,6 +328,30 @@ function handleToolbarContextMenu(event: MouseEvent) {
                         </div>
                       </div>
 
+                      <div class="space-y-3">
+                        <p class="text-sm font-medium">
+                          {{ t('gallery.toolbar.filters.folderScope') }}
+                        </p>
+                        <div class="grid grid-cols-2 gap-2">
+                          <Button
+                            :variant="includeSubfolders ? 'default' : 'outline'"
+                            size="sm"
+                            class="h-auto py-2 text-xs"
+                            @click="setIncludeSubfolders(true)"
+                          >
+                            {{ t('gallery.toolbar.filter.subfolders.include') }}
+                          </Button>
+                          <Button
+                            :variant="!includeSubfolders ? 'default' : 'outline'"
+                            size="sm"
+                            class="h-auto py-2 text-xs"
+                            @click="setIncludeSubfolders(false)"
+                          >
+                            {{ t('gallery.toolbar.filter.subfolders.currentOnly') }}
+                          </Button>
+                        </div>
+                      </div>
+
                       <div v-if="!isWide" class="border-t" />
 
                       <div v-if="!isWide" class="space-y-3">
@@ -344,46 +381,29 @@ function handleToolbarContextMenu(event: MouseEvent) {
             </TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <div class="inline-flex">
-                <Toggle
-                  size="sm"
-                  :model-value="!includeSubfolders"
-                  :aria-label="t('gallery.toolbar.folderOptions.currentFolderOnly')"
-                  class="text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 data-[state=on]:bg-sidebar-accent data-[state=on]:text-sidebar-foreground data-[state=on]:hover:bg-sidebar-accent data-[state=on]:hover:text-sidebar-foreground"
-                  @update:model-value="(val) => setIncludeSubfolders(!val)"
-                >
-                  <Folder class="h-4 w-4" />
-                </Toggle>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {{ t('gallery.toolbar.folderOptions.currentFolderOnly') }}
-            </TooltipContent>
-          </Tooltip>
+          <div class="ml-1 flex items-center gap-2">
+            <Tooltip v-if="showMapEntry">
+              <TooltipTrigger as-child>
+                <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenMap">
+                  <Map class="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {{ t('app.navigation.map') }}
+              </TooltipContent>
+            </Tooltip>
 
-          <Tooltip v-if="showMapEntry">
-            <TooltipTrigger as-child>
-              <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenMap">
-                <Map class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {{ t('app.navigation.map') }}
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger as-child @mouseenter="isPreferencesTooltipAllowed = true">
-              <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenPreferences">
-                <Settings class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent v-if="isPreferencesTooltipAllowed" side="bottom">
-              {{ t('gallery.preferences.open') }}
-            </TooltipContent>
-          </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child @mouseenter="isPreferencesTooltipAllowed = true">
+                <Button variant="sidebarGhost" size="icon-sm" @click="handleOpenPreferences">
+                  <Settings class="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent v-if="isPreferencesTooltipAllowed" side="bottom">
+                {{ t('gallery.preferences.open') }}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </TooltipProvider>
     </div>
@@ -415,7 +435,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </PopoverTrigger>
@@ -477,7 +497,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </PopoverTrigger>
@@ -554,7 +574,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </DropdownMenuTrigger>
@@ -616,7 +636,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </PopoverTrigger>
@@ -699,7 +719,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </DropdownMenuTrigger>
@@ -755,7 +775,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </PopoverTrigger>
@@ -834,7 +854,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           >
                             <X class="h-3.5 w-3.5" />
                           </span>
-                          <ChevronDown v-else class="h-3.5 w-3.5" />
+                          <ChevronDown v-else class="-ml-0.5 size-3" />
                         </template>
                       </Button>
                     </DropdownMenuTrigger>

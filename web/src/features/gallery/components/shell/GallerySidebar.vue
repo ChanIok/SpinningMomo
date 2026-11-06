@@ -731,7 +731,7 @@ onMounted(() => {
         @click="openPreferences"
       >
         <Settings class="size-4" />
-        {{ t('gallery.preferences.open') }}
+        {{ t('app.navigation.settings') }}
       </Button>
     </div>
 
