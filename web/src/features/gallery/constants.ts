@@ -27,3 +27,9 @@ export const MIN_ORIGINAL_CARD_SHORT_EDGE_PX = 360
 /** 暗房实际缩放比例的统一边界；交互层和视图层共用同一份定义。 */
 export const LIGHTBOX_MIN_ZOOM = 0.05
 export const LIGHTBOX_MAX_ZOOM = 5
+
+/** 暗房原始像素超过 4K 时，改用分块上传，避免一次性提交大纹理。 */
+export const LIGHTBOX_TILE_THRESHOLD_PIXELS = 3840 * 2160
+
+/** 暗房原图分块尺寸；每块约占 16 MB RGBA 像素内存。 */
+export const LIGHTBOX_TILE_SIZE = 2048
