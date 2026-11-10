@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useElementSize, useThrottleFn } from '@vueuse/core'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
+import { isCompactViewport } from '@/core/viewport'
 
 // 通用滚动轨道的数据模型。
 // 轨道本身不关心“这是月份还是别的业务标记”，只关心内容坐标与展示文案。
@@ -170,16 +171,12 @@ function mobileTimelineToContent(timelineY: number): number {
   return progress * scrollRange.value
 }
 
-function isMobileViewport(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
-}
-
 function timelineToContent(timelineY: number): number {
   if (scrollRange.value === 0 || availableHeight.value === 0) {
     return 0
   }
 
-  if (isMobileViewport()) {
+  if (isCompactViewport()) {
     return mobileTimelineToContent(timelineY)
   }
 
@@ -586,7 +583,8 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-@media (max-width: 639px) {
+/* 与 core/viewport.ts 的 WIDE_VIEWPORT_QUERY 严格互补：非宽屏即紧凑视图。 */
+@media not all and (min-width: 640px) {
   .timeline-scrollbar {
     position: absolute;
     top: 3.5rem;

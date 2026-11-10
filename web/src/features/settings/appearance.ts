@@ -1,6 +1,7 @@
 import type { AppSettings, WebThemeMode } from './types'
 import { resolveBackgroundImageUrl } from './backgroundPath'
 import { buildOverlayGradient, getOverlayPaletteFromBackground } from './overlayPalette'
+import { applyAnimationsPreference } from './motion'
 
 const USER_CUSTOM_STYLE_ID = 'spinning-momo-user-css'
 const decodedBackgroundUrls = new Set<string>()
@@ -213,23 +214,13 @@ const applyRoundedCorners = (enabled: boolean): void => {
   root.style.setProperty('--radius', enabled ? '0.625rem' : '0px')
 }
 
-const applyAnimations = (enabled: boolean): void => {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  if (enabled) {
-    delete root.dataset.motion
-  } else {
-    root.dataset.motion = 'off'
-  }
-}
-
 export const applyAppearanceToDocument = (settings: AppSettings): void => {
   if (typeof document === 'undefined') return
 
   applyTheme(settings.ui.webTheme.mode)
   applyMenuBlur(settings.ui.webTheme.menuBlur !== false)
   applyRoundedCorners(settings.ui.webTheme.enableRoundedCorners !== false)
-  applyAnimations(settings.ui.webTheme.enableAnimations !== false)
+  applyAnimationsPreference(settings.ui.webTheme.enableAnimations !== false)
   applyBackground(settings)
   applyCustomUserCss(settings.ui.webTheme.customCss ?? '')
 }

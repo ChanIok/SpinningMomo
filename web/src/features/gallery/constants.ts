@@ -1,6 +1,3 @@
-/** 应用窗口进入紧凑图库布局的宽度边界。 */
-export const GALLERY_WINDOW_COMPACT_BREAKPOINT = 640
-
 /** 图库内部工具栏开始压缩的内容宽度边界；它不参与窗口级布局切换。 */
 export const GALLERY_TOOLBAR_COMPACT_BREAKPOINT = 768
 

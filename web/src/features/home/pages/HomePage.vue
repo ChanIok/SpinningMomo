@@ -210,9 +210,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 2. 左下角：数据概览卡片 (HUD Corner Widget) -->
-    <div
-      class="absolute bottom-8 left-8 z-20 max-w-[calc(100%-4rem)] animate-in duration-300 fade-in-0"
-    >
+    <div class="absolute bottom-8 left-8 z-20 max-w-[calc(100%-4rem)]">
       <div class="relative overflow-hidden rounded-md backdrop-blur-md">
         <div class="app-background-overlay pointer-events-none absolute inset-0 z-0"></div>
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>

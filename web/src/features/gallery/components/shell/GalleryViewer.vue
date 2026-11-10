@@ -9,7 +9,7 @@ import {
 import { LoaderCircle, Upload, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
-import { useSettingsStore } from '@/features/settings/store'
+import { useAnimationsEnabled } from '@/features/settings/motion'
 import {
   useGalleryAssetActions,
   useGalleryData,
@@ -41,10 +41,7 @@ import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
-const settingsStore = useSettingsStore()
-const animationsEnabled = computed(
-  () => settingsStore.appSettings.ui.webTheme.enableAnimations !== false
-)
+const animationsEnabled = useAnimationsEnabled()
 const canHandleShortcut = useGalleryKeyboardContext()
 const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()

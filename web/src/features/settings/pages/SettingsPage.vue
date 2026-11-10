@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
+import { COMPACT_WINDOW_BREAKPOINT } from '@/core/viewport'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import SettingsSidebar from '../components/SettingsSidebar.vue'
 import SettingsMenuList from '../components/SettingsMenuList.vue'
@@ -16,7 +17,7 @@ import BackupSettingsContent from '../components/BackupSettingsContent.vue'
 import NetworkAccessContent from '../components/NetworkAccessContent.vue'
 import AdbModeContent from '../components/AdbModeContent.vue'
 import { useSettingsStore } from '../store'
-import { SETTINGS_COMPACT_BREAKPOINT, isValidSettingsPageKey, type SettingsPageKey } from '../menu'
+import { isValidSettingsPageKey, type SettingsPageKey } from '../menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,7 +26,7 @@ const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 
 const { width: windowWidth } = useWindowSize()
 const isCompact = computed(
-  () => windowWidth.value > 0 && windowWidth.value < SETTINGS_COMPACT_BREAKPOINT
+  () => windowWidth.value > 0 && windowWidth.value < COMPACT_WINDOW_BREAKPOINT
 )
 
 // 当前路由参数中的有效 section

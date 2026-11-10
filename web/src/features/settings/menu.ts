@@ -30,8 +30,6 @@ export interface SettingsMenuItem {
   icon: Component
 }
 
-export const SETTINGS_COMPACT_BREAKPOINT = 640
-
 export const SETTINGS_MENUS: SettingsMenuItem[] = [
   {
     key: 'general',

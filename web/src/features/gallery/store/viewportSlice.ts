@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { GALLERY_WINDOW_COMPACT_BREAKPOINT } from '../constants'
+import { COMPACT_WINDOW_BREAKPOINT } from '@/core/viewport'
 
 /**
  * 窗口级响应式状态。
@@ -9,7 +9,7 @@ import { GALLERY_WINDOW_COMPACT_BREAKPOINT } from '../constants'
 export function createViewportSlice() {
   const windowWidth = ref(0)
   const isCompactWindow = computed(
-    () => windowWidth.value > 0 && windowWidth.value < GALLERY_WINDOW_COMPACT_BREAKPOINT
+    () => windowWidth.value > 0 && windowWidth.value < COMPACT_WINDOW_BREAKPOINT
   )
 
   function setWindowWidth(width: number) {

@@ -53,7 +53,7 @@ initializeRPC()
     await router.replace('/welcome')
   }
 
-  // 在挂载前应用主题和背景，避免首屏闪烁
+  // 在挂载前应用外观与动效偏好，避免首屏闪烁
   applyAppearanceToDocument(settingsStore.appSettings)
 
   // 监听设置变化，实时同步外观

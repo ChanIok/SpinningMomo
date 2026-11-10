@@ -2,7 +2,6 @@ import { useDebounceFn } from '@vueuse/core'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import { isGalleryLightboxOverlay, useGalleryOverlayHistory } from './useGalleryOverlayHistory'
-import { runWithLayoutTransition } from './useGalleryLayoutTransition'
 import { galleryApi } from '../api'
 import type { Asset, AssetLayoutMetaItem, ScanAssetsParams } from '../types'
 import { toQueryAssetsFilters } from '../queryFilters'
@@ -285,51 +284,6 @@ export function useGalleryData() {
     store.setDetailsFocus({ type: 'asset', assetId: firstAsset.id })
   }
 
-  function getAssetFromPages(
-    index: number,
-    pages: Map<number, Asset[]>,
-    pageSize: number
-  ): Asset | null {
-    if (!Number.isInteger(index) || index < 0 || pageSize <= 0) {
-      return null
-    }
-    const pageNum = Math.floor(index / pageSize) + 1
-    const indexInPage = index % pageSize
-    return pages.get(pageNum)?.[indexInPage] ?? null
-  }
-
-  /**
-   * 检查视口内真正可见的资产 ID 序列是否发生变化。
-   * 无论整页总数是否有微调，只要用户肉眼可见区域内的卡片 ID 和排布 1:1 严格一致，
-   * 界面在视觉上就是静止的，跳过 View Transition 过渡动画，避免呼吸灯闪烁。
-   */
-  function haveVisibleAssetsChanged(newPages: Map<number, Asset[]>): boolean {
-    if (newPages.size === 0 && store.paginatedAssets.size === 0) {
-      return false
-    }
-    if (newPages.size === 0 || store.paginatedAssets.size === 0) {
-      return true
-    }
-
-    // 视口范围未知（虚拟器尚未上报或当前无可见卡片行）时，无法断言可见像素静止，
-    // 按“已变化”处理以播放过渡；跳过动画只允许发生在范围确切且逐张比对一致时。
-    const { startIndex, endIndex } = store.visibleRange
-    if (startIndex === undefined || endIndex === undefined) {
-      return true
-    }
-
-    for (let index = startIndex; index <= endIndex; index++) {
-      const oldAsset = store.getAssetAt(index)
-      const newAsset = getAssetFromPages(index, newPages, store.perPage)
-
-      if (oldAsset?.id !== newAsset?.id) {
-        return true
-      }
-    }
-
-    return false
-  }
-
   /**
    * 重新拉取当前查询条件下的布局元数据（宽高等轻量信息）。
    */
@@ -410,24 +364,16 @@ export function useGalleryData() {
         return
       }
 
-      const applyUpdates = async () => {
-        store.clearTimelineData()
-        store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
-        if (layoutMetaItems) {
-          store.setLayoutMetaItems(layoutMetaItems)
-        } else if (!requiresLayoutMeta) {
-          store.clearLayoutMetaItems()
-        }
-        store.replacePaginatedAssets(pages)
-        await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
-        tryFocusFirstResultWhenDetailsEmpty(requestVersion)
+      store.clearTimelineData()
+      store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
+      if (layoutMetaItems) {
+        store.setLayoutMetaItems(layoutMetaItems)
+      } else if (!requiresLayoutMeta) {
+        store.clearLayoutMetaItems()
       }
-
-      if (haveVisibleAssetsChanged(pages)) {
-        await runWithLayoutTransition(applyUpdates)
-      } else {
-        await applyUpdates()
-      }
+      store.replacePaginatedAssets(pages)
+      await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
+      tryFocusFirstResultWhenDetailsEmpty(requestVersion)
       void refreshDyeCodeStatuses([...pages.values()].flat(), requestVersion)
 
       console.log('📊 加载完成:', {
@@ -490,29 +436,21 @@ export function useGalleryData() {
         return
       }
 
-      const applyUpdates = async () => {
-        store.setTimelineBuckets(bucketsResponse.buckets)
-        store.setTimelineTotalCount(bucketsResponse.totalCount)
-        store.setPagination(
-          bucketsResponse.totalCount,
-          pageNum,
-          pageNum < Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
-        )
-        if (layoutMetaItems) {
-          store.setLayoutMetaItems(layoutMetaItems)
-        } else if (!requiresLayoutMeta) {
-          store.clearLayoutMetaItems()
-        }
-        store.replacePaginatedAssets(pages)
-        await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
-        tryFocusFirstResultWhenDetailsEmpty(requestVersion)
+      store.setTimelineBuckets(bucketsResponse.buckets)
+      store.setTimelineTotalCount(bucketsResponse.totalCount)
+      store.setPagination(
+        bucketsResponse.totalCount,
+        pageNum,
+        pageNum < Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
+      )
+      if (layoutMetaItems) {
+        store.setLayoutMetaItems(layoutMetaItems)
+      } else if (!requiresLayoutMeta) {
+        store.clearLayoutMetaItems()
       }
-
-      if (haveVisibleAssetsChanged(pages)) {
-        await runWithLayoutTransition(applyUpdates)
-      } else {
-        await applyUpdates()
-      }
+      store.replacePaginatedAssets(pages)
+      await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
+      tryFocusFirstResultWhenDetailsEmpty(requestVersion)
       void refreshDyeCodeStatuses([...pages.values()].flat(), requestVersion)
 
       console.log('📅 时间线数据加载成功:', {

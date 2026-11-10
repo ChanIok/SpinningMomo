@@ -4,7 +4,6 @@ import { useGalleryStore } from '../store'
 import type { DateGrouping, FolderTreeNode, SortBy, TagTreeNode, ViewMode } from '../types'
 import { Grid3x3, LayoutGrid, List, Rows3 } from '@lucide/vue'
 import { useGalleryData } from './useGalleryData'
-import { runWithLayoutTransition } from './useGalleryLayoutTransition'
 
 type SourceType = 'all' | 'folder' | 'tag'
 
@@ -104,13 +103,11 @@ export function useGalleryViewControls() {
     }
   }
 
-  async function setDateGrouping(value: DateGrouping) {
+  function setDateGrouping(value: DateGrouping) {
     if (value === store.view.dateGrouping) {
       return
     }
-    await runWithLayoutTransition(() => {
-      store.setDateGrouping(value)
-    })
+    store.setDateGrouping(value)
   }
 
   function toggleSortOrder() {
@@ -144,9 +141,7 @@ export function useGalleryViewControls() {
         await galleryData.ensureLayoutMetaLoaded()
       }
 
-      await runWithLayoutTransition(() => {
-        store.view.mode = targetMode
-      })
+      store.view.mode = targetMode
     }
   }
 

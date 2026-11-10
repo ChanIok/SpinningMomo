@@ -32,7 +32,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/component
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { isLocalAccess } from '@/core/access'
 import { useI18n } from '@/composables/useI18n'
-import { useSettingsStore } from '@/features/settings/store'
+import { useAnimationsEnabled } from '@/features/settings/motion'
 import {
   isGalleryTouchContextMenu,
   isGalleryTouchInput,
@@ -80,10 +80,7 @@ const emit = defineEmits<{
 const firstFrameReady = ref(false)
 
 const store = useGalleryStore()
-const settingsStore = useSettingsStore()
-const animationsEnabled = computed(
-  () => settingsStore.appSettings.ui.webTheme.enableAnimations !== false
-)
+const animationsEnabled = useAnimationsEnabled()
 const canHandleShortcut = useGalleryKeyboardContext()
 const imageLoading = provideLightboxImageLoading()
 const lightbox = useGalleryLightbox()

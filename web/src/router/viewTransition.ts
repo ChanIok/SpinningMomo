@@ -1,4 +1,5 @@
 import type { RouteLocationRaw, Router } from 'vue-router'
+import { shouldDisableMotion } from '@/features/settings/motion'
 
 type MinimalViewTransition = {
   finished: Promise<void>
@@ -29,7 +30,7 @@ export function pushWithViewTransition(router: Router, to: RouteLocationRaw) {
 
     const doc =
       typeof document !== 'undefined' ? (document as DocumentWithViewTransition) : undefined
-    if (!doc?.startViewTransition || doc.documentElement.dataset.motion === 'off') {
+    if (!doc?.startViewTransition || shouldDisableMotion()) {
       await router.push(to)
       return
     }
@@ -69,7 +70,7 @@ export function backWithViewTransition(router: Router, fallback: RouteLocationRa
   return enqueueTransition(async () => {
     const doc =
       typeof document !== 'undefined' ? (document as DocumentWithViewTransition) : undefined
-    if (!doc?.startViewTransition || doc.documentElement.dataset.motion === 'off') {
+    if (!doc?.startViewTransition || shouldDisableMotion()) {
       await navigateBack(router, fallback)
       return
     }

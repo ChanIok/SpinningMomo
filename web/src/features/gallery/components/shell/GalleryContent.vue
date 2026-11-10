@@ -105,7 +105,7 @@ defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
-  <div class="gallery-layout-scene h-full w-full">
+  <div class="h-full w-full">
     <GalleryEmptyState v-if="showEmptyState" />
     <GridView
       v-else-if="viewMode === 'grid'"

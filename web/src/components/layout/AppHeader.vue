@@ -8,6 +8,7 @@ import { useToast } from '@/composables/useToast'
 import { call } from '@/core/rpc'
 import { useTaskStore } from '@/core/tasks/store'
 import { isWebView } from '@/core/env'
+import { COMPACT_WINDOW_BREAKPOINT } from '@/core/viewport'
 import { Button } from '@/components/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import {
@@ -32,11 +33,7 @@ import {
 } from '@lucide/vue'
 import { backWithViewTransition } from '@/router/viewTransition'
 import { useWindowSize } from '@vueuse/core'
-import {
-  SETTINGS_COMPACT_BREAKPOINT,
-  getSettingsMenuLabelKey,
-  isValidSettingsPageKey,
-} from '@/features/settings/menu'
+import { getSettingsMenuLabelKey, isValidSettingsPageKey } from '@/features/settings/menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,7 +43,7 @@ const taskStore = useTaskStore()
 const showWindowControls = isWebView()
 const { width: windowWidth } = useWindowSize()
 const isCompactWindow = computed(
-  () => windowWidth.value > 0 && windowWidth.value < SETTINGS_COMPACT_BREAKPOINT
+  () => windowWidth.value > 0 && windowWidth.value < COMPACT_WINDOW_BREAKPOINT
 )
 const isGalleryPage = computed(() => route.name === 'gallery')
 const isSettingsPage = computed(() => route.name === 'settings')

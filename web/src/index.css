@@ -307,7 +307,8 @@ body,
   transition: opacity 220ms ease;
 }
 
-/* 按容器标识关闭结构动效，不依赖 Tailwind 变体类名，也不影响内部加载指示和直接操作反馈。 */
+/* data-motion 由 settings/motion.ts 同步生效状态，CSS 不重复判断用户偏好或布局。
+   按容器标识关闭结构动效，保留内部加载指示和直接操作反馈。 */
 :root[data-motion='off']
   :is(
     [data-slot='context-menu-content'],
@@ -363,10 +364,7 @@ body,
 
 html[data-motion='off']::view-transition-group(route-scene),
 html[data-motion='off']::view-transition-old(route-scene),
-html[data-motion='off']::view-transition-new(route-scene),
-html[data-motion='off']::view-transition-group(gallery-layout),
-html[data-motion='off']::view-transition-old(gallery-layout),
-html[data-motion='off']::view-transition-new(gallery-layout) {
+html[data-motion='off']::view-transition-new(route-scene) {
   animation: none !important;
 }
 
@@ -385,83 +383,6 @@ html[data-motion='off']::view-transition-new(gallery-layout) {
   }
   to {
     opacity: 1;
-  }
-}
-
-/* 画廊布局切换专属局部 View Transition */
-html[data-transition='gallery-layout'] {
-  view-transition-name: none;
-}
-
-html[data-transition='gallery-layout'] .route-scene {
-  view-transition-name: none;
-}
-
-.gallery-layout-scene {
-  view-transition-name: gallery-layout;
-}
-
-/* 布局切换时将打开的浮动面板提升至顶层 View Transition 伪元素，防止被内容快照遮挡 */
-html[data-transition='gallery-layout'] [data-slot='popover-content']:not([data-state='closed']),
-html[data-transition='gallery-layout']
-  [data-slot='dropdown-menu-content']:not([data-state='closed']),
-html[data-transition='gallery-layout'] .mobile-drawer-root {
-  view-transition-name: gallery-floating-panel;
-}
-
-::view-transition-group(gallery-floating-panel) {
-  z-index: 100;
-  animation: none;
-}
-
-::view-transition-old(gallery-floating-panel) {
-  display: none;
-}
-
-::view-transition-new(gallery-floating-panel) {
-  animation: none;
-}
-
-::view-transition-group(gallery-layout) {
-  z-index: 1;
-  animation-duration: var(--route-transition-duration);
-  animation-timing-function: var(--route-transition-easing);
-}
-
-::view-transition-old(gallery-layout) {
-  animation-name: gallery-layout-fade-out;
-}
-
-::view-transition-new(gallery-layout) {
-  animation-name: gallery-layout-fade-in;
-}
-
-@keyframes gallery-layout-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes gallery-layout-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(gallery-layout),
-  ::view-transition-old(gallery-layout),
-  ::view-transition-new(gallery-layout),
-  ::view-transition-group(gallery-floating-panel),
-  ::view-transition-old(gallery-floating-panel),
-  ::view-transition-new(gallery-floating-panel) {
-    animation: none !important;
   }
 }
 
