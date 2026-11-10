@@ -28,6 +28,10 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   const filter = ref<AssetFilter>({})
   const sortBy = ref<SortBy>('createdAt')
   const sortOrder = ref<SortOrder>('desc')
+  let previousSorting: { sortBy: Exclude<SortBy, 'colorSimilarity'>; sortOrder: SortOrder } = {
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  }
   const includeSubfolders = computed({
     get: () => settings.value.navigation.includeSubfolders,
     set: (include: boolean) => {
@@ -127,15 +131,35 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   function setFilter(newFilter: Partial<AssetFilter>) {
     // 使用 merge 而不是覆盖，允许 composable 按字段增量更新筛选项。
     filter.value = { ...filter.value, ...newFilter }
+    if (!filter.value.colorHex) {
+      setColorSimilaritySorting(false)
+    }
   }
 
   function resetFilter() {
     filter.value = {}
+    setColorSimilaritySorting(false)
   }
 
   function setSorting(newSortBy: SortBy, newSortOrder: SortOrder) {
+    if (newSortBy === 'colorSimilarity') {
+      if (!filter.value.colorHex) return
+
+      if (sortBy.value !== 'colorSimilarity') {
+        previousSorting = { sortBy: sortBy.value, sortOrder: sortOrder.value }
+        newSortOrder = 'desc'
+      }
+    }
     sortBy.value = newSortBy
     sortOrder.value = newSortOrder
+  }
+
+  function setColorSimilaritySorting(enabled: boolean) {
+    if (enabled) {
+      setSorting('colorSimilarity', sortOrder.value)
+    } else if (sortBy.value === 'colorSimilarity') {
+      setSorting(previousSorting.sortBy, previousSorting.sortOrder)
+    }
   }
 
   function resetNavigationState() {
@@ -155,6 +179,7 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
+    previousSorting = { sortBy: 'createdAt', sortOrder: 'desc' }
   }
 
   return {
@@ -184,6 +209,7 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     setFilter,
     resetFilter,
     setSorting,
+    setColorSimilaritySorting,
     resetNavigationState,
   }
 }

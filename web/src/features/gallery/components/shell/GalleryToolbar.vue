@@ -69,6 +69,7 @@ const {
   colorPopoverOpen,
   draftColorHex,
   draftColorDistance,
+  draftColorSimilaritySorting,
   datePopoverOpen,
   draftDateRange,
   displayDateFilterLabel,
@@ -103,6 +104,7 @@ const {
   viewMode,
   dateGrouping,
   sortBy,
+  sortOptions,
   includeSubfolders,
   setIncludeSubfolders,
   currentSliderPosition,
@@ -236,19 +238,24 @@ function handleToolbarContextMenu(event: MouseEvent) {
                       :model-value="sortBy"
                       @update:model-value="onSortByChange"
                     >
-                      <DropdownMenuRadioItem value="createdAt">
-                        <CalendarClock class="mr-2 h-4 w-4" />
-                        {{ t('gallery.toolbar.sort.createdAt') }}
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="name">
-                        <Type class="mr-2 h-4 w-4" />
-                        {{ t('gallery.toolbar.sort.name') }}
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="resolution">
-                        <span class="pl-8">{{ t('gallery.toolbar.sort.resolution') }}</span>
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="size">
-                        <span class="pl-8">{{ t('gallery.toolbar.sort.size') }}</span>
+                      <DropdownMenuRadioItem
+                        v-for="option in sortOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        <CalendarClock v-if="option.value === 'createdAt'" class="mr-2 h-4 w-4" />
+                        <Type v-else-if="option.value === 'name'" class="mr-2 h-4 w-4" />
+                        <Palette
+                          v-else-if="option.value === 'colorSimilarity'"
+                          class="mr-2 h-4 w-4"
+                        />
+                        <span
+                          :class="{
+                            'pl-8': option.value === 'resolution' || option.value === 'size',
+                          }"
+                        >
+                          {{ t(option.i18nKey) }}
+                        </span>
                       </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                     <DropdownMenuSeparator />
@@ -670,19 +677,30 @@ function handleToolbarContextMenu(event: MouseEvent) {
                           />
                         </div>
 
-                        <div class="flex justify-end gap-2">
-                          <Button
-                            v-if="activeColorHex"
-                            variant="outline"
-                            size="sm"
-                            class="h-7 px-3 text-xs"
-                            @click="clearColorFilter"
-                          >
-                            {{ t('gallery.toolbar.colorFilter.clear') }}
-                          </Button>
-                          <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
-                            {{ t('gallery.toolbar.colorFilter.apply') }}
-                          </Button>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                          <label class="mr-auto flex cursor-pointer items-center gap-1.5 text-xs">
+                            <Checkbox
+                              :model-value="draftColorSimilaritySorting"
+                              @update:model-value="
+                                (value) => (draftColorSimilaritySorting = value === true)
+                              "
+                            />
+                            {{ t('gallery.toolbar.colorFilter.sortBySimilarity') }}
+                          </label>
+                          <div class="flex shrink-0 items-center gap-2">
+                            <Button
+                              v-if="activeColorHex"
+                              variant="outline"
+                              size="sm"
+                              class="h-7 px-3 text-xs"
+                              @click="clearColorFilter"
+                            >
+                              {{ t('gallery.toolbar.colorFilter.clear') }}
+                            </Button>
+                            <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
+                              {{ t('gallery.toolbar.colorFilter.apply') }}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </PopoverContent>

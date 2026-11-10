@@ -7,6 +7,10 @@
 
 namespace features::gallery::color::filter {
 
+auto build_color_score_expression(const features::gallery::QueryAssetsFilters& filters,
+                                  std::vector<core::database::DbParam>& params)
+    -> std::expected<std::string, std::string>;
+
 auto append_color_filter_conditions(const features::gallery::QueryAssetsFilters& filters,
                                     std::vector<std::string>& conditions,
                                     std::vector<core::database::DbParam>& params,

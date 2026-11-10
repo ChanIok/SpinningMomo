@@ -9,7 +9,6 @@
 namespace features::gallery::color::filter {
 
 constexpr double kDefaultColorDistance = 18.0;
-constexpr int kColorBinTolerance = 2;
 
 struct QueryColorTarget {
   float lab_l = 0.0f;
@@ -38,15 +37,8 @@ auto build_color_target(const std::string& hex) -> std::expected<QueryColorTarge
   };
 }
 
-auto append_color_match_params(std::vector<core::database::DbParam>& params,
-                               const QueryColorTarget& target, double distance) -> void {
-  params.push_back(std::max(0, target.l_bin - kColorBinTolerance));
-  params.push_back(target.l_bin + kColorBinTolerance);
-  params.push_back(std::max(0, target.a_bin - kColorBinTolerance));
-  params.push_back(target.a_bin + kColorBinTolerance);
-  params.push_back(std::max(0, target.b_bin - kColorBinTolerance));
-  params.push_back(target.b_bin + kColorBinTolerance);
-
+auto append_color_distance_params(std::vector<core::database::DbParam>& params,
+                                  const QueryColorTarget& target, double distance) -> void {
   params.push_back(static_cast<double>(target.lab_l));
   params.push_back(static_cast<double>(target.lab_l));
   params.push_back(static_cast<double>(target.lab_a));
@@ -54,6 +46,51 @@ auto append_color_match_params(std::vector<core::database::DbParam>& params,
   params.push_back(static_cast<double>(target.lab_b));
   params.push_back(static_cast<double>(target.lab_b));
   params.push_back(distance * distance);
+}
+
+auto append_color_match_params(std::vector<core::database::DbParam>& params,
+                               const QueryColorTarget& target, double distance) -> void {
+  const MainColorExtractOptions options;
+  const double l_radius = std::ceil(distance / options.l_bin_size);
+  const double ab_radius = std::ceil(distance / options.ab_bin_size);
+  // 分桶仅作粗筛，须覆盖整个色差半径，再由实际 Lab 距离精确筛选。
+  params.push_back(std::max(0.0, target.l_bin - l_radius));
+  params.push_back(target.l_bin + l_radius);
+  params.push_back(std::max(0.0, target.a_bin - ab_radius));
+  params.push_back(target.a_bin + ab_radius);
+  params.push_back(std::max(0.0, target.b_bin - ab_radius));
+  params.push_back(target.b_bin + ab_radius);
+  append_color_distance_params(params, target, distance);
+}
+
+auto build_color_score_expression(const features::gallery::QueryAssetsFilters& filters,
+                                  std::vector<core::database::DbParam>& params)
+    -> std::expected<std::string, std::string> {
+  if (!filters.color_hexes.has_value() || filters.color_hexes->size() != 1) {
+    return std::unexpected("Color similarity sorting requires exactly one target color");
+  }
+
+  auto target_result = build_color_target(filters.color_hexes->front());
+  if (!target_result) {
+    return std::unexpected(target_result.error());
+  }
+
+  const double distance = filters.color_distance.value_or(kDefaultColorDistance);
+  if (!std::isfinite(distance) || distance <= 0.0) {
+    return std::unexpected("Color similarity sorting requires a finite positive color distance");
+  }
+  append_color_distance_params(params, target_result.value(), std::max(0.1, distance));
+
+  // 累加所有主色的占比贡献，让大片相近色优先于一小块精确颜色。
+  return R"(COALESCE((
+    SELECT SUM(ac.weight * MAX(0.0, 1.0 - (
+      (ac.lab_l - ?) * (ac.lab_l - ?)
+      + (ac.lab_a - ?) * (ac.lab_a - ?)
+      + (ac.lab_b - ?) * (ac.lab_b - ?)
+    ) / ?))
+    FROM asset_colors ac
+    WHERE ac.asset_id = assets.id
+  ), 0.0))";
 }
 
 auto build_single_color_match_sql() -> std::string {

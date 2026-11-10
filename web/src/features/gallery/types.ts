@@ -129,7 +129,7 @@ export type ViewMode = 'masonry' | 'grid' | 'list' | 'adaptive'
 export type DateGrouping = 'none' | 'month' | 'day'
 
 // 排序选项
-export type SortBy = 'createdAt' | 'name' | 'size' | 'resolution'
+export type SortBy = 'createdAt' | 'name' | 'size' | 'resolution' | 'colorSimilarity'
 export type SortOrder = 'asc' | 'desc'
 
 // 筛选器

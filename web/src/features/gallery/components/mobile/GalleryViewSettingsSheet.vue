@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ArrowDown, ArrowUp } from '@lucide/vue'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,6 +15,7 @@ const {
   dateGrouping,
   sortBy,
   sortOrder,
+  sortOptions,
   includeSubfolders,
   setIncludeSubfolders,
   currentSliderPosition,
@@ -28,13 +28,6 @@ const {
   setDateGrouping,
   onViewSizeSliderChange,
 } = useGalleryViewControls()
-
-const sortOptions = computed(() => [
-  { value: 'createdAt', label: t('gallery.toolbar.sort.createdAt') },
-  { value: 'name', label: t('gallery.toolbar.sort.name') },
-  { value: 'resolution', label: t('gallery.toolbar.sort.resolution') },
-  { value: 'size', label: t('gallery.toolbar.sort.size') },
-])
 </script>
 
 <template>
@@ -106,7 +99,7 @@ const sortOptions = computed(() => [
           </div>
         </div>
 
-        <!-- 排序方式（4联分段器 + 排序方向切换） -->
+        <!-- 排序方式与方向；颜色排序按筛选状态加入，可换行。 -->
         <div class="flex flex-col gap-2">
           <div class="flex h-5 items-center justify-between">
             <span class="text-sm font-medium text-foreground">
@@ -134,14 +127,15 @@ const sortOptions = computed(() => [
               :key="opt.value"
               type="button"
               class="flex h-8.5 items-center justify-center rounded-md text-xs font-medium transition-colors duration-150"
-              :class="
+              :class="[
+                opt.value === 'colorSimilarity' ? 'col-span-2' : '',
                 sortBy === opt.value
                   ? 'bg-sidebar-accent font-medium text-primary shadow-xs'
-                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-              "
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground',
+              ]"
               @click="onSortByChange(opt.value)"
             >
-              <span>{{ opt.label }}</span>
+              <span class="px-1 text-center">{{ t(opt.i18nKey) }}</span>
             </button>
           </div>
         </div>

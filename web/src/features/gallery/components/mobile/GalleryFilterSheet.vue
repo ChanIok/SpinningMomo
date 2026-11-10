@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { CalendarClock, ChevronDown, Palette, RotateCcw, Search, Star, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { RangeCalendar } from '@/components/ui/range-calendar'
@@ -23,6 +24,7 @@ const {
   selectedRatings,
   draftColorHex,
   draftColorDistance,
+  draftColorSimilaritySorting,
   draftDateRange,
   displayDateFilterLabel,
   hasAttributeFilters,
@@ -412,19 +414,28 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
                   @update:model-value="onColorDistanceChange"
                 />
               </div>
-              <div class="flex justify-end gap-1.5 pt-1">
-                <Button
-                  v-if="activeColorHex"
-                  variant="ghost"
-                  size="sm"
-                  class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
-                  @click="clearColorFilter"
-                >
-                  {{ t('gallery.toolbar.colorFilter.clear') }}
-                </Button>
-                <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyColorFilter">
-                  {{ t('gallery.toolbar.colorFilter.apply') }}
-                </Button>
+              <div class="flex flex-wrap items-center justify-end gap-1.5 pt-1">
+                <label class="mr-auto flex min-h-8 items-center gap-2 text-xs">
+                  <Checkbox
+                    :model-value="draftColorSimilaritySorting"
+                    @update:model-value="(value) => (draftColorSimilaritySorting = value === true)"
+                  />
+                  {{ t('gallery.toolbar.colorFilter.sortBySimilarity') }}
+                </label>
+                <div class="flex shrink-0 items-center gap-2">
+                  <Button
+                    v-if="activeColorHex"
+                    variant="ghost"
+                    size="sm"
+                    class="h-7.5 px-2 text-xs text-muted-foreground hover:text-sidebar-foreground"
+                    @click="clearColorFilter"
+                  >
+                    {{ t('gallery.toolbar.colorFilter.clear') }}
+                  </Button>
+                  <Button size="sm" class="h-7.5 px-3 text-xs" @click="applyColorFilter">
+                    {{ t('gallery.toolbar.colorFilter.apply') }}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

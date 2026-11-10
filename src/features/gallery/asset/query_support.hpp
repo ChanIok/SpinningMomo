@@ -14,12 +14,16 @@ struct QueryOrderConfig {
   std::string asset_order_clause;
   // 给 ROW_NUMBER() 用的排序子句；需要基于中间列名而不是 assets 原始表达式。
   std::string indexed_order_clause;
+  std::string color_score_expression = "0.0";
+  std::vector<core::database::DbParam> order_params;
 };
 
 auto validate_month_format(const std::string& month) -> bool;
 
 auto build_query_order_config(std::optional<std::string> sort_by_param,
-                              std::optional<std::string> sort_order_param) -> QueryOrderConfig;
+                              std::optional<std::string> sort_order_param,
+                              const features::gallery::QueryAssetsFilters& filters)
+    -> std::expected<QueryOrderConfig, std::string>;
 
 auto build_unified_where_clause(const features::gallery::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias = "")

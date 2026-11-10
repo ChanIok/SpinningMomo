@@ -88,7 +88,12 @@ auto query_assets(core::AppState& app_state, const QueryAssetsParams& params)
   auto [where_clause, where_params] = std::move(where_result.value());
 
   // 2. 验证和构建 ORDER BY
-  auto order_config = query_support::build_query_order_config(params.sort_by, params.sort_order);
+  auto order_result =
+      query_support::build_query_order_config(params.sort_by, params.sort_order, params.filters);
+  if (!order_result) {
+    return std::unexpected(order_result.error());
+  }
+  const auto& order_config = order_result.value();
 
   // 3. 获取总数（用于分页计算或前端显示）
   std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
@@ -120,6 +125,8 @@ auto query_assets(core::AppState& app_state, const QueryAssetsParams& params)
                                 where_clause, order_config.asset_order_clause);
 
   auto final_params = where_params;
+  final_params.insert(final_params.end(), order_config.order_params.begin(),
+                      order_config.order_params.end());
 
   // 5. 如果需要分页，添加 LIMIT/OFFSET
   int page = 1;
@@ -184,7 +191,12 @@ auto query_asset_layout_meta(core::AppState& app_state, const QueryAssetLayoutMe
   }
   auto [where_clause, where_params] = std::move(where_result.value());
 
-  auto order_config = query_support::build_query_order_config(params.sort_by, params.sort_order);
+  auto order_result =
+      query_support::build_query_order_config(params.sort_by, params.sort_order, params.filters);
+  if (!order_result) {
+    return std::unexpected(order_result.error());
+  }
+  const auto& order_config = order_result.value();
 
   std::string sql = std::format(R"(
     SELECT id, width, height
@@ -194,6 +206,8 @@ auto query_asset_layout_meta(core::AppState& app_state, const QueryAssetLayoutMe
   )",
                                 where_clause, order_config.asset_order_clause);
 
+  where_params.insert(where_params.end(), order_config.order_params.begin(),
+                      order_config.order_params.end());
   auto items_result = core::database::query<AssetLayoutMetaItem>(app_state, sql, where_params);
   if (!items_result) {
     return std::unexpected("Failed to query asset layout meta: " + items_result.error());
@@ -224,8 +238,12 @@ auto get_timeline_buckets(core::AppState& app_state, const TimelineBucketsParams
   filters.color_match_mode = params.color_match_mode;
   filters.color_distance = params.color_distance;
 
-  auto order_config = query_support::build_query_order_config(
-      std::optional<std::string>{"created_at"}, params.sort_order);
+  auto order_result = query_support::build_query_order_config(
+      std::optional<std::string>{"created_at"}, params.sort_order, filters);
+  if (!order_result) {
+    return std::unexpected(order_result.error());
+  }
+  const auto& order_config = order_result.value();
 
   // 复用统一的 WHERE 条件构建器
   auto where_result = query_support::build_unified_where_clause(filters);

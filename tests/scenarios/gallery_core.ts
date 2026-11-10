@@ -6,6 +6,7 @@ import missingRestorePhase from "./gallery/missing_restore.ts";
 import watcherConsistencyPhase from "./gallery/watcher_consistency.ts";
 import tagCrudPhase from "./gallery/tag_crud.ts";
 import queryFiltersPhase from "./gallery/query_filters.ts";
+import colorSortPhase from "./gallery/color_sort.ts";
 import purgeMissingPhase from "./gallery/purge_missing.ts";
 
 import { runScenarioPhases } from "./support/support.ts";
@@ -24,5 +25,6 @@ await runScenarioPhases("gallery_core", [
   watcherConsistencyPhase,
   tagCrudPhase,
   queryFiltersPhase,
+  colorSortPhase,
   purgeMissingPhase,
 ]);

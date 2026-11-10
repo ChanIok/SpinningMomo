@@ -6,7 +6,7 @@ import { useGalleryStore } from '../store'
 import type { AssetFilter, AssetShape, AssetType, ReviewFlag } from '../types'
 
 export const COLOR_DISTANCE_MIN = 1
-export const COLOR_DISTANCE_MAX = 40
+export const COLOR_DISTANCE_MAX = 60
 export const COLOR_DISTANCE_DEFAULT = 18
 export const GALLERY_FILTER_STARS = [1, 2, 3, 4, 5] as const
 
@@ -35,6 +35,7 @@ export function useGalleryFilterControls() {
   const colorPopoverOpen = ref(false)
   const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
   const draftColorDistance = ref(activeColorDistance.value)
+  const draftColorSimilaritySorting = ref(store.sortBy === 'colorSimilarity')
   const datePopoverOpen = ref(false)
   const draftDateRange = shallowRef<DateRange>({ start: undefined, end: undefined })
 
@@ -84,6 +85,7 @@ export function useGalleryFilterControls() {
   function syncFilterDrafts() {
     draftColorHex.value = activeColorHex.value || '#FFFFFF'
     draftColorDistance.value = activeColorDistance.value
+    draftColorSimilaritySorting.value = store.sortBy === 'colorSimilarity'
     draftDateRange.value = {
       start: millisToCalendarDate(activeDateFrom.value),
       end: millisToCalendarDate(activeDateTo.value, true),
@@ -319,6 +321,7 @@ export function useGalleryFilterControls() {
 
   function applyColorFilter() {
     store.setFilter({ colorHex: draftColorHex.value, colorDistance: draftColorDistance.value })
+    store.setColorSimilaritySorting(draftColorSimilaritySorting.value)
   }
 
   function clearColorFilter(event?: Event) {
@@ -327,6 +330,7 @@ export function useGalleryFilterControls() {
     store.setFilter({ colorHex: undefined, colorDistance: undefined })
     draftColorHex.value = '#FFFFFF'
     draftColorDistance.value = COLOR_DISTANCE_DEFAULT
+    draftColorSimilaritySorting.value = false
     colorPopoverOpen.value = false
   }
 
@@ -350,6 +354,7 @@ export function useGalleryFilterControls() {
     })
     draftColorHex.value = '#FFFFFF'
     draftColorDistance.value = COLOR_DISTANCE_DEFAULT
+    draftColorSimilaritySorting.value = false
     draftDateRange.value = { start: undefined, end: undefined }
   }
 
@@ -370,6 +375,7 @@ export function useGalleryFilterControls() {
     colorPopoverOpen,
     draftColorHex,
     draftColorDistance,
+    draftColorSimilaritySorting,
     datePopoverOpen,
     draftDateRange,
     displayDateFilterLabel,

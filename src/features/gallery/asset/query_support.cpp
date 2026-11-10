@@ -61,7 +61,9 @@ auto is_valid_shape(const std::string& shape) -> bool {
 }
 
 auto build_query_order_config(std::optional<std::string> sort_by_param,
-                              std::optional<std::string> sort_order_param) -> QueryOrderConfig {
+                              std::optional<std::string> sort_order_param,
+                              const features::gallery::QueryAssetsFilters& filters)
+    -> std::expected<QueryOrderConfig, std::string> {
   QueryOrderConfig config{
       .sort_by = sort_by_param.value_or("created_at"),
       .sort_order = sort_order_param.value_or("desc"),
@@ -69,11 +71,26 @@ auto build_query_order_config(std::optional<std::string> sort_by_param,
 
   if (config.sort_by != "created_at" && config.sort_by != "name" &&
       config.sort_by != "resolution" && config.sort_by != "size" &&
-      config.sort_by != "file_created_at") {
+      config.sort_by != "file_created_at" && config.sort_by != "colorSimilarity") {
     config.sort_by = "created_at";
   }
   if (config.sort_order != "asc" && config.sort_order != "desc") {
     config.sort_order = "desc";
+  }
+
+  if (config.sort_by == "colorSimilarity") {
+    auto score_result = features::gallery::color::filter::build_color_score_expression(
+        filters, config.order_params);
+    if (!score_result) {
+      return std::unexpected(score_result.error());
+    }
+    config.color_score_expression = std::move(score_result.value());
+    config.asset_order_clause =
+        std::format("ORDER BY {} {}, COALESCE(file_created_at, created_at) DESC, id DESC",
+                    config.color_score_expression, config.sort_order);
+    config.indexed_order_clause = std::format(
+        "ORDER BY sort_color_score {}, sort_created_at DESC, id DESC", config.sort_order);
+    return config;
   }
 
   if (config.sort_by == "created_at") {
@@ -298,7 +315,8 @@ auto find_active_asset_index(core::AppState& app_state,
              (COALESCE(width, 0) * COALESCE(height, 0)) AS sort_resolution,
              COALESCE(width, 0) AS sort_width,
              COALESCE(height, 0) AS sort_height,
-             size AS sort_size
+             size AS sort_size,
+             {} AS sort_color_score
       FROM assets
       {}
     ),
@@ -311,8 +329,12 @@ auto find_active_asset_index(core::AppState& app_state,
     FROM indexed_assets
     WHERE id = ?
   )",
-                                where_clause, order_config.indexed_order_clause);
+                                order_config.color_score_expression, where_clause,
+                                order_config.indexed_order_clause);
 
+  // 评分位于 SELECT，绑定参数必须排在 WHERE 参数之前。
+  query_params.insert(query_params.begin(), order_config.order_params.begin(),
+                      order_config.order_params.end());
   query_params.push_back(active_asset_id);
 
   auto index_result = core::database::query_scalar<std::int64_t>(app_state, sql, query_params);

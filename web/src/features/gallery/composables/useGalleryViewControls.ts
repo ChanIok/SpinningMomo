@@ -50,6 +50,15 @@ export function useGalleryViewControls() {
   )
   const sortBy = computed(() => store.sortBy)
   const sortOrder = computed(() => store.sortOrder)
+  const sortOptions = computed(() => [
+    { value: 'createdAt' as const, i18nKey: 'gallery.toolbar.sort.createdAt' },
+    { value: 'name' as const, i18nKey: 'gallery.toolbar.sort.name' },
+    { value: 'resolution' as const, i18nKey: 'gallery.toolbar.sort.resolution' },
+    { value: 'size' as const, i18nKey: 'gallery.toolbar.sort.size' },
+    ...(store.filter.colorHex
+      ? [{ value: 'colorSimilarity' as const, i18nKey: 'gallery.toolbar.sort.colorSimilarity' }]
+      : []),
+  ])
   const dateGrouping = computed(() => store.view.dateGrouping)
   const includeSubfolders = computed(() => store.includeSubfolders)
   const currentSliderPosition = computed(() => store.getSliderPosition())
@@ -156,6 +165,7 @@ export function useGalleryViewControls() {
     viewMode,
     sortBy,
     sortOrder,
+    sortOptions,
     dateGrouping,
     includeSubfolders,
     setIncludeSubfolders,

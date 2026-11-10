@@ -18,7 +18,7 @@ import GallerySelectionDropdownMenu from './GallerySelectionDropdownMenu.vue'
 
 const { t } = useI18n()
 const store = useGalleryStore()
-const { setViewMode } = useGalleryViewControls()
+const { setViewMode, sortOptions } = useGalleryViewControls()
 const viewMode = computed(() => store.view.mode)
 const sortBy = computed(() => store.sortBy)
 const sortOrder = computed(() => store.sortOrder)
@@ -28,13 +28,6 @@ const viewModeOptions = [
   { value: 'adaptive' as ViewMode, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
   { value: 'masonry' as ViewMode, i18nKey: 'gallery.toolbar.viewMode.masonry' },
   { value: 'list' as ViewMode, i18nKey: 'gallery.toolbar.viewMode.list' },
-]
-
-const sortByOptions = [
-  { value: 'createdAt' as SortBy, i18nKey: 'gallery.toolbar.sort.createdAt' },
-  { value: 'name' as SortBy, i18nKey: 'gallery.toolbar.sort.name' },
-  { value: 'resolution' as SortBy, i18nKey: 'gallery.toolbar.sort.resolution' },
-  { value: 'size' as SortBy, i18nKey: 'gallery.toolbar.sort.size' },
 ]
 
 function setSortBy(value: SortBy) {
@@ -79,7 +72,7 @@ function setSortOrder(value: SortOrder) {
     <DropdownMenuSubContent class="w-44">
       <DropdownMenuRadioGroup :model-value="sortBy">
         <DropdownMenuRadioItem
-          v-for="option in sortByOptions"
+          v-for="option in sortOptions"
           :key="option.value"
           :value="option.value"
           @click="setSortBy(option.value)"
