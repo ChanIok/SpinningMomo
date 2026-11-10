@@ -45,7 +45,6 @@ const emit = defineEmits<{
 }>()
 
 // 响应式状态
-const isImageLoading = ref(true)
 const imageError = ref(false)
 const hasThumbnailRendered = ref(false)
 const failedOriginalUrl = ref('')
@@ -105,6 +104,12 @@ const placeholderColor = computed(() => {
   return getAdjustedPlaceholderColor(props.asset.dominantColorHex)
 })
 
+// 主色占位按主题 alpha 合成到卡片下方，透出真实背景而不是一层假的白色薄纱。
+const placeholderBackground = computed(
+  () =>
+    `color-mix(in srgb, ${placeholderColor.value} var(--asset-placeholder-alpha, 70%), transparent)`
+)
+
 watch(
   [() => props.asset.id, scheduledThumbnailUrl],
   () => {
@@ -116,7 +121,6 @@ watch(
     failedOriginalUrl.value = ''
     isShowingOriginal.value = false
     imageError.value = false
-    isImageLoading.value = scheduledThumbnailUrl.value.length > 0 || thumbnailUrl.value.length > 0
   },
   { immediate: true }
 )
@@ -289,7 +293,6 @@ async function onThumbnailLoad(event: Event) {
 
   // 主色背景始终保留，图片显示不依赖占位层的移除时机。
   hasThumbnailRendered.value = true
-  isImageLoading.value = false
   imageError.value = false
 }
 
@@ -297,7 +300,6 @@ async function onThumbnailLoad(event: Event) {
 function onThumbnailError() {
   imageRequestVersion += 1
 
-  isImageLoading.value = false
   imageError.value = true
 }
 
@@ -497,7 +499,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
   <div
     data-asset-card
     draggable="true"
-    class="group relative w-full overflow-hidden transition-shadow duration-200 contain-[layout_size_paint] select-none"
+    class="group relative w-full overflow-hidden transition-shadow duration-200 contain-[layout_size_paint] select-none [--asset-placeholder-alpha:70%] dark:[--asset-placeholder-alpha:76%]"
     :class="[
       store.cardCornerClass,
       store.isCompactWindow && 'shadow-none',
@@ -510,7 +512,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     :style="{
       aspectRatio: props.aspectRatio,
       touchAction: 'pan-y',
-      backgroundColor: placeholderColor,
+      backgroundColor: imageError ? placeholderColor : placeholderBackground,
     }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
@@ -522,10 +524,10 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     @contextmenu="handleContextMenu"
     @dragstart="handleDragStart"
   >
-    <!-- 主色与明暗修饰常驻图片下方，加载过程中始终提供连续背景。 -->
+    <!-- 主色占位由卡片根节点承载，加载过程中始终提供连续背景。 -->
     <div
       data-asset-thumbnail
-      class="relative h-full w-full overflow-hidden bg-white/24 dark:bg-black/32"
+      class="relative h-full w-full overflow-hidden"
       :class="store.cardCornerClass"
     >
       <!-- 缩略图直接覆盖常驻背景，后续原图升级继续用缩略图兜底。 -->
@@ -556,12 +558,6 @@ function getAdjustedPlaceholderColor(hex?: string): string {
           'transition-transform duration-200 group-hover:scale-105': enableHoverScale,
         }"
         @error="onOriginalImageError"
-      />
-
-      <!-- 加载结束只移除动画，不改变图片下方的背景。 -->
-      <div
-        v-if="isImageLoading"
-        class="absolute inset-0 animate-pulse bg-gradient-to-br from-white/18 via-transparent to-black/10 dark:from-white/10 dark:to-black/18"
       />
 
       <!-- 错误占位符 -->
