@@ -28,6 +28,20 @@ auto toggle_letterbox(core::AppState& state) -> void {
     return;
   }
 
+  std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
+  auto target_window = features::window_control::find_target_window(window_title);
+  std::optional<utils::display::MonitorInfo> monitor_info;
+  if (target_window && (!is_enabled || state.overlay->running.load(std::memory_order_acquire))) {
+    auto resolved = features::window_control::resolve_working_monitor(state);
+    if (!resolved) {
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.letterbox_toggle_failed"] + resolved.error());
+      return;
+    }
+    monitor_info = *resolved;
+  }
+
   auto old_settings = state.settings->raw;
 
   // 切换启用状态
@@ -57,16 +71,13 @@ auto toggle_letterbox(core::AppState& state) -> void {
                                                 "Settings updated via letterbox toggle");
   }
 
-  std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
-  auto target_window = features::window_control::find_target_window(window_title);
-
   // 根据叠加层是否运行采取不同的处理方式
   if (state.overlay->running.load(std::memory_order_acquire)) {
     // 叠加层正在运行时，黑边模式由叠加层模块处理
     // 只需重启叠加层以应用新的黑边模式设置
     if (target_window) {
       features::overlay::stop_overlay(state);
-      auto start_result = features::overlay::start_overlay(state, target_window.value());
+      auto start_result = features::overlay::start_overlay(state, *target_window, *monitor_info);
 
       if (!start_result) {
         Logger().error("Failed to restart overlay after letterbox mode change: {}",
@@ -75,7 +86,7 @@ auto toggle_letterbox(core::AppState& state) -> void {
         state.letterbox->enabled = is_enabled;
         state.settings->raw.features.letterbox.enabled = is_enabled;
         std::string error_message =
-            state.i18n->texts["message.overlay_start_failed"] + start_result.error();
+            state.i18n->texts["message.letterbox_toggle_failed"] + start_result.error();
         core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                error_message);
       }
@@ -85,13 +96,14 @@ auto toggle_letterbox(core::AppState& state) -> void {
     if (!is_enabled) {
       // 启用黑边模式
       if (target_window) {
-        if (auto result = features::letterbox::show(state, target_window.value()); !result) {
+        if (auto result = features::letterbox::show(state, *target_window, *monitor_info);
+            !result) {
           Logger().error("Failed to show letterbox: {}", result.error());
           // 回滚启用状态
           state.letterbox->enabled = false;
           state.settings->raw.features.letterbox.enabled = false;
           std::string error_message =
-              state.i18n->texts["message.overlay_start_failed"] + result.error();
+              state.i18n->texts["message.letterbox_toggle_failed"] + result.error();
           core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                  error_message);
         }
@@ -101,7 +113,7 @@ auto toggle_letterbox(core::AppState& state) -> void {
       if (auto result = features::letterbox::shutdown(state); !result) {
         Logger().error("Failed to shutdown letterbox: {}", result.error());
         std::string error_message =
-            state.i18n->texts["message.overlay_start_failed"] + result.error();
+            state.i18n->texts["message.letterbox_toggle_failed"] + result.error();
         core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                error_message);
       }

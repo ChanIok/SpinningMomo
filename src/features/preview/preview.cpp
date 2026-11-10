@@ -13,8 +13,8 @@
 #include "features/preview/rendering.hpp"
 #include "features/preview/state.hpp"
 #include "features/preview/types.hpp"
+#include "features/preview/viewport.hpp"
 #include "features/preview/window.hpp"
-#include "ui/floating_window/state.hpp"
 #include "utils/display/display.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
@@ -22,6 +22,14 @@
 #include "utils/logger/logger.hpp"
 
 namespace features::preview {
+
+auto set_working_monitor(core::AppState& state, const utils::display::MonitorInfo& monitor)
+    -> void {
+  state.preview->screen_rect = monitor.monitor_rect;
+  state.preview->has_screen_rect = true;
+  state.preview->interaction.last_game_window_pos.reset();
+  viewport::update_viewport_rect(state);
+}
 
 auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
   if (!preview_hwnd || !IsWindow(preview_hwnd)) {
@@ -31,7 +39,9 @@ auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
   return SendMessageW(preview_hwnd, message, 0, 0) != 0;
 }
 
-auto start_preview(core::AppState& state, HWND target_window) -> std::expected<void, std::string> {
+auto start_preview(core::AppState& state, HWND target_window,
+                   const utils::display::MonitorInfo& monitor_info)
+    -> std::expected<void, std::string> {
   auto& preview_state = *state.preview;
 
   // 检查是否支持捕获
@@ -63,20 +73,13 @@ auto start_preview(core::AppState& state, HWND target_window) -> std::expected<v
   }
   const bool enable_hdr = hdr_info->hdr_active;
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!monitor_info) {
-    return std::unexpected("Failed to resolve working monitor: " + monitor_info.error());
-  }
-
   if (!send_preview_control_message(preview_state.hwnd, WM_CANCEL_PREVIEW_CLEANUP)) {
     Logger().warn("Failed to cancel pending preview cleanup");
   }
 
   // 保存目标窗口
   preview_state.target_window = target_window;
-  preview_state.screen_rect = monitor_info->monitor_rect;
-  preview_state.has_screen_rect = true;
+  set_working_monitor(state, monitor_info);
 
   if (preview_state.rendering_resources.initialized.load(std::memory_order_acquire) &&
       preview_state.rendering_resources.d3d_context.enable_hdr != enable_hdr) {

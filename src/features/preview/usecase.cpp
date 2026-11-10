@@ -30,6 +30,21 @@ auto toggle_preview(core::AppState& state) -> void {
       return;
     }
 
+    std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
+    auto target_window = features::window_control::find_target_window(window_title);
+    if (!target_window) {
+      core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                             state.i18n->texts["message.window_not_found"]);
+      return;
+    }
+    auto monitor_info = features::window_control::resolve_working_monitor(state);
+    if (!monitor_info) {
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.preview_start_failed"] + monitor_info.error());
+      return;
+    }
+
     // 启动预览
     // 预览窗与叠加层互斥：以 overlay->enabled（与浮动窗菜单勾选）为准
     if (state.overlay->enabled) {
@@ -37,37 +52,23 @@ auto toggle_preview(core::AppState& state) -> void {
       if (state.overlay->running.load(std::memory_order_acquire)) {
         features::overlay::stop_overlay(state);
       }
+      // 从叠加层切换到预览时，恢复独立黑边窗口。
       if (state.letterbox->enabled) {
-        std::wstring lb_window_title =
-            utils::string::FromUtf8(state.settings->raw.window.target_title);
-        auto lb_target_window = features::window_control::find_target_window(lb_window_title);
-        if (lb_target_window) {
-          if (auto lb_result = features::letterbox::show(state, lb_target_window.value());
-              !lb_result) {
-            Logger().error("Failed to show letterbox: {}", lb_result.error());
-          }
+        if (auto result = features::letterbox::show(state, *target_window, *monitor_info);
+            !result) {
+          Logger().error("Failed to restore letterbox after disabling overlay: {}", result.error());
         }
       }
       core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                              state.i18n->texts["message.preview_overlay_conflict"]);
     }
 
-    std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
-    auto target_window = features::window_control::find_target_window(window_title);
-
-    if (target_window) {
-      if (auto result = features::preview::start_preview(state, target_window.value()); !result) {
-        Logger().error("Failed to start preview: {}", result.error());
-        // 使用新的消息定义并附加错误详情
-        std::string error_message =
-            state.i18n->texts["message.preview_start_failed"] + result.error();
-        core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               error_message);
-      }
-    } else {
-      Logger().warn("No target window found for preview");
-      core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                             state.i18n->texts["message.window_not_found"]);
+    if (auto result = features::preview::start_preview(state, *target_window, *monitor_info);
+        !result) {
+      Logger().error("Failed to start preview: {}", result.error());
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.preview_start_failed"] + result.error());
     }
   } else {
     // 停止预览

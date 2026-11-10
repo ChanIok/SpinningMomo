@@ -29,10 +29,23 @@ auto toggle_overlay(core::AppState& state) -> void {
     return;
   }
 
-  // 切换启用状态
-  state.overlay->enabled = !is_enabled;
-
   if (!is_enabled) {
+    std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
+    auto target_window = features::window_control::find_target_window(window_title);
+    if (!target_window) {
+      core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                             state.i18n->texts["message.window_not_found"]);
+      return;
+    }
+    auto monitor_info = features::window_control::resolve_working_monitor(state);
+    if (!monitor_info) {
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.overlay_start_failed"] + monitor_info.error());
+      return;
+    }
+    state.overlay->enabled = true;
+
     // 用户想启用叠加层
     // 预览窗与叠加层互斥，若预览窗运行则先关闭
     if (state.preview && state.preview->running.load(std::memory_order_acquire)) {
@@ -47,29 +60,17 @@ auto toggle_overlay(core::AppState& state) -> void {
       }
     }
 
-    std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
-    auto target_window = features::window_control::find_target_window(window_title);
-
-    if (target_window) {
-      if (auto result = features::overlay::start_overlay(state, target_window.value()); !result) {
-        Logger().error("Failed to start overlay: {}", result.error());
-        // 回滚启用状态
-        state.overlay->enabled = false;
-        // 使用新的消息定义并附加错误详情
-        std::string error_message =
-            state.i18n->texts["message.overlay_start_failed"] + result.error();
-        core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               error_message);
-      }
-    } else {
-      // 找不到目标窗口
-      Logger().warn("No target window found for overlay");
+    if (auto result = features::overlay::start_overlay(state, *target_window, *monitor_info);
+        !result) {
+      Logger().error("Failed to start overlay: {}", result.error());
       state.overlay->enabled = false;
-      core::notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                             state.i18n->texts["message.window_not_found"]);
+      core::notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.overlay_start_failed"] + result.error());
     }
   } else {
-    // 用户想停用叠加层
+    // 停止不依赖当前屏幕设置，显示器断开后仍可关闭叠加层。
+    state.overlay->enabled = false;
     features::overlay::stop_overlay(state);
 
     // 如果启用了黑边模式，重新显示黑边窗口
@@ -77,7 +78,15 @@ auto toggle_overlay(core::AppState& state) -> void {
       std::wstring window_title = utils::string::FromUtf8(state.settings->raw.window.target_title);
       auto target_window = features::window_control::find_target_window(window_title);
       if (target_window) {
-        if (auto result = features::letterbox::show(state, target_window.value()); !result) {
+        auto monitor_info = features::window_control::resolve_working_monitor(state);
+        if (!monitor_info) {
+          core::notifications::show_notification(
+              state, state.i18n->texts["label.app_name"],
+              state.i18n->texts["message.overlay_start_failed"] + monitor_info.error());
+          return;
+        }
+        if (auto result = features::letterbox::show(state, *target_window, *monitor_info);
+            !result) {
           Logger().error("Failed to show letterbox: {}", result.error());
         }
       }

@@ -4,6 +4,8 @@
 
 #include "vendor/windows.hpp"
 
+#include "utils/display/display.hpp"
+
 namespace features::letterbox {
 
 struct LetterboxState {
@@ -15,6 +17,7 @@ struct LetterboxState {
   HWND message_window{nullptr};
   HINSTANCE instance{nullptr};
   bool is_initialized{false};
+  std::optional<utils::display::MonitorInfo> working_monitor;
 
   // 线程和事件相关
   std::jthread event_thread;

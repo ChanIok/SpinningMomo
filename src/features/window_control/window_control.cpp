@@ -14,6 +14,23 @@
 
 namespace features::window_control {
 
+auto resolve_working_monitor(const core::AppState& state)
+    -> std::expected<utils::display::MonitorInfo, std::string> {
+  const auto& device_path = state.settings->raw.window.monitor_device_path;
+  if (!device_path.empty()) {
+    auto monitor_info = utils::display::get_monitor_by_device_path(device_path);
+    if (monitor_info) {
+      return monitor_info;
+    }
+    // 固定显示器不可用时临时使用主屏，保留选择以便重新连接后恢复。
+    Logger().warn("Selected display unavailable, falling back to primary display: {}",
+                  monitor_info.error());
+    return utils::display::get_primary_monitor();
+  }
+  const auto& fw = *state.floating_window;
+  return utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+}
+
 constexpr int kWindowSizeAlignment = 8;
 constexpr int kAlignmentSearchRadius = 16;
 
@@ -356,18 +373,13 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
 
 // 调整窗口大小并居中
 auto resize_and_center_window(core::AppState& state, HWND hwnd, int width, int height,
-                              bool activate) -> std::expected<void, std::string> {
+                              const utils::display::MonitorInfo& monitor_info, bool activate)
+    -> std::expected<void, std::string> {
   if (!hwnd || !IsWindow(hwnd)) {
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
   }
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!monitor_info) {
-    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
-  }
-
-  const auto& screen_rect = monitor_info->monitor_rect;
+  const auto& screen_rect = monitor_info.monitor_rect;
   const int screen_w = utils::display::rect_width(screen_rect);
   const int screen_h = utils::display::rect_height(screen_rect);
 
@@ -384,7 +396,7 @@ auto resize_and_center_window(core::AppState& state, HWND hwnd, int width, int h
   DWORD exStyle = static_cast<DWORD>(*ex_style_long);
 
   auto ex_style_result =
-      apply_layered_capture_workaround(state, hwnd, width, height, exStyle, *monitor_info);
+      apply_layered_capture_workaround(state, hwnd, width, height, exStyle, monitor_info);
   if (!ex_style_result) {
     return std::unexpected{ex_style_result.error()};
   }
@@ -769,9 +781,10 @@ auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput&
 
 // 应用窗口变换
 auto apply_window_transform(core::AppState& state, HWND target_window, const Resolution& resolution,
+                            const utils::display::MonitorInfo& monitor_info,
                             const TransformOptions& options) -> std::expected<void, std::string> {
   auto result = resize_and_center_window(state, target_window, resolution.width, resolution.height,
-                                         options.activate_window);
+                                         monitor_info, options.activate_window);
   if (!result) {
     return std::unexpected{result.error()};
   }
@@ -780,17 +793,12 @@ auto apply_window_transform(core::AppState& state, HWND target_window, const Res
 
 // 重置窗口到屏幕尺寸
 auto reset_window_to_screen(core::AppState& state, HWND target_window,
+                            const utils::display::MonitorInfo& monitor_info,
                             const TransformOptions& options) -> std::expected<void, std::string> {
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!monitor_info) {
-    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
-  }
-
-  const int screen_width = utils::display::rect_width(monitor_info->monitor_rect);
-  const int screen_height = utils::display::rect_height(monitor_info->monitor_rect);
+  const int screen_width = utils::display::rect_width(monitor_info.monitor_rect);
+  const int screen_height = utils::display::rect_height(monitor_info.monitor_rect);
   return apply_window_transform(state, target_window, Resolution{screen_width, screen_height},
-                                options);
+                                monitor_info, options);
 }
 
 auto start_center_lock_monitor(core::AppState& state) -> std::expected<void, std::string> {

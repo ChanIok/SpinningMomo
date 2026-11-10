@@ -10,6 +10,7 @@
 #include "core/state/app_state.hpp"
 #include "features/window_control/types.hpp"
 #include "features/window_control/window_control.hpp"
+#include "utils/display/display.hpp"
 #include "utils/string/string.hpp"
 
 namespace core::rpc::endpoints::window_control {
@@ -17,6 +18,27 @@ namespace core::rpc::endpoints::window_control {
 struct VisibleWindowTitleItem {
   std::string title;
 };
+
+struct MonitorItem {
+  std::string device_path;
+  std::string name;
+};
+
+auto handle_list_monitors([[maybe_unused]] core::AppState& app_state,
+                          [[maybe_unused]] const EmptyParams& params)
+    -> asio::awaitable<RpcResult<std::vector<MonitorItem>>> {
+  auto monitors = utils::display::list_monitors();
+  if (!monitors) {
+    co_return std::unexpected{
+        RpcError{.code = static_cast<int>(ErrorCode::ServerError), .message = monitors.error()}};
+  }
+  std::vector<MonitorItem> items;
+  items.reserve(monitors->size());
+  for (const auto& monitor : *monitors) {
+    items.push_back({monitor.device_path, monitor.name});
+  }
+  co_return items;
+}
 
 auto is_selectable_window(const features::window_control::WindowInfo& window) -> bool {
   if (window.title.empty() || window.title == L"Program Manager") {
@@ -57,6 +79,9 @@ auto handle_list_visible_windows([[maybe_unused]] core::AppState& app_state,
 }
 
 auto register_all(core::AppState& app_state) -> void {
+  register_method<EmptyParams, std::vector<MonitorItem>>(
+      app_state, app_state.rpc->registry, "windowControl.listMonitors", handle_list_monitors,
+      "List active desktop monitors, primary display first");
   register_method<EmptyParams, std::vector<VisibleWindowTitleItem>>(
       app_state, app_state.rpc->registry, "windowControl.listVisibleWindows",
       handle_list_visible_windows,

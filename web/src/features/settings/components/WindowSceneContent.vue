@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { windowControlApi, type MonitorItem } from '../api'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
@@ -22,6 +23,7 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
+  updateWindowMonitor,
   updateWindowTitle,
   updateWindowCenterLockCursor,
   updateWindowLayeredCaptureWorkaround,
@@ -32,6 +34,73 @@ const {
 } = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
+
+const FOLLOW_FLOATING_WINDOW = 'floating'
+const monitors = ref<MonitorItem[]>([])
+const monitorsLoaded = ref(false)
+const monitorsLoading = ref(false)
+const monitorsError = ref(false)
+const selectedMonitor = computed(() => {
+  const path = appSettings.value.window.monitorDevicePath
+  if (!path) return FOLLOW_FLOATING_WINDOW
+  return (
+    monitors.value.find((monitor) => monitor.devicePath.toLowerCase() === path.toLowerCase())
+      ?.devicePath || path
+  )
+})
+const selectedMonitorMissing = computed(
+  () =>
+    monitorsLoaded.value &&
+    !!appSettings.value.window.monitorDevicePath &&
+    !monitors.value.some(
+      (monitor) =>
+        monitor.devicePath.toLowerCase() ===
+        appSettings.value.window.monitorDevicePath.toLowerCase()
+    )
+)
+const monitorLabel = (monitor: MonitorItem, index: number) => {
+  const label = t('settings.function.windowControl.monitor.display', { number: index + 1 })
+  return monitor.name ? `${label} · ${monitor.name}` : label
+}
+const selectedMonitorLabel = computed(() => {
+  if (selectedMonitor.value === FOLLOW_FLOATING_WINDOW) {
+    return t('settings.function.windowControl.monitor.floating')
+  }
+  const index = monitors.value.findIndex(
+    (monitor) => monitor.devicePath.toLowerCase() === selectedMonitor.value.toLowerCase()
+  )
+  const monitor = monitors.value[index]
+  if (monitor) return monitorLabel(monitor, index)
+  return t(
+    selectedMonitorMissing.value
+      ? 'settings.function.windowControl.monitor.disconnected'
+      : 'settings.function.windowControl.monitor.selected'
+  )
+})
+const loadMonitors = async () => {
+  if (monitorsLoading.value) return
+  monitorsLoading.value = true
+  monitorsError.value = false
+  try {
+    monitors.value = await windowControlApi.listMonitors()
+    monitorsLoaded.value = true
+  } catch (error) {
+    monitorsLoaded.value = false
+    monitorsError.value = true
+    console.error('Failed to list monitors:', error)
+  } finally {
+    monitorsLoading.value = false
+  }
+}
+onMounted(loadMonitors)
+
+const handleMonitorChange = async (value: string) => {
+  try {
+    await updateWindowMonitor(value === FOLLOW_FLOATING_WINDOW ? '' : value)
+  } catch (error) {
+    console.error('Failed to update target monitor:', error)
+  }
+}
 
 type ResetResolutionMode = 'screen' | 'custom'
 
@@ -182,6 +251,51 @@ const handleResetSettings = async () => {
               :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
               class="w-48"
             />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>{{ t('settings.function.windowControl.monitor.label') }}</ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.monitor.description') }}
+            </ItemDescription>
+            <p v-if="monitorsError" class="text-sm text-destructive" role="alert">
+              {{ t('settings.function.windowControl.monitor.loadFailed') }}
+            </p>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="selectedMonitor"
+              @update:model-value="(value) => handleMonitorChange(String(value))"
+              @update:open="
+                (open) => {
+                  if (open) void loadMonitors()
+                }
+              "
+            >
+              <SelectTrigger
+                class="w-64"
+                :aria-label="t('settings.function.windowControl.monitor.label')"
+              >
+                <SelectValue>{{ selectedMonitorLabel }}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="FOLLOW_FLOATING_WINDOW">
+                  {{ t('settings.function.windowControl.monitor.floating') }}
+                </SelectItem>
+                <SelectItem v-if="selectedMonitorMissing" :value="selectedMonitor" disabled>
+                  {{ t('settings.function.windowControl.monitor.disconnected') }}
+                </SelectItem>
+                <SelectItem
+                  v-for="(monitor, index) in monitors"
+                  :key="monitor.devicePath"
+                  :value="monitor.devicePath"
+                >
+                  {{ monitorLabel(monitor, index) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </ItemActions>
         </Item>
 

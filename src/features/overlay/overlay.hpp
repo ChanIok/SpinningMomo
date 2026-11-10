@@ -5,13 +5,15 @@
 #include "vendor/windows.hpp"
 
 #include "core/state/app_state.hpp"
+#include "utils/display/display.hpp"
 
 namespace features::overlay {
 
-// 开始叠加层捕捉
+// 在调用方确定的屏幕上开始叠加层捕捉。
 // freeze_after_first_frame: 首帧渲染后自动冻结（用于窗口变换场景）
-auto start_overlay(core::AppState& state, HWND target_window, bool freeze_after_first_frame = false)
-    -> std::expected<void, std::string>;
+auto start_overlay(core::AppState& state, HWND target_window,
+                   const utils::display::MonitorInfo& monitor_info,
+                   bool freeze_after_first_frame = false) -> std::expected<void, std::string>;
 
 // 停止叠加层。
 // restore_target_window 为 true 时，按“正常关闭”处理；

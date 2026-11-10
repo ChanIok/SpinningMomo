@@ -15,7 +15,6 @@
 #include "features/overlay/threads.hpp"
 #include "features/overlay/types.hpp"
 #include "features/overlay/window.hpp"
-#include "ui/floating_window/state.hpp"
 #include "utils/display/display.hpp"
 #include "utils/graphics/hdr.hpp"
 #include "utils/logger/logger.hpp"
@@ -70,7 +69,8 @@ auto stop_overlay_runtime(core::AppState& state, bool restore_target_window) -> 
   interaction::cleanup_interaction(state);
 }
 
-auto start_overlay(core::AppState& state, HWND target_window, bool freeze_after_first_frame)
+auto start_overlay(core::AppState& state, HWND target_window,
+                   const utils::display::MonitorInfo& monitor_info, bool freeze_after_first_frame)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -99,12 +99,6 @@ auto start_overlay(core::AppState& state, HWND target_window, bool freeze_after_
   }
   const bool enable_hdr = hdr_info->hdr_active;
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!monitor_info) {
-    return std::unexpected("Failed to resolve working monitor: " + monitor_info.error());
-  }
-
   overlay_state.window.target_window = target_window;
   if (overlay_state.rendering.d3d_initialized &&
       overlay_state.rendering.d3d_context.enable_hdr != enable_hdr) {
@@ -112,7 +106,7 @@ auto start_overlay(core::AppState& state, HWND target_window, bool freeze_after_
   }
   overlay_state.enable_hdr = enable_hdr;
 
-  const auto& monitor_rect = monitor_info->monitor_rect;
+  const auto& monitor_rect = monitor_info.monitor_rect;
   overlay_state.window.screen_left = monitor_rect.left;
   overlay_state.window.screen_top = monitor_rect.top;
   overlay_state.window.screen_width = utils::display::rect_width(monitor_rect);
@@ -135,8 +129,8 @@ auto start_overlay(core::AppState& state, HWND target_window, bool freeze_after_
   }
 
   auto [width, height] = dimensions_result.value();
-  auto screen_width = utils::display::rect_width(monitor_info->monitor_rect);
-  auto screen_height = utils::display::rect_height(monitor_info->monitor_rect);
+  auto screen_width = utils::display::rect_width(monitor_info.monitor_rect);
+  auto screen_height = utils::display::rect_height(monitor_info.monitor_rect);
 
   // 在非变换场景下，检查是否需要 overlay
   if (!freeze_after_first_frame &&

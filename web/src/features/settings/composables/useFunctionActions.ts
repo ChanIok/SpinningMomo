@@ -6,6 +6,13 @@ export const useFunctionActions = () => {
   const store = useSettingsStore()
   const { appSettings } = storeToRefs(store)
 
+  const updateWindowMonitor = async (monitorDevicePath: string) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: { ...appSettings.value.window, monitorDevicePath },
+    })
+  }
+
   const updateWindowTitle = async (title: string) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -360,6 +367,7 @@ export const useFunctionActions = () => {
       ...appSettings.value,
       window: {
         ...appSettings.value.window,
+        monitorDevicePath: DEFAULT_APP_SETTINGS.window.monitorDevicePath,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
         centerLockCursor: DEFAULT_APP_SETTINGS.window.centerLockCursor,
         alignWindowSizeTo8: DEFAULT_APP_SETTINGS.window.alignWindowSizeTo8,
@@ -447,6 +455,7 @@ export const useFunctionActions = () => {
       ...appSettings.value,
       window: {
         ...appSettings.value.window,
+        monitorDevicePath: DEFAULT_APP_SETTINGS.window.monitorDevicePath,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
         enableLayeredCaptureWorkaround: DEFAULT_APP_SETTINGS.window.enableLayeredCaptureWorkaround,
         alignWindowSizeTo8: DEFAULT_APP_SETTINGS.window.alignWindowSizeTo8,
@@ -461,6 +470,7 @@ export const useFunctionActions = () => {
   }
 
   return {
+    updateWindowMonitor,
     updateWindowTitle,
     updateWindowCenterLockCursor,
     updateWindowLayeredCaptureWorkaround,

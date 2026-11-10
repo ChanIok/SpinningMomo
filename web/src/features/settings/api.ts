@@ -3,6 +3,15 @@ import { isWebView } from '@/core/env'
 import { isLocalAccess } from '@/core/access'
 import type { AppSettings, RuntimeCapabilities } from './types'
 
+export interface MonitorItem {
+  devicePath: string
+  name: string
+}
+
+export const windowControlApi = {
+  listMonitors: (): Promise<MonitorItem[]> => call<MonitorItem[]>('windowControl.listMonitors'),
+}
+
 export interface AdbModeStatus {
   connected: boolean
   operationInProgress: boolean

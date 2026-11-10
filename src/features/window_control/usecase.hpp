@@ -20,7 +20,7 @@ auto handle_resolution_changed(core::AppState& state,
 auto handle_window_selected(core::AppState& state,
                             const ui::floating_window::events::WindowSelectionEvent& event) -> void;
 
-// 重置窗口变换（直接调用版本）
+// 重置窗口变换
 auto reset_window_transform(core::AppState& state) -> void;
 
 }  // namespace features::window_control

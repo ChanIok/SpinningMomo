@@ -115,6 +115,16 @@ auto prepare_transform_actions(core::AppState& state, HWND target_window, int ta
     return false;
   }
 
+  const auto& screen = monitor_info.monitor_rect;
+  const auto& overlay_window = state.overlay->window;
+  if (state.overlay->running.load(std::memory_order_acquire) &&
+      (overlay_window.screen_left != screen.left || overlay_window.screen_top != screen.top ||
+       overlay_window.screen_width != utils::display::rect_width(screen) ||
+       overlay_window.screen_height != utils::display::rect_height(screen))) {
+    // 停止旧屏幕上的交互会话，再以本次变换的屏幕启动，避免继续用旧坐标移动游戏。
+    features::overlay::stop_overlay(state);
+  }
+
   auto screen_w = utils::display::rect_width(monitor_info.monitor_rect);
   auto screen_h = utils::display::rect_height(monitor_info.monitor_rect);
   bool will_need_overlay = features::overlay::geometry::should_use_overlay(
@@ -128,7 +138,8 @@ auto prepare_transform_actions(core::AppState& state, HWND target_window, int ta
   } else if (will_need_overlay) {
     // overlay 未运行，但目标尺寸需要 overlay，启动并在首帧后自动冻结
     state.overlay->is_transforming.store(true, std::memory_order_release);
-    auto overlay_result = features::overlay::start_overlay(state, target_window, true);
+    auto overlay_result =
+        features::overlay::start_overlay(state, target_window, monitor_info, true);
     if (overlay_result) {
       return true;  // 需要等待首帧
     } else {
@@ -145,6 +156,10 @@ auto prepare_transform_actions(core::AppState& state, HWND target_window, int ta
 // 变换后的后续处理
 auto post_transform_actions(core::AppState& state, HWND target_window,
                             const utils::display::MonitorInfo& monitor_info) -> void {
+  if (state.preview->running.load(std::memory_order_acquire) &&
+      state.preview->target_window == target_window) {
+    features::preview::set_working_monitor(state, monitor_info);
+  }
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     auto dimensions = features::overlay::geometry::get_window_dimensions(target_window);
     auto screen_w = utils::display::rect_width(monitor_info.monitor_rect);
@@ -169,7 +184,7 @@ auto post_transform_actions(core::AppState& state, HWND target_window,
 
   // 重启 letterbox
   if (!state.overlay->running.load(std::memory_order_acquire) && state.letterbox->enabled) {
-    auto letterbox_result = features::letterbox::show(state, target_window);
+    auto letterbox_result = features::letterbox::show(state, target_window, monitor_info);
     if (!letterbox_result) {
       Logger().error("Failed to restart letterbox after window transform: {}",
                      letterbox_result.error());
@@ -191,8 +206,7 @@ auto transform_ratio_async(core::AppState& state, size_t ratio_index, double rat
     co_return;
   }
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = features::window_control::resolve_working_monitor(state);
   if (!monitor_info) {
     core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
@@ -221,10 +235,13 @@ auto transform_ratio_async(core::AppState& state, size_t ratio_index, double rat
   // 应用窗口变换
   features::window_control::TransformOptions options{.activate_window = true};
 
-  auto result = features::window_control::apply_window_transform(state, *target_window,
-                                                                 new_resolution, options);
+  auto result = features::window_control::apply_window_transform(
+      state, *target_window, new_resolution, *monitor_info, options);
   if (!result) {
     state.overlay->is_transforming.store(false, std::memory_order_release);
+    if (state.overlay->running.load(std::memory_order_acquire)) {
+      features::overlay::unfreeze_overlay(state);
+    }
     core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
@@ -234,8 +251,8 @@ auto transform_ratio_async(core::AppState& state, size_t ratio_index, double rat
   // 后续处理：等待窗口稳定后决定 overlay 状态
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await core::async::ui_delay{std::chrono::milliseconds(400)};
-    post_transform_actions(state, *target_window, *monitor_info);
   }
+  post_transform_actions(state, *target_window, *monitor_info);
 
   // 更新当前比例索引
   const auto& ratios = features::settings::menu::get_ratios(state);
@@ -268,8 +285,7 @@ auto transform_resolution_async(core::AppState& state, size_t resolution_index)
     co_return;
   }
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = features::window_control::resolve_working_monitor(state);
   if (!monitor_info) {
     core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
@@ -299,10 +315,13 @@ auto transform_resolution_async(core::AppState& state, size_t resolution_index)
   // 应用窗口变换
   features::window_control::TransformOptions options{.activate_window = true};
 
-  auto result = features::window_control::apply_window_transform(state, *target_window,
-                                                                 new_resolution, options);
+  auto result = features::window_control::apply_window_transform(
+      state, *target_window, new_resolution, *monitor_info, options);
   if (!result) {
     state.overlay->is_transforming.store(false, std::memory_order_release);
+    if (state.overlay->running.load(std::memory_order_acquire)) {
+      features::overlay::unfreeze_overlay(state);
+    }
     core::notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
@@ -312,8 +331,8 @@ auto transform_resolution_async(core::AppState& state, size_t resolution_index)
   // 后续处理：等待窗口稳定后决定 overlay 状态
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await core::async::ui_delay{std::chrono::milliseconds(400)};
-    post_transform_actions(state, *target_window, *monitor_info);
   }
+  post_transform_actions(state, *target_window, *monitor_info);
 
   // 更新当前分辨率索引
   const auto& resolutions = features::settings::menu::get_resolutions(state);
@@ -370,8 +389,7 @@ auto handle_window_selected(core::AppState& state,
                                            state.i18n->texts["message.window_not_found"]);
     return;
   }
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  auto monitor_info = features::window_control::resolve_working_monitor(state);
   if (monitor_info) {
     post_transform_actions(state, target_window.value(), *monitor_info);
   }
@@ -399,6 +417,12 @@ auto reset_window_transform(core::AppState& state) -> void {
     return;
   }
 
+  auto monitor_info = resolve_working_monitor(state);
+  if (!monitor_info) {
+    Logger().error("Failed to resolve working monitor: {}", monitor_info.error());
+    return;
+  }
+
   features::window_control::TransformOptions options{.activate_window = true};
 
   const auto& reset_resolution = state.settings->raw.window.reset_resolution;
@@ -410,9 +434,10 @@ auto reset_window_transform(core::AppState& state) -> void {
         .height = reset_resolution.height,
     };
     result = features::window_control::apply_window_transform(state, *target_window, resolution,
-                                                              options);
+                                                              *monitor_info, options);
   } else {
-    result = features::window_control::reset_window_to_screen(state, *target_window, options);
+    result = features::window_control::reset_window_to_screen(state, *target_window, *monitor_info,
+                                                              options);
   }
 
   if (!result) {

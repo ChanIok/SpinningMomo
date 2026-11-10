@@ -162,6 +162,7 @@ export interface AppSettings {
 
   // window 分组 - 窗口相关设置
   window: {
+    monitorDevicePath: string // 空表示跟随悬浮窗，否则固定到显示器设备路径
     targetTitle: string // 目标窗口标题
     centerLockCursor: boolean // 锁鼠时强制居中
     enableLayeredCaptureWorkaround: boolean // 超屏时临时启用 layered 捕获兼容方案
@@ -319,6 +320,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   // window 设置
   window: {
+    monitorDevicePath: '',
     targetTitle: '',
     centerLockCursor: false,
     enableLayeredCaptureWorkaround: false,

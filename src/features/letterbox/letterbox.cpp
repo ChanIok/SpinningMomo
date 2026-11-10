@@ -7,7 +7,6 @@
 
 #include "core/state/app_state.hpp"
 #include "features/letterbox/state.hpp"
-#include "ui/floating_window/state.hpp"
 #include "utils/display/display.hpp"
 #include "utils/logger/logger.hpp"
 
@@ -35,6 +34,21 @@ auto needs_letterbox(HWND target_window, const utils::display::MonitorInfo& work
           (window_height >= screen_height && window_width < screen_width));
 }
 
+// 隐藏
+auto hide(core::AppState& state) -> std::expected<void, std::string> {
+  auto& letterbox = *state.letterbox;
+
+  if (!letterbox.is_initialized) {
+    return std::unexpected{"Letterbox not initialized"};
+  }
+
+  if (letterbox.window_handle) {
+    ShowWindow(letterbox.window_handle, SW_HIDE);
+  }
+
+  return {};
+}
+
 // 更新位置
 auto update_position(core::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
@@ -53,14 +67,11 @@ auto update_position(core::AppState& state) -> std::expected<void, std::string> 
     return std::unexpected{"Target window is no longer valid"};
   }
 
-  const auto& fw = *state.floating_window;
-  auto monitor_info = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!monitor_info) {
-    [[maybe_unused]] auto hide_result = hide(state);
-    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
+  if (!letterbox.working_monitor) {
+    return std::unexpected{"Letterbox working monitor is not initialized"};
   }
 
-  const auto& screen_rect = monitor_info->monitor_rect;
+  const auto& screen_rect = letterbox.working_monitor->monitor_rect;
   int screen_width = utils::display::rect_width(screen_rect);
   int screen_height = utils::display::rect_height(screen_rect);
 
@@ -177,6 +188,52 @@ auto initialize(core::AppState& state, HINSTANCE instance) -> std::expected<void
   return {};
 }
 
+// 恢复显示与事件监听回调相互依赖，保留这一处前向声明。
+auto start_event_monitoring(core::AppState& state, const LetterboxConfig& config)
+    -> std::expected<void, std::string>;
+
+// 前后台切换恢复当前会话，不重新选择目标窗口或屏幕。
+auto restore_visibility(core::AppState& state) -> std::expected<void, std::string> {
+  auto& letterbox = *state.letterbox;
+  if (!letterbox.is_initialized) {
+    return std::unexpected{"Letterbox not initialized"};
+  }
+
+  if (!letterbox.target_window) {
+    return std::unexpected{"No target window specified"};
+  }
+
+  // 检查目标窗口是否可见
+  if (!IsWindowVisible(letterbox.target_window)) {
+    return std::unexpected{"Target window is not visible"};
+  }
+
+  if (!letterbox.working_monitor) {
+    return std::unexpected{"Letterbox working monitor is not initialized"};
+  }
+
+  // 检查是否真正需要显示letterbox
+  if (!needs_letterbox(letterbox.target_window, *letterbox.working_monitor)) {
+    [[maybe_unused]] auto result = hide(state);
+    return {};
+  }
+
+  // 确保事件监听线程已启动
+  if (!state.letterbox->event_thread.joinable()) {
+    if (auto result = start_event_monitoring(state, LetterboxConfig{}); !result) {
+      return std::unexpected{"Failed to start event monitoring: " + result.error()};
+    }
+  }
+
+  ShowWindow(letterbox.window_handle, SW_SHOWNA);
+
+  if (auto result = update_position(state); !result) {
+    return result;
+  }
+
+  return {};
+}
+
 LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
   core::AppState* state = nullptr;
 
@@ -197,7 +254,7 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
   switch (message) {
     case WM_TARGET_WINDOW_FOREGROUND: {
       if (!IsWindowVisible(hwnd)) {
-        [[maybe_unused]] auto result = show(*state);
+        [[maybe_unused]] auto result = restore_visibility(*state);
       } else {
         [[maybe_unused]] auto result = update_position(*state);
       }
@@ -210,7 +267,7 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
     }
 
     case WM_SHOW_LETTERBOX: {
-      [[maybe_unused]] auto result = show(*state);
+      [[maybe_unused]] auto result = restore_visibility(*state);
       break;
     }
   }
@@ -332,72 +389,17 @@ auto start_event_monitoring(core::AppState& state, const LetterboxConfig& config
   }
 }
 
-// 显示
-auto show(core::AppState& state, HWND target_window) -> std::expected<void, std::string> {
+auto show(core::AppState& state, HWND target_window,
+          const utils::display::MonitorInfo& working_monitor) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
-
-  // 检查Letterbox是否已初始化，如果未初始化则进行初始化
   if (!letterbox.is_initialized) {
-    HINSTANCE instance = GetModuleHandle(nullptr);
-    if (auto result = initialize(state, instance); !result) {
+    if (auto result = initialize(state, GetModuleHandle(nullptr)); !result) {
       return std::unexpected{"Failed to initialize letterbox: " + result.error()};
     }
   }
-
-  if (target_window) {
-    letterbox.target_window = target_window;
-  }
-
-  if (!letterbox.target_window) {
-    return std::unexpected{"No target window specified"};
-  }
-
-  // 检查目标窗口是否可见
-  if (!IsWindowVisible(letterbox.target_window)) {
-    return std::unexpected{"Target window is not visible"};
-  }
-
-  const auto& fw = *state.floating_window;
-  auto working_monitor = utils::display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
-  if (!working_monitor) {
-    return std::unexpected{"Failed to resolve working monitor: " + working_monitor.error()};
-  }
-
-  // 检查是否真正需要显示letterbox
-  if (!needs_letterbox(letterbox.target_window, *working_monitor)) {
-    [[maybe_unused]] auto result = hide(state);
-    return {};
-  }
-
-  // 确保事件监听线程已启动
-  if (!state.letterbox->event_thread.joinable()) {
-    if (auto result = start_event_monitoring(state, LetterboxConfig{}); !result) {
-      return std::unexpected{"Failed to start event monitoring: " + result.error()};
-    }
-  }
-
-  ShowWindow(letterbox.window_handle, SW_SHOWNA);
-
-  if (auto result = update_position(state); !result) {
-    return result;
-  }
-
-  return {};
-}
-
-// 隐藏
-auto hide(core::AppState& state) -> std::expected<void, std::string> {
-  auto& letterbox = *state.letterbox;
-
-  if (!letterbox.is_initialized) {
-    return std::unexpected{"Letterbox not initialized"};
-  }
-
-  if (letterbox.window_handle) {
-    ShowWindow(letterbox.window_handle, SW_HIDE);
-  }
-
-  return {};
+  letterbox.target_window = target_window;
+  letterbox.working_monitor = working_monitor;
+  return restore_visibility(state);
 }
 
 // 停止事件监听
