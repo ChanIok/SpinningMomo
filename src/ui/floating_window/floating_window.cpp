@@ -78,7 +78,7 @@ auto create_window(core::AppState& state) -> std::expected<void, std::string> {
 
   // 由 DirectComposition 托管像素内容时，窗口本身不再走 DWM 的 redirection bitmap。
   state.floating_window->window.hwnd = CreateWindowExW(
-      WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+      WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
       L"SpinningMomoFloatingWindowClass", L"SpinningMomo", WS_POPUP | WS_CLIPCHILDREN, window_pos.x,
       window_pos.y, window_size.cx, window_size.cy, nullptr, nullptr,
       state.floating_window->window.instance, &state);

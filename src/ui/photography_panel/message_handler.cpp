@@ -108,6 +108,9 @@ auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM w_param
     -> LRESULT {
   auto& panel = *state.photography_panel;
   switch (msg) {
+    case WM_MOUSEACTIVATE:
+      return MA_NOACTIVATE;
+
     case WM_ERASEBKGND:
       return 1;
 

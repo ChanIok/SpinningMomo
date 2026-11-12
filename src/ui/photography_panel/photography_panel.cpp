@@ -63,10 +63,10 @@ auto create_window(core::AppState& state) -> std::expected<void, std::string> {
   const POINT position = calculate_panel_position(panel.layout.window_size);
   const auto title = utils::string::FromUtf8(state.i18n->texts["menu.photography_toggle"]);
 
-  HWND hwnd = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
-                              kWindowClassName, title.c_str(), WS_POPUP | WS_CLIPCHILDREN,
-                              position.x, position.y, panel.layout.window_size.cx,
-                              panel.layout.window_size.cy, nullptr, nullptr, instance, &state);
+  HWND hwnd = CreateWindowExW(
+      WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+      kWindowClassName, title.c_str(), WS_POPUP | WS_CLIPCHILDREN, position.x, position.y,
+      panel.layout.window_size.cx, panel.layout.window_size.cy, nullptr, nullptr, instance, &state);
   if (!hwnd) {
     return std::unexpected("Failed to create photography panel window");
   }

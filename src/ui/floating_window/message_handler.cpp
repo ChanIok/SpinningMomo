@@ -230,6 +230,9 @@ auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
       return 0;
     }
 
+    case WM_MOUSEACTIVATE:
+      return MA_NOACTIVATE;
+
     case WM_LBUTTONDOWN: {
       handle_left_click(state, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
       return 0;
@@ -327,7 +330,6 @@ auto window_procedure(core::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
     // 自定义消息：另一个实例请求显示窗口
     case 0x8000 + 100:  // WM_SPINNINGMOMO_SHOW
       ui::floating_window::show_window(state);
-      SetForegroundWindow(hwnd);
       return 0;
 
     // 处理异步事件队列 (WM_APP + 1)
