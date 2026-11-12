@@ -231,7 +231,6 @@ auto video_type(const RecordingConfig& config, bool compressed)
 struct Encoder {
   wil::com_ptr<IMFTransform> transform;
   wil::com_ptr<IMFMediaType> input;
-  wil::com_ptr<IMFMediaType> output;
   wil::com_ptr<IMFDXGIDeviceManager> manager;
   bool gpu = false;
   std::string name;
@@ -380,10 +379,8 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
     return std::unexpected(output.error());
   }
 
+  MF_TRY(transform->SetOutputType(0, output->get(), 0));
   result.input = std::move(*input);
-  result.output = std::move(*output);
-
-  MF_TRY(transform->SetOutputType(0, result.output.get(), 0));
   MF_TRY(transform->SetInputType(0, result.input.get(), 0));
 
   failed.release();
@@ -736,17 +733,16 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   bool type_published = false;
 
   // 从 MFT 拉取压缩输出包的闭包：严格校验 PTS/DTS，以保留包确定前一个包的 duration
-  auto collect = [&](bool one) -> std::expected<void, std::string> {
-    do {
+  const auto pull_mode = encoder.gpu ? utils::media::mft::PullMode::asynchronous
+                                     : utils::media::mft::PullMode::synchronous;
+  auto collect = [&]() -> std::expected<void, std::string> {
+    while (!session.failed.load()) {
       session.video_stage.store("ProcessOutput");
-      auto sample = utils::media::mft::pull(encoder.transform.get(), encoder.output.get());
+      auto sample = utils::media::mft::pull(encoder.transform.get(), pull_mode);
       if (!sample) {
         return std::unexpected(sample.error());
       }
       if (!*sample) {
-        if (one) {
-          return std::unexpected("Async video MFT signaled output but produced none");
-        }
         return {};
       }
 
@@ -793,7 +789,10 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
         }
       }
       pending = std::move(*packet);
-    } while (!one && !session.failed.load());
+      if (pull_mode == utils::media::mft::PullMode::asynchronous) {
+        return {};
+      }
+    }
 
     return {};
   };
@@ -847,7 +846,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
         ++credits;
       }
       if (type == METransformHaveOutput) {
-        auto output = collect(true);
+        auto output = collect();
         if (!output) {
           return output;
         }
@@ -877,7 +876,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
       MF_TRY(encoder.transform->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0));
 
       if (!encoder.gpu) {
-        auto output = collect(false);
+        auto output = collect();
         if (!output) {
           return output;
         }
@@ -1019,7 +1018,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
 
         // 同步软件 MFT 立即轮询拉取输出
         if (!encoder.gpu) {
-          auto output = collect(false);
+          auto output = collect();
           if (!output) {
             return output;
           }

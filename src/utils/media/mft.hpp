@@ -20,6 +20,8 @@ struct Packet {
   DWORD bytes = 0;
 };
 
+enum class PullMode { synchronous, asynchronous };
+
 // 格式化 HRESULT 错误信息
 auto hr_error(std::string_view action, HRESULT hr) -> std::string;
 
@@ -34,9 +36,8 @@ auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO&
                const MFT_REGISTER_TYPE_INFO& output, IMFAttributes* attributes = nullptr)
     -> Result<std::vector<wil::com_ptr<IMFActivate>>>;
 
-// 从同步或异步 MFT 中安全拉取单份输出样本，处理流格式动态协商
-auto pull(IMFTransform* transform, IMFMediaType* configured)
-    -> Result<std::optional<wil::com_ptr<IMFSample>>>;
+// 拉取输出样本；异步 MFT 的流格式变更留待后续输出事件处理
+auto pull(IMFTransform* transform, PullMode mode) -> Result<std::optional<wil::com_ptr<IMFSample>>>;
 
 // 从 IMFSample 提取 PTS、DTS、时长和字节数并打包为 Packet
 auto packet_from(wil::com_ptr<IMFSample> sample) -> Result<Packet>;

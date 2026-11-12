@@ -422,7 +422,8 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   auto collect = [&]() -> std::expected<void, std::string> {
     while (!session.failed.load()) {
       session.audio_stage.store("ProcessOutput");
-      auto sample = utils::media::mft::pull(encoder.get(), output.get());
+      auto sample =
+          utils::media::mft::pull(encoder.get(), utils::media::mft::PullMode::synchronous);
       if (!sample) {
         return std::unexpected(sample.error());
       }

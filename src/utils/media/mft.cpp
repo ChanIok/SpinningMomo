@@ -89,10 +89,10 @@ auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO&
   return result;
 }
 
-// 从同步或异步 MFT 中安全拉取单份输出样本，处理流格式动态协商
-auto pull(IMFTransform* transform, IMFMediaType* configured)
+// 从 MFT 拉取输出样本，并按同步或异步模式处理流格式变更
+auto pull(IMFTransform* transform, PullMode mode)
     -> Result<std::optional<wil::com_ptr<IMFSample>>> {
-  // 允许最多尝试两次，应对初次输出时的动态格式协商请求
+  // 同步 MFT 可在本轮完成格式协商；异步 MFT 留待后续输出事件再拉取
   for (UINT attempt = 0; attempt < 2; ++attempt) {
     MFT_OUTPUT_STREAM_INFO info{};
     MF_TRY(transform->GetOutputStreamInfo(0, &info));
@@ -130,12 +130,14 @@ auto pull(IMFTransform* transform, IMFMediaType* configured)
       sample.attach(output.pSample);
     }
 
-    // 硬件编码器可在首次输出时要求补全输出类型；保留本段已协商的尺寸与编码配置
+    // MFT 可在首次输出时要求补全输出类型；直接采用它协商出的类型
     if (hr == MF_E_TRANSFORM_STREAM_CHANGE) {
       wil::com_ptr<IMFMediaType> negotiated;
       MF_TRY(transform->GetOutputAvailableType(0, 0, negotiated.put()));
-      MF_TRY(configured->CopyAllItems(negotiated.get()));
       MF_TRY(transform->SetOutputType(0, negotiated.get(), 0));
+      if (mode == PullMode::asynchronous) {
+        return std::optional<wil::com_ptr<IMFSample>>{};
+      }
       continue;
     }
 
