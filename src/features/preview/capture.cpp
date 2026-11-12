@@ -27,10 +27,11 @@ auto pack_extent(int width, int height) -> std::uint64_t {
          static_cast<std::uint32_t>(height);
 }
 
-auto report_capture_failure(core::AppState& state,
-                            const std::shared_ptr<CaptureNotification>& notification, HWND hwnd,
-                            WPARAM generation, const std::string& error) -> void {
-  if (!notification->active.exchange(false, std::memory_order_acq_rel)) {
+auto report_capture_failure(core::AppState& state, HWND hwnd, WPARAM generation,
+                            const std::string& error) -> void {
+  auto& capture = state.preview->capture_state;
+  if (generation != capture.generation.load(std::memory_order_acquire) ||
+      !capture.callback_active.exchange(false, std::memory_order_acq_rel)) {
     return;
   }
 
@@ -46,11 +47,10 @@ auto report_capture_failure(core::AppState& state,
   }
 }
 
-auto on_frame_arrived(core::AppState& state,
-                      const std::shared_ptr<CaptureNotification>& notification, HWND hwnd,
-                      WPARAM generation, utils::graphics::capture::Direct3D11CaptureFrame frame)
-    -> void {
-  if (!notification->active.load(std::memory_order_acquire) ||
+auto on_frame_arrived(core::AppState& state, HWND hwnd, WPARAM generation,
+                      utils::graphics::capture::Direct3D11CaptureFrame frame) -> void {
+  auto& capture = state.preview->capture_state;
+  if (!capture.callback_active.load(std::memory_order_acquire) ||
       !state.preview->running.load(std::memory_order_acquire) ||
       generation != state.preview->capture_state.generation.load(std::memory_order_acquire) ||
       !frame) {
@@ -72,14 +72,11 @@ auto on_frame_arrived(core::AppState& state,
 
     const auto extent = pack_extent(content.Width, content.Height);
     // 同一尺寸只通知一次；尺寸未应用前丢弃帧，避免用旧帧池绘制新尺寸画面。
-    if (notification->last_reported_extent.exchange(extent, std::memory_order_acq_rel) != extent) {
+    if (capture.last_reported_extent.exchange(extent, std::memory_order_acq_rel) != extent) {
       if (!PostMessageW(hwnd, WM_PREVIEW_CAPTURE_SIZE_CHANGED, generation,
                         static_cast<LPARAM>(extent))) {
-        notification->last_reported_extent.store(
-            state.preview->capture_state.applied_extent.load(std::memory_order_acquire),
-            std::memory_order_release);
         report_capture_failure(
-            state, notification, hwnd, generation,
+            state, hwnd, generation,
             std::format("Failed to post preview size change: {}", GetLastError()));
         return;
       }
@@ -93,23 +90,21 @@ auto on_frame_arrived(core::AppState& state,
     auto texture =
         utils::graphics::capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
     if (!texture) {
-      report_capture_failure(state, notification, hwnd, generation,
-                             "Cannot get preview capture texture");
+      report_capture_failure(state, hwnd, generation, "Cannot get preview capture texture");
       return;
     }
     if (auto result = rendering::render_frame(state, texture.get()); !result) {
-      report_capture_failure(state, notification, hwnd, generation, result.error());
+      report_capture_failure(state, hwnd, generation, result.error());
     }
   } catch (const winrt::hresult_error& error) {
     report_capture_failure(
-        state, notification, hwnd, generation,
+        state, hwnd, generation,
         std::format("Preview capture failed: {}", winrt::to_string(error.message())));
   } catch (const std::exception& error) {
-    report_capture_failure(state, notification, hwnd, generation,
+    report_capture_failure(state, hwnd, generation,
                            std::format("Preview capture failed: {}", error.what()));
   } catch (...) {
-    report_capture_failure(state, notification, hwnd, generation,
-                           "Preview capture failed with an unknown error");
+    report_capture_failure(state, hwnd, generation, "Preview capture failed with an unknown error");
   }
 }
 
@@ -149,12 +144,11 @@ auto initialize_capture(core::AppState& state, HWND target_window, int width, in
   auto& capture = state.preview->capture_state;
   const auto generation = capture.generation.fetch_add(1, std::memory_order_acq_rel) + 1;
   const auto hwnd = state.preview->hwnd;
-  auto notification = std::make_shared<CaptureNotification>();
-  notification->last_reported_extent.store(pack_extent(width, height), std::memory_order_release);
+  capture.last_reported_extent.store(pack_extent(width, height), std::memory_order_release);
   capture.applied_extent.store(pack_extent(width, height), std::memory_order_release);
-  // 回调捕获会话编号，旧会话迟到的回调不会操作新会话。
-  auto frame_callback = [&state, notification, hwnd, generation](auto&& frame) {
-    on_frame_arrived(state, notification, hwnd, generation, std::move(frame));
+  // 回调携带会话编号，旧会话的迟到消息会被忽略。
+  auto frame_callback = [&state, hwnd, generation](auto&& frame) {
+    on_frame_arrived(state, hwnd, generation, std::move(frame));
   };
 
   utils::graphics::capture::CaptureSessionOptions options;
@@ -169,7 +163,7 @@ auto initialize_capture(core::AppState& state, HWND target_window, int width, in
     return std::unexpected(session.error());
   }
   capture.session = std::move(*session);
-  capture.notification = std::move(notification);
+  capture.callback_active.store(true, std::memory_order_release);
   capture.pending_width = 0;
   capture.pending_height = 0;
   capture.resize_due = {};
@@ -267,10 +261,7 @@ auto apply_pending_resize(core::AppState& state) -> std::expected<void, std::str
 auto stop_capture(core::AppState& state) -> void {
   auto& capture = state.preview->capture_state;
   cancel_pending_resize(state);
-  if (capture.notification) {
-    capture.notification->active.store(false, std::memory_order_release);
-    capture.notification.reset();
-  }
+  capture.callback_active.store(false, std::memory_order_release);
   utils::graphics::capture::stop_capture(capture.session);
   Logger().debug("Preview capture session {} stopped",
                  capture.generation.load(std::memory_order_acquire));
@@ -279,10 +270,7 @@ auto stop_capture(core::AppState& state) -> void {
 auto cleanup_capture(core::AppState& state) -> void {
   auto& capture = state.preview->capture_state;
   cancel_pending_resize(state);
-  if (capture.notification) {
-    capture.notification->active.store(false, std::memory_order_release);
-    capture.notification.reset();
-  }
+  capture.callback_active.store(false, std::memory_order_release);
   rendering::release_capture_surface(state);
   utils::graphics::capture::cleanup_capture_session(capture.session);
   Logger().info("Preview capture resources cleaned up");

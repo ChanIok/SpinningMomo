@@ -116,16 +116,11 @@ struct RenderingResources {
   wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
 };
 
-// 停止时禁用回调状态，让迟到的帧回调尽早退出。
-struct CaptureNotification {
-  std::atomic<bool> active = true;
-  std::atomic<std::uint64_t> last_reported_extent = 0;
-};
-
 // 捕获会话（业务层封装）
 struct CaptureState {
   utils::graphics::capture::CaptureSession session;
-  std::shared_ptr<CaptureNotification> notification;
+  std::atomic<bool> callback_active = false;
+  std::atomic<std::uint64_t> last_reported_extent = 0;
   // 消息只携带编号，不携带可能已被销毁的会话指针。
   std::atomic<WPARAM> generation = 0;
   std::atomic<std::uint64_t> applied_extent = 0;
