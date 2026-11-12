@@ -4,6 +4,7 @@
 #include "vendor/windows/avrt.hpp"
 #include "vendor/windows/mferror.hpp"
 
+#include "features/recording/audio_negotiation.hpp"
 #include "features/recording/mux.hpp"
 #include "features/recording/recording.hpp"
 #include "features/recording/state.hpp"
@@ -27,28 +28,129 @@ constexpr LONGLONG delivery_delay = 400'000;
     if (FAILED(hr_)) return std::unexpected(utils::media::mft::hr_error(#call, hr_)); \
   } while (false)
 
-// 构建音频媒体类型：区分未压缩 16-bit PCM 输入与 AAC 压缩输出
-auto audio_type(bool compressed, UINT bitrate)
-    -> std::expected<wil::com_ptr<IMFMediaType>, std::string> {
+// 拼接各候选编码器的失败原因，构成可诊断的错误信息
+auto join_diagnostics(const std::vector<std::string>& failures) -> std::string {
+  std::string joined;
+  for (const auto& failure : failures) {
+    if (!joined.empty()) {
+      joined += "; ";
+    }
+    joined += failure;
+  }
+  return joined;
+}
+
+// 构建未压缩 PCM 输入媒体类型：与采集层统一协商的 48kHz / 16-bit / 2ch 对齐
+auto pcm_input_type() -> std::expected<wil::com_ptr<IMFMediaType>, std::string> {
   wil::com_ptr<IMFMediaType> type;
   MF_TRY(MFCreateMediaType(type.put()));
 
   MF_TRY(type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio));
-  MF_TRY(type->SetGUID(MF_MT_SUBTYPE, compressed ? MFAudioFormat_AAC : MFAudioFormat_PCM));
+  MF_TRY(type->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM));
   MF_TRY(type->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, k_audio_sample_rate));
   MF_TRY(type->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2));
   MF_TRY(type->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16));
-  MF_TRY(type->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, compressed ? bitrate / 8 : 192000));
-
-  if (compressed) {
-    MF_TRY(type->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 0));
-    MF_TRY(type->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 0x29));
-  } else {
-    MF_TRY(type->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 4));
-    MF_TRY(type->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE));
-  }
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
+                         k_audio_sample_rate * k_audio_bytes_per_frame));
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, k_audio_bytes_per_frame));
+  MF_TRY(type->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE));
 
   return type;
+}
+
+// 交给 MPEG-4 容器的是「容器侧类型」，与交给编码器 MFT 的类型属于两套契约，不能复用同一份。
+// 微软 MPEG-4 File Sink 文档：AAC 的 MF_MT_USER_DATA 可选，缺省时按 AAC-LC 自行生成 stsd；
+// SinkWriter 对多余属性敏感，因此这里只写文档要求的属性集（与 playground 探针验证过的一致）。
+// 码率与 profile 取自编码器协商结果，不假设任何码率白名单。
+auto sink_output_type(IMFMediaType* negotiated, std::uint32_t bytes_per_second)
+    -> std::expected<wil::com_ptr<IMFMediaType>, std::string> {
+  UINT32 profile = 0x29;
+  (void)negotiated->GetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, &profile);
+
+  wil::com_ptr<IMFMediaType> type;
+  MF_TRY(MFCreateMediaType(type.put()));
+  MF_TRY(type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio));
+  MF_TRY(type->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC));
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, k_audio_sample_rate));
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2));
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16));
+  MF_TRY(type->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bytes_per_second));
+  MF_TRY(type->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 0));
+  MF_TRY(type->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, profile));
+  return type;
+}
+
+struct ConfiguredAac {
+  wil::com_ptr<IMFMediaType> stream_type;  // 容器侧类型，交给封装线程 AddStream
+  wil::com_ptr<IMFMediaType> configured;   // 编码器侧类型，供 mft::pull 回写动态格式变更
+  std::uint32_t bitrate_bps = 0;           // 实际生效的码率
+};
+
+// 编码器侧输出类型来自 GetOutputAvailableType：选能实现目标码率的最低档，
+// 超出上限时饱和到最高档；选中的档位若被拒则直接报错。
+// 容器侧类型另行构造，见 sink_output_type。
+auto configure_aac(IMFTransform* encoder, IMFMediaType* input, std::uint32_t target_bitrate_bps)
+    -> std::expected<ConfiguredAac, std::string> {
+  // 可用输出类型集合依赖输入类型，必须先设输入
+  MF_TRY(encoder->SetInputType(0, input, 0));
+
+  std::vector<wil::com_ptr<IMFMediaType>> types;
+  std::vector<audio_negotiation::OutputCandidate> candidates;
+  for (UINT32 index = 0;; ++index) {
+    wil::com_ptr<IMFMediaType> type;
+    const auto hr = encoder->GetOutputAvailableType(0, index, type.put());
+    if (hr == MF_E_NO_MORE_TYPES) {
+      break;
+    }
+    if (FAILED(hr)) {
+      return std::unexpected(utils::media::mft::hr_error("GetOutputAvailableType", hr));
+    }
+
+    audio_negotiation::OutputCandidate candidate;
+    // 码率为协商必需项；格式属性缺失时保留零值，表示编码器未声明该属性
+    (void)type->GetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &candidate.bytes_per_second);
+    (void)type->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &candidate.sample_rate);
+    (void)type->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &candidate.channels);
+    candidates.push_back(candidate);
+    types.push_back(std::move(type));
+  }
+
+  const auto selected =
+      audio_negotiation::select_candidate(candidates, target_bitrate_bps, k_audio_sample_rate, 2);
+  if (!selected) {
+    return std::unexpected(std::format("no AAC output type matches {}Hz/2ch PCM (available={})",
+                                       k_audio_sample_rate, candidates.size()));
+  }
+
+  const auto index = *selected;
+  const auto hr = encoder->SetOutputType(0, types[index].get(), 0);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("SetOutputType(AAC, {}B/s) rejected selected candidate: {}",
+                                       candidates[index].bytes_per_second,
+                                       utils::media::mft::hr_error("SetOutputType", hr)));
+  }
+
+  wil::com_ptr<IMFMediaType> negotiated;
+  MF_TRY(encoder->GetOutputCurrentType(0, negotiated.put()));
+
+  UINT32 bytes_per_second = candidates[index].bytes_per_second;
+  (void)negotiated->GetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &bytes_per_second);
+
+  auto stream_type = sink_output_type(negotiated.get(), bytes_per_second);
+  if (!stream_type) {
+    return std::unexpected(stream_type.error());
+  }
+
+  // 本线程保留编码器侧完整类型，供 mft::pull 回写动态格式变更
+  wil::com_ptr<IMFMediaType> configured;
+  MF_TRY(MFCreateMediaType(configured.put()));
+  MF_TRY(configured->CopyAllItems(negotiated.get()));
+
+  return ConfiguredAac{
+      .stream_type = std::move(*stream_type),
+      .configured = std::move(configured),
+      .bitrate_bps = bytes_per_second * 8,
+  };
 }
 
 // 清空当前积压的所有 PCM 来源采样并重置时间锚点
@@ -206,35 +308,65 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
     }
   });
 
-  // 枚举并激活同步 AAC 编码器 MFT
+  // 枚举全部同步 AAC 编码器 MFT，逐个尝试协商，首个可用者胜出
   const MFT_REGISTER_TYPE_INFO in{MFMediaType_Audio, MFAudioFormat_PCM};
   const MFT_REGISTER_TYPE_INFO out{MFMediaType_Audio, MFAudioFormat_AAC};
-  auto activation = utils::media::mft::enumerate(
+  auto activations = utils::media::mft::enumerate(
       MFT_CATEGORY_AUDIO_ENCODER, MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_SORTANDFILTER, in, out);
-  if (!activation) {
-    return std::unexpected(activation.error());
+  if (!activations) {
+    return std::unexpected(activations.error());
   }
 
-  wil::com_ptr<IMFTransform> encoder;
-  MF_TRY((*activation)->ActivateObject(IID_PPV_ARGS(encoder.put())));
-  auto shutdown = wil::scope_exit([&] { MFShutdownObject(encoder.get()); });
-
-  // 配置编码器的输入 PCM 与输出 AAC 媒体类型
-  auto input = audio_type(false, session.config.audio_bitrate);
-  auto output = audio_type(true, session.config.audio_bitrate);
+  auto input = pcm_input_type();
   if (!input) {
     return std::unexpected(input.error());
   }
-  if (!output) {
-    return std::unexpected(output.error());
+
+  const auto target_bitrate = session.config.audio_bitrate;
+  wil::com_ptr<IMFTransform> encoder;
+  wil::com_ptr<IMFMediaType> output;
+  wil::com_ptr<IMFMediaType> stream_type;
+  std::string encoder_name;
+  std::uint32_t effective_bitrate = 0;
+  std::vector<std::string> failures;
+
+  for (const auto& activation : *activations) {
+    const auto identity = utils::media::mft::activation_identity(activation.get());
+
+    wil::com_ptr<IMFTransform> candidate;
+    const auto activated = activation->ActivateObject(IID_PPV_ARGS(candidate.put()));
+    if (FAILED(activated)) {
+      failures.push_back(std::format("{}: {}", identity,
+                                     utils::media::mft::hr_error("ActivateObject", activated)));
+      continue;
+    }
+
+    auto configured = configure_aac(candidate.get(), input->get(), target_bitrate);
+    if (!configured) {
+      failures.push_back(std::format("{}: {}", identity, configured.error()));
+      MFShutdownObject(candidate.get());
+      continue;
+    }
+
+    encoder = std::move(candidate);
+    output = std::move(configured->configured);
+    stream_type = std::move(configured->stream_type);
+    effective_bitrate = configured->bitrate_bps;
+    encoder_name = utils::media::mft::describe(activation.get());
+    break;
   }
 
-  MF_TRY(encoder->SetOutputType(0, output->get(), 0));
-  MF_TRY(encoder->SetInputType(0, input->get(), 0));
+  if (!encoder) {
+    return std::unexpected(std::format(
+        "Audio encoder setup failed (target={}kbps, format={}Hz/2ch): no usable AAC MFT; "
+        "try 192 kbps or disable audio recording; details=[{}]",
+        target_bitrate / 1000, k_audio_sample_rate, join_diagnostics(failures)));
+  }
 
-  // 获取编码器最终协商确定的输出格式
-  wil::com_ptr<IMFMediaType> negotiated;
-  MF_TRY(encoder->GetOutputCurrentType(0, negotiated.put()));
+  auto shutdown = wil::scope_exit([&] { MFShutdownObject(encoder.get()); });
+
+  Logger().info("Recording audio encoder: {}, target={}kbps, effective={}kbps, mfts={}",
+                encoder_name, target_bitrate / 1000, effective_bitrate / 1000, activations->size());
 
   MF_TRY(encoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0));
   MF_TRY(encoder->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0));
@@ -274,12 +406,10 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   // 发布音频流就绪标志，允许封装线程开始写盘
   {
     std::lock_guard lock(session.mutex);
-    session.streams[1].type = std::move(negotiated);
+    session.streams[1].type = std::move(stream_type);
     session.streams[1].ready = true;
     session.changed.notify_all();
   }
-
-  Logger().info("Recording audio encoder: {}", utils::media::mft::describe(activation->get()));
 
   // 等待全局录制正式开始信号
   if (!wait_session_start(app_state)) {
@@ -292,7 +422,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   auto collect = [&]() -> std::expected<void, std::string> {
     while (!session.failed.load()) {
       session.audio_stage.store("ProcessOutput");
-      auto sample = utils::media::mft::pull(encoder.get(), output->get());
+      auto sample = utils::media::mft::pull(encoder.get(), output.get());
       if (!sample) {
         return std::unexpected(sample.error());
       }

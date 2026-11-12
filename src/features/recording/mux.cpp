@@ -107,7 +107,12 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
     if (!types[i]) {
       continue;
     }
-    MF_TRY(writer->AddStream(types[i].get(), &streams[i]));
+    const auto hr = writer->AddStream(types[i].get(), &streams[i]);
+    if (FAILED(hr)) {
+      return std::unexpected(std::format("AddStream(stream={}, {}): {}", i,
+                                         i == 0 ? "video" : "audio",
+                                         utils::media::mft::hr_error("AddStream", hr)));
+    }
     MF_TRY(writer->SetInputMediaType(streams[i], types[i].get(), nullptr));
   }
 

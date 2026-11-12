@@ -47,10 +47,10 @@ auto describe(IMFAttributes* attributes) -> std::string {
   return SUCCEEDED(hr) ? utils::string::ToUtf8(name) : hr_error("MFT name unavailable", hr);
 }
 
-// 根据输入输出类型与分类枚举匹配的 MFT 激活对象
+// 根据输入输出类型与分类枚举全部匹配的 MFT 激活对象
 auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO& input,
                const MFT_REGISTER_TYPE_INFO& output, IMFAttributes* attributes)
-    -> Result<wil::com_ptr<IMFActivate>> {
+    -> Result<std::vector<wil::com_ptr<IMFActivate>>> {
   IMFActivate** list = nullptr;
   UINT32 count = 0;
 
@@ -67,23 +67,25 @@ auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO&
     return std::unexpected(hr_error("MFTEnum2", hr));
   }
 
-  // 每次视频编码器选择仅输出一条摘要；未选中的候选只在 Debug 下展开。
-  if (category == MFT_CATEGORY_VIDEO_ENCODER) {
-    Logger().info("Video encoder MFT: hardware={}, candidates={}, selected=[{}]",
-                  (flags & MFT_ENUM_FLAG_HARDWARE) != 0, count,
-                  count ? activation_identity(list[0]) : "none");
-    for (UINT32 i = 1; i < count; ++i) {
-      Logger().debug("Video encoder MFT alternative: index={}, {}", i,
-                     activation_identity(list[i]));
-    }
+  const auto category_name = category == MFT_CATEGORY_AUDIO_ENCODER ? "audio" : "video";
+  Logger().info("Encoder MFT: category={}, hardware={}, candidates={}", category_name,
+                (flags & MFT_ENUM_FLAG_HARDWARE) != 0, count);
+
+  // 音频编码器可能被第三方实现抢占候选首位，所有候选身份都进入日志以便定位环境差异
+  for (UINT32 i = 0; i < count; ++i) {
+    Logger().info("Encoder MFT candidate: category={}, index={}, {}", category_name, i,
+                  activation_identity(list[i]));
   }
 
   if (!count) {
     return std::unexpected("No MFT matches the selected adapter and formats");
   }
 
-  // 选用首个匹配度最高的激活对象
-  wil::com_ptr<IMFActivate> result = list[0];
+  std::vector<wil::com_ptr<IMFActivate>> result;
+  result.reserve(count);
+  for (UINT32 i = 0; i < count; ++i) {
+    result.emplace_back(list[i]);
+  }
   return result;
 }
 
@@ -142,6 +144,7 @@ auto pull(IMFTransform* transform, IMFMediaType* configured)
       return std::optional<wil::com_ptr<IMFSample>>{};
     }
 
+    // 失败原因随 Result 上抛，由录制会话统一记录上下文
     if (FAILED(hr)) {
       return std::unexpected(hr_error("ProcessOutput", hr));
     }

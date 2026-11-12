@@ -26,10 +26,13 @@ auto hr_error(std::string_view action, HRESULT hr) -> std::string;
 // 从 MFT 属性集中读取友好名称描述字符串
 auto describe(IMFAttributes* attributes) -> std::string;
 
-// 根据输入输出类型与分类枚举匹配的 MFT 激活对象
+// 读取激活对象的友好名称、CLSID 与厂商，用于定位实际选中的编码器实现
+auto activation_identity(IMFActivate* activation) -> std::string;
+
+// 根据输入输出类型与分类枚举全部匹配的 MFT 激活对象（按匹配度排序）
 auto enumerate(const GUID& category, UINT32 flags, const MFT_REGISTER_TYPE_INFO& input,
                const MFT_REGISTER_TYPE_INFO& output, IMFAttributes* attributes = nullptr)
-    -> Result<wil::com_ptr<IMFActivate>>;
+    -> Result<std::vector<wil::com_ptr<IMFActivate>>>;
 
 // 从同步或异步 MFT 中安全拉取单份输出样本，处理流格式动态协商
 auto pull(IMFTransform* transform, IMFMediaType* configured)

@@ -263,16 +263,18 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
         filter->SetBlob(MFT_ENUM_ADAPTER_LUID, reinterpret_cast<const BYTE*>(&luid), sizeof(luid)));
   }
 
-  auto activation = utils::media::mft::enumerate(
+  auto activations = utils::media::mft::enumerate(
       MFT_CATEGORY_VIDEO_ENCODER,
       (gpu ? MFT_ENUM_FLAG_HARDWARE : MFT_ENUM_FLAG_SYNCMFT) | MFT_ENUM_FLAG_SORTANDFILTER, in, out,
       filter.get());
-  if (!activation) {
-    return std::unexpected(activation.error());
+  if (!activations) {
+    return std::unexpected(activations.error());
   }
 
-  result.name = utils::media::mft::describe(activation->get());
-  const auto activation_hr = (*activation)->ActivateObject(IID_PPV_ARGS(result.transform.put()));
+  // 视频编码器沿用匹配度最高的首个候选
+  const auto& activation = activations->front();
+  result.name = utils::media::mft::describe(activation.get());
+  const auto activation_hr = activation->ActivateObject(IID_PPV_ARGS(result.transform.put()));
   if (FAILED(activation_hr)) {
     return std::unexpected(utils::media::mft::hr_error(
         std::format("ActivateObject video encoder \"{}\" (GPU={}, codec={}, input={}, "
