@@ -8,12 +8,13 @@
 
 #include "core/state/app_state.hpp"
 #include "features/preview/capture.hpp"
+#include "features/preview/preview.hpp"
 #include "features/preview/rendering.hpp"
 #include "features/preview/state.hpp"
 #include "features/preview/types.hpp"
 #include "features/preview/window.hpp"
+#include "ui/floating_window/floating_window.hpp"
 #include "utils/display/display_geometry.hpp"
-#include "utils/graphics/capture.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/throttle/throttle.hpp"
 
@@ -46,6 +47,21 @@ auto restore_taskbar_redraw(core::AppState& state) -> void {
     state.preview->interaction.taskbar_redraw_suppressed = false;
     Logger().debug("Taskbar redraw restored");
   }
+}
+
+auto cancel_interaction(core::AppState& state) -> void {
+  auto& preview = *state.preview;
+  preview.interaction.is_dragging = false;
+  preview.interaction.viewport_dragging = false;
+  KillTimer(preview.hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG);
+  KillTimer(preview.hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
+  if (preview.interaction.move_throttle) {
+    utils::throttle::reset(*preview.interaction.move_throttle);
+  }
+  if (GetCapture() == preview.hwnd) {
+    ReleaseCapture();
+  }
+  restore_taskbar_redraw(state);
 }
 
 // ==================== 辅助函数实现 ====================
@@ -415,6 +431,9 @@ auto handle_size(core::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
   // 调整渲染系统大小
   if (auto result = features::preview::rendering::resize_rendering(state, width, height); !result) {
     Logger().error("Failed to resize preview rendering: {}", result.error());
+    if (state.preview->running.load(std::memory_order_acquire)) {
+      features::preview::fail_preview(state, result.error());
+    }
   }
 
   return 0;
@@ -519,8 +538,20 @@ auto handle_timer(core::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
     return 0;
   }
 
+  if (wParam == features::preview::TIMER_ID_CAPTURE_RESIZE) {
+    KillTimer(hwnd, features::preview::TIMER_ID_CAPTURE_RESIZE);
+    if (auto result = features::preview::capture::apply_pending_resize(state); !result) {
+      features::preview::fail_preview(state, result.error());
+    }
+    return 0;
+  }
+
   if (wParam == features::preview::TIMER_ID_PREVIEW_CLEANUP) {
     KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
+    // KillTimer 不会移除已经排队的 WM_TIMER；快速重开后不能清理新会话。
+    if (state.preview->running.load(std::memory_order_acquire)) {
+      return 0;
+    }
     features::preview::capture::cleanup_capture(state);
     features::preview::rendering::cleanup_rendering(state);
     Logger().info("Preview resources cleaned up");
@@ -532,86 +563,27 @@ auto handle_timer(core::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
 auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   switch (message) {
-    case features::preview::WM_SCHEDULE_PREVIEW_CLEANUP:
-      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
-      if (SetTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP, 3000, nullptr) == 0) {
-        Logger().error("Failed to schedule delayed preview cleanup");
-        return {true, 0};
-      }
-      return {true, 1};
-
-    case features::preview::WM_CANCEL_PREVIEW_CLEANUP:
-      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
-      return {true, 1};
-
-    case features::preview::WM_IMMEDIATE_PREVIEW_CLEANUP:
-      KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
-      features::preview::capture::cleanup_capture(state);
-      features::preview::rendering::cleanup_rendering(state);
-      Logger().info("Preview resources cleaned up");
-      return {true, 1};
-
-    case features::preview::WM_APPLY_CAPTURE_SIZE: {
-      auto& preview_state = *state.preview;
-      auto& capture_state = preview_state.capture_state;
-
-      if (!preview_state.running.load(std::memory_order_acquire)) {
-        const std::scoped_lock lock(capture_state.pending_extent_mutex);
-        capture_state.resize_pending.store(false, std::memory_order_release);
-        return {true, 0};
-      }
-
-      // 旧会话可能残留一条已排队消息；没有在途事务时无需触碰当前帧池。
-      if (!capture_state.resize_pending.load(std::memory_order_acquire)) {
-        return {true, 0};
-      }
-
-      for (;;) {
-        features::preview::CaptureExtent requested_extent;
-        {
-          const std::scoped_lock lock(capture_state.pending_extent_mutex);
-          requested_extent = capture_state.pending_extent;
+    case features::preview::WM_PREVIEW_CAPTURE_SIZE_CHANGED: {
+      // WGC 回调只报告尺寸；帧池与预览窗口尺寸由窗口线程统一调整。
+      if (wParam == state.preview->capture_state.generation.load(std::memory_order_acquire)) {
+        const auto extent = static_cast<std::uint64_t>(lParam);
+        const int width = static_cast<int>(extent >> 32);
+        const int height = static_cast<int>(extent & 0xffffffffu);
+        if (auto result = features::preview::capture::queue_resize(state, width, height); !result) {
+          features::preview::fail_preview(state, result.error());
         }
-        const int capture_width = requested_extent.width;
-        const int capture_height = requested_extent.height;
-
-        Logger().debug("Applying preview capture resize: {}x{}", capture_width, capture_height);
-
-        // 丢弃对旧帧池 surface 的长期引用，再重建帧池。
-        features::preview::rendering::release_capture_surface(state);
-        if (auto recreate_result = utils::graphics::capture::recreate_frame_pool(
-                capture_state.session, capture_width, capture_height);
-            !recreate_result) {
-          Logger().error("{}", recreate_result.error());
-          preview_state.running.store(false, std::memory_order_release);
-          {
-            const std::scoped_lock lock(capture_state.pending_extent_mutex);
-            capture_state.resize_pending.store(false, std::memory_order_release);
-          }
-          features::preview::window::hide_preview_window(state);
-          features::preview::capture::cleanup_capture(state);
-          features::preview::rendering::cleanup_rendering(state);
-          return {true, 0};
-        }
-
-        capture_state.last_frame_width.store(capture_width, std::memory_order_release);
-        capture_state.last_frame_height.store(capture_height, std::memory_order_release);
-        preview_state.create_new_srv.store(true, std::memory_order_release);
-
-        // SetWindowPos 同步触发的 WM_SIZE 会在返回前完成交换链调整；事务标记在此期间保持。
-        features::preview::window::set_preview_window_size(state, capture_width, capture_height);
-        Logger().debug("Preview capture resize applied: {}x{}", capture_width, capture_height);
-
-        {
-          const std::scoped_lock lock(capture_state.pending_extent_mutex);
-          if (capture_state.pending_extent == requested_extent) {
-            capture_state.resize_pending.store(false, std::memory_order_release);
-            return {true, 0};
-          }
-        }
-
-        // 回调在重建期间提交了更新的尺寸，当前 UI 消息直接继续消费。
       }
+      return {true, 0};
+    }
+
+    case features::preview::WM_PREVIEW_CAPTURE_FAILED: {
+      // 忽略旧会话的迟到失败通知。
+      if (wParam == state.preview->capture_state.generation.load(std::memory_order_acquire) &&
+          state.preview->running.load(std::memory_order_acquire)) {
+        features::preview::stop_preview(state);
+        ui::floating_window::request_repaint(state);
+      }
+      return {true, 0};
     }
 
     case WM_PAINT:
@@ -645,13 +617,12 @@ auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPAR
       return {true, handle_timer(state, hwnd, wParam)};
 
     case WM_DESTROY:
-      state.preview->interaction.viewport_dragging = false;
-      KillTimer(hwnd, features::preview::TIMER_ID_VIEWPORT_DRAG);
-      // 清理资源但不调用PostQuitMessage
-      // 确保任务栏重绘被恢复
-      KillTimer(hwnd, features::preview::TIMER_ID_TASKBAR_REDRAW);
+      state.preview->running.store(false, std::memory_order_release);
+      features::preview::capture::cleanup_capture(state);
+      features::preview::rendering::cleanup_rendering(state);
+      cancel_interaction(state);
+      // 预览窗是子窗口；只清理自身资源，不退出应用消息循环。
       KillTimer(hwnd, features::preview::TIMER_ID_PREVIEW_CLEANUP);
-      restore_taskbar_redraw(state);
       return {true, 0};
 
     default:

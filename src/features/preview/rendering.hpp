@@ -17,14 +17,15 @@ auto initialize_rendering(core::AppState& state, HWND hwnd, int width, int heigh
 // 清理渲染资源
 auto cleanup_rendering(core::AppState& state) -> void;
 
+// 在帧池重建或关闭前解除绑定并释放缓存对捕获纹理的引用。
+auto release_capture_surface(core::AppState& state) -> void;
+
 // 调整渲染尺寸
 auto resize_rendering(core::AppState& state, int width, int height)
     -> std::expected<void, std::string>;
 
-// 在重建 WGC 帧池前解除对旧捕获 surface 的绑定与持有。
-auto release_capture_surface(core::AppState& state) -> void;
-
-// 渲染一帧
-auto render_frame(core::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture) -> void;
+// 按纹理对象身份复用单个 SRV，返回前解除绑定。
+auto render_frame(core::AppState& state, ID3D11Texture2D* capture_texture)
+    -> std::expected<void, std::string>;
 
 }  // namespace features::preview::rendering

@@ -8,6 +8,9 @@
 
 namespace features::preview::interaction {
 
+// 结束会话时释放鼠标捕获并恢复任务栏，不再提交待处理的游戏窗口移动。
+auto cancel_interaction(core::AppState& state) -> void;
+
 // 主消息处理函数
 // 返回值：first为true表示已处理消息，为false表示应使用默认处理
 auto handle_preview_message(core::AppState& state, HWND hwnd, UINT message, WPARAM wParam,

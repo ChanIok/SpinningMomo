@@ -16,10 +16,8 @@ namespace features::preview {
 constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
 
 // 内部消息常量
-constexpr UINT WM_SCHEDULE_PREVIEW_CLEANUP = WM_USER + 1;
-constexpr UINT WM_CANCEL_PREVIEW_CLEANUP = WM_USER + 2;
-constexpr UINT WM_IMMEDIATE_PREVIEW_CLEANUP = WM_USER + 3;
-constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 4;
+constexpr UINT WM_PREVIEW_CAPTURE_SIZE_CHANGED = WM_USER + 1;
+constexpr UINT WM_PREVIEW_CAPTURE_FAILED = WM_USER + 2;
 
 // 顶点结构体
 struct Vertex {
@@ -49,9 +47,12 @@ struct ViewportState {
 constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
 constexpr UINT_PTR TIMER_ID_PREVIEW_CLEANUP = 2;
 constexpr UINT_PTR TIMER_ID_VIEWPORT_DRAG = 3;
+constexpr UINT_PTR TIMER_ID_CAPTURE_RESIZE = 4;
 
 // 任务栏重绘延迟时间（毫秒）
 constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;
+// 窗口尺寸稳定后再重建帧池。
+constexpr UINT CAPTURE_RESIZE_DELAY_MS = 400;
 
 // 交互状态
 struct InteractionState {
@@ -103,32 +104,34 @@ struct WindowSizeState {
 // 渲染相关资源
 struct RenderingResources {
   std::atomic<bool> initialized = false;
-  std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
+  std::atomic<bool> resources_busy = false;
+  // WM_SIZE 同步重入启动流程时，将调整失败原因交回调用方。
+  std::optional<std::string> resize_error;
   utils::graphics::d3d::D3DContext d3d_context;
   utils::graphics::d3d::ShaderResources basic_shaders;
   utils::graphics::d3d::ShaderResources viewport_shaders;
   wil::com_ptr<ID3D11Buffer> basic_vertex_buffer;
   wil::com_ptr<ID3D11Buffer> viewport_vertex_buffer;
+  // 只缓存一个视图；通过其资源身份判断复用，不额外持有纹理指针。
   wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
 };
 
-struct CaptureExtent {
-  int width = 0;
-  int height = 0;
-
-  auto operator==(const CaptureExtent&) const -> bool = default;
+// 停止时禁用回调状态，让迟到的帧回调尽早退出。
+struct CaptureNotification {
+  std::atomic<bool> active = true;
+  std::atomic<std::uint64_t> last_reported_extent = 0;
 };
 
 // 捕获会话（业务层封装）
 struct CaptureState {
   utils::graphics::capture::CaptureSession session;
-  std::atomic<int> last_frame_width = 0;
-  std::atomic<int> last_frame_height = 0;
-  // resize_pending 表示窗口线程已拥有或即将拥有一次捕获尺寸切换事务。
-  // pending_extent 与事务权的更新由 pending_extent_mutex 串行化，避免遗漏最新尺寸。
-  std::atomic<bool> resize_pending = false;
-  std::mutex pending_extent_mutex;
-  CaptureExtent pending_extent;
+  std::shared_ptr<CaptureNotification> notification;
+  // 消息只携带编号，不携带可能已被销毁的会话指针。
+  std::atomic<WPARAM> generation = 0;
+  std::atomic<std::uint64_t> applied_extent = 0;
+  int pending_width = 0;
+  int pending_height = 0;
+  std::chrono::steady_clock::time_point resize_due{};
 };
 
 }  // namespace features::preview

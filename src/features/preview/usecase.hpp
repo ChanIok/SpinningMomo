@@ -3,7 +3,6 @@
 #include "vendor/std.hpp"
 
 #include "core/state/app_state.hpp"
-#include "ui/floating_window/events.hpp"
 
 namespace features::preview {
 

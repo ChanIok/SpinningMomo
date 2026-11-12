@@ -42,6 +42,7 @@ auto initialize_rendering(core::AppState& state, HWND hwnd, int width, int heigh
     -> std::expected<void, std::string> {
   auto& resources = state.preview->rendering_resources;
 
+  resources.resize_error.reset();
   // 创建D3D上下文
   auto d3d_result =
       utils::graphics::d3d::create_d3d_context(hwnd, width, height, state.preview->enable_hdr,
@@ -93,7 +94,9 @@ auto cleanup_rendering(core::AppState& state) -> void {
   auto& resources = state.preview->rendering_resources;
 
   resources.initialized.store(false, std::memory_order_release);
+  // 清理过程中跳过到达的捕获帧。
   resources.resources_busy.store(true, std::memory_order_release);
+  release_capture_surface(state);
 
   // 清理着色器资源
   utils::graphics::d3d::cleanup_shader_resources(resources.basic_shaders);
@@ -103,12 +106,21 @@ auto cleanup_rendering(core::AppState& state) -> void {
   utils::graphics::d3d::cleanup_d3d_context(resources.d3d_context);
 
   // 重置资源
-  resources.capture_srv.reset();
   resources.basic_vertex_buffer.reset();
   resources.viewport_vertex_buffer.reset();
-
   resources.resources_busy.store(false, std::memory_order_release);
+
   Logger().info("Preview rendering resources cleaned up");
+}
+
+auto release_capture_surface(core::AppState& state) -> void {
+  auto& resources = state.preview->rendering_resources;
+  if (resources.d3d_context.context) {
+    ID3D11ShaderResourceView* null_srv = nullptr;
+    resources.d3d_context.context->PSSetShaderResources(0, 1, &null_srv);
+    resources.d3d_context.context->Flush();
+  }
+  resources.capture_srv.reset();
 }
 
 auto resize_rendering(core::AppState& state, int width, int height)
@@ -118,42 +130,26 @@ auto resize_rendering(core::AppState& state, int width, int height)
   }
 
   auto& resources = state.preview->rendering_resources;
-
+  resources.resize_error.reset();
+  // 标记交换链调整状态；回调若观察到此标记就跳过当前帧。
   resources.resources_busy.store(true, std::memory_order_release);
 
   // 调整交换链大小
   auto resize_result =
       utils::graphics::d3d::resize_swap_chain(resources.d3d_context, width, height);
-
   resources.resources_busy.store(false, std::memory_order_release);
 
   if (!resize_result) {
-    Logger().error("Failed to resize swap chain");
-    return std::unexpected("Failed to resize swap chain");
+    resources.resize_error = resize_result.error();
+    return std::unexpected(resize_result.error());
   }
 
   Logger().debug("Preview rendering resized to {}x{}", width, height);
   return {};
 }
 
-auto release_capture_surface(core::AppState& state) -> void {
-  auto& resources = state.preview->rendering_resources;
-  if (auto* context = resources.d3d_context.context.get()) {
-    ID3D11ShaderResourceView* null_srv = nullptr;
-    context->PSSetShaderResources(0, 1, &null_srv);
-    context->Flush();
-  }
-  resources.capture_srv.reset();
-}
-
-auto update_capture_srv(core::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
-    -> std::expected<void, std::string> {
-  if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire) || !texture) {
-    return std::unexpected("Invalid rendering resources or texture");
-  }
-
-  auto& resources = state.preview->rendering_resources;
-
+auto create_capture_srv(ID3D11Device* device, ID3D11Texture2D* texture)
+    -> std::expected<wil::com_ptr<ID3D11ShaderResourceView>, std::string> {
   // 获取纹理描述
   D3D11_TEXTURE2D_DESC desc;
   texture->GetDesc(&desc);
@@ -166,18 +162,44 @@ auto update_capture_srv(core::AppState& state, wil::com_ptr<ID3D11Texture2D> tex
   srvDesc.Texture2D.MipLevels = 1;
 
   // 创建新的SRV
-  HRESULT hr = resources.d3d_context.device->CreateShaderResourceView(texture.get(), &srvDesc,
-                                                                      resources.capture_srv.put());
+  wil::com_ptr<ID3D11ShaderResourceView> srv;
+  HRESULT hr = device->CreateShaderResourceView(texture, &srvDesc, srv.put());
   if (FAILED(hr)) {
-    Logger().error("Failed to create shader resource view, HRESULT: 0x{:08X}",
-                   static_cast<unsigned int>(hr));
-    return std::unexpected("Failed to create shader resource view");
+    return std::unexpected(std::format("Failed to create preview SRV, HRESULT: 0x{:08X}",
+                                       static_cast<unsigned int>(hr)));
   }
 
-  return {};
+  return srv;
 }
 
-auto render_basic_quad(const features::preview::RenderingResources& resources) -> void {
+auto matches_capture_texture(ID3D11ShaderResourceView* srv, ID3D11Texture2D* texture)
+    -> std::expected<bool, std::string> {
+  if (!srv) {
+    return false;
+  }
+
+  wil::com_ptr<ID3D11Resource> resource;
+  srv->GetResource(resource.put());
+  // 不同接口指针可能属于同一 COM 对象，统一比较 IUnknown 身份。
+  wil::com_ptr<IUnknown> cached_identity;
+  auto hr = resource->QueryInterface(IID_PPV_ARGS(cached_identity.put()));
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to query cached preview texture identity, HRESULT: 0x{:08X}",
+                    static_cast<unsigned int>(hr)));
+  }
+  wil::com_ptr<IUnknown> current_identity;
+  hr = texture->QueryInterface(IID_PPV_ARGS(current_identity.put()));
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to query preview texture identity, HRESULT: 0x{:08X}",
+                    static_cast<unsigned int>(hr)));
+  }
+  return cached_identity.get() == current_identity.get();
+}
+
+auto render_basic_quad(const features::preview::RenderingResources& resources,
+                       ID3D11ShaderResourceView* srv) -> void {
   auto* context = resources.d3d_context.context.get();
 
   // 设置着色器和资源
@@ -191,7 +213,6 @@ auto render_basic_quad(const features::preview::RenderingResources& resources) -
 
   context->VSSetShader(resources.basic_shaders.vertex_shader.get(), nullptr, 0);
   context->PSSetShader(resources.basic_shaders.pixel_shader.get(), nullptr, 0);
-  ID3D11ShaderResourceView* srv = resources.capture_srv.get();
   context->PSSetShaderResources(0, 1, &srv);
   ID3D11SamplerState* sampler = resources.basic_shaders.sampler.get();
   context->PSSetSamplers(0, 1, &sampler);
@@ -215,30 +236,39 @@ auto render_viewport_frame(core::AppState& state,
       resources.viewport_shaders.pixel_shader, resources.viewport_shaders.input_layout);
 }
 
-auto render_frame(core::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture) -> void {
-  if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
-    return;
-  }
-
+auto render_frame(core::AppState& state, ID3D11Texture2D* capture_texture)
+    -> std::expected<void, std::string> {
   auto& resources = state.preview->rendering_resources;
-
-  // 检查渲染资源是否正忙，如果是则跳过渲染
+  if (!resources.initialized.load(std::memory_order_acquire) || !capture_texture) {
+    return std::unexpected("Invalid preview rendering resources or texture");
+  }
+  // 交换链尺寸调整时丢弃当前帧；下一次捕获回调会继续刷新预览。
   if (resources.resources_busy.load(std::memory_order_acquire)) {
-    return;
+    return {};
+  }
+  if (!resources.d3d_context.render_target) {
+    return std::unexpected("Preview render target is unavailable");
   }
 
   auto* context = resources.d3d_context.context.get();
-
-  // 更新捕获SRV（如果需要）
-  if (state.preview->create_new_srv.load(std::memory_order_acquire) && capture_texture) {
-    if (auto srv_result = update_capture_srv(state, capture_texture); srv_result) {
-      state.preview->create_new_srv.store(false, std::memory_order_release);
+  auto matches = matches_capture_texture(resources.capture_srv.get(), capture_texture);
+  if (!matches) {
+    return std::unexpected(matches.error());
+  }
+  if (!*matches) {
+    // 帧池重建后纹理对象会改变，此时才重建缓存的 SRV。
+    release_capture_surface(state);
+    auto srv = create_capture_srv(resources.d3d_context.device.get(), capture_texture);
+    if (!srv) {
+      return std::unexpected(srv.error());
     }
+    resources.capture_srv = std::move(*srv);
   }
-
-  if (!resources.capture_srv) {
-    return;  // 没有可渲染的内容
-  }
+  // context 也会持有绑定的 SRV，必须在归还捕获帧前解除上下文绑定。
+  auto unbind_capture = wil::scope_exit([&] {
+    ID3D11ShaderResourceView* null_srv = nullptr;
+    context->PSSetShaderResources(0, 1, &null_srv);
+  });
 
   // 清除背景
   float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -261,13 +291,20 @@ auto render_frame(core::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_t
   context->RSSetViewports(1, &viewport);
 
   // 渲染基本四边形（游戏画面）
-  render_basic_quad(resources);
+  render_basic_quad(resources, resources.capture_srv.get());
 
   // 渲染视口框
   render_viewport_frame(state, resources);
 
   // 显示
-  resources.d3d_context.swap_chain->Present(0, 0);
+  const auto hr = resources.d3d_context.swap_chain->Present(0, 0);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format(
+        "Preview Present failed, HRESULT: 0x{:08X}, device status: 0x{:08X}",
+        static_cast<unsigned int>(hr),
+        static_cast<unsigned int>(resources.d3d_context.device->GetDeviceRemovedReason())));
+  }
+  return {};
 }
 
 }  // namespace features::preview::rendering

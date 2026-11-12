@@ -2,10 +2,13 @@
 
 #include "vendor/std.hpp"
 
+#include "vendor/wil.hpp"
 #include "vendor/windows.hpp"
 #include "vendor/windows/dwmapi.hpp"
 #include "vendor/windows/windowsx.hpp"
 
+#include "core/i18n/state.hpp"
+#include "core/notifications/notifications.hpp"
 #include "core/state/app_state.hpp"
 #include "core/state/runtime_info.hpp"
 #include "features/preview/capture.hpp"
@@ -15,11 +18,13 @@
 #include "features/preview/types.hpp"
 #include "features/preview/viewport.hpp"
 #include "features/preview/window.hpp"
+#include "ui/floating_window/floating_window.hpp"
 #include "utils/display/display.hpp"
 #include "utils/graphics/capture.hpp"
 #include "utils/graphics/d3d.hpp"
 #include "utils/graphics/hdr.hpp"
 #include "utils/logger/logger.hpp"
+#include "utils/string/string.hpp"
 
 namespace features::preview {
 
@@ -29,14 +34,6 @@ auto set_working_monitor(core::AppState& state, const utils::display::MonitorInf
   state.preview->has_screen_rect = true;
   state.preview->interaction.last_game_window_pos.reset();
   viewport::update_viewport_rect(state);
-}
-
-auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
-  if (!preview_hwnd || !IsWindow(preview_hwnd)) {
-    return false;
-  }
-
-  return SendMessageW(preview_hwnd, message, 0, 0) != 0;
 }
 
 auto start_preview(core::AppState& state, HWND target_window,
@@ -73,9 +70,15 @@ auto start_preview(core::AppState& state, HWND target_window,
   }
   const bool enable_hdr = hdr_info->hdr_active;
 
-  if (!send_preview_control_message(preview_state.hwnd, WM_CANCEL_PREVIEW_CLEANUP)) {
-    Logger().warn("Failed to cancel pending preview cleanup");
-  }
+  KillTimer(preview_state.hwnd, TIMER_ID_PREVIEW_CLEANUP);
+
+  // 启动失败也统一释放部分初始化的资源，避免留下可见但没有捕获会话的窗口。
+  auto rollback = wil::scope_exit([&] {
+    preview_state.running.store(false, std::memory_order_release);
+    capture::cleanup_capture(state);
+    window::hide_preview_window(state);
+    rendering::cleanup_rendering(state);
+  });
 
   // 保存目标窗口
   preview_state.target_window = target_window;
@@ -87,11 +90,12 @@ auto start_preview(core::AppState& state, HWND target_window,
   }
   preview_state.enable_hdr = enable_hdr;
 
-  // 计算捕获尺寸
-  RECT clientRect;
-  GetClientRect(target_window, &clientRect);
-  int width = clientRect.right - clientRect.left;
-  int height = clientRect.bottom - clientRect.top;
+  // 使用 WGC 的实际捕获尺寸，避免客户区与捕获范围不一致导致首次就重建帧池。
+  auto capture_size = utils::graphics::capture::get_capture_item_size(target_window);
+  if (!capture_size) {
+    return std::unexpected(capture_size.error());
+  }
+  const auto [width, height] = *capture_size;
 
   // 初始化渲染系统（如果需要）
   if (!preview_state.rendering_resources.initialized.load(std::memory_order_acquire)) {
@@ -114,17 +118,21 @@ auto start_preview(core::AppState& state, HWND target_window,
   }
   // 计算窗口尺寸和宽高比
   window::set_preview_window_size(state, width, height);
+  if (preview_state.rendering_resources.resize_error) {
+    return std::unexpected(*preview_state.rendering_resources.resize_error);
+  }
 
   window::show_preview_window(state);
 
   // 启动捕获
+  preview_state.running.store(true, std::memory_order_release);
   auto start_result = capture::start_capture(state);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected(start_result.error());
   }
 
-  preview_state.running.store(true, std::memory_order_release);
+  rollback.release();
 
   Logger().info("Preview capture started successfully");
   return {};
@@ -138,7 +146,8 @@ auto stop_preview(core::AppState& state) -> void {
   }
 
   preview_state.running.store(false, std::memory_order_release);
-  preview_state.create_new_srv.store(true, std::memory_order_release);
+
+  interaction::cancel_interaction(state);
 
   // 停止捕获
   capture::stop_capture(state);
@@ -146,11 +155,24 @@ auto stop_preview(core::AppState& state) -> void {
   // 隐藏窗口
   window::hide_preview_window(state);
 
-  if (!send_preview_control_message(preview_state.hwnd, WM_SCHEDULE_PREVIEW_CLEANUP)) {
+  if (SetTimer(preview_state.hwnd, TIMER_ID_PREVIEW_CLEANUP, 3000, nullptr) == 0) {
+    Logger().error("Failed to schedule delayed preview cleanup");
     cleanup_preview(state);
   }
 
   Logger().info("Preview capture stopped");
+}
+
+auto fail_preview(core::AppState& state, const std::string& error) -> void {
+  Logger().error("Preview session {} failed: {}",
+                 state.preview->capture_state.generation.load(std::memory_order_acquire), error);
+  stop_preview(state);
+
+  core::notifications::NotificationOptions options;
+  options.title = utils::string::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message = utils::string::FromUtf8(state.i18n->texts["message.preview_failed"] + error);
+  core::notifications::post_notification_request(state, std::move(options));
+  ui::floating_window::request_repaint(state);
 }
 
 auto update_preview_dpi(core::AppState& state, UINT new_dpi) -> void {
@@ -159,10 +181,9 @@ auto update_preview_dpi(core::AppState& state, UINT new_dpi) -> void {
 }
 
 auto cleanup_preview(core::AppState& state) -> void {
-  if (send_preview_control_message(state.preview->hwnd, WM_IMMEDIATE_PREVIEW_CLEANUP)) {
-    return;
+  if (state.preview->hwnd) {
+    KillTimer(state.preview->hwnd, TIMER_ID_PREVIEW_CLEANUP);
   }
-
   capture::cleanup_capture(state);
   rendering::cleanup_rendering(state);
 

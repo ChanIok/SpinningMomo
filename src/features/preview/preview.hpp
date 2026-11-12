@@ -9,7 +9,7 @@
 
 namespace features::preview {
 
-// 使用调用方确定的游戏视口屏幕开始捕获并显示预览。
+// 在应用 UI 线程使用调用方确定的游戏视口屏幕开始捕获并显示预览。
 auto start_preview(core::AppState& state, HWND target_window,
                    const utils::display::MonitorInfo& monitor_info)
     -> std::expected<void, std::string>;
@@ -19,6 +19,9 @@ auto set_working_monitor(core::AppState& state, const utils::display::MonitorInf
 
 // 停止预览并隐藏窗口
 auto stop_preview(core::AppState& state) -> void;
+
+// 在 UI 线程结束失败会话并通知用户。
+auto fail_preview(core::AppState& state, const std::string& error) -> void;
 
 // DPI 处理
 auto update_preview_dpi(core::AppState& state, UINT new_dpi) -> void;
