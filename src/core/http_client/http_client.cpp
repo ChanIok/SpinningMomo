@@ -9,12 +9,17 @@
 #include "core/http_client/state.hpp"
 #include "core/http_client/types.hpp"
 #include "core/state/app_state.hpp"
+#include "core/version.hpp"
 #include "utils/logger/logger.hpp"
 #include "utils/string/string.hpp"
 
 namespace core::http_client::detail {
 
 using RequestOperation = core::http_client::RequestOperation;
+
+auto make_user_agent() -> std::wstring {
+  return utils::string::FromUtf8("SpinningMomo/" + core::version::get_app_version());
+}
 
 // 延长异步操作生命周期，确保在底层 WinHTTP 回调结束前对象不被析构
 auto acquire_keepalive(RequestOperation* operation) -> std::shared_ptr<RequestOperation> {
@@ -627,9 +632,10 @@ auto initialize(core::AppState& state) -> std::expected<void, std::string> {
     return {};
   }
 
+  const auto user_agent = detail::make_user_agent();
   state.http_client->session = core::http_client::UniqueHInternet{
-      WinHttpOpen(state.http_client->user_agent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                  WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC)};
+      WinHttpOpen(user_agent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
+                  WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC)};
   if (!state.http_client->session) {
     return std::unexpected("Failed to open WinHTTP async session");
   }

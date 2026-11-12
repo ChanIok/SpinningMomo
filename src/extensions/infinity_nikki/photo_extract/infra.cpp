@@ -174,7 +174,6 @@ auto http_post_json(core::AppState& app_state, const std::string& url_utf8,
       .headers =
           {
               core::http_client::Header{.name = "Content-Type", .value = "application/json"},
-              core::http_client::Header{.name = "X-Client", .value = "SpinningMomo"},
           },
       .body = request_body_utf8,
   };

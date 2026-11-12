@@ -93,7 +93,6 @@ struct RequestOperation {
 
 struct HttpClientState {
   core::http_client::UniqueHInternet session;
-  std::wstring user_agent = L"SpinningMomo/1.0";
 
   int resolve_timeout_ms = 0;
   int connect_timeout_ms = 10'000;

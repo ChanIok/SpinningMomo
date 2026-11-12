@@ -118,7 +118,6 @@ auto fetch_role_nickname(core::AppState& app_state, const std::string& uid)
       .headers =
           {
               core::http_client::Header{.name = "Accept", .value = "application/json"},
-              core::http_client::Header{.name = "X-Client", .value = "SpinningMomo"},
           },
       .connect_timeout_ms = kRoleApiConnectTimeoutMs,
       .receive_timeout_ms = kRoleApiReceiveTimeoutMs,
