@@ -601,6 +601,15 @@ export function useLightboxSwipeNavigation(options: UseLightboxSwipeNavigationOp
         navigationReadyIndex.value = null
       }
       pendingNavigationIndex.value = validTargetIndex
+
+      // 窄屏暗房在手势提交当帧就切换操作对象，不等 400ms 动画结束；activeIndex 仍留给动画结束后提交。
+      if (store.isCompactWindow && store.lightbox.isOpen) {
+        const asset = store.getAssetAt(validTargetIndex)
+        if (asset) {
+          store.replaceSelection([asset.id])
+          store.setActiveAssetId(asset.id)
+        }
+      }
     } else if (
       validTargetIndex === store.selection.activeIndex &&
       pendingNavigationIndex.value !== validTargetIndex

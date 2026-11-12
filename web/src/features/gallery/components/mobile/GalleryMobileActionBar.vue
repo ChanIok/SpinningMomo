@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
+import { useButtonActivation } from '../../composables/useButtonActivation'
 import { useGalleryAssetActions, useGalleryData } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { galleryApi } from '../../api'
@@ -52,6 +53,7 @@ const containerClass = computed(() => {
 const { t } = useI18n()
 const { toast } = useToast()
 const store = useGalleryStore()
+const activation = useButtonActivation()
 const assetActions = useGalleryAssetActions()
 const galleryData = useGalleryData()
 
@@ -429,13 +431,18 @@ async function handleDownload() {
 
 <template>
   <div :class="containerClass" @contextmenu.prevent.stop>
+    <!-- 触摸在抬起时激活；鼠标和键盘保留 click 语义。 -->
     <div class="mx-auto grid w-full max-w-xl grid-cols-5 gap-1">
       <Button
         variant="ghost"
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="downloadAssetIds.length === 0 || isDownloading || downloadConfirmationOpen"
         :aria-busy="isDownloading"
-        @click="void handleDownload()"
+        @pointerdown="activation.onPointerDown"
+        @pointermove="activation.onPointerMove"
+        @pointerup="activation.onPointerUp($event, () => void handleDownload(), true)"
+        @pointercancel="activation.onPointerCancel"
+        @click="activation.onClick($event, () => void handleDownload())"
       >
         <LoaderCircle v-if="isDownloading" class="size-5 animate-spin" :stroke-width="1.5" />
         <Download v-else class="size-5" :stroke-width="1.5" />
@@ -447,7 +454,11 @@ async function handleDownload() {
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
         :aria-label="`${t('gallery.mobile.actions.rating')}: ${ratingDisplayLabel}`"
-        @click="openRatingSheet"
+        @pointerdown="activation.onPointerDown"
+        @pointermove="activation.onPointerMove"
+        @pointerup="activation.onPointerUp($event, openRatingSheet, true)"
+        @pointercancel="activation.onPointerCancel"
+        @click="activation.onClick($event, openRatingSheet)"
       >
         <Star
           class="size-5 transition-colors"
@@ -468,7 +479,11 @@ async function handleDownload() {
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :class="allSelectedRejected ? 'text-rose-500 hover:text-rose-600' : ''"
         :disabled="selectedCount === 0"
-        @click="handleRejected"
+        @pointerdown="activation.onPointerDown"
+        @pointermove="activation.onPointerMove"
+        @pointerup="activation.onPointerUp($event, handleRejected)"
+        @pointercancel="activation.onPointerCancel"
+        @click="activation.onClick($event, handleRejected)"
       >
         <X class="size-5 scale-110" :stroke-width="1.5" />
         <span>
@@ -484,7 +499,11 @@ async function handleDownload() {
         variant="ghost"
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
-        @click="void openTagSheet()"
+        @pointerdown="activation.onPointerDown"
+        @pointermove="activation.onPointerMove"
+        @pointerup="activation.onPointerUp($event, () => void openTagSheet(), true)"
+        @pointercancel="activation.onPointerCancel"
+        @click="activation.onClick($event, () => void openTagSheet())"
       >
         <Tag class="size-5" :stroke-width="1.5" />
         <span>{{ t('gallery.mobile.actions.tags') }}</span>
@@ -494,7 +513,11 @@ async function handleDownload() {
         variant="ghost"
         class="h-13 min-w-0 flex-col gap-1 rounded-xl px-1 text-xs text-foreground transition-colors hover:bg-black/10 active:bg-black/15 disabled:opacity-40 dark:hover:bg-white/10 dark:active:bg-white/15"
         :disabled="selectedCount === 0"
-        @click="moreSheetOpen = true"
+        @pointerdown="activation.onPointerDown"
+        @pointermove="activation.onPointerMove"
+        @pointerup="activation.onPointerUp($event, () => (moreSheetOpen = true), true)"
+        @pointercancel="activation.onPointerCancel"
+        @click="activation.onClick($event, () => (moreSheetOpen = true))"
       >
         <MoreHorizontal class="size-5" :stroke-width="1.5" />
         <span>{{ t('gallery.mobile.actions.more') }}</span>
@@ -527,6 +550,7 @@ async function handleDownload() {
   <MobileDrawer
     :open="ratingSheetOpen"
     side="bottom"
+    :z-index="110"
     :aria-label="t('gallery.mobile.sheet.ratingTitle')"
     class="rounded-t-2xl"
     @close="ratingSheetOpen = false"
@@ -572,6 +596,7 @@ async function handleDownload() {
   <MobileDrawer
     :open="tagSheetOpen"
     side="bottom"
+    :z-index="110"
     :aria-label="t('gallery.mobile.sheet.tagsTitle')"
     class="max-h-[82vh] overflow-y-auto rounded-t-2xl supports-[height:100dvh]:max-h-[82dvh]"
     @close="tagSheetOpen = false"
@@ -588,6 +613,7 @@ async function handleDownload() {
   <MobileDrawer
     :open="moreSheetOpen"
     side="bottom"
+    :z-index="110"
     class="max-h-[86vh] overflow-y-auto rounded-t-2xl pt-2 supports-[height:100dvh]:max-h-[86dvh]"
     @close="moreSheetOpen = false"
   >

@@ -9,9 +9,8 @@ export function useGalleryLightbox() {
   const gallerySelection = useGallerySelection()
   const overlayHistory = useGalleryOverlayHistory()
   async function syncLightboxSelection(index: number) {
-    // 普通浏览状态下，暗房当前资产就是单选目标；这让暗房内的操作和详情沿用图库选择语义。
-    // 多选状态下保留用户已经建立的集合，暗房导航只改变当前浏览位置。
-    if (store.selection.mode === 'multi-select') {
+    // 宽屏多选保留用户建立的集合，暗房导航只改变当前浏览位置；窄屏暗房一律单选，当前显示的那张就是操作对象。
+    if (!store.isCompactWindow && store.selectedCount > 1) {
       return gallerySelection.activateIndex(index, { syncDetails: store.selectedCount > 1 })
     }
 

@@ -589,13 +589,14 @@ export function useGalleryAssetActions() {
     rating?: number
     reviewFlag?: ReviewFlag
   }) {
-    if (selectedAssetIds.value.length === 0) {
+    const ids = [...selectedAssetIds.value]
+    if (ids.length === 0) {
       return
     }
 
     try {
       const result = await galleryApi.updateAssetsReviewState({
-        assetIds: selectedAssetIds.value,
+        assetIds: ids,
         rating: payload.rating,
         reviewFlag: payload.reviewFlag,
       })
@@ -605,7 +606,7 @@ export function useGalleryAssetActions() {
       }
 
       // 审片是高频操作：成功后优先 patch 当前已加载数据，避免等待整页重载。
-      store.patchAssetsReviewState(selectedAssetIds.value, payload)
+      store.patchAssetsReviewState(ids, payload)
       store.patchBatchSummaryReviewState(payload)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

@@ -242,9 +242,10 @@ function handleImagePannableChange(pannable: boolean) {
   imagePannable.value = pannable
 }
 
-// 滑动产生的 click 不能落到图片缩放或视频控件上。
+// 只吞掉手势本身产生的合成 click；settling 会一直持续到新图媒体就绪，不能再拿它封锁整段交互。
 function handlePagerClickCapture(event: MouseEvent) {
-  if (swipePhase.value !== 'idle' || multiTouchActive.value || consumeSuppressedClick()) {
+  const suppressedClick = consumeSuppressedClick()
+  if (multiTouchActive.value || suppressedClick) {
     event.preventDefault()
     event.stopPropagation()
   }

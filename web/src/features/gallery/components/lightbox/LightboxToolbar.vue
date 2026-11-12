@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
+import { useButtonActivation } from '../../composables/useButtonActivation'
 import { cn } from '@/lib/utils'
 import {
   ChevronLeft,
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const store = useGalleryStore()
+const activation = useButtonActivation()
 
 const currentIndex = computed(() => store.selection.activeIndex ?? 0)
 const totalCount = computed(() => store.totalCount)
@@ -126,7 +128,7 @@ const backButtonSize = computed(() => (props.compressed ? ('icon' as const) : ('
 const backButtonBoxClass = computed(() => props.compressed && 'h-10 w-10')
 const backButtonIconClass = computed(() => (props.compressed ? 'size-5' : 'size-4'))
 
-function handleRotateClick(event: MouseEvent) {
+function handleRotate(event: MouseEvent | PointerEvent) {
   emit('rotate', event.altKey ? -90 : 90)
 }
 
@@ -153,6 +155,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
     :class="toolbarBackgroundClass"
     @contextmenu="handleToolbarContextMenu"
   >
+    <!-- 触摸在抬起时激活；鼠标和键盘保留 click 语义。 -->
     <TooltipProvider :delay-duration="300">
       <!-- 左侧区域 -->
       <div class="flex h-12 min-w-0 items-center gap-3">
@@ -164,7 +167,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               class="shrink-0"
               :class="cn(toolbarButtonClass, backButtonBoxClass)"
               :aria-label="t('gallery.lightbox.toolbar.backTitle')"
-              @click="emit('back')"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, () => emit('back'), true)"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, () => emit('back'))"
             >
               <ChevronLeft :class="backButtonIconClass" :stroke-width="1.5" />
             </Button>
@@ -202,7 +209,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 cn(toolbarButtonClass, props.detailsOpen && 'text-primary hover:text-primary')
               "
               :aria-label="t('gallery.lightbox.toolbar.detailsTitle')"
-              @click="emit('toggleDetails')"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, () => emit('toggleDetails'), true)"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, () => emit('toggleDetails'))"
             >
               <Info class="size-5" :stroke-width="1.5" />
             </Button>
@@ -224,7 +235,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                   ? t('gallery.lightbox.toolbar.exitImmersiveTitle')
                   : t('gallery.lightbox.toolbar.immersiveTitle')
               "
-              @click="emit('toggleImmersive')"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, () => emit('toggleImmersive'), true)"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, () => emit('toggleImmersive'))"
             >
               <Minimize v-if="isImmersive" class="size-5" :stroke-width="1.5" />
               <Maximize v-else class="size-5" :stroke-width="1.5" />
@@ -263,7 +278,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                       supportsZoom && isFitMode && toggleActiveClass
                     )
                   "
-                  @click="emit('fit')"
+                  @pointerdown="activation.onPointerDown"
+                  @pointermove="activation.onPointerMove"
+                  @pointerup="activation.onPointerUp($event, () => emit('fit'))"
+                  @pointercancel="activation.onPointerCancel"
+                  @click="activation.onClick($event, () => emit('fit'))"
                 >
                   {{ t('gallery.lightbox.toolbar.fit') }}
                 </Button>
@@ -287,7 +306,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                       supportsZoom && isActualSize && toggleActiveClass
                     )
                   "
-                  @click="emit('actual')"
+                  @pointerdown="activation.onPointerDown"
+                  @pointermove="activation.onPointerMove"
+                  @pointerup="activation.onPointerUp($event, () => emit('actual'))"
+                  @pointercancel="activation.onPointerCancel"
+                  @click="activation.onClick($event, () => emit('actual'))"
                 >
                   {{ t('gallery.lightbox.toolbar.actual') }}
                 </Button>
@@ -307,7 +330,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 size="icon-sm"
                 :disabled="!supportsZoom"
                 :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
-                @click="emit('zoomOut')"
+                @pointerdown="activation.onPointerDown"
+                @pointermove="activation.onPointerMove"
+                @pointerup="activation.onPointerUp($event, () => emit('zoomOut'))"
+                @pointercancel="activation.onPointerCancel"
+                @click="activation.onClick($event, () => emit('zoomOut'))"
               >
                 <ZoomOut class="size-4" :stroke-width="1.5" />
               </Button>
@@ -325,7 +352,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
                 size="icon-sm"
                 :disabled="!supportsZoom"
                 :class="cn(toolbarButtonClass, !supportsZoom && 'cursor-not-allowed')"
-                @click="emit('zoomIn')"
+                @pointerdown="activation.onPointerDown"
+                @pointermove="activation.onPointerMove"
+                @pointerup="activation.onPointerUp($event, () => emit('zoomIn'))"
+                @pointercancel="activation.onPointerCancel"
+                @click="activation.onClick($event, () => emit('zoomIn'))"
               >
                 <ZoomIn class="size-4" :stroke-width="1.5" />
               </Button>
@@ -345,7 +376,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               size="icon-sm"
               class="hidden @min-[420px]:inline-flex"
               :class="toolbarButtonClass"
-              @click="handleRotateClick"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, handleRotate)"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, handleRotate)"
             >
               <RotateCw class="size-4" :stroke-width="1.5" />
             </Button>
@@ -397,7 +432,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               :variant="toolbarVariant"
               size="icon-sm"
               :class="cn(toolbarButtonClass, showFilmstrip && toggleActiveClass)"
-              @click="emit('toggleFilmstrip')"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, () => emit('toggleFilmstrip'))"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, () => emit('toggleFilmstrip'))"
             >
               <Film class="size-4 rotate-90" :stroke-width="1.5" />
             </Button>
@@ -421,7 +460,11 @@ function handleToolbarContextMenu(event: MouseEvent) {
               :variant="toolbarVariant"
               size="icon-sm"
               :class="toolbarButtonClass"
-              @click="emit('toggleImmersive')"
+              @pointerdown="activation.onPointerDown"
+              @pointermove="activation.onPointerMove"
+              @pointerup="activation.onPointerUp($event, () => emit('toggleImmersive'))"
+              @pointercancel="activation.onPointerCancel"
+              @click="activation.onClick($event, () => emit('toggleImmersive'))"
             >
               <Minimize v-if="isImmersive" class="size-4" :stroke-width="1.5" />
               <Maximize v-else class="size-4" :stroke-width="1.5" />
