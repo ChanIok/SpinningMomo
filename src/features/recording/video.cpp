@@ -317,9 +317,6 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
                                      reinterpret_cast<ULONG_PTR>(result.manager.get())));
   }
 
-  // 开启编码低延迟提示
-  MF_TRY(attributes->SetUINT32(MF_LOW_LATENCY, TRUE));
-
   // 通过 ICodecAPI 精确配置编码参数（速率控制、GOP、码率/质量、零 B 帧）
   wil::com_ptr<ICodecAPI> codec;
   MF_TRY(transform->QueryInterface(IID_PPV_ARGS(codec.put())));
@@ -355,12 +352,6 @@ auto create_encoder(const RecordingConfig& config, ID3D11Device* device, const L
   if (!configured) {
     return std::unexpected(configured.error());
   }
-
-  // 请求低延迟模式
-  VARIANT latency{};
-  latency.vt = VT_BOOL;
-  latency.boolVal = VARIANT_TRUE;
-  MF_TRY(codec->SetValue(&CODECAPI_AVLowLatencyMode, &latency));
 
   // 禁用 B 帧（设置为 0），避免帧重排序延迟
   const auto no_b =
