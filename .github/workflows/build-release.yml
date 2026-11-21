@@ -23,7 +23,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # 固定为 windows-2022（VS 2022），避开 windows-latest / windows-2025（VS 2026 / MSVC 14.52）编译 reflect-cpp 的 C3539 回归
+    runs-on: windows-2022
     env:
       # Keep xmake/vcpkg caches in workspace for reliable cache restore on GitHub runners.
       XMAKE_GLOBALDIR: ${{ github.workspace }}\.xmake-global
