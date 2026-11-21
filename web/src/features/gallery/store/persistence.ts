@@ -43,8 +43,8 @@ export function createDefaultGallerySettings(): GallerySettings {
   return {
     view: {
       size: 256,
-      mode: 'grid' satisfies ViewMode,
-      dateGrouping: 'none' satisfies DateGrouping,
+      mode: 'adaptive' satisfies ViewMode,
+      dateGrouping: 'day' satisfies DateGrouping,
       useOriginalImagesForCards: true,
       preloadOriginalImagesForLightbox: true,
       useNarrowCardSpacing: false,
