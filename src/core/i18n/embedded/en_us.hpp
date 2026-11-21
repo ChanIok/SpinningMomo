@@ -11,11 +11,11 @@
 namespace embedded_locales {
 
 // Embedded English JSON content as string_view
-// Size: 6463 bytes
+// Size: 6466 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
-  "menu.app_main": "Main",
+  "menu.app_main": "Main UI",
   "menu.app_float": "Floating Window",
   "menu.app_exit": "Exit",
   "menu.app_user_guide": "User Guide",

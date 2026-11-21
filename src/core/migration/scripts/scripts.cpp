@@ -181,6 +181,60 @@ auto migrate_v2_0_11_0(core::AppState& app_state) -> std::expected<void, std::st
   return {};
 }
 
+auto migrate_v2_3_1_0(core::AppState&) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.3.1.0: Normalize resolution preset suffixes");
+
+  auto settings_path_result = features::settings::get_settings_path();
+  if (!settings_path_result) {
+    return std::unexpected("Failed to get settings path: " + settings_path_result.error());
+  }
+
+  const auto& settings_path = settings_path_result.value();
+  if (!std::filesystem::exists(settings_path)) {
+    Logger().info("Settings file not found, skip resolution preset migration");
+    return {};
+  }
+
+  std::ifstream file(settings_path);
+  if (!file) {
+    return std::unexpected("Failed to open settings file: " + settings_path.string());
+  }
+
+  std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  auto settings_result =
+      rfl::json::read<features::settings::AppSettings, rfl::DefaultIfMissing>(json_str);
+  if (!settings_result) {
+    return std::unexpected("Failed to parse settings: " + settings_result.error().what());
+  }
+
+  auto settings = settings_result.value();
+  bool changed = false;
+  for (auto& resolution : settings.ui.app_menu.resolutions) {
+    if (resolution == "480P") {
+      resolution = "480p";
+      changed = true;
+    } else if (resolution == "720P") {
+      resolution = "720p";
+      changed = true;
+    } else if (resolution == "1080P") {
+      resolution = "1080p";
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return {};
+  }
+
+  auto save_result = features::settings::save_settings_to_file(settings_path, settings);
+  if (!save_result) {
+    return std::unexpected("Failed to save settings: " + save_result.error());
+  }
+
+  Logger().info("Resolution presets migrated to lowercase 'p' successfully");
+  return {};
+}
+
 auto get_all_migrations() -> const std::vector<MigrationScript>& {
   static const std::vector<MigrationScript> migrations = {
       {"2.0.0.0", "Initialize database schema", true, migrate_v2_0_0_0},
@@ -191,6 +245,7 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
       {"2.0.11.0", "Set update download sources", false, migrate_v2_0_11_0},
       {"2.1.2.0", "Add gallery asset missing lifecycle", true, migrate_v2_1_2_0},
       {"2.2.2.0", "Add Infinity Nikki decoded photo metadata", true, migrate_v2_2_2_0},
+      {"2.3.1.0", "Normalize resolution preset suffixes", false, migrate_v2_3_1_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},

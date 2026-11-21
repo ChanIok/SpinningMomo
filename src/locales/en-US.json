@@ -1,7 +1,7 @@
 {
   "version": "1.0",
 
-  "menu.app_main": "Main",
+  "menu.app_main": "Main UI",
   "menu.app_float": "Floating Window",
   "menu.app_exit": "Exit",
   "menu.app_user_guide": "User Guide",

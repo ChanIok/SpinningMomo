@@ -52,9 +52,9 @@ export const ASPECT_RATIO_PRESETS: Record<string, number> = {
 // 内置分辨率别名
 export const RESOLUTION_ALIASES: Record<string, [number, number]> = {
   Default: [0, 0],
-  '480P': [720, 480],
-  '720P': [1280, 720],
-  '1080P': [1920, 1080],
+  '480p': [720, 480],
+  '720p': [1280, 720],
+  '1080p': [1920, 1080],
   '2K': [2560, 1440],
   '4K': [3840, 2160],
   '5K': [5120, 2880],

@@ -413,7 +413,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         'letterbox.toggle',
       ],
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
-      resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],
+      resolutions: ['Default', '1080p', '2K', '4K', '6K', '8K', '12K'],
     },
     floatingWindowLayout: {
       baseItemHeight: 24,

@@ -155,7 +155,7 @@ struct AppSettings {
       std::string record_codec = "h264";          // 录制编码格式: "h264" | "h265"
 
       // ADB 分辨率预设按长边计算。模拟器/真机对长边有上限（如 1920），按短边模式下
-      // 21:9 会被推到 2520×1080 导致 wm size 失败；按长边则固定长边（如 1080P 长边 1920）。
+      // 21:9 会被推到 2520×1080 导致 wm size 失败；按长边则固定长边（如 1080p 长边 1920）。
       bool use_resolution_long_edge = true;
     } adb_mode;
 
@@ -224,7 +224,7 @@ struct AppSettings {
       // 启用的比例列表（顺序即为菜单显示顺序）
       std::vector<std::string> aspect_ratios = {"21:9", "16:9", "3:2", "1:1", "3:4", "2:3", "9:16"};
       // 启用的分辨率列表（顺序即为菜单显示顺序）
-      std::vector<std::string> resolutions = {"Default", "1080P", "2K", "4K", "6K", "8K", "12K"};
+      std::vector<std::string> resolutions = {"Default", "1080p", "2K", "4K", "6K", "8K", "12K"};
     } app_menu;
 
     // 浮窗布局配置

@@ -90,7 +90,8 @@ const normalizeResolutionInput = (value: string): string => {
   if (/^default$/i.test(normalized)) return 'Default'
   return normalized.replace(
     /(\d+)([kp])$/i,
-    (_, n: string, suffix: string) => `${n}${suffix.toUpperCase()}`
+    (_, n: string, suffix: string) =>
+      `${n}${suffix.toLowerCase() === 'p' ? 'p' : suffix.toUpperCase()}`
   )
 }
 

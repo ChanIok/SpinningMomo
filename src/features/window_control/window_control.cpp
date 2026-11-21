@@ -683,7 +683,7 @@ auto calculate_resolution_by_short_edge(double ratio, int short_edge, int screen
 
 // 长边模式：分辨率预设的长边固定，短边根据当前比例反推。
 // 适合 ADB 场景：模拟器/真机长边有上限（如 1920），按短边模式 21:9 会被推到 2520×1080
-// 导致 wm size 失败。固定长边后 1080P 在 21:9 下为 1920×823。
+// 导致 wm size 失败。固定长边后 1080p 在 21:9 下为 1920×823。
 auto calculate_resolution_by_long_edge(double ratio, int long_edge, int screen_width,
                                        int screen_height) -> Resolution {
   if (long_edge <= 0) {
@@ -755,13 +755,13 @@ auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput&
 
   Resolution resolution;
   if (options.use_long_edge) {
-    // 长边模式把 1080P 理解为“长边为 1920”，规避设备长边上限：
+    // 长边模式把 1080p 理解为“长边为 1920”，规避设备长边上限：
     // 21:9 -> 1920x823，9:16 -> 1080x1920。
     const int long_edge = std::max(resolution_preset.base_width, resolution_preset.base_height);
     resolution = calculate_resolution_by_long_edge(ratio, long_edge, options.screen_width,
                                                    options.screen_height);
   } else if (options.use_short_edge) {
-    // 短边模式把 1080P 理解为“短边为 1080”，适合录制构图：
+    // 短边模式把 1080p 理解为“短边为 1080”，适合录制构图：
     // 21:9 -> 2520x1080，3:4 -> 1080x1440。
     const int short_edge = std::min(resolution_preset.base_width, resolution_preset.base_height);
     resolution = calculate_resolution_by_short_edge(ratio, short_edge, options.screen_width,

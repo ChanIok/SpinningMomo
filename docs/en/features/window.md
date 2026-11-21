@@ -33,7 +33,7 @@ To switch to a different window, **right-click the floating window or tray icon*
 | Preset | Equivalent Base | Total Pixels |
 |--------|----------------|--------------|
 | Default | Follows screen | — |
-| 1080P  | 1920×1080      | ~2.1 MP |
+| 1080p  | 1920×1080      | ~2.1 MP |
 | 2K     | 2560×1440      | ~3.7 MP |
 | 4K     | 3840×2160      | ~8.3 MP |
 | 6K     | 5760×3240      | ~18.7 MP |
@@ -56,7 +56,7 @@ Higher resolutions consume more VRAM, RAM, and virtual memory. On an RTX 3060 12
 Both ratio and resolution presets can be added or removed under **Settings > Floating Window > Menu Settings**, and reordered by dragging.
 
 - **Aspect Ratio**: Enter as `width:height`, e.g. `16:9` or `4:5`.
-- **Resolution**: Enter as `width x height`, e.g. `1920x1080`; shorthands such as `4K` or `1080P` also work.
+- **Resolution**: Enter as `width x height`, e.g. `1920x1080`; shorthands such as `4K` or `1080p` also work.
 
 Newly added presets go to the end of the list — drag them to wherever you use them most.
 
