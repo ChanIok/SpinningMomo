@@ -1,0 +1,77 @@
+/*
+ * 设计令牌
+ * 数值直接对应 web/src/index.css 的两套主题（Light Modern / Dark Modern），不另造颜色：
+ *   浅色  --background #ffffff  --foreground #1b1b1b  --primary #c66900
+ *   深色  --background #191919  --foreground #ececec  --primary #f5a623
+ *
+ * 唯一偏离：深色下按钮文字用 #1b1b1b 而不是 --primary-foreground 的白色。
+ * 程序里 primary 多用于小面积元素，白字压 #f5a623 只有 2.0:1；官网做成整块填充按钮后
+ * 必须换成深字（8.5:1），否则按钮上的字看不清。
+ */
+
+:root {
+  color-scheme: light;
+
+  /* 底色与文字 */
+  --bg: #ffffff;
+  --bg-soft: #f8f8f8;
+  --card: #ffffff;
+  --ink: #1b1b1b;
+  --ink-2: #5c5c5c;
+  --ink-3: #767676;
+  --line: rgb(0 0 0 / 0.1);
+  --line-strong: rgb(0 0 0 / 0.18);
+
+  /* 品牌 */
+  --brand: #c66900;
+  --brand-ink: #a35600; /* 白底可读的文本色，5.1:1 */
+  --on-brand: #ffffff;
+  --brand-hover: #b05c00;
+  --brand-wash: color-mix(in srgb, var(--brand) 7%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand) 24%, transparent);
+
+  /* 取景框占位 */
+  --frame-bg: #fbf9f6;
+  --grid-line: rgb(0 0 0 / 0.05);
+
+  /* 排版 */
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* 尺度 */
+  --shell: 1120px;
+  --gutter: clamp(20px, 5vw, 40px);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur-slow: 680ms;
+}
+
+/* VitePress 在 <html> 上切换 .dark */
+.dark {
+  color-scheme: dark;
+
+  --bg: #191919;
+  --bg-soft: #212121;
+  --card: #202020;
+  --ink: #ececec;
+  --ink-2: #a6a6a6;
+  --ink-3: #8a8a8a;
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.18);
+
+  --brand: #f5a623;
+  --brand-ink: #f5a623;
+  --on-brand: #1b1b1b;
+  --brand-hover: #ffb84d;
+  --brand-wash: color-mix(in srgb, var(--brand) 14%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand) 32%, transparent);
+
+  --frame-bg: #1e1e1e;
+  --grid-line: rgb(255 255 255 / 0.07);
+}

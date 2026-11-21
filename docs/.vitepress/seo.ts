@@ -31,6 +31,9 @@ export function isLegacyDocPath(relativePath: string): boolean {
   return relativePath.replace(/\\/g, "/").startsWith("v0/");
 }
 
+/** 只有中文的单页（更新日志）：没有英文对页，不输出 hreflang */
+const SINGLE_LOCALE_PAGES = new Set(["changelog.md"]);
+
 /**
  * 返回当前 v2 页面对应的中英 canonical 路径（含前导 /，已考虑 index.md）。
  * 若无对页（非 v2 双语结构），返回 null。
@@ -41,6 +44,7 @@ export function getBilingualPathnames(relativePath: string): {
 } | null {
   const p = relativePath.replace(/\\/g, "/");
   if (isLegacyDocPath(p)) return null;
+  if (SINGLE_LOCALE_PAGES.has(p)) return null;
 
   if (p === "index.md") {
     return { zhPathname: "/", enPathname: "/en/" };

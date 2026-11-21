@@ -1,0 +1,71 @@
+/* 营销页共用的壳：首页、下载、更新日志 */
+
+.home-page .btn {
+  display: inline-flex;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 26px;
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.home-page .btn:hover {
+  background: var(--brand-hover);
+}
+
+.home-page .btn:active {
+  transform: translateY(1px);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- 阅读页壳（下载、更新日志） ---------- */
+
+.doc-page .doc {
+  width: 100%;
+  max-width: 780px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  padding-block: clamp(40px, 7vh, 76px) clamp(56px, 10vh, 104px);
+}
+
+.doc-page .doc-head h1 {
+  font-size: clamp(2rem, 3.6vw, 2.6rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.015em;
+}
+
+.doc-page .doc-head p {
+  margin-top: 14px;
+  max-width: 36em;
+  font-size: 15.5px;
+  line-height: 1.8;
+  color: var(--ink-2);
+}
+
+.doc-page .doc-foot {
+  margin-top: clamp(38px, 6vh, 56px);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.doc-page .doc-foot a {
+  color: var(--brand-ink);
+}
+
+.doc-page .doc-foot a:hover {
+  color: var(--brand);
+}

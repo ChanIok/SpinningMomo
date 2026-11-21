@@ -7,14 +7,15 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview",
+    "sync:releases": "node scripts/sync-releases.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "GPL-3.0",
   "devDependencies": {
     "@types/node": "^24.10.2",
-    "vitepress": "^1.5.0",
-    "vue": "^3.5.13"
+    "vitepress": "2.0.0-alpha.21",
+    "vue": "^3.5.45"
   }
 }

@@ -7,7 +7,7 @@ import {
   mdRelativeToPathname,
   pageLocale,
   toAbsoluteUrl,
-} from "./seo";
+} from "./seo.ts";
 
 const baseEnv = process.env.VITE_BASE_PATH || "/";
 const base = baseEnv.endsWith("/") ? baseEnv : `${baseEnv}/`;
@@ -136,17 +136,65 @@ export default defineConfig({
       description: SITE_DESCRIPTION_EN,
       themeConfig: {
         siteTitle: SITE_NAME_EN,
+
+        // 语言级的 themeConfig 与根配置浅合并，界面文案要重新给一遍
+        outline: { label: "On this page", level: [2, 3] },
+        docFooter: { prev: "Previous page", next: "Next page" },
+        skipToContentLabel: "Skip to content",
+        returnToTopLabel: "Return to top",
+        sidebarMenuLabel: "Menu",
+        navMenuLabel: "Menu",
+        extraMenuLabel: "More",
+        langMenuLabel: "Change language",
+        darkModeSwitchLabel: "Appearance",
+        lightModeSwitchTitle: "Switch to light theme",
+        darkModeSwitchTitle: "Switch to dark theme",
+        notFound: {
+          code: "404",
+          title: "PAGE NOT FOUND",
+          quote: "This link may be broken, or the page has been archived.",
+          linkText: "Take me home",
+          linkLabel: "Go to home",
+        },
+
+        search: {
+          provider: "local",
+          options: {
+            translations: {
+              button: { buttonText: "Search", buttonAriaLabel: "Search" },
+              modal: {
+                displayDetails: "Display detailed list",
+                resetButtonTitle: "Reset search",
+                backButtonTitle: "Close search",
+                noResultsText: "No results for",
+                footer: {
+                  selectText: "to select",
+                  selectKeyAriaLabel: "enter",
+                  navigateText: "to navigate",
+                  navigateUpKeyAriaLabel: "up arrow",
+                  navigateDownKeyAriaLabel: "down arrow",
+                  closeText: "to close",
+                  closeKeyAriaLabel: "escape",
+                },
+              },
+            },
+          },
+        },
         footer: {
-          message: `Released under GPL-3.0 · <a href="${withBasePath("/en/about/legal")}">Legal & Privacy</a> · <a href="${withBasePath("/en/about/credits")}">Open Source Credits</a>`,
-          copyright: "Copyright © 2026 InfinityMomo",
+          message: `<a href="${withBasePath("/en/about/legal")}">Legal & Privacy</a> · <a href="${withBasePath("/en/about/credits")}">Open Source Credits</a>`,
+          copyright: "© 2026 InfinityMomo · GPL-3.0",
         },
         nav: [
           { text: "Guide", link: "/en/guide/getting-started" },
+          {
+            text: "Download",
+            link: "https://github.com/ChanIok/SpinningMomo/releases/latest",
+          },
           { text: "Legal", link: "/en/about/legal" },
           {
             text: "Version",
             items: [
-              { text: "v2.0 (Current)", link: "/en/" },
+              { text: "v2.0 (Current)", link: "/en/guide/getting-started" },
               { text: "v0.7.7 (Legacy)", link: "/v0/en/" },
             ],
           },
@@ -196,9 +244,78 @@ export default defineConfig({
   themeConfig: {
     logo: withBasePath("/logo.png"),
     siteTitle: SITE_NAME,
+
+    /*
+     * VitePress 2.0 不再内置界面多语言：目录标题、翻页、开关等文案都要显式配置，
+     * 否则中文站会露出英文。
+     */
+    outline: { label: "本页目录", level: [2, 3] },
+    docFooter: { prev: "上一篇", next: "下一篇" },
+    skipToContentLabel: "跳到正文",
+    returnToTopLabel: "回到顶部",
+    sidebarMenuLabel: "菜单",
+    navMenuLabel: "导航",
+    extraMenuLabel: "更多",
+    langMenuLabel: "切换语言",
+    darkModeSwitchLabel: "外观",
+    lightModeSwitchTitle: "切换到浅色模式",
+    darkModeSwitchTitle: "切换到深色模式",
+
+    notFound: {
+      code: "404",
+      title: "页面不存在",
+      quote: "链接可能已经失效，或者这个页面在旧版本里已经归档。",
+      linkText: "回到首页",
+      linkLabel: "回到首页",
+    },
+
+    /*
+     * 语言切换的落点。默认会机械替换语言前缀，但更新日志只有中文版，
+     * 切到英文时回到英文首页。
+     * 注意：这个函数会被序列化进客户端，只能使用入参，不能引用模块作用域变量；
+     * 返回的路径不带 base，由 VPLink 统一补。
+     */
+    i18nRouting(_data, route, targetLocale) {
+      const rel = String(route.data.relativePath).replace(/\.md$/, "");
+
+      if (rel === "changelog") {
+        return targetLocale === "root" ? "/" : `/${targetLocale}/`;
+      }
+      if (targetLocale === "root") {
+        return `/${rel.replace(/^en\//, "").replace(/(^|\/)index$/, "")}`;
+      }
+      const en = rel.startsWith("en/") ? rel : `en/${rel}`;
+      return `/${en.replace(/(^|\/)index$/, "")}`;
+    },
+
+    // 右上角只保留一个紧凑的搜索入口，Ctrl+K 唤起
+    search: {
+      provider: "local",
+      options: {
+        translations: {
+          button: { buttonText: "搜索", buttonAriaLabel: "搜索" },
+          modal: {
+            displayDetails: "显示详细列表",
+            resetButtonTitle: "清除查询",
+            backButtonTitle: "关闭搜索",
+            noResultsText: "没有找到结果",
+            footer: {
+              selectText: "选择",
+              selectKeyAriaLabel: "回车",
+              navigateText: "切换",
+              navigateUpKeyAriaLabel: "上箭头",
+              navigateDownKeyAriaLabel: "下箭头",
+              closeText: "关闭",
+              closeKeyAriaLabel: "Esc",
+            },
+          },
+        },
+      },
+    },
+
     footer: {
-      message: `GPL-3.0 开源 · <a href="${withBasePath("/about/legal")}">法律与隐私</a> · <a href="${withBasePath("/about/credits")}">开源鸣谢</a>`,
-      copyright: "Copyright © 2026 InfinityMomo",
+      message: `<a href="${withBasePath("/about/legal")}">法律与隐私</a> · <a href="${withBasePath("/about/credits")}">开源鸣谢</a>`,
+      copyright: "© 2026 InfinityMomo · GPL-3.0",
     },
 
     // 社交链接
@@ -209,16 +326,13 @@ export default defineConfig({
     // 导航栏
     nav: [
       { text: "指南", link: "/guide/getting-started" },
+      { text: "更新日志", link: "/changelog" },
       {
         text: "版本",
         items: [
-          { text: "v2.0 (当前)", link: "/" },
-          { text: "v0.7.7 (旧版)", link: "/v0/index.md" }
-        ]
-      },
-      {
-        text: "下载",
-        link: "https://github.com/ChanIok/SpinningMomo/releases",
+          { text: "v2.0 (当前)", link: "/guide/getting-started" },
+          { text: "v0.7.7 (旧版)", link: "/v0/" },
+        ],
       },
     ],
 

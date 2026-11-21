@@ -20,6 +20,8 @@
     "build:installer": "node scripts/build-installer.js",
     "build:checksums": "node scripts/generate-checksums.js",
     "dev:web": "pnpm --filter web run dev",
+    "dev:docs": "pnpm --filter docs run dev",
+    "build:docs": "pnpm --filter docs run build",
     "test:scenarios": "node tests/scenarios/run.ts",
     "release": "pnpm run build && pnpm run build:portable && pnpm run build:installer && pnpm run build:checksums",
     "release:version": "node scripts/release-version.js",
