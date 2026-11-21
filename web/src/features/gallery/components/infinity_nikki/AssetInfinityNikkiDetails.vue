@@ -808,7 +808,7 @@ watch(
             )
           }}</span>
           <span
-            class="max-w-32 truncate"
+            class="min-w-0 truncate"
             :class="{ 'font-mono': !metadataNames.poseName }"
             :title="formatMetadataTitle(formatPoseId(displayPoseId), metadataNames.poseName)"
           >
@@ -820,7 +820,7 @@ watch(
             t('gallery.details.infinityNikki.multiplayer.pose')
           }}</span>
           <span
-            class="max-w-32 truncate"
+            class="min-w-0 truncate"
             :class="{ 'font-mono': !metadataNames.otherPoseName }"
             :title="
               formatMetadataTitle(
@@ -842,7 +842,7 @@ watch(
             t('gallery.details.infinityNikki.lightId')
           }}</span>
           <span
-            class="max-w-32 truncate"
+            class="min-w-0 truncate"
             :class="{ 'font-mono': !metadataNames.lightName }"
             :title="
               formatMetadataTitle(formatMetadataId(extracted.lightId), metadataNames.lightName)
@@ -920,7 +920,7 @@ watch(
             t('gallery.details.infinityNikki.filterId')
           }}</span>
           <span
-            class="max-w-32 truncate"
+            class="min-w-0 truncate"
             :class="{ 'font-mono': !metadataNames.filterName }"
             :title="
               formatMetadataTitle(formatMetadataId(extracted.filterId), metadataNames.filterName)

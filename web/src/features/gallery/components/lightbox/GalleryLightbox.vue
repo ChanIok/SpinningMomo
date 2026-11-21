@@ -1177,7 +1177,7 @@ onUnmounted(() => {
                 />
               </div>
             </ContextMenuTrigger>
-            <ContextMenuContent class="w-56">
+            <ContextMenuContent>
               <GalleryAssetContextMenuContent />
             </ContextMenuContent>
           </ContextMenu>
