@@ -371,33 +371,49 @@ export async function assertPngDimensions(
   assert.equal(data.readUInt32BE(20), expectedHeight, `PNG 高度不符：${path}`);
 }
 
-export async function assertMp4Structure(
-  path: string,
-  layout?: "fragmented" | "regular",
-): Promise<void> {
-  const data = await readFile(path);
-  const boxTypes = new Set<string>();
-  let offset = 0;
+type Mp4Box = {
+  type: string;
+  contentStart: number;
+  end: number;
+};
 
-  while (offset + 8 <= data.length) {
+function iterateMp4Boxes(data: Buffer, start: number, end: number, path: string): Mp4Box[] {
+  const boxes: Mp4Box[] = [];
+  let offset = start;
+
+  while (offset + 8 <= end) {
     let boxSize = data.readUInt32BE(offset);
     let headerSize = 8;
     if (boxSize === 1) {
-      assert.ok(offset + 16 <= data.length, `MP4 large box header 不完整：${path}`);
+      assert.ok(offset + 16 <= end, `MP4 large box header 不完整：${path}`);
       const largeSize = data.readBigUInt64BE(offset + 8);
       assert.ok(largeSize <= BigInt(Number.MAX_SAFE_INTEGER), `MP4 box 过大：${path}`);
       boxSize = Number(largeSize);
       headerSize = 16;
     } else if (boxSize === 0) {
-      boxSize = data.length - offset;
+      boxSize = end - offset;
     }
 
-    assert.ok(boxSize >= headerSize && offset + boxSize <= data.length, `MP4 box 无效：${path}`);
-    boxTypes.add(data.toString("ascii", offset + 4, offset + 8));
+    assert.ok(boxSize >= headerSize && offset + boxSize <= end, `MP4 box 无效：${path}`);
+    boxes.push({
+      type: data.toString("ascii", offset + 4, offset + 8),
+      contentStart: offset + headerSize,
+      end: offset + boxSize,
+    });
     offset += boxSize;
   }
 
-  assert.equal(offset, data.length, `MP4 末尾存在无法解析的数据：${path}`);
+  assert.equal(offset, end, `MP4 末尾存在无法解析的数据：${path}`);
+  return boxes;
+}
+
+export async function assertMp4Structure(
+  path: string,
+  layout?: "fragmented" | "regular",
+): Promise<void> {
+  const data = await readFile(path);
+  const boxTypes = new Set(iterateMp4Boxes(data, 0, data.length, path).map((box) => box.type));
+
   assert.ok(boxTypes.has("ftyp"), `MP4 缺少 ftyp box：${path}`);
   assert.ok(boxTypes.has("moov"), `MP4 缺少 moov box：${path}`);
   if (layout !== undefined) {
@@ -408,6 +424,48 @@ export async function assertMp4Structure(
       `MP4 不是预期的 ${layout} 结构：${path}`,
     );
   }
+}
+
+export async function readMp4VideoSampleCount(path: string): Promise<number> {
+  const data = await readFile(path);
+  const topBoxes = iterateMp4Boxes(data, 0, data.length, path);
+  const moov = topBoxes.find((box) => box.type === "moov");
+  assert.ok(moov, `MP4 缺少 moov box：${path}`);
+
+  for (const trak of iterateMp4Boxes(data, moov.contentStart, moov.end, path)) {
+    if (trak.type !== "trak") {
+      continue;
+    }
+    const mdia = iterateMp4Boxes(data, trak.contentStart, trak.end, path).find(
+      (box) => box.type === "mdia",
+    );
+    if (!mdia) {
+      continue;
+    }
+
+    const mdiaBoxes = iterateMp4Boxes(data, mdia.contentStart, mdia.end, path);
+    const hdlr = mdiaBoxes.find((box) => box.type === "hdlr");
+    if (!hdlr || hdlr.contentStart + 12 > hdlr.end) {
+      continue;
+    }
+    if (data.toString("ascii", hdlr.contentStart + 8, hdlr.contentStart + 12) !== "vide") {
+      continue;
+    }
+
+    const minf = mdiaBoxes.find((box) => box.type === "minf");
+    assert.ok(minf, `MP4 视频轨缺少 minf box：${path}`);
+    const stbl = iterateMp4Boxes(data, minf.contentStart, minf.end, path).find(
+      (box) => box.type === "stbl",
+    );
+    assert.ok(stbl, `MP4 视频轨缺少 stbl box：${path}`);
+    const stsz = iterateMp4Boxes(data, stbl.contentStart, stbl.end, path).find(
+      (box) => box.type === "stsz",
+    );
+    assert.ok(stsz && stsz.contentStart + 12 <= stsz.end, `MP4 视频轨缺少有效 stsz box：${path}`);
+    return data.readUInt32BE(stsz.contentStart + 8);
+  }
+
+  assert.fail(`MP4 缺少视频轨：${path}`);
 }
 
 // 每个 fixture 必须是内容唯一（hash 不同）的有效图片。

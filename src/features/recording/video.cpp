@@ -722,6 +722,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   }
 
   bool type_published = false;
+  auto last_progress = Clock::now();
 
   // 从 MFT 拉取压缩输出包的闭包：严格校验 PTS/DTS，以保留包确定前一个包的 duration
   const auto pull_mode = encoder.gpu ? utils::media::mft::PullMode::asynchronous
@@ -751,6 +752,7 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
       }
       expected.pop_front();
       ++session.video_encoded;
+      last_progress = Clock::now();
 
       session.video_delay_100ns.store(time::elapsed_since_start_100ns(session.start_qpc_100ns) -
                                       packet->pts);
@@ -800,7 +802,6 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
   bool drained = false;
   bool notified = false;
   bool write_backlog_notified = false;
-  auto last_progress = Clock::now();
   auto drain_started = Clock::now();
   auto next_log = Clock::now() + std::chrono::seconds(1);
   std::uint64_t last_skipped = 0;
@@ -841,7 +842,6 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
         if (!output) {
           return output;
         }
-        last_progress = Clock::now();
       }
       if (type == METransformDrainComplete) {
         drained = true;
@@ -895,8 +895,8 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
 
       std::optional<UINT> slot;
 
-      // 拥有 MFT 输入额度且在池子安全上限内时，租借一个空闲纹理槽位
-      if (credits && expected.size() < k_video_pool_size) {
+      // 拥有 MFT 输入额度时，从 4 槽有界池租借空闲纹理；不限制编码器内部在途帧数，避免多帧缓冲死锁
+      if (credits) {
         std::lock_guard lock(signals->mutex);
         for (UINT i = 0; i < k_video_pool_size; ++i) {
           if (signals->busy[i]) {
@@ -999,6 +999,9 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
           --credits;
         }
 
+        if (expected.empty()) {
+          last_progress = Clock::now();
+        }
         expected.push_back(pts);
         last_input = pts;
         next = target + 1;
@@ -1012,9 +1015,6 @@ auto run(core::AppState& app_state) -> std::expected<void, std::string> {
           auto output = collect();
           if (!output) {
             return output;
-          }
-          if (expected.empty()) {
-            last_progress = Clock::now();
           }
         }
       }

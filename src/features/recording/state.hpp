@@ -54,6 +54,7 @@ struct RecordingSession {
   std::int64_t start_qpc_100ns = 0;
   std::atomic<std::int64_t> stop_qpc_100ns{-1};
   std::string error;
+  bool failed_during_stop = false;
 
   // 视频统计与监控指标
   std::atomic<std::uint64_t> video_captured{0};

@@ -83,7 +83,21 @@ auto take_pending_start_request(RecordingState& state)
   return request;
 }
 
-// 根据桌面录制停止结果分发通知，区分正常保存、短段丢弃与封装失败
+// 拼接失败提示详情：已落盘异常分片附带路径，未落盘仅展示错误原因
+auto format_stop_failure_detail(const features::recording::StopResult& stop_result) -> std::string {
+  auto detail = stop_result.output_created
+                    ? utils::string::ToUtf8(stop_result.output_path.wstring())
+                    : std::string{};
+  if (!stop_result.error.empty()) {
+    if (!detail.empty()) {
+      detail += "\n";
+    }
+    detail += stop_result.error;
+  }
+  return detail;
+}
+
+// 根据桌面录制停止结果分发通知，区分正常保存、短段丢弃、录制中途失败与停止封装失败
 auto show_recording_stop_result_notification(core::AppState& state,
                                              const features::recording::StopResult& stop_result)
     -> void {
@@ -102,14 +116,15 @@ auto show_recording_stop_result_notification(core::AppState& state,
       return;
     }
 
-    case StopResultKind::Failed: {
-      auto detail = utils::string::ToUtf8(stop_result.output_path.wstring());
-      if (!stop_result.error.empty()) {
-        detail += "\n" + stop_result.error;
-      }
-      notify_message(state, state.i18n->texts["message.recording_stop_failed"] + detail);
+    case StopResultKind::RecordingFailed:
+      notify_message(state, state.i18n->texts["message.recording_failed"] +
+                                format_stop_failure_detail(stop_result));
       return;
-    }
+
+    case StopResultKind::StopFailed:
+      notify_message(state, state.i18n->texts["message.recording_stop_failed"] +
+                                format_stop_failure_detail(stop_result));
+      return;
 
     case StopResultKind::NotRecording:
     default:
@@ -192,7 +207,8 @@ auto restart_after_resize(core::AppState& app_state) -> void {
                 restart_config.output_path.string());
 
   const auto stopped = stop_desktop_segment(app_state);
-  if (stopped.kind == StopResultKind::Failed) {
+  if (stopped.kind == StopResultKind::RecordingFailed ||
+      stopped.kind == StopResultKind::StopFailed) {
     show_recording_stop_result_notification(app_state, stopped);
     core::events::post(app_state,
                        ui::floating_window::events::RecordingToggleEvent{.enabled = false});

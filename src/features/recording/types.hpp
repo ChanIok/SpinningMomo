@@ -146,12 +146,14 @@ enum class StopResultKind {
   NotRecording,
   Saved,
   Discarded,
-  Failed,
+  RecordingFailed,
+  StopFailed,
 };
 
 struct StopResult {
   StopResultKind kind = StopResultKind::NotRecording;
   std::filesystem::path output_path;
+  bool output_created = false;
   std::string error;
 };
 

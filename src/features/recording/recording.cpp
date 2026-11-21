@@ -109,6 +109,7 @@ auto request_session_stop(core::AppState& app_state, std::int64_t qpc_100ns) -> 
 // 标记会话失败：记录首个错误、打印日志并广播停止
 auto fail_session(core::AppState& app_state, std::string error) -> void {
   auto& session = *app_state.recording->session;
+  auto status = RecordingStatus::Idle;
   {
     std::lock_guard lock(session.mutex);
 
@@ -117,7 +118,9 @@ auto fail_session(core::AppState& app_state, std::string error) -> void {
       return;
     }
 
+    status = app_state.recording->status.load();
     session.error = std::move(error);
+    session.failed_during_stop = (status == RecordingStatus::Stopping);
     session.failed.store(true);
   }
 
@@ -128,7 +131,6 @@ auto fail_session(core::AppState& app_state, std::string error) -> void {
   request_session_stop(app_state, time::query_qpc_100ns());
 
   // 启动或录制期间的失败交给控制线程收尾；已在停止时不重复提交
-  const auto status = app_state.recording->status.load();
   if (status == RecordingStatus::Recording || status == RecordingStatus::Starting) {
     request_control_action(app_state, RecordingControlAction::AbortWithError);
   }
@@ -380,10 +382,12 @@ auto stop(core::AppState& app_state) -> StopResult {
   // 组装停止结果并校验视频编码总帧数
   StopResult result;
   result.output_path = session.config.output_path;
+  result.output_created = session.output_created.load();
   result.error = session.error;
 
   if (!result.error.empty()) {
-    result.kind = StopResultKind::Failed;
+    result.kind =
+        session.failed_during_stop ? StopResultKind::StopFailed : StopResultKind::RecordingFailed;
   } else if (session.video_encoded.load() <= k_discard_video_frame_threshold) {
     // 画面少于等于阈值（3帧）判定为误触短录，丢弃并删除文件
     result.kind = StopResultKind::Discarded;
@@ -392,8 +396,10 @@ auto stop(core::AppState& app_state) -> StopResult {
     std::error_code error;
     std::filesystem::remove(result.output_path, error);
     if (error) {
-      result.kind = StopResultKind::Failed;
+      result.kind = StopResultKind::StopFailed;
       result.error = error.message();
+    } else {
+      result.output_created = false;
     }
   } else {
     result.kind = StopResultKind::Saved;
