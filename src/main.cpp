@@ -9,6 +9,12 @@
 #include "utils/logger/logger.hpp"
 #include "utils/system/system.hpp"
 
+// 向 NVIDIA Optimus 和 AMD PowerXpress 声明进程级高性能显卡偏好。
+extern "C" {
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 // Win32 入口
 auto __stdcall wWinMain(HINSTANCE hInstance, [[maybe_unused]] HINSTANCE hPrevInstance,
                         LPWSTR lpCmdLine, [[maybe_unused]] int nCmdShow) -> int {
