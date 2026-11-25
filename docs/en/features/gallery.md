@@ -22,20 +22,6 @@ Selecting a photo or video shows its dominant colors, resolution, file size, cre
 
 Double-click to open the photo viewer (single tap on touch input), with zoom, video playback, and continuous browsing.
 
-## Browsing Performance
-
-Measured on directories holding around 100,000 photos, scrolling, load speed, and memory usage all stay within normal ranges.
-
-- Only cards near the current viewport are rendered, so per-frame render cost is independent of the total photo count.
-- Photos are loaded page by page on demand; switching filters or sorting also fetches only the pages near the current viewport.
-- Only thumbnails are decoded while scrolling. Full-size images are swapped in one by one once scrolling settles, so decoding never blocks scrolling.
-
-## File Changes & Annotation Retention
-
-- **Directory Watching**: Additions, removals, and edits inside a directory are reflected in the gallery in real time. On startup, the NTFS change journal is used to catch up on changes made while the app was closed. Network directories do not support this and are re-scanned instead.
-- **Move & Rename**: Moving or renaming a file in File Explorer does not immediately discard its annotations — they are retained for 30 days. Put the file back within that window and its tags, rating, and description reattach automatically.
-- **Copy & Save As**: The new path is indexed as a new record. If its content is exactly identical to an existing photo, tags, rating, and description are inherited once; after that the two copies stay independent.
-
 ## Network Storage
 
 Full support for network shared folders (UNC paths, such as NAS or LAN network drives).
@@ -49,5 +35,9 @@ Open the gallery in a phone or tablet browser on the same local network and it a
 ## Infinity Nikki Extension
 
 - **Camera Parameters**: Automatically parses photo shooting parameters, allowing you to copy camera parameter codes anytime for in-game import.
-- **Dye Codes**: Record and copy outfit dye codes for easy outfit management and sharing.
 - **Photo Map**: Pins photos onto the in-game map based on shot locations. Hover over pins for photo previews, or click pins to jump to the photo viewer.
+- **Media Hardlinks**: The game saves duplicate copies of photos and videos by default. Enabling hardlinks keeps a single physical copy to save disk space without affecting viewing or sharing.
+
+::: tip Missing parameters on some photos?
+Right-click a folder in the sidebar > Extract Infinity Nikki Metadata, then enter your **UID** to re-run extraction.
+:::

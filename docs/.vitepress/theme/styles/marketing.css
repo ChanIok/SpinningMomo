@@ -48,14 +48,6 @@
   letter-spacing: 0.015em;
 }
 
-.doc-page .doc-head p {
-  margin-top: 14px;
-  max-width: 36em;
-  font-size: 15.5px;
-  line-height: 1.8;
-  color: var(--ink-2);
-}
-
 .doc-page .doc-foot {
   margin-top: clamp(38px, 6vh, 56px);
   font-size: 13.5px;

@@ -20,6 +20,7 @@
   --vp-c-bg-alt: #f6f6f7;
   --vp-c-bg-soft: #f8f8f8;
   --vp-c-bg-elv: #ffffff;
+  --vp-sidebar-bg-color: var(--vp-c-bg);
 
   /* 字体 */
   --vp-font-family-base: var(--font-sans);
@@ -84,6 +85,11 @@
   width: 24px;
   height: 24px;
   border-radius: 7px;
+  transition: transform 620ms var(--ease-out);
+}
+
+.VPNavBarTitle .logo.is-spinning {
+  transform: rotate(360deg);
 }
 
 /* 导航分组之间的竖线去掉，靠间距分组 */
@@ -155,43 +161,58 @@ mark {
 
 /* ---------- 侧栏 ---------- */
 
-.VPSidebar {
-  border-right: 0;
+@media (min-width: 60rem) {
+  /* 桌面侧栏无需为抽屉底部留空，避免只因留白就出现滚动条。 */
+  .Layout > .VPSidebar {
+    padding-bottom: 2rem;
+  }
 }
 
-.VPSidebarItem.level-0 > .item > .text {
-  font-size: 14px;
+.VPSidebar .group + .group {
+  border-top: 0;
 }
 
-.VPSidebarItem.level-1 .text {
-  font-size: 14px;
+/* 高亮向外留出内边距，链接文字仍和分组标题对齐。 */
+.VPSidebarItem > .item > .link {
+  margin-inline-start: -0.625rem;
+  padding-inline: 0.625rem;
+  border-radius: var(--radius-sm);
 }
 
-/* 激活项：橙色文字 + 2px 竖条（旧站观感） */
-.VPSidebarItem.level-1.is-active > .item .link .text,
-.VPSidebarItem.level-2.is-active > .item .link .text,
-.VPSidebarItem.level-3.is-active > .item .link .text {
-  color: var(--vp-c-brand-1);
-  font-weight: 500;
+.VPSidebarItem > .item > .link[aria-current="page"] {
+  background-color: var(--brand-wash);
 }
 
 /* ---------- 页脚 ---------- */
 
 /*
- * 首页页脚是一行元信息：版权 + 许可证，不加分隔线。
+ * 首页与更新日志页的页脚是一行元信息：版权 + 许可证，不加分隔线、不带站内导航链接。
  * 主题的页脚样式带 [data-v] 属性选择器（0,2,0），单靠 .VPFooter（0,1,0）覆盖不掉边框，
  * 所以用页面类把权重对齐。
  */
-.home-page .VPFooter {
+.home-page .VPFooter,
+.changelog-page .VPFooter {
   border-top: 0;
 }
 
+/* 首页通过 Flex 链撑满顶栏与页脚之间的剩余空间，避免手算高度产生溢出滚动条 */
+.home-page .VPContent,
+.home-page .VPPage,
+.home-page .VPPage > div,
+.home-page .VPPage > div > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+
 /* 只留版权行：许可证已并入版权文案 */
-.home-page .VPFooter .message {
+.home-page .VPFooter .message,
+.changelog-page .VPFooter .message {
   display: none;
 }
 
-.home-page .VPFooter .copyright {
+.home-page .VPFooter .copyright,
+.changelog-page .VPFooter .copyright {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0.01em;

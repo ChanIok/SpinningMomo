@@ -3,7 +3,6 @@ import type { HeadConfig } from "vitepress";
 import {
   SITE_ORIGIN,
   getBilingualPathnames,
-  isLegacyDocPath,
   mdRelativeToPathname,
   pageLocale,
   toAbsoluteUrl,
@@ -15,8 +14,8 @@ const is_canonical_build = base === "/";
 const withBasePath = (p: string) => `${base}${p.replace(/^\//, "")}`;
 const SITE_NAME = "旋转吧大喵";
 const SITE_NAME_EN = "SpinningMomo";
-const SITE_DESCRIPTION_ZH = "《无限暖暖》游戏摄影与录像工具";
-const SITE_DESCRIPTION_EN = "Infinity Nikki photography and recording tool";
+const SITE_DESCRIPTION_ZH = "面向《无限暖暖》的游戏摄影、录制与图库工具";
+const SITE_DESCRIPTION_EN = "Game photography, recording, and gallery tool for Infinity Nikki";
 
 export default defineConfig({
   title: SITE_NAME,
@@ -39,15 +38,7 @@ export default defineConfig({
   // 忽略死链接检查
   ignoreDeadLinks: true,
 
-  sitemap: is_canonical_build
-    ? {
-        hostname: SITE_ORIGIN,
-        transformItems(items) {
-          // VitePress 在此使用相对路径（如 v0/zh/...），不含前导 /v0
-          return items.filter((item) => item.url !== "v0" && !item.url.startsWith("v0/"));
-        },
-      }
-    : undefined,
+  sitemap: is_canonical_build ? { hostname: SITE_ORIGIN } : undefined,
 
   async transformHead(ctx): Promise<HeadConfig[]> {
     const { pageData, title, description } = ctx;
@@ -65,8 +56,6 @@ export default defineConfig({
 
     if (!is_canonical_build) {
       head.push(["meta", { name: "robots", content: "noindex, nofollow" }]);
-    } else if (isLegacyDocPath(relativePath)) {
-      head.push(["meta", { name: "robots", content: "noindex, follow" }]);
     }
 
     const bilingual = getBilingualPathnames(relativePath);
@@ -85,19 +74,17 @@ export default defineConfig({
     head.push(["meta", { property: "og:type", content: "website" }]);
 
     const loc = pageLocale(relativePath);
-    if (loc) {
-      head.push([
-        "meta",
-        { property: "og:locale", content: loc.replace("-", "_") },
-      ]);
-      head.push([
-        "meta",
-        {
-          property: "og:locale:alternate",
-          content: loc === "zh-CN" ? "en_US" : "zh_CN",
-        },
-      ]);
-    }
+    head.push([
+      "meta",
+      { property: "og:locale", content: loc.replace("-", "_") },
+    ]);
+    head.push([
+      "meta",
+      {
+        property: "og:locale:alternate",
+        content: loc === "zh-CN" ? "en_US" : "zh_CN",
+      },
+    ]);
 
     head.push(["meta", { name: "twitter:card", content: "summary" }]);
     head.push(["meta", { name: "twitter:title", content: title }]);
@@ -152,7 +139,7 @@ export default defineConfig({
         notFound: {
           code: "404",
           title: "PAGE NOT FOUND",
-          quote: "This link may be broken, or the page has been archived.",
+          quote: "Check that the URL is correct.",
           linkText: "Take me home",
           linkLabel: "Go to home",
         },
@@ -191,13 +178,6 @@ export default defineConfig({
             link: "https://github.com/ChanIok/SpinningMomo/releases/latest",
           },
           { text: "Legal", link: "/en/about/legal" },
-          {
-            text: "Version",
-            items: [
-              { text: "v2.0 (Current)", link: "/en/guide/getting-started" },
-              { text: "v0.7.7 (Legacy)", link: "/v0/en/" },
-            ],
-          },
         ],
         sidebar: {
           "/en/": [
@@ -264,7 +244,7 @@ export default defineConfig({
     notFound: {
       code: "404",
       title: "页面不存在",
-      quote: "链接可能已经失效，或者这个页面在旧版本里已经归档。",
+      quote: "请检查链接是否正确。",
       linkText: "回到首页",
       linkLabel: "回到首页",
     },
@@ -327,13 +307,6 @@ export default defineConfig({
     nav: [
       { text: "指南", link: "/guide/getting-started" },
       { text: "更新日志", link: "/changelog" },
-      {
-        text: "版本",
-        items: [
-          { text: "v2.0 (当前)", link: "/guide/getting-started" },
-          { text: "v0.7.7 (旧版)", link: "/v0/" },
-        ],
-      },
     ],
 
     sidebar: {
@@ -377,37 +350,6 @@ export default defineConfig({
           ]
         },
       ],
-      // 保留旧版本的配置
-      "/v0/zh/": [
-        {
-          text: "指南 (v0.7.7)",
-          items: [
-            { text: "项目介绍", link: "/v0/zh/guide/introduction" },
-            { text: "快速开始", link: "/v0/zh/guide/getting-started" },
-            { text: "基本功能", link: "/v0/zh/guide/features" },
-          ],
-        },
-        {
-          text: "进阶使用",
-          items: [
-            { text: "自定义设置", link: "/v0/zh/advanced/custom-settings" },
-            { text: "常见问题", link: "/v0/zh/advanced/troubleshooting" },
-          ],
-        },
-      ],
-      "/v0/en/": [
-        {
-          text: "Guide (v0.7.7)",
-          items: [{ text: "Overview", link: "/v0/en/" }],
-        },
-        {
-          text: "Legal",
-          items: [
-            { text: "Legal & Privacy Notice", link: "/v0/en/legal/notice" },
-            { text: "Third-Party Licenses", link: "/v0/en/credits" }
-          ],
-        },
-      ]
     },
   },
 });

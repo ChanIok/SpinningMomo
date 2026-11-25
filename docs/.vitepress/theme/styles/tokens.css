@@ -30,9 +30,23 @@
   --brand-wash: color-mix(in srgb, var(--brand) 7%, transparent);
   --brand-line: color-mix(in srgb, var(--brand) 24%, transparent);
 
-  /* 取景框占位 */
-  --frame-bg: #fbf9f6;
-  --grid-line: rgb(0 0 0 / 0.05);
+  /* 首屏取景舞台与极简演示 */
+  --hero-dot: rgb(0 0 0 / 0.085);
+  --hero-dot-lit: rgb(198 105 0 / 0.34);
+  --hero-spot-enabled: 0;
+  --stage-aura-opacity: 0;
+  --hero-line: rgb(0 0 0 / 0.075);
+  --frame-bg: #ffffff;
+  --frame-surface: #ffffff;
+  --frame-subtle: #fafafa;
+  --grid-line: rgb(0 0 0 / 0.055);
+  --stage-ref-line: rgb(0 0 0 / 0.22);
+  --momo-ink: rgb(27 27 27 / 0.14);
+  --rec-dot: #dc4c46;
+  --gallery-tone-0: #e7e2da;
+  --gallery-tone-1: #dfe6ed;
+  --gallery-tone-2: #eae3d9;
+  --gallery-tone-3: #e0e7e3;
 
   /* 排版 */
   --font-sans:
@@ -72,6 +86,20 @@
   --brand-wash: color-mix(in srgb, var(--brand) 14%, transparent);
   --brand-line: color-mix(in srgb, var(--brand) 32%, transparent);
 
+  --hero-dot: rgb(255 255 255 / 0.095);
+  --hero-dot-lit: rgb(245 166 35 / 0.42);
+  --hero-spot-enabled: 1;
+  --stage-aura-opacity: 0.72;
+  --hero-line: rgb(255 255 255 / 0.085);
   --frame-bg: #1e1e1e;
-  --grid-line: rgb(255 255 255 / 0.07);
+  --frame-surface: #242424;
+  --frame-subtle: #1e1e1e;
+  --grid-line: rgb(255 255 255 / 0.065);
+  --stage-ref-line: rgb(255 255 255 / 0.24);
+  --momo-ink: rgb(255 255 255 / 0.16);
+  --rec-dot: #ef6461;
+  --gallery-tone-0: #2d2925;
+  --gallery-tone-1: #252c36;
+  --gallery-tone-2: #302a24;
+  --gallery-tone-3: #242d29;
 }

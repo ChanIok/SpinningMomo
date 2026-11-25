@@ -4,10 +4,7 @@
 
 ## 下载程序
 
-| 下载源 | 链接 | 说明 |
-|:--|:--|:--|
-| **GitHub** | [点击下载](https://github.com/ChanIok/SpinningMomo/releases/latest) | 国内访问可能受限 |
-| **百度网盘** | [点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo) | 提取码：`momo` |
+<DownloadLinks />
 
 提供两种版本：
 
@@ -31,9 +28,7 @@
 
 运行程序后，可能会弹出以下系统提示：
 
-::: warning Windows 安全提示
 - **UAC 提示**：点击 **是** 授予管理员权限（程序调整游戏窗口必须使用此权限）
-:::
 
 ## 初始配置向导
 

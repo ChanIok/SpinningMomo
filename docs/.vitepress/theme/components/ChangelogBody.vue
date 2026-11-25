@@ -9,7 +9,6 @@ const shown = releases.slice(0, 6);
   <div class="doc">
     <header class="doc-head">
       <h1>更新日志</h1>
-      <p>按发布时间倒序。每个版本的安装包与 SHA-256 校验和都可以在 GitHub Releases 找到。</p>
     </header>
 
     <ol class="releases">
@@ -44,18 +43,24 @@ const shown = releases.slice(0, 6);
 </template>
 
 <style scoped>
+.releases {
+  margin-top: 32px;
+}
+
 .releases > li {
   display: grid;
   grid-template-columns: 148px minmax(0, 1fr);
   gap: 32px;
   padding-block: 34px 38px;
-  border-top: 1px solid var(--line);
   scroll-margin-top: 24px;
 }
 
 .releases > li:first-child {
-  margin-top: 26px;
-  border-top-color: var(--line-strong);
+  padding-block-start: 0;
+}
+
+.releases > li + li {
+  border-top: 1px solid var(--line);
 }
 
 .release-meta {

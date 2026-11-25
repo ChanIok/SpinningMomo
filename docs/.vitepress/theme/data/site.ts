@@ -1,7 +1,7 @@
 export const SITE = {
   name: "旋转吧大喵",
   nameEn: "SpinningMomo",
-  tagline: "《无限暖暖》游戏摄影与录像工具",
+  tagline: "面向《无限暖暖》的游戏摄影、录制与图库工具",
   repo: "https://github.com/ChanIok/SpinningMomo",
   releases: "https://github.com/ChanIok/SpinningMomo/releases/latest",
   /** 国内下载渠道 */

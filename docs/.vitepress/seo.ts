@@ -26,24 +26,15 @@ export function toAbsoluteUrl(siteOrigin: string, base: string, pathname: string
   return `${origin}${normalizedBase}${path}`;
 }
 
-/** v0 文档：不参与 hreflang，且应 noindex */
-export function isLegacyDocPath(relativePath: string): boolean {
-  return relativePath.replace(/\\/g, "/").startsWith("v0/");
-}
-
 /** 只有中文的单页（更新日志）：没有英文对页，不输出 hreflang */
 const SINGLE_LOCALE_PAGES = new Set(["changelog.md"]);
 
-/**
- * 返回当前 v2 页面对应的中英 canonical 路径（含前导 /，已考虑 index.md）。
- * 若无对页（非 v2 双语结构），返回 null。
- */
+/** 返回中英对页的 canonical 路径；单语页面返回 null。 */
 export function getBilingualPathnames(relativePath: string): {
   zhPathname: string;
   enPathname: string;
 } | null {
   const p = relativePath.replace(/\\/g, "/");
-  if (isLegacyDocPath(p)) return null;
   if (SINGLE_LOCALE_PAGES.has(p)) return null;
 
   if (p === "index.md") {
@@ -68,9 +59,7 @@ export function getBilingualPathnames(relativePath: string): {
   return null;
 }
 
-export function pageLocale(relativePath: string): "zh-CN" | "en-US" | null {
+export function pageLocale(relativePath: string): "zh-CN" | "en-US" {
   const p = relativePath.replace(/\\/g, "/");
-  if (isLegacyDocPath(p)) return null;
-  if (p.startsWith("en/")) return "en-US";
-  return "zh-CN";
+  return p.startsWith("en/") ? "en-US" : "zh-CN";
 }

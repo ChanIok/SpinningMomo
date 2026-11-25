@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
-    "preview": "vitepress preview",
-    "sync:releases": "node scripts/sync-releases.mjs"
+    "preview": "vitepress preview"
   },
   "keywords": [],
   "author": "",

@@ -2,7 +2,7 @@
  * 从 GitHub Releases 拉取更新日志，生成 .vitepress/theme/data/releases.ts。
  *
  * 构建时不联网：CI 里 GitHub 可达性不稳定，站点应始终能用仓库内的快照构建。
- * 需要刷新时手动运行 `pnpm --filter docs run sync:releases`。
+ * 需要刷新时手动运行 `pnpm run sync:docs-releases`。
  */
 import { writeFile } from "node:fs/promises";
 import path from "node:path";

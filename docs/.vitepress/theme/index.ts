@@ -3,6 +3,7 @@ import DefaultTheme from "vitepress/theme";
 
 import HomeHero from "./components/HomeHero.vue";
 import ChangelogBody from "./components/ChangelogBody.vue";
+import DownloadLinks from "./components/DownloadLinks.vue";
 
 // 顺序有意义：令牌 → 品牌映射 → 营销页
 import "./styles/tokens.css";
@@ -14,5 +15,6 @@ export default {
   enhanceApp({ app }) {
     app.component("HomeHero", HomeHero);
     app.component("ChangelogBody", ChangelogBody);
+    app.component("DownloadLinks", DownloadLinks);
   },
 } satisfies Theme;

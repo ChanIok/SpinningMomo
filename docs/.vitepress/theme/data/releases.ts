@@ -17,6 +17,30 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    "version": "2.3.1",
+    "tag": "v2.3.1",
+    "name": "v2.3.1",
+    "date": "2026-11-21",
+    "url": "https://github.com/ChanIok/SpinningMomo/releases/tag/v2.3.1",
+    "groups": [
+      {
+        "title": "优化",
+        "items": [
+          "图库默认视图改为自适应布局并按日分组展示"
+        ]
+      },
+      {
+        "title": "修复",
+        "items": [
+          "修复录制编码卡帧与超时误判，区分录制失败与收尾失败提示",
+          "向 NVIDIA 和 AMD 显卡驱动声明进程级高性能显卡偏好",
+          "修复按钮文字易误选中、照片详情字段过早截断及暗房右键菜单换行异常的问题",
+          "将悬浮窗主界面英文文案调整为 Main UI，并统一分辨率预设小写 p 命名（如 1080p）"
+        ]
+      }
+    ]
+  },
+  {
     "version": "2.3.0",
     "tag": "v2.3.0",
     "name": "v2.3.0",
@@ -503,27 +527,6 @@ export const releases: Release[] = [
         "items": [
           "将录制启动切换为由控制线程统一执行",
           "优化悬浮窗功能项默认值"
-        ]
-      }
-    ]
-  },
-  {
-    "version": "2.0.13",
-    "tag": "v2.0.13",
-    "name": "v2.0.13",
-    "date": "2026-06-26",
-    "url": "https://github.com/ChanIok/SpinningMomo/releases/tag/v2.0.13",
-    "groups": [
-      {
-        "title": "修复 | Fixes",
-        "items": [
-          "修复录制停止时因尾音队列和捕获关闭异常导致卡住"
-        ]
-      },
-      {
-        "title": "其他 | Chores",
-        "items": [
-          "更新版本至2.0.13"
         ]
       }
     ]

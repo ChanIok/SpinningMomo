@@ -1,5 +1,7 @@
 # Getting Started
 
+Get set up and take your first ultra-high-res portrait.
+
 ## Download
 
 Download the latest version from [GitHub Releases](https://github.com/ChanIok/SpinningMomo/releases/latest).
@@ -31,7 +33,7 @@ The first time you run the program, Windows may show:
 On first launch, the setup wizard will walk you through:
 
 1. **Pick your language and theme** (dark / light / system)
-2. **Confirm the target window title** (defaults to *Infinity Nikki*)
+2. **Confirm the target window title**
 
 Once done, the floating window will appear on your screen.
 

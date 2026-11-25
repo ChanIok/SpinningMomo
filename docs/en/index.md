@@ -4,7 +4,7 @@ pageClass: home-page
 sidebar: false
 aside: false
 title: SpinningMomo
-description: Infinity Nikki photography and recording tool
+description: Game photography, recording, and gallery tool for Infinity Nikki
 ---
 
 <HomeHero lang="en" />
