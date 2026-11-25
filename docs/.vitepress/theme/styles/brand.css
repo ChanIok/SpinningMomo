@@ -85,11 +85,6 @@
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  transition: transform 620ms var(--ease-out);
-}
-
-.VPNavBarTitle .logo.is-spinning {
-  transform: rotate(360deg);
 }
 
 /* 导航分组之间的竖线去掉，靠间距分组 */

@@ -40,7 +40,6 @@
   --frame-surface: #ffffff;
   --frame-subtle: #fafafa;
   --grid-line: rgb(0 0 0 / 0.055);
-  --stage-ref-line: rgb(0 0 0 / 0.22);
   --momo-ink: rgb(27 27 27 / 0.14);
   --rec-dot: #dc4c46;
   --gallery-tone-0: #e7e2da;
@@ -95,7 +94,6 @@
   --frame-surface: #242424;
   --frame-subtle: #1e1e1e;
   --grid-line: rgb(255 255 255 / 0.065);
-  --stage-ref-line: rgb(255 255 255 / 0.24);
   --momo-ink: rgb(255 255 255 / 0.16);
   --rec-dot: #ef6461;
   --gallery-tone-0: #2d2925;

@@ -43,13 +43,17 @@ interface GalleryCardItem {
 const MOMO_OUTLINE_PATH =
   "M831.142 470.376C832.559 470.121 832.083 470.162 833.708 470.092C983.03 463.675 1138.44 507.296 1251.43 645.307C1251.67 645.888 1255.42 649.442 1255.7 649.292C1265.67 644.075 1274.37 637.704 1284.7 633.131C1304.36 624.431 1324.81 619.352 1345.5 618.036C1401.15 614.849 1460.7 635.401 1500.72 684.407C1541.41 734.229 1543.25 790.988 1550.8 856.393C1559.12 882.45 1578.49 903.642 1577.02 935.234C1573.79 1005 1546.64 1112.5 1513.01 1165.09C1488.03 1204.16 1413.35 1219.96 1376 1223.13C1341.13 1226.08 1312.44 1210.69 1286.89 1177.74C1223.83 1258.8 1173.78 1303.3 1089.28 1334.18C1114.34 1371.78 1155.45 1453.79 1159.13 1506.03C1160.84 1530.37 1143.9 1544.57 1134.22 1558.7L1133.6 1559.62C1140.15 1576.43 1147.88 1593.41 1154.08 1610.81C1159 1624.37 1164.02 1638.93 1168.87 1652.41C1172.73 1663.14 1189.86 1703.42 1187.43 1715.24C1181.28 1745.19 1161.28 1773.54 1149.44 1800.15C1146.97 1805.71 1143.32 1812.17 1141.33 1818.23C1137.56 1835.86 1142.73 1854.46 1136.08 1872.19C1128.05 1893.4 1110.26 1909.64 1093.32 1915.82C1063.31 1926.77 1031.91 1936.87 1002.98 1916.9C995 1919.61 987.375 1922.64 979.3 1925.18C966.308 1929.25 952.912 1931.71 939.979 1935.41C934.484 1936.31 912.804 1938.72 909.163 1941.86C905.249 1945.24 908.68 1987.98 892.638 2009.92C876.289 2032.27 848.678 2038.44 826.33 2038.19C808.351 2037.99 785.292 2034.53 772.318 2016.34C764.729 2005.71 763.729 1996.01 763.992 1982.11C743.548 1967.4 729.644 1938.06 714.336 1926C701.391 1915.8 668.219 1908.2 652.546 1900.51C628.203 1888.56 624.753 1892.65 622.646 1852.86C615.924 1741.48 571.687 1639.86 573.074 1526.74C573.21 1515.65 573.758 1494.38 572.417 1484.13C561.599 1483.53 545.115 1488.34 532.17 1488.44C512.256 1488.58 480.138 1493.92 463.39 1476.76C461.291 1472.77 452.364 1451.12 452.066 1447.48C450.914 1433.39 450.645 1409.6 459.475 1400.91C478.473 1382.22 498.711 1370.89 518.457 1355.57C553.299 1328.52 587.834 1301.7 624.269 1279.11C584.199 1259.53 554.484 1240.89 520.486 1205.16C509.511 1193.63 498.565 1176.18 487.309 1167.67C482.844 1164.3 461.935 1161.38 455.68 1160.53C407.588 1153.95 374.021 1139.31 335.715 1098.22C297.768 1057.52 266.705 1000.15 260.272 934.12C255.156 881.597 279.154 865.759 289.936 823.221C298.047 789.459 296.577 735.436 315.725 708.083C333.04 683.349 365.377 647.952 386.793 629.391C419.336 601.188 461.515 593.45 499.388 596.153C515.316 597.29 534.726 600.17 550.452 597.883C554.708 596.832 579.862 575.992 585.21 571.751C597.018 562.522 608.984 553.657 621.098 545.164C671.539 510.664 725.888 487.448 781.974 476.442C798.174 473.401 814.891 472.369 831.142 470.376Z M835.878 487.69C842.299 486.453 870.719 486.869 878.511 487.089C974.952 489.808 1077.1 516.291 1160.81 581.823C1181.93 598.307 1202.15 616.754 1221.33 637.026C1230.67 647.043 1239.29 659.418 1249.23 668.26C1251.75 670.498 1254.07 670.552 1256.97 669.636C1262.59 667.858 1268.07 663.555 1273.24 660.201C1284.06 653.182 1295.5 645.848 1307.35 642.579C1364.41 626.827 1422.21 635.512 1471.42 679.144C1504.97 708.885 1524.14 756.74 1529.01 809.69C1530.68 827.852 1530.54 848.501 1535.41 865.68C1541.43 886.903 1556.14 899.227 1559.37 922.849C1565.84 970.232 1529.4 1101.28 1508.57 1140.15C1504.18 1148.34 1499.49 1156.52 1493.52 1162.79C1471.08 1186.37 1430.11 1197.1 1401.9 1203.05C1371.32 1209.5 1341.37 1208.87 1315.36 1183.94C1306.62 1175.56 1299.04 1165.29 1290.3 1156.93L1289.36 1156.05C1287.43 1155.9 1282.21 1155.41 1281.02 1156.85C1268.1 1172.41 1253.63 1191.37 1240.77 1206.51C1201.69 1252.23 1156.18 1287.12 1106.88 1309.15C1095.76 1314.16 1071.77 1319.87 1064.23 1324.52C1063.7 1326.81 1064.56 1328.46 1065.92 1330.53C1097.49 1378.64 1132.25 1441.8 1141.95 1505.3C1144.81 1524 1122.82 1543.06 1115.26 1555.34C1116.55 1566.13 1122.74 1578.55 1126.45 1588.38C1132.97 1605.63 1168.11 1696.51 1169.4 1708.01C1171.23 1724.29 1142.39 1776.56 1134.34 1793.02C1130.82 1800.2 1126.21 1807.79 1124.1 1815.96C1118.94 1835.94 1127.21 1854.36 1116.23 1874.46C1100.85 1902.6 1049.63 1915.91 1025.6 1909.94C1018.47 1908.17 1010.75 1896.72 1003.65 1897.55C995.899 1898.45 987.33 1904.43 979.614 1907.02C963.676 1912.36 947.045 1915.99 930.8 1919.23C928.604 1918.9 899.182 1924.63 897.147 1926.86C882.939 1942.38 894.603 1981.04 878.696 1999.88C857.111 2025.44 808.775 2030.26 785.844 2006.32C779.619 1999.69 780.795 1982.11 780.882 1971.75C750.298 1953.56 747.388 1930.31 721.74 1910.04C709.831 1900.62 648.413 1884.33 641.657 1873.66C639.971 1865.7 639.275 1850.78 638.772 1842.06C635.911 1792.51 625.552 1747.32 614.46 1700.18C600.105 1639.17 588.579 1576.44 589.905 1511.97C590.187 1498.28 589.151 1483.76 590.564 1470.22C590.993 1466.2 592.187 1464.88 589.652 1461.56C586.785 1461.46 565.549 1466.47 560.414 1467.35C543.837 1470.11 527.158 1471.62 510.455 1471.88C485.082 1472.58 466.561 1472.98 468.09 1430.26C468.807 1410.23 477.139 1406.58 488.887 1398.31C533.578 1366.87 576.762 1331.95 621.765 1301.26C626.742 1297.87 654.313 1281.46 656.621 1278.45L656.466 1276.87C644.755 1267.7 612.563 1257.05 599.414 1246.93C591.938 1241.17 584.991 1237.95 578.11 1232.78C563.948 1222.12 549.801 1209.35 536.533 1196.73C523.413 1184.26 509.73 1162.45 496.736 1151.99C492.94 1148.93 470.483 1145.66 464.746 1144.87C415.642 1138.06 379.3 1124.88 341.519 1079.22C310.132 1041.3 280.548 989.011 277.021 930.328C275.198 900.004 283.032 883.496 294.705 858.942C296.153 854.628 301.573 845.942 302.187 841.709C303.839 830.305 307.873 819.879 309.821 808.889C315.418 777.315 314.004 740.092 331.365 714.588C341.01 700.42 354.212 688.198 364.976 675.37C411.393 621.72 450.049 607.425 511.2 614.169C521.218 615.274 550.399 619.407 558.054 614.495C577.609 601.948 598.523 583.294 618.227 569.095C687.221 519.376 757.369 492.549 835.878 487.69Z";
 
+// 复用 web/src/assets/zongzi-momo.svg 的外轮廓，以描边控制线宽
+const ZONGZI_MOMO_OUTER_PATH =
+  "M1394.82 42.4357C1400.16 41.6537 1408.66 42.0382 1414.31 42.102C1421.54 48.5148 1425.86 51.2328 1428.85 61.748C1439.15 104.165 1433.23 148.819 1434.01 192.11C1434.47 218.315 1439.16 244.924 1444.71 270.309C1488 468.332 1630.17 663.099 1552.56 875.347C1548.58 886.242 1490.73 944.159 1479.55 955.451C1484.14 966.113 1485.36 969.612 1487.34 981.304C1494.7 977.679 1505.77 971.103 1512.19 965.585C1535.96 945.155 1543.18 929.574 1574.6 929.55C1597.86 929.532 1614.14 936.931 1631.79 955.904C1640.63 965.417 1645.68 980.362 1645.46 994.289C1644.99 1023.89 1632.94 1037.15 1616.68 1056.17C1616.15 1060.66 1615.64 1064.91 1614.59 1069.29C1612.01 1080.3 1607.31 1090.47 1600.85 1098.99C1590.29 1112.95 1578.91 1118.29 1568.15 1129.57C1529.61 1169.98 1490.12 1213.05 1444.68 1242.72C1442.51 1266.8 1438.26 1275.81 1430.09 1297.35C1440.01 1316.22 1448.92 1346.94 1453.51 1368.15C1473.49 1340.07 1501.85 1313.61 1532.54 1304.68C1604.92 1283.61 1693.72 1317.42 1714.43 1409.73C1730.07 1479.77 1709.39 1565.08 1636.13 1560.27C1597.12 1557.71 1576.11 1531.95 1567.43 1488.57C1543.58 1546.04 1534.56 1612.37 1500.39 1664.55C1478.7 1697.67 1449.12 1726.91 1418.24 1747.38C1395.05 1833.96 1329.93 1882.15 1261.35 1911.5C1256.11 1947.14 1256.12 1988.94 1246.61 2023.82C1242.34 2039.5 1225.83 2057.11 1212.41 2063.41C1187.83 2074.95 1151.56 2073.62 1125.03 2071.69C1119.07 2071.65 1108.27 2066.35 1102.98 2066.72C1068.22 2069.13 1011.77 2082.8 993.46 2035.5C988.76 2023.36 990.547 2003.74 995.258 1991.21C969.555 1951.4 944.647 1917.96 932.975 1868.94C927.33 1853.72 925.941 1820.92 919.678 1807.48C901.803 1769.12 886.755 1742.91 876.263 1699.65C875.79 1695.32 874.602 1690.08 873.982 1685.58C869.492 1652.98 869.807 1619.86 869.02 1586.85C800.963 1617.51 735.726 1570.24 690.204 1512.63C671.788 1513.99 662.114 1514.16 648.611 1497.2C634.204 1479.1 631.566 1466.28 631.962 1442.13C634.471 1438.31 637.495 1434.33 640.184 1430.63C638.854 1420.21 638.77 1415.41 638.647 1404.76C616.978 1408.1 594.763 1407.53 572.988 1407.63C523.063 1407.79 461.721 1389.97 418.994 1358.19C345.027 1303.18 273.334 1238.98 188.672 1207.44C163.826 1198.18 141.447 1194.67 115.364 1195.17C91.8501 1195.62 68.4742 1204.63 51.8504 1180.21L51.9427 1160.53C81.501 1115.35 230.399 1071.92 277.368 1054.04C304.573 1043.67 330.44 1031.95 357.806 1019.33C354.062 1003.69 352.487 985.5 349.022 970.716C340.4 933.92 332.651 905.304 327.596 867.483C325.26 865.917 322.934 864.332 320.617 862.728C305.448 852.167 287.311 834.603 277.029 817.437C272.934 810.598 269.479 802.552 265.078 795.663C260.516 788.523 253.025 780.687 248.94 773.586C223.874 730.023 200.045 678.357 189.468 627.134C183.708 599.238 179.971 562.751 193.649 537.531C200.746 524.446 211.302 512.762 222.004 503.879C272.21 462.205 345.507 464.346 404.34 464.97C419.519 465.132 434.795 466.46 449.971 465.762C463.002 465.162 476.152 461.124 489.042 458.679C493.871 457.763 511.103 456.555 514.115 455.034C533.589 445.206 553.865 425.317 572.267 412.495C593.608 397.625 614.47 383.934 636.335 370.736C694.151 335.839 760.091 319.149 823.24 303.617C836.431 300.373 850.877 297.808 863.659 294.254C890.278 263.178 913.471 228.962 942.239 199.767C992.539 149.52 1057.68 106.782 1123.15 144.167C1171.73 171.914 1185.5 207.428 1217.84 252.149C1242.76 189.426 1272.57 152.204 1319.38 111.892C1331.49 101.466 1343.96 91.8208 1355.88 81.0833C1368.87 69.3764 1380.38 50.8659 1394.82 42.4357Z";
+
 const props = withDefaults(defineProps<{ lang?: "zh" | "en" }>(), { lang: "zh" });
 
 const copy = {
   zh: {
     name: "旋转吧大喵",
     nameEn: "SpinningMomo",
-    tagline: "面向《无限暖暖》的游戏摄影、录制与图库工具",
+    tagline: ["面向《无限暖暖》的", "游戏摄影、录制与图库工具"],
     cta: "快速开始",
     ctaHref: "/guide/getting-started",
     meta: (version: string) => `v${version} · Windows 10 1903+ · 64 位`,
@@ -106,7 +110,7 @@ const copy = {
   en: {
     name: "SpinningMomo",
     nameEn: "旋转吧大喵",
-    tagline: "Game photography, recording, and gallery tool for Infinity Nikki",
+    tagline: ["Game photography, recording, and gallery tool for Infinity Nikki"],
     cta: "Get Started",
     ctaHref: "/en/guide/getting-started",
     meta: (version: string) => `v${version} · Windows 10 1903+ · 64-bit`,
@@ -231,7 +235,7 @@ const resolveHref = (href: string) =>
 const ctaHref = computed(() => resolveHref(t.value.ctaHref));
 const activeHref = computed(() => resolveHref(active.value.href));
 
-/* ---------- 比例态：自由比例与旋转彩蛋 ---------- */
+/* ---------- 比例态：比例档位切换 ---------- */
 
 const ratioPresetIndex = ref(0);
 const currentRatioPreset = computed(() => ratioPresets[ratioPresetIndex.value]);
@@ -297,7 +301,7 @@ const activeGalleryCard = computed(() => galleryCards[activeGalleryIndex.value])
 const row1Cards = galleryCards.filter((c) => c.row === 1);
 const row2Cards = galleryCards.filter((c) => c.row === 2);
 
-/* ---------- 动态画框比例与旋转反馈 ---------- */
+/* ---------- 动态画框比例与交互 ---------- */
 
 const effectiveRatio = computed(() => {
   if (active.value.id === "ratio") {
@@ -309,19 +313,8 @@ const effectiveRatio = computed(() => {
   return active.value.ratio;
 });
 
-function triggerLogoSpin() {
-  if (typeof document === "undefined") return;
-  const logo = document.querySelector<HTMLElement>(".VPNavBarTitle .logo");
-  if (!logo) return;
-  logo.classList.remove("is-spinning");
-  void logo.offsetWidth;
-  logo.classList.add("is-spinning");
-  window.setTimeout(() => logo.classList.remove("is-spinning"), 660);
-}
-
 function cycleRatioPreset() {
   ratioPresetIndex.value = (ratioPresetIndex.value + 1) % ratioPresets.length;
-  triggerLogoSpin();
   restartAutoCycle();
 }
 
@@ -449,13 +442,17 @@ onBeforeUnmount(() => {
 
     <div class="hero-inner">
       <!-- 左侧主文案与入口 -->
-      <h1 class="title">{{ t.name }}</h1>
-      <p class="title-en" :lang="lang === 'zh' ? 'en' : 'zh'">{{ t.nameEn }}</p>
-      <p class="lede">{{ t.tagline }}</p>
+      <div class="hero-copy">
+        <h1 class="title">{{ t.name }}</h1>
+        <p class="title-en" :lang="lang === 'zh' ? 'en' : 'zh'">{{ t.nameEn }}</p>
+        <p class="lede">
+          <template v-for="(line, li) in t.tagline" :key="li"><br v-if="li > 0" class="lede-break" />{{ line }}</template>
+        </p>
 
-      <div class="actions">
-        <a class="btn" :href="ctaHref">{{ t.cta }}</a>
-        <p class="meta">{{ t.meta(version) }}</p>
+        <div class="actions">
+          <a class="btn" :href="ctaHref">{{ t.cta }}</a>
+          <p class="meta">{{ t.meta(version) }}</p>
+        </div>
       </div>
 
       <!-- 右侧：极简光学取景舞台 × 真实功能演示 -->
@@ -488,16 +485,24 @@ onBeforeUnmount(() => {
           }"
           @click="onFrameClick"
         >
-          <!-- 摄影 / 超清 / 录制共用：极简大喵轮廓主体 + 取景参考线 -->
+          <!-- 超清 / 比例 / 录制共用：极简大喵轮廓主体及各自的取景辅助 -->
           <template v-if="active.id !== 'gallery'">
             <div class="momo-canvas" aria-hidden="true">
               <svg
                 class="momo-svg"
-                viewBox="0 0 1508 1775"
+                :viewBox="active.id === 'record' ? '0 0 1800 2120' : '0 0 1508 1775'"
                 fill="currentColor"
                 focusable="false"
               >
-                <g transform="matrix(1.06787 0 0 1.06787 -216.778 -448.507)">
+                <path
+                  v-if="active.id === 'record'"
+                  :d="ZONGZI_MOMO_OUTER_PATH"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="22"
+                  stroke-linejoin="round"
+                />
+                <g v-else transform="matrix(1.06787 0 0 1.06787 -216.778 -448.507)">
                   <path fill-rule="evenodd" :d="MOMO_OUTLINE_PATH" />
                 </g>
               </svg>
@@ -718,19 +723,24 @@ onBeforeUnmount(() => {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
-  grid-template-areas:
-    "title   visual"
-    "en      visual"
-    "lede    visual"
-    "actions visual";
-  align-content: center;
-  align-items: start;
+  grid-template-areas: "copy visual";
+  align-items: center;
   column-gap: clamp(32px, 5.2vw, 72px);
   width: 100%;
   max-width: var(--shell);
   margin-inline: auto;
   padding-inline: var(--gutter);
   padding-block: clamp(36px, 7vh, 72px);
+}
+
+.hero-copy {
+  grid-area: copy;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  min-width: 0;
+  padding-top: 14px;
 }
 
 /* ---------- 通栏背景层：点阵 + 制图参考线 + 交点微标 + 鼠标显影 ---------- */
@@ -928,32 +938,38 @@ onBeforeUnmount(() => {
 
 .title-en {
   grid-area: en;
-  margin-top: clamp(6px, 0.9vh, 10px);
+  margin-top: clamp(4px, 0.7vh, 6px);
   font-size: clamp(2.5rem, 4.2vw, 3.35rem);
   font-weight: 600;
-  line-height: 1.12;
+  line-height: 1.1;
   letter-spacing: -0.015em;
   color: var(--ink);
 }
 
 .lede {
   grid-area: lede;
-  margin-top: clamp(16px, 2.2vh, 22px);
+  margin-top: clamp(26px, 3.8vh, 36px);
   max-width: 22em;
-  font-size: clamp(1.15rem, 1.5vw, 1.35rem);
-  line-height: 1.65;
+  font-size: clamp(1.15rem, 1.5vw, 1.2rem);
+  line-height: 1.7;
   color: var(--ink-2);
   text-wrap: balance;
 }
 
+.lede-break {
+  display: inline;
+}
+
 .actions {
   grid-area: actions;
-  margin-top: clamp(32px, 5.2vh, 52px);
+  margin-top: auto;
+  padding-top: clamp(32px, 4.5vh, 48px);
 }
 
 .meta {
-  margin-top: 14px;
+  margin-top: clamp(18px, 2.4vh, 24px);
   font-size: 12.5px;
+  line-height: 1.6;
   color: var(--ink-3);
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
@@ -1136,6 +1152,7 @@ onBeforeUnmount(() => {
 .momo-canvas {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1147,10 +1164,6 @@ onBeforeUnmount(() => {
     color 300ms var(--ease-out);
 }
 
-.mode-superres .momo-canvas {
-  padding: 16px;
-}
-
 .momo-svg {
   height: 100%;
   width: auto;
@@ -1158,29 +1171,31 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* 三分参考线 */
+/* 三分参考线只画框内两横两竖，外沿由画框本身绘制。 */
 .thirds-grid {
+  --grid-stroke: linear-gradient(var(--grid-line), var(--grid-line));
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0.7;
-  background-image:
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  background-size: 33.3333% 33.3333%;
+  background:
+    var(--grid-stroke) calc(100% / 3) 0 / 1px 100% no-repeat,
+    var(--grid-stroke) calc(200% / 3) 0 / 1px 100% no-repeat,
+    var(--grid-stroke) 0 calc(100% / 3) / 100% 1px no-repeat,
+    var(--grid-stroke) 0 calc(200% / 3) / 100% 1px no-repeat;
 }
 
-/* 超清态：物理屏幕虚线参照框 */
+/* 超清态：物理屏幕虚线参照框（退居大喵轮廓后方，标注引出至右侧空白区） */
 .screen-bounds {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  border: 1px dashed var(--stage-ref-line);
+  border: 1px dashed color-mix(in srgb, var(--brand) 34%, transparent);
   border-radius: 3px;
-  background: color-mix(in srgb, var(--bg) 36%, transparent);
+  background: color-mix(in srgb, var(--brand) 5%, transparent);
   pointer-events: none;
-  z-index: 2;
+  z-index: 0;
   transition:
     width 460ms var(--ease-out),
     height 460ms var(--ease-out);
@@ -1188,14 +1203,26 @@ onBeforeUnmount(() => {
 
 .screen-bounds-tag {
   position: absolute;
-  left: 50%;
-  top: -17px;
-  transform: translateX(-50%);
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
   font-family: var(--font-mono);
   font-size: 9.5px;
-  letter-spacing: 0.06em;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
   color: var(--ink-3);
   white-space: nowrap;
+}
+
+.screen-bounds-tag::before {
+  content: "";
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 50%;
+  width: 6px;
+  height: 1px;
+  background: color-mix(in srgb, var(--brand) 38%, transparent);
+  transform: translateY(-50%);
 }
 
 /* 取景框 HUD 元素 */
@@ -1593,8 +1620,20 @@ onBeforeUnmount(() => {
     padding-block: clamp(24px, 5vh, 40px) clamp(36px, 7vh, 56px);
   }
 
+  .hero-copy {
+    display: contents;
+  }
+
   .guide-h,
   .guide-rail {
+    display: none;
+  }
+
+  .lede {
+    max-width: none;
+  }
+
+  .lede-break {
     display: none;
   }
 
@@ -1610,6 +1649,7 @@ onBeforeUnmount(() => {
 
   .actions {
     margin-top: clamp(28px, 5vh, 42px);
+    padding-top: 0;
   }
 
   .actions .btn {
@@ -1622,6 +1662,20 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 520px) {
+  .screen-bounds-tag {
+    left: calc(100% + 7px);
+    font-size: 8.5px;
+    letter-spacing: 0.03em;
+    white-space: normal;
+    width: max-content;
+    max-width: 52px;
+  }
+
+  .screen-bounds-tag::before {
+    right: calc(100% + 2px);
+    width: 4px;
+  }
+
   .g-body {
     grid-template-columns: minmax(0, 1fr) 38%;
   }
