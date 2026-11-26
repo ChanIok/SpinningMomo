@@ -4,6 +4,7 @@ import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from '../constants'
 import { isGalleryTouchInput, normalizeGalleryInputType } from '../input'
 import type { Asset, LightboxState } from '../types'
 import { waitForLightboxImageReady, waitForLightboxPaint } from './useLightboxImageLoading'
+import { computeLightboxFitScale } from './lightboxFit'
 
 const ZOOM_STEP = 1.1
 // 缩放吸附容差：实际缩放比例接近 fitScale 的 1.02 倍以内时，自动吸附回适合模式。
@@ -151,21 +152,14 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
     isQuarterTurn.value ? imageWidth.value : imageHeight.value
   )
 
-  const fitScale = computed(() => {
-    if (
-      !hasImageDimensions.value ||
-      viewportInnerWidth.value <= 0 ||
-      viewportInnerHeight.value <= 0
-    ) {
-      return 1
-    }
-
-    return Math.min(
-      viewportInnerWidth.value / visualImageWidth.value,
-      viewportInnerHeight.value / visualImageHeight.value,
-      1
+  const fitScale = computed(() =>
+    computeLightboxFitScale(
+      viewportInnerWidth.value,
+      viewportInnerHeight.value,
+      visualImageWidth.value,
+      visualImageHeight.value
     )
-  })
+  )
 
   const displayScale = computed(() => {
     if (fitMode.value === 'contain') {
@@ -1364,6 +1358,8 @@ export function useLightboxImageViewport(options: UseLightboxImageViewportOption
   return {
     restoreThumbnailActive,
     restoreContentHidden,
+    viewportWidth: width,
+    viewportHeight: height,
     fitScale,
     isPannable,
     canvasStyle,

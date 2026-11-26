@@ -2,6 +2,7 @@
 import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGalleryLightbox, useLightboxImageViewport } from '../../composables'
+import { getLightboxFitImageStyle } from '../../composables/lightboxFit'
 import {
   shouldUseLightboxTiling,
   waitForLightboxImageReady,
@@ -98,6 +99,8 @@ const tiledCanvasVisible = computed(
 const {
   restoreThumbnailActive,
   restoreContentHidden,
+  viewportWidth,
+  viewportHeight,
   fitScale,
   isPannable,
   canvasStyle,
@@ -156,6 +159,16 @@ watch(
   },
   { immediate: true }
 )
+
+const pendingImageStyle = computed(() => {
+  const asset = pendingDisplayRequest.value?.asset
+  return getLightboxFitImageStyle(
+    viewportWidth.value,
+    viewportHeight.value,
+    asset?.width ?? 0,
+    asset?.height ?? 0
+  )
+})
 
 const zoomIndicator = computed(() => {
   if (fitMode.value === 'contain') {
@@ -650,17 +663,22 @@ defineExpose({
       }"
     />
 
-    <!-- 解码完成后独占画面；目标 stage 稳定后再移除，隐藏期间保留节点供 decode 使用。 -->
-    <img
+    <!-- 解码完成后独占画面；尺寸与正式 stage 共用适屏规则，目标稳定后再移除。 -->
+    <div
       v-if="pendingDisplayRequest && pendingVisualUrl"
-      ref="pendingImageRef"
-      :src="pendingVisualUrl"
-      :alt="pendingDisplayRequest.asset.name"
-      class="pointer-events-none absolute inset-0 z-20 h-full w-full object-contain select-none"
+      class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-hidden"
       :style="{ visibility: pendingPreviewVisible ? 'visible' : 'hidden' }"
-      draggable="false"
-      @dragstart.prevent
-    />
+    >
+      <img
+        ref="pendingImageRef"
+        :src="pendingVisualUrl"
+        :alt="pendingDisplayRequest.asset.name"
+        class="max-w-none shrink-0 select-none"
+        :style="pendingImageStyle"
+        draggable="false"
+        @dragstart.prevent
+      />
+    </div>
 
     <!-- 双击缩放统一使用缩略图代理；保持缩略图自身尺寸，避免把 8K 图片盒子作为动画图层。 -->
     <img

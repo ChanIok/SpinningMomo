@@ -6,6 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
+import { computeLightboxFitScale } from '../../composables/lightboxFit'
 import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
 
@@ -92,21 +93,14 @@ const mediaWidth = computed(() => currentAsset.value?.width || 0)
 const mediaHeight = computed(() => currentAsset.value?.height || 0)
 const hasMediaDimensions = computed(() => mediaWidth.value > 0 && mediaHeight.value > 0)
 
-const fitScale = computed(() => {
-  if (
-    !hasMediaDimensions.value ||
-    viewportInnerWidth.value <= 0 ||
-    viewportInnerHeight.value <= 0
-  ) {
-    return 1
-  }
-
-  return Math.min(
-    viewportInnerWidth.value / mediaWidth.value,
-    viewportInnerHeight.value / mediaHeight.value,
-    1
+const fitScale = computed(() =>
+  computeLightboxFitScale(
+    viewportInnerWidth.value,
+    viewportInnerHeight.value,
+    mediaWidth.value,
+    mediaHeight.value
   )
-})
+)
 
 const renderWidth = computed(() => {
   if (!hasMediaDimensions.value) {

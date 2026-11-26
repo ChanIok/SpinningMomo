@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { shouldDisableMotion } from '@/features/settings/motion'
+import { computeLightboxFitScale } from './lightboxFit'
 
 // PC 暗房根节点使用 px-[1px]；紧凑模式不保留这层边距。真实媒体 viewport 已经是内容盒，不应重复扣除。
 export const LIGHTBOX_VIEWPORT_PADDING = 1
@@ -46,7 +47,7 @@ export function computeLightboxHeroRect(
   const contentHeight = Math.max(containerRect.height - viewportPadding * 2, 1)
   const imageWidth = Math.max(width, 1)
   const imageHeight = Math.max(height, 1)
-  const scale = Math.min(contentWidth / imageWidth, contentHeight / imageHeight, 1)
+  const scale = computeLightboxFitScale(contentWidth, contentHeight, imageWidth, imageHeight)
   const targetWidth = imageWidth * scale
   const targetHeight = imageHeight * scale
   const targetX = containerRect.left + (containerRect.width - targetWidth) / 2

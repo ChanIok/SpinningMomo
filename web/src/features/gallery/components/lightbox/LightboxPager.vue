@@ -10,6 +10,8 @@ import {
   useLightboxImageLoading,
   type LightboxImageRequest,
 } from '../../composables/useLightboxImageLoading'
+import { getLightboxFitImageStyle } from '../../composables/lightboxFit'
+import type { Asset } from '../../types'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'
 
@@ -251,6 +253,17 @@ function handlePagerClickCapture(event: MouseEvent) {
   }
 }
 
+// 相邻预览页与正式图片/视频视图共用同一套适屏尺寸规则，避免切图交接时尺寸跳变。
+function getSwipePreviewImageStyle(asset: Asset) {
+  return getLightboxFitImageStyle(
+    width.value,
+    height.value,
+    asset.width ?? 0,
+    asset.height ?? 0,
+    asset.type === 'video' ? 'contain' : 'fill'
+  )
+}
+
 // 对外保持原有灯箱工具栏的缩放接口，实际调用转发给图片渲染器。
 defineExpose({
   showFitMode: async () => {
@@ -283,7 +296,7 @@ defineExpose({
     <div
       v-for="page in swipePreviewPages"
       :key="page.asset.id"
-      class="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-transparent"
+      class="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden bg-transparent"
       :style="page.style"
     >
       <img
@@ -292,7 +305,8 @@ defineExpose({
           galleryApi.getThumbnailUrl(page.asset.hash)
         "
         :alt="page.asset.name"
-        class="h-full w-full object-contain select-none"
+        class="max-w-none shrink-0 select-none"
+        :style="getSwipePreviewImageStyle(page.asset)"
         draggable="false"
       />
     </div>
