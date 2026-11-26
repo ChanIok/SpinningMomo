@@ -399,7 +399,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-full w-full" :class="isCompactWindow ? 'p-0' : 'p-1 pt-0'">
+  <div
+    data-gallery-keyboard-scope="gallery"
+    class="h-full w-full"
+    :class="isCompactWindow ? 'p-0' : 'p-1 pt-0'"
+  >
     <div class="relative h-full w-full overflow-hidden" :class="[!isCompactWindow && 'rounded-sm']">
       <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
       <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />

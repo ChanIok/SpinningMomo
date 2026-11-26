@@ -3,20 +3,81 @@ import { useEventListener } from '@vueuse/core'
 import { useGalleryStore } from '../store'
 import { useGalleryOverlayHistory } from './useGalleryOverlayHistory'
 
-type GalleryKeyboardScope = 'gallery' | 'lightbox'
-type CanHandleShortcut = (event: KeyboardEvent, scope: GalleryKeyboardScope) => boolean
+export type GalleryKeyboardScope = 'gallery' | 'lightbox' | 'details'
 
-const keyboardContextKey: InjectionKey<CanHandleShortcut> = Symbol('galleryKeyboardContext')
+export interface GalleryKeyboardContext {
+  canHandleShortcut: (event: KeyboardEvent, scope: GalleryKeyboardScope) => boolean
+  hasActiveOverlay: (target?: EventTarget | null) => boolean
+  setActiveScope: (scope: GalleryKeyboardScope | null) => void
+}
+
+const keyboardContextKey: InjectionKey<GalleryKeyboardContext> = Symbol('galleryKeyboardContext')
+
 const OVERLAY_SELECTOR =
   '[role="menu"], [role="dialog"], [role="alertdialog"], [data-slot="popover-content"], ' +
-  '[data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]'
+  '[data-slot="dropdown-menu-content"], [data-slot="context-menu-content"], ' +
+  '[data-slot="context-menu-sub-content"], [data-slot="dialog-overlay"], ' +
+  '[data-slot="alert-dialog-overlay"]'
 
-/** 快捷键归属独立于图片选区和 DOM 焦点，菜单、弹窗不会覆盖原来的操作区域。 */
+const OPEN_OVERLAY_SELECTOR =
+  '[data-slot="popover-content"][data-state="open"], ' +
+  '[data-slot="dropdown-menu-content"][data-state="open"], ' +
+  '[data-slot="context-menu-content"][data-state="open"], ' +
+  '[data-slot="context-menu-sub-content"][data-state="open"], ' +
+  '[data-slot="dialog-content"][data-state="open"], ' +
+  '[data-slot="alert-dialog-content"][data-state="open"]'
+
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+export function isSelectAllShortcut(event: KeyboardEvent): boolean {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'a'
+  )
+}
+
+function parseKeyboardScope(value: string | null | undefined): GalleryKeyboardScope | null {
+  if (value === 'gallery' || value === 'lightbox' || value === 'details') {
+    return value
+  }
+  return null
+}
+
+/** 快捷键归属按语义区域追踪，弹层交互不会覆盖原有操作区域。 */
 export function provideGalleryKeyboardContext() {
   const store = useGalleryStore()
   const overlayHistory = useGalleryOverlayHistory()
-  const activeScope = ref<GalleryKeyboardScope | null>(store.lightbox.isOpen ? 'lightbox' : null)
+  const activeScope = ref<GalleryKeyboardScope | null>(
+    store.lightbox.isOpen ? 'lightbox' : 'gallery'
+  )
   let isTabNavigation = false
+
+  function hasActiveOverlay(target?: EventTarget | null): boolean {
+    if (target instanceof Element && target.closest(OVERLAY_SELECTOR)) {
+      return true
+    }
+
+    const overlay = overlayHistory.snapshot.value.overlay
+    if (
+      store.contextMenu.isOpen ||
+      store.moveToFolderDialogOpen ||
+      store.deleteAssetsDialog.open ||
+      store.preferencesDialogOpen ||
+      (overlay !== null && overlay !== 'selection' && overlay !== 'lightbox')
+    ) {
+      return true
+    }
+
+    return Boolean(document.querySelector(OPEN_OVERLAY_SELECTOR))
+  }
 
   function trackInteraction(event: PointerEvent | FocusEvent) {
     const target = event.target
@@ -33,7 +94,7 @@ export function provideGalleryKeyboardContext() {
     const scope = target
       .closest('[data-gallery-keyboard-scope]')
       ?.getAttribute('data-gallery-keyboard-scope')
-    activeScope.value = scope === 'gallery' || scope === 'lightbox' ? scope : null
+    activeScope.value = parseKeyboardScope(scope)
   }
 
   useEventListener(window, 'pointerdown', trackInteraction, { capture: true })
@@ -49,10 +110,10 @@ export function provideGalleryKeyboardContext() {
 
   // 打开、退出暗房和详情抽屉时切换操作区域，不主动改变浏览器焦点。
   watch(
-    (): GalleryKeyboardScope | null =>
+    (): GalleryKeyboardScope =>
       store.lightbox.isOpen
         ? overlayHistory.snapshot.value.overlay === 'lightbox-details'
-          ? null
+          ? 'details'
           : 'lightbox'
         : 'gallery',
     (scope) => {
@@ -60,34 +121,35 @@ export function provideGalleryKeyboardContext() {
     }
   )
 
-  provide(keyboardContextKey, (event, scope) => {
-    const overlay = overlayHistory.snapshot.value.overlay
-    if (
-      activeScope.value !== scope ||
-      event.defaultPrevented ||
-      event.isComposing ||
-      event.altKey ||
-      store.contextMenu.isOpen ||
-      store.moveToFolderDialogOpen ||
-      store.deleteAssetsDialog.open ||
-      store.preferencesDialogOpen ||
-      (overlay !== null && overlay !== 'selection' && overlay !== 'lightbox') ||
-      (event.target instanceof Element && event.target.closest(OVERLAY_SELECTOR))
-    )
-      return false
+  provide(keyboardContextKey, {
+    hasActiveOverlay,
+    setActiveScope(scope) {
+      activeScope.value = scope
+    },
+    canHandleShortcut(event, scope) {
+      if (
+        activeScope.value !== scope ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        hasActiveOverlay(event.target)
+      ) {
+        return false
+      }
 
-    // 普通复制始终尊重原生文字选区，包括焦点仍留在旧控件上的情况。
-    return !(
-      (event.ctrlKey || event.metaKey) &&
-      !event.shiftKey &&
-      event.key.toLowerCase() === 'c' &&
-      window.getSelection()?.toString()
-    )
+      // 普通复制始终尊重原生文字选区，包括焦点仍留在旧控件上的情况。
+      return !(
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'c' &&
+        window.getSelection()?.toString()
+      )
+    },
   })
 }
 
-export function useGalleryKeyboardContext(): CanHandleShortcut {
-  const canHandle = inject(keyboardContextKey)
-  if (!canHandle) throw new Error('Gallery keyboard context must be provided by GalleryPage')
-  return canHandle
+export function useGalleryKeyboardContext(): GalleryKeyboardContext {
+  const context = inject(keyboardContextKey)
+  if (!context) throw new Error('Gallery keyboard context must be provided by GalleryPage')
+  return context
 }

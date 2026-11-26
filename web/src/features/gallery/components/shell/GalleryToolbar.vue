@@ -46,6 +46,7 @@ import { useSettingsStore } from '@/features/settings/store'
 import { pushWithViewTransition } from '@/router/viewTransition'
 import { GALLERY_TOOLBAR_COMPACT_BREAKPOINT } from '../../constants'
 import { useGalleryFilterControls, useGalleryViewControls } from '../../composables'
+import { isEditableTarget } from '../../composables/useGalleryKeyboardContext'
 
 const emit = defineEmits<{
   'open-preferences': []
@@ -157,14 +158,6 @@ function handleFilterWheel(event: WheelEvent) {
   }
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-}
-
 function handleToolbarContextMenu(event: MouseEvent) {
   if (isEditableTarget(event.target)) {
     return
@@ -175,7 +168,7 @@ function handleToolbarContextMenu(event: MouseEvent) {
 </script>
 
 <template>
-  <div ref="toolbarRef" class="flex flex-col" @contextmenu="handleToolbarContextMenu">
+  <div ref="toolbarRef" class="flex flex-col select-none" @contextmenu="handleToolbarContextMenu">
     <div class="flex min-h-10 items-center justify-between gap-3 px-2 pt-1.5">
       <div class="flex min-w-0 items-center gap-2">
         <div

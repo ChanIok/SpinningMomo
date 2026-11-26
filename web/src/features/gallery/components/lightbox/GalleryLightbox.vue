@@ -7,7 +7,11 @@ import {
   provideLightboxImageLoading,
   type LightboxImageRequest,
 } from '../../composables/useLightboxImageLoading'
-import { useGalleryKeyboardContext } from '../../composables/useGalleryKeyboardContext'
+import {
+  isEditableTarget,
+  isSelectAllShortcut,
+  useGalleryKeyboardContext,
+} from '../../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -81,7 +85,7 @@ const firstFrameReady = ref(false)
 
 const store = useGalleryStore()
 const animationsEnabled = useAnimationsEnabled()
-const canHandleShortcut = useGalleryKeyboardContext()
+const keyboardContext = useGalleryKeyboardContext()
 const imageLoading = provideLightboxImageLoading()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
@@ -252,14 +256,6 @@ const throttledZoomOut = useThrottleFn(() => {
     void lightboxPagerRef.value?.zoomOut()
   }
 }, 60)
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-}
 
 function enterImmersive() {
   if (isImmersive.value) {
@@ -812,9 +808,15 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  // 暗房打开期间阻止非输入态 Ctrl+A 选中背后的网页文字。
+  if (isSelectAllShortcut(event)) {
+    event.preventDefault()
+    return
+  }
+
   if (!firstFrameReady.value) return
 
-  if (!canHandleShortcut(event, 'lightbox')) return
+  if (!keyboardContext.canHandleShortcut(event, 'lightbox')) return
 
   if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
     const key = event.key.toLowerCase()

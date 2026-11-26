@@ -19,7 +19,11 @@ import {
   useVisibleAssetTags,
 } from '../../composables'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
-import { useGalleryKeyboardContext } from '../../composables/useGalleryKeyboardContext'
+import {
+  isEditableTarget,
+  isSelectAllShortcut,
+  useGalleryKeyboardContext,
+} from '../../composables/useGalleryKeyboardContext'
 import {
   isGalleryLightboxOverlay,
   useGalleryOverlayHistory,
@@ -42,7 +46,7 @@ import GalleryMobileActionBar from '../mobile/GalleryMobileActionBar.vue'
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const animationsEnabled = useAnimationsEnabled()
-const canHandleShortcut = useGalleryKeyboardContext()
+const keyboardContext = useGalleryKeyboardContext()
 const overlayHistory = useGalleryOverlayHistory()
 const assetActions = useGalleryAssetActions()
 const folderActions = useGalleryFolderActions()
@@ -347,36 +351,6 @@ function toggleSelectedAssetsRejected() {
   void assetActions.setSelectedAssetsRejected()
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-}
-
-function isEscapeHandledByOverlay(target: EventTarget | null): boolean {
-  if (target instanceof Element) {
-    const overlayElement = target.closest(
-      '[role="dialog"], [role="alertdialog"], [role="menu"], ' +
-        '[data-slot="popover-content"], [data-slot="dropdown-menu-content"], ' +
-        '[data-slot="context-menu-content"], [data-slot="context-menu-sub-content"]'
-    )
-    if (overlayElement) {
-      return true
-    }
-  }
-
-  const overlay = overlayHistory.snapshot.value.overlay
-  return (
-    store.contextMenu.isOpen ||
-    store.moveToFolderDialogOpen ||
-    store.preferencesDialogOpen ||
-    store.deleteAssetsDialog.open ||
-    (overlay !== null && overlay !== 'selection')
-  )
-}
-
 function handleKeydown(event: KeyboardEvent) {
   if (
     store.lightbox.isOpen ||
@@ -394,7 +368,7 @@ function handleKeydown(event: KeyboardEvent) {
     !event.shiftKey &&
     !event.altKey
   ) {
-    if (event.defaultPrevented || isEscapeHandledByOverlay(event.target)) {
+    if (keyboardContext.hasActiveOverlay(event.target)) {
       return
     }
 
@@ -411,19 +385,33 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  // 非输入态下 Ctrl+A 始终阻止整页文字全选；无阻塞弹层时全选缩略图并将操作区切回图库。
+  if (isSelectAllShortcut(event)) {
+    event.preventDefault()
+    if (keyboardContext.hasActiveOverlay(event.target)) {
+      return
+    }
+    window.getSelection()?.removeAllRanges()
+    keyboardContext.setActiveScope('gallery')
+    void gallerySelection.selectAllCurrentQuery()
+    return
+  }
+
   // 文件夹粘贴与 Escape 保留页面级语义，其余图片快捷键属于当前操作区域。
   if (
     (event.ctrlKey || event.metaKey) &&
     !event.shiftKey &&
+    !event.altKey &&
     isLocalAccess() &&
-    event.key.toLowerCase() === 'v'
+    event.key.toLowerCase() === 'v' &&
+    !keyboardContext.hasActiveOverlay(event.target)
   ) {
     event.preventDefault()
     void folderActions.pasteClipboardToSelectedFolder()
     return
   }
 
-  if (!canHandleShortcut(event, 'gallery')) return
+  if (!keyboardContext.canHandleShortcut(event, 'gallery')) return
 
   if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
     const key = event.key.toLowerCase()
@@ -449,12 +437,6 @@ function handleKeydown(event: KeyboardEvent) {
   ) {
     event.preventDefault()
     void assetActions.handleCopyAssetsToClipboard()
-    return
-  }
-
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
-    event.preventDefault()
-    void gallerySelection.selectAllCurrentQuery()
     return
   }
 
@@ -720,7 +702,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
         />
         <div
           v-else
-          class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2"
+          class="flex min-h-10 shrink-0 items-center justify-between border-b border-border/60 px-2 select-none"
         >
           <Button
             variant="ghost"
@@ -744,7 +726,6 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       </template>
       <div
         ref="contentRef"
-        data-gallery-keyboard-scope="gallery"
         class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
         :class="store.isCompactWindow && 'gallery-compact-touch-surface'"
         :style="galleryViewportStyle"

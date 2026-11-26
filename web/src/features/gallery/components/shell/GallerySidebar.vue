@@ -485,7 +485,7 @@ onMounted(() => {
 
 <template>
   <div
-    class="flex h-full flex-col"
+    class="flex h-full flex-col select-none"
     @dragover="handleSidebarDragOver"
     @drop="handleSidebarDrop"
     @contextmenu="handleSidebarContextMenu"

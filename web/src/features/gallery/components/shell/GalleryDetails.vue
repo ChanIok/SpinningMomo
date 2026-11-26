@@ -718,7 +718,11 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
 <template>
   <!-- 空状态：无选中内容时全高居中展示，不被滚动容器包裹 -->
-  <div v-if="!hasDetails" class="flex h-full w-full items-center justify-center p-4">
+  <div
+    v-if="!hasDetails"
+    data-gallery-keyboard-scope="details"
+    class="flex h-full w-full items-center justify-center p-4"
+  >
     <div class="text-center text-muted-foreground">
       <Images class="mx-auto mb-4 size-12 stroke-[1.5] opacity-50" />
       <p class="text-sm">{{ t('gallery.details.empty') }}</p>
@@ -726,7 +730,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
   </div>
 
   <!-- 详情内容：有选中项时启用 ScrollArea 进行正常纵向滚动 -->
-  <ScrollArea v-else class="h-full">
+  <ScrollArea v-else data-gallery-keyboard-scope="details" class="h-full">
     <div class="p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
