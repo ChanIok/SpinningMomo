@@ -131,11 +131,6 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
     activeClass: 'bg-sidebar-accent font-medium text-primary shadow-xs',
   },
   {
-    value: 'picked',
-    label: t('gallery.toolbar.filter.flag.picked'),
-    activeClass: 'bg-amber-500/15 font-medium text-amber-500 dark:text-amber-400 shadow-xs',
-  },
-  {
     value: 'rejected',
     label: t('gallery.toolbar.filter.flag.rejected'),
     activeClass: 'bg-rose-500/15 font-medium text-rose-500 dark:text-rose-400 shadow-xs',
@@ -235,13 +230,13 @@ const reviewFlagOptions = computed<ReviewFlagOption[]>(() => [
           </div>
         </div>
 
-        <!-- 标记状态（4 联分段控制器） -->
+        <!-- 标记状态（3 联分段控制器） -->
         <div class="space-y-2">
           <label class="text-sm font-medium text-foreground">
             {{ t('gallery.toolbar.filters.reviewFlag') }}
           </label>
           <div
-            class="grid grid-cols-4 gap-1 rounded-lg border border-border/30 bg-sidebar-hover/50 p-1"
+            class="grid grid-cols-3 gap-1 rounded-lg border border-border/30 bg-sidebar-hover/50 p-1"
           >
             <button
               v-for="opt in reviewFlagOptions"

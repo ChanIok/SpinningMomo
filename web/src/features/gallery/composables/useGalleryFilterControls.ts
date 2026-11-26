@@ -145,7 +145,6 @@ export function useGalleryFilterControls() {
 
   function getReviewFlagLabel(reviewFlag?: ReviewFlag): string {
     if (reviewFlag === 'none') return t('gallery.toolbar.filter.flag.none')
-    if (reviewFlag === 'picked') return t('gallery.toolbar.filter.flag.picked')
     if (reviewFlag === 'rejected') return t('gallery.toolbar.filter.flag.rejected')
     return t('gallery.toolbar.filters.reviewFlag')
   }
