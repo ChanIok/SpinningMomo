@@ -35,6 +35,16 @@ When enabled, records as HEVC HDR10 video, which requires GPU hardware encoding 
 - **Codec Limits**: With GPU hardware encoding, H.264 tops out at roughly 4096 (a limit shared by NVIDIA, AMD, and Intel hardware encoders). For anything above 4K, switch to **H.265** (upper limit around 8192).
 :::
 
+## Cloud PCs & Internet Cafes
+
+On certain cloud PCs or diskless systems, if recording shows an **Encoder overloaded** warning or hardware encoding fails, press `Win + X`, select **Terminal (Admin)**, run the command below, and restart SpinningMomo:
+
+```powershell
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control' -Name 'PortableOperatingSystem' -Value 0 -Type DWord
+```
+
+This clears the portable OS flag so Windows does not block GPU hardware encoders.
+
 ## Compared to Other Recorders
 
 **Lower overhead**: Capture and encoding run on native Windows pipelines and prefer GPU hardware encoding, with no scene compositing or streaming, so VRAM and system usage stay below general-purpose screen recorders.
